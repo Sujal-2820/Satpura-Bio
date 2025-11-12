@@ -11,8 +11,8 @@ export function MenuList({ items = [], active }) {
             className={cn(
               'flex w-full items-center gap-3 rounded-2xl border border-transparent px-4 py-3 text-left text-sm font-medium transition',
               active === item.id
-                ? 'border-brand bg-brand-soft/80 text-brand shadow-card'
-                : 'bg-surface text-muted-foreground hover:border-brand/40 hover:text-brand',
+                ? 'border-muted/50 bg-[#f3f4f2] text-surface-foreground shadow-sm'
+                : 'bg-white text-muted-foreground hover:border-brand/40 hover:text-brand',
             )}
           >
             <span className="flex h-8 w-8 flex-none items-center justify-center rounded-xl bg-white/80 text-brand">

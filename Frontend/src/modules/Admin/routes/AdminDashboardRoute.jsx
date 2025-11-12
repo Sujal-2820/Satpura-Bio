@@ -1,17 +1,17 @@
 import { useMemo, useState } from 'react'
-import { AdminProvider } from './context/AdminContext'
-import { AdminLayout } from './components/AdminLayout'
-import { Sidebar } from './components/Sidebar'
-import { DashboardPage } from './pages/Dashboard'
-import { ProductsPage } from './pages/Products'
-import { VendorsPage } from './pages/Vendors'
-import { SellersPage } from './pages/Sellers'
-import { UsersPage } from './pages/Users'
-import { OrdersPage } from './pages/Orders'
-import { FinancePage } from './pages/Finance'
-import { AnalyticsPage } from './pages/Analytics'
+import { AdminProvider } from '../context/AdminContext'
+import { AdminLayout } from '../components/AdminLayout'
+import { Sidebar } from '../components/Sidebar'
+import { DashboardPage } from '../pages/Dashboard'
+import { ProductsPage } from '../pages/Products'
+import { VendorsPage } from '../pages/Vendors'
+import { SellersPage } from '../pages/Sellers'
+import { UsersPage } from '../pages/Users'
+import { OrdersPage } from '../pages/Orders'
+import { FinancePage } from '../pages/Finance'
+import { AnalyticsPage } from '../pages/Analytics'
 
-const routes = [
+const routeConfig = [
   { id: 'dashboard', element: DashboardPage },
   { id: 'products', element: ProductsPage },
   { id: 'vendors', element: VendorsPage },
@@ -22,11 +22,11 @@ const routes = [
   { id: 'analytics', element: AnalyticsPage },
 ]
 
-export function AdminApp({ onExit }) {
+export function AdminDashboardRoute({ onExit }) {
   const [activeRoute, setActiveRoute] = useState('dashboard')
 
   const ActivePage = useMemo(() => {
-    const match = routes.find((route) => route.id === activeRoute)
+    const match = routeConfig.find((route) => route.id === activeRoute)
     return match?.element ?? DashboardPage
   }, [activeRoute])
 
@@ -41,6 +41,4 @@ export function AdminApp({ onExit }) {
     </AdminProvider>
   )
 }
-
-export default AdminApp
 

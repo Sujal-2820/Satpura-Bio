@@ -6,19 +6,19 @@ export function BottomNavItem({ label, icon, active, onClick }) {
       type="button"
       onClick={onClick}
       className={cn(
-        'flex flex-1 flex-col items-center gap-1 rounded-2xl px-2 py-1 text-xs font-medium transition-colors',
-        active ? 'text-brand' : 'text-muted-foreground',
+        'flex flex-1 items-center justify-center rounded-2xl px-0 py-1 transition-colors',
+        active ? 'text-white' : 'text-muted-foreground',
       )}
+      aria-label={label}
     >
       <span
         className={cn(
-          'flex h-10 w-10 items-center justify-center rounded-full transition-all',
-          active ? 'bg-brand-soft shadow-card text-brand' : 'bg-surface text-muted-foreground',
+          'flex h-11 w-11 items-center justify-center rounded-full transition-all',
+          active ? 'bg-[#1f8a5b] text-white shadow-card' : 'bg-[#e7e9e5] text-muted-foreground',
         )}
       >
         {icon}
       </span>
-      <span className={cn('text-[11px]', active ? 'font-semibold text-brand' : 'text-muted-foreground')}>{label}</span>
     </button>
   )
 }
