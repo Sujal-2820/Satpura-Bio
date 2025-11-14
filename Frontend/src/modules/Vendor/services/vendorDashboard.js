@@ -64,6 +64,7 @@ export const vendorSnapshot = {
     { label: 'Orders this week', value: '84', meta: '+12% growth' },
     { label: 'Revenue this month', value: '₹18.6L', meta: 'Processing ₹4.2L' },
     { label: 'Credit purchases', value: '₹9.4L', meta: 'Across 3 requisitions' },
+    { label: 'Customer satisfaction', value: '4.7/5', meta: 'Based on 156 reviews' },
   ],
 }
 

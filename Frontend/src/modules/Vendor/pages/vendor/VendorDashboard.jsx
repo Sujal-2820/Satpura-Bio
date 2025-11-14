@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVendorDispatch, useVendorState } from '../../context/VendorContext'
 import { MobileShell } from '../../components/MobileShell'
 import { BottomNavItem } from '../../components/BottomNavItem'
@@ -17,6 +17,9 @@ import {
 } from '../../components/icons'
 import { vendorSnapshot } from '../../services/vendorDashboard'
 import { cn } from '../../../../lib/cn'
+import { useButtonAction } from '../../hooks/useButtonAction'
+import { ButtonActionPanel } from '../../components/ButtonActionPanel'
+import { useToast, ToastContainer } from '../../components/ToastNotification'
 
 const NAV_ITEMS = [
   {
@@ -55,6 +58,127 @@ export function VendorDashboard({ onLogout }) {
   const { profile } = useVendorState()
   const dispatch = useVendorDispatch()
   const [activeTab, setActiveTab] = useState('overview')
+  const welcomeName = (profile?.name || vendorSnapshot.welcome.name || 'Partner').split(' ')[0]
+  const { isOpen, isMounted, currentAction, openPanel, closePanel } = useButtonAction()
+  const { toasts, dismissToast, success, error, info, warning } = useToast()
+  const tabLabels = useMemo(() => {
+    return NAV_ITEMS.reduce((acc, item) => {
+      acc[item.id] = item.label
+      return acc
+    }, {})
+  }, [])
+  const searchCatalog = useMemo(
+    () =>
+      [
+        {
+          id: 'search-overview-hero',
+          label: 'Morning brief & wallet balance',
+          keywords: ['overview', 'brief', 'wallet', 'balance', 'welcome'],
+          tab: 'overview',
+          targetId: 'overview-hero',
+        },
+        {
+          id: 'search-overview-services',
+          label: 'Other services shortcuts',
+          keywords: ['overview', 'services', 'reorder', 'support', 'pricing'],
+          tab: 'overview',
+          targetId: 'overview-services',
+        },
+        {
+          id: 'search-overview-activity',
+          label: 'Recent activity timeline',
+          keywords: ['overview', 'activity', 'transactions', 'updates'],
+          tab: 'overview',
+          targetId: 'overview-activity',
+        },
+        {
+          id: 'search-overview-snapshot',
+          label: 'Snapshot KPIs',
+          keywords: ['overview', 'snapshot', 'kpi', 'metrics', 'highlights'],
+          tab: 'overview',
+          targetId: 'overview-snapshot',
+        },
+        {
+          id: 'search-overview-quick-actions',
+          label: 'Quick actions',
+          keywords: ['overview', 'actions', 'tasks', 'shortcuts'],
+          tab: 'overview',
+          targetId: 'overview-quick-actions',
+        },
+        {
+          id: 'search-inventory-header',
+          label: 'Inventory status',
+          keywords: ['inventory', 'stock', 'skus', 'health'],
+          tab: 'inventory',
+          targetId: 'inventory-header',
+        },
+        {
+          id: 'search-inventory-restock',
+          label: 'Restock advisory',
+          keywords: ['inventory', 'restock', 'advisory', 'credit'],
+          tab: 'inventory',
+          targetId: 'inventory-restock',
+        },
+        {
+          id: 'search-orders-header',
+          label: 'Orders workflow',
+          keywords: ['orders', 'workflow', 'queue', 'availability'],
+          tab: 'orders',
+          targetId: 'orders-header',
+        },
+        {
+          id: 'search-orders-tracker',
+          label: 'Order status tracker',
+          keywords: ['orders', 'tracker', 'stages', 'processing'],
+          tab: 'orders',
+          targetId: 'orders-tracker',
+        },
+        {
+          id: 'search-orders-fallback',
+          label: 'Fallback logistics',
+          keywords: ['orders', 'fallback', 'logistics', 'escalate'],
+          tab: 'orders',
+          targetId: 'orders-fallback',
+        },
+        {
+          id: 'search-credit-summary',
+          label: 'Credit summary & usage',
+          keywords: ['credit', 'limit', 'usage', 'penalty'],
+          tab: 'credit',
+          targetId: 'credit-summary',
+        },
+        {
+          id: 'search-credit-penalty',
+          label: 'Penalty timeline',
+          keywords: ['credit', 'penalty', 'timeline', 'repayment'],
+          tab: 'credit',
+          targetId: 'credit-penalty',
+        },
+        {
+          id: 'search-reports-overview',
+          label: 'Reports overview',
+          keywords: ['reports', 'insights', 'analytics'],
+          tab: 'reports',
+          targetId: 'reports-overview',
+        },
+        {
+          id: 'search-reports-top-vendors',
+          label: 'Top vendor leaderboard',
+          keywords: ['reports', 'vendors', 'leaderboard', 'performance'],
+          tab: 'reports',
+          targetId: 'reports-top-vendors',
+        },
+      ].map((item) => ({
+        ...item,
+        tabLabel: tabLabels[item.tab],
+      })),
+    [tabLabels],
+  )
+  const [searchMounted, setSearchMounted] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [pendingScroll, setPendingScroll] = useState(null)
+  const searchInputRef = useRef(null)
 
   const handleLogout = () => {
     dispatch({ type: 'AUTH_LOGOUT' })
@@ -87,57 +211,196 @@ export function VendorDashboard({ onLogout }) {
       },
     },
   ]
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) {
+      return searchCatalog.slice(0, 7)
+    }
+    const tokens = query.split(/\s+/).filter(Boolean)
+    const results = searchCatalog
+      .map((item) => {
+        const haystack = `${item.label} ${item.tabLabel} ${item.keywords.join(' ')}`.toLowerCase()
+        const directIndex = haystack.indexOf(query)
+        const directScore = directIndex >= 0 ? 200 - directIndex : 0
+        const tokenScore = tokens.reduce((score, token) => (haystack.includes(token) ? score + 20 : score), 0)
+        const score = directScore + tokenScore
+        return { ...item, score }
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+    return results.length ? results : searchCatalog.slice(0, 5)
+  }, [searchCatalog, searchQuery])
+
+  const openSearch = () => {
+    setSearchMounted(true)
+    requestAnimationFrame(() => setSearchOpen(true))
+  }
+
+  const closeSearch = () => {
+    setSearchOpen(false)
+    setTimeout(() => {
+      setSearchMounted(false)
+      setSearchQuery('')
+    }, 260)
+  }
+
+  const handleSearchNavigate = (item) => {
+    if (!item) return
+    const delay = item.tab === activeTab ? 150 : 420
+    setActiveTab(item.tab)
+    setPendingScroll({ id: item.targetId, delay })
+    closeSearch()
+  }
+
+  const handleSearchSubmit = () => {
+    if (searchResults.length) {
+      handleSearchNavigate(searchResults[0])
+    }
+  }
+
+  useEffect(() => {
+    if (searchOpen && searchInputRef.current) {
+      searchInputRef.current.focus()
+      searchInputRef.current.select()
+    }
+  }, [searchOpen])
+
+  useEffect(() => {
+    if (!pendingScroll) return
+    const { id, delay } = pendingScroll
+    const timer = setTimeout(() => {
+      const element = document.getElementById(id)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' })
+      }
+      setPendingScroll(null)
+    }, delay)
+    return () => clearTimeout(timer)
+  }, [pendingScroll, activeTab])
 
   return (
-    <MobileShell
-      navigation={NAV_ITEMS.map((item) => (
-        <BottomNavItem
-          key={item.id}
-          label={item.label}
-          active={activeTab === item.id}
-          onClick={() => setActiveTab(item.id)}
-          icon={<item.icon active={activeTab === item.id} className="h-5 w-5" />}
-      />
-      ))}
-      menuContent={({ close }) => <MenuList items={buildMenuItems(close)} active={activeTab} />}
-    >
-      <section className="space-y-6">
-        {activeTab === 'overview' && <OverviewView onNavigate={navigateTo} />}
-        {activeTab === 'inventory' && <InventoryView onNavigate={navigateTo} />}
-        {activeTab === 'orders' && <OrdersView />}
-        {activeTab === 'credit' && <CreditView />}
-        {activeTab === 'reports' && <ReportsView />}
-      </section>
-    </MobileShell>
+    <>
+      <MobileShell
+        title={`Hello ${welcomeName}`}
+        subtitle="Kolhapur, Maharashtra"
+        onSearchClick={openSearch}
+        navigation={NAV_ITEMS.map((item) => (
+          <BottomNavItem
+            key={item.id}
+            label={item.label}
+            active={activeTab === item.id}
+            onClick={() => setActiveTab(item.id)}
+            icon={<item.icon active={activeTab === item.id} className="h-5 w-5" />}
+        />
+        ))}
+        menuContent={({ close }) => <MenuList items={buildMenuItems(close)} active={activeTab} />}
+      >
+        <section className="space-y-6">
+          {activeTab === 'overview' && <OverviewView onNavigate={navigateTo} welcomeName={welcomeName} openPanel={openPanel} />}
+          {activeTab === 'inventory' && <InventoryView onNavigate={navigateTo} openPanel={openPanel} />}
+          {activeTab === 'orders' && <OrdersView openPanel={openPanel} />}
+          {activeTab === 'credit' && <CreditView openPanel={openPanel} />}
+          {activeTab === 'reports' && <ReportsView />}
+        </section>
+      </MobileShell>
+
+      {searchMounted ? (
+        <div className={cn('vendor-search-sheet', searchOpen && 'is-open')}>
+          <div className={cn('vendor-search-sheet__overlay', searchOpen && 'is-open')} onClick={closeSearch} />
+          <div className={cn('vendor-search-sheet__panel', searchOpen && 'is-open')}>
+            <div className="vendor-search-sheet__header">
+              <input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    handleSearchSubmit()
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    closeSearch()
+                  }
+                }}
+                placeholder="Search inventory, orders, reports..."
+                className="vendor-search-input"
+                aria-label="Search vendor console"
+              />
+              <button type="button" className="vendor-search-cancel" onClick={closeSearch}>
+                Cancel
+              </button>
+            </div>
+            <div className="vendor-search-sheet__body">
+              {searchResults.length ? (
+                searchResults.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleSearchNavigate(item)}
+                    className="vendor-search-result"
+                  >
+                    <span className="vendor-search-result__label">{item.label}</span>
+                    <span className="vendor-search-result__meta">{item.tabLabel}</span>
+                  </button>
+                ))
+              ) : (
+                <p className="vendor-search-empty">No matches yet. Try another keyword.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isMounted && (
+        <ButtonActionPanel
+          action={currentAction}
+          isOpen={isOpen}
+          onClose={closePanel}
+          onAction={(actionData) => {
+            // Handle actions - can be extended for API calls
+            console.log('Action performed:', actionData)
+            // Note: Backend integration is currently absent, so this is front-end mockup only
+            if (actionData.type === 'update' && actionData.data.type === 'admin_request') {
+              // Simulate sending request to admin
+              success('Request sent to admin successfully. You will be notified once reviewed.')
+            }
+          }}
+          onShowNotification={(message, type = 'info') => {
+            if (type === 'success') success(message)
+            else if (type === 'error') error(message)
+            else if (type === 'warning') warning(message)
+            else info(message)
+          }}
+        />
+      )}
+
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+    </>
   )
 }
 
-function OverviewView({ onNavigate }) {
+function OverviewView({ onNavigate, welcomeName, openPanel }) {
   const [showActivitySheet, setShowActivitySheet] = useState(false)
+  const [renderActivitySheet, setRenderActivitySheet] = useState(false)
+  const servicesRef = useRef(null)
+  const [servicePage, setServicePage] = useState(0)
 
   const services = [
-    { label: 'Inventory', note: 'Reorder stock', tone: 'success', target: 'inventory', icon: BoxIcon },
-    { label: 'Pricing', note: 'Update MRP', tone: 'warn', target: 'inventory', icon: ReportIcon },
-    { label: 'Dispatch', note: 'Arrange truck', tone: 'success', target: 'orders', icon: TruckIcon },
-    { label: 'Wallet', note: 'View payouts', tone: 'success', target: 'credit', icon: WalletIcon },
-    { label: 'Performance', note: 'Reports', tone: 'success', target: 'reports', icon: ChartIcon },
-    { label: 'Support', note: 'Raise ticket', tone: 'warn', target: 'orders', icon: MenuIcon },
-    { label: 'Network', note: 'Partner list', tone: 'success', target: 'reports', icon: HomeIcon },
-    { label: 'Settings', note: 'Profile & KYC', tone: 'success', target: 'credit', icon: CreditIcon },
+    { label: 'Inventory', note: 'Reorder stock', tone: 'success', target: 'inventory', icon: BoxIcon, action: null },
+    { label: 'Pricing', note: 'Update MRP', tone: 'warn', target: 'inventory', icon: ReportIcon, action: 'update-mrp' },
+    { label: 'Dispatch', note: 'Arrange truck', tone: 'success', target: 'orders', icon: TruckIcon, action: null },
+    { label: 'Wallet', note: 'View payouts', tone: 'success', target: 'credit', icon: WalletIcon, action: 'view-payouts' },
+    { label: 'Performance', note: 'Reports', tone: 'success', target: 'reports', icon: ChartIcon, action: null },
+    { label: 'Support', note: 'Raise ticket', tone: 'warn', target: 'orders', icon: MenuIcon, action: null },
+    { label: 'Network', note: 'Partner list', tone: 'success', target: 'reports', icon: HomeIcon, action: null },
+    { label: 'Settings', note: 'Profile & KYC', tone: 'success', target: 'credit', icon: CreditIcon, action: 'profile-settings' },
   ]
 
   const transactions = [
     { name: 'Farm Fresh Traders', action: 'Order accepted', amount: '+₹86,200', status: 'Completed', avatar: 'FF' },
     { name: 'Green Valley Hub', action: 'Credit repayment', amount: '-₹40,000', status: 'Pending', avatar: 'GV' },
     { name: 'HarvestLink Pvt Ltd', action: 'Dispatch scheduled', amount: '+₹21,500', status: 'Scheduled', avatar: 'HL' },
-  ]
-
-  const heroActions = [
-    { label: 'Inventory', icon: BoxIcon, target: 'inventory' },
-    { label: 'Orders', icon: CartIcon, target: 'orders' },
-    { label: 'Credit', icon: CreditIcon, target: 'credit' },
-    { label: 'Reports', icon: ReportIcon, target: 'reports' },
-    { label: 'Logistics', icon: TruckIcon, target: 'orders' },
   ]
 
   const walletBalance = vendorSnapshot.credit.remaining || '₹0'
@@ -149,6 +412,7 @@ function OverviewView({ onNavigate }) {
       target: 'orders',
       icon: TruckIcon,
       tone: 'green',
+      action: 'confirm-delivery-slot',
     },
     {
       label: 'Update inventory batch',
@@ -156,6 +420,7 @@ function OverviewView({ onNavigate }) {
       target: 'inventory',
       icon: BoxIcon,
       tone: 'orange',
+      action: 'update-inventory-batch',
     },
     {
       label: 'Raise credit order',
@@ -163,103 +428,145 @@ function OverviewView({ onNavigate }) {
       target: 'credit',
       icon: CreditIcon,
       tone: 'teal',
+      action: 'raise-credit-order',
     },
   ]
 
+  useEffect(() => {
+    const container = servicesRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      const max = container.scrollWidth - container.clientWidth
+      if (max <= 0) {
+        setServicePage(0)
+        return
+      }
+      const progress = container.scrollLeft / max
+      const index = Math.min(2, Math.max(0, Math.round(progress * 2)))
+      setServicePage(index)
+    }
+
+    handleScroll()
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [services.length])
+
   return (
-    <div className="space-y-6">
-      <section className="vendor-gradient-card p-6">
-        <div className="relative z-10 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="vendor-chip success uppercase tracking-wide">
+    <div className="vendor-overview space-y-6">
+      <section id="overview-hero" className="overview-hero">
+        <div className="overview-hero__card">
+          <div className="overview-hero__meta">
+            <span className="overview-chip overview-chip--success">
               Active Zone • {vendorSnapshot.welcome.coverageKm} km
             </span>
-            <span className="vendor-chip warn uppercase tracking-wide">Today {new Date().toLocaleDateString()}</span>
+            <span className="overview-chip overview-chip--warn">Today {new Date().toLocaleDateString('en-GB')}</span>
           </div>
-          <h2 className="vendor-hero-title">
-            Morning brief, {vendorSnapshot.welcome.name.split(' ')[0]}
-          </h2>
-          <div className="vendor-hero-balance">
-            <div>
-              <p className="vendor-hero-label">Wallet balance</p>
-              <p className="vendor-hero-value">{walletBalance}</p>
+          <div className="overview-hero__core">
+            <div className="overview-hero__identity">
+              <span className="overview-hero__greeting">Morning brief</span>
+              <h2 className="overview-hero__welcome">{welcomeName}</h2>
             </div>
-            <button type="button" onClick={() => onNavigate('credit')} className="vendor-hero-cta">
-              Credit center
+            <div className="overview-hero__badge">
+              <SparkIcon className="h-6 w-6 text-white" />
+            </div>
+          </div>
+          <div className="overview-hero__balance">
+            <div>
+              <p className="overview-hero__label">Wallet balance</p>
+              <p className="overview-hero__value">{walletBalance}</p>
+            </div>
+            <button type="button" onClick={() => openPanel('check-credit')} className="overview-hero__cta">
+              Check credit
             </button>
           </div>
-          <div className="vendor-hero-actions">
-            {heroActions.map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                onClick={() => onNavigate(action.target)}
-                className="vendor-hero-action"
-              >
-                <action.icon className="h-5 w-5" />
-                <span>{action.label}</span>
-              </button>
-            ))}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="overview-hero__stats">
             {[
-              { label: 'Order confirmations pending', value: '02', tone: 'warn' },
-              { label: 'Credit reminder today', value: '₹1.2L', tone: 'success' },
-              { label: 'Average delivery time', value: '21h', tone: 'success' },
+              { label: 'Order confirmations pending', value: '02' },
+              { label: 'Credit reminder today', value: '₹1.2L' },
+              { label: 'Average delivery time', value: '21h' },
+              { label: 'Pending reviews', value: '05' },
             ].map((item) => (
-              <div
-                key={item.label}
-                className="rounded-2xl border border-white/30 bg-white/40 px-4 py-3 text-xs font-medium text-surface-foreground shadow-sm backdrop-blur"
-              >
-                <p className="text-[11px] uppercase tracking-wide text-surface-foreground/60">{item.label}</p>
-                <p className="mt-1 text-lg font-semibold">{item.value}</p>
+              <div key={item.label} className="overview-stat-card">
+                <p>{item.label}</p>
+                <span>{item.value}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="space-y-4">
-        <h3 className="vendor-section-title">Other services</h3>
-        <div className="vendor-service-carousel">
+      <section id="overview-services" className="overview-section">
+        <div className="overview-section__header">
+          <div>
+            <h3 className="overview-section__title">Shortcuts</h3>
+          </div>
+        </div>
+        <div ref={servicesRef} className="overview-services__rail">
           {services.map((service) => (
             <button
               key={service.label}
               type="button"
-              onClick={() => service.target && onNavigate(service.target)}
-              className="vendor-service-card"
+              onClick={() => {
+                if (service.action) {
+                  openPanel(service.action)
+                } else if (service.target) {
+                  onNavigate(service.target)
+                }
+              }}
+              className="overview-service-card"
             >
-              <div className={cn('vendor-service-icon', service.tone === 'warn' ? 'warn' : 'success')}>
+              <span className={cn('overview-service-card__icon', service.tone === 'warn' ? 'is-warn' : 'is-success')}>
                 <service.icon className="h-5 w-5" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold text-surface-foreground">{service.label}</p>
-                <p className="text-xs text-muted-foreground">{service.note}</p>
-              </div>
+              </span>
+              <span className="overview-service-card__label">{service.label}</span>
+              <span className="overview-service-card__note">{service.note}</span>
             </button>
+          ))}
+        </div>
+        <div className="overview-services__dots" aria-hidden="true">
+          {[0, 1, 2].map((dot) => (
+            <span
+              key={dot}
+              className={cn('overview-services__dot', servicePage === dot && 'is-active')}
+            />
           ))}
         </div>
       </section>
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="vendor-section-title">Recent activity</h3>
-          <button type="button" onClick={() => setShowActivitySheet(true)} className="text-xs font-semibold text-brand">
+      <section id="overview-activity" className="overview-section">
+        <div className="overview-section__header">
+          <div>
+            <h3 className="overview-section__title">Recent activity</h3>
+          </div>
+          <button
+            type="button"
+            className="overview-section__cta"
+            onClick={() => {
+              setRenderActivitySheet(true)
+              requestAnimationFrame(() => setShowActivitySheet(true))
+            }}
+          >
             See all
           </button>
         </div>
-        <div className="space-y-2">
+        <div className="overview-activity__list">
           {transactions.map((item) => (
-            <div key={item.name} className="vendor-transaction-card">
-              <div className="vendor-transaction-avatar">{item.avatar}</div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold text-surface-foreground">{item.name}</p>
-                  <p className={cn('text-sm font-semibold', item.amount.startsWith('-') ? 'text-accent' : 'text-brand')}>
+            <div key={item.name} className="overview-activity__item">
+              <div className="overview-activity__avatar">{item.avatar}</div>
+              <div className="overview-activity__details">
+                <div className="overview-activity__row">
+                  <span className="overview-activity__name">{item.name}</span>
+                  <span
+                    className={cn(
+                      'overview-activity__amount',
+                      item.amount.startsWith('-') ? 'is-negative' : 'is-positive',
+                    )}
+                  >
                     {item.amount}
-                  </p>
+                  </span>
                 </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="overview-activity__meta">
                   <span>{item.action}</span>
                   <span>{item.status}</span>
                 </div>
@@ -269,33 +576,45 @@ function OverviewView({ onNavigate }) {
         </div>
       </section>
 
-      {showActivitySheet ? (
-        <div className="vendor-activity-sheet">
-          <div className="vendor-activity-sheet__overlay" onClick={() => setShowActivitySheet(false)} />
-          <div className="vendor-activity-sheet__panel">
+      {renderActivitySheet ? (
+        <div className={cn('vendor-activity-sheet', showActivitySheet && 'is-open')}>
+          <div
+            className={cn('vendor-activity-sheet__overlay', showActivitySheet && 'is-open')}
+            onClick={() => {
+              setShowActivitySheet(false)
+              setTimeout(() => setRenderActivitySheet(false), 260)
+            }}
+          />
+          <div className={cn('vendor-activity-sheet__panel', showActivitySheet && 'is-open')}>
             <div className="vendor-activity-sheet__header">
               <h4>All activity</h4>
-              <button type="button" onClick={() => setShowActivitySheet(false)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowActivitySheet(false)
+                  setTimeout(() => setRenderActivitySheet(false), 260)
+                }}
+              >
                 Close
               </button>
             </div>
             <div className="vendor-activity-sheet__body">
-              {[...transactions, ...transactions].map((item, idx) => (
-                <div key={`${item.name}-${idx}`} className="vendor-transaction-card">
-                  <div className="vendor-transaction-avatar">{item.avatar}</div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-surface-foreground">{item.name}</p>
-                      <p
+              {[...transactions, ...transactions].map((item, index) => (
+                <div key={`${item.name}-${index}`} className="overview-activity__item">
+                  <div className="overview-activity__avatar">{item.avatar}</div>
+                  <div className="overview-activity__details">
+                    <div className="overview-activity__row">
+                      <span className="overview-activity__name">{item.name}</span>
+                      <span
                         className={cn(
-                          'text-sm font-semibold',
-                          item.amount.startsWith('-') ? 'text-accent' : 'text-brand',
+                          'overview-activity__amount',
+                          item.amount.startsWith('-') ? 'is-negative' : 'is-positive',
                         )}
                       >
                         {item.amount}
-                      </p>
+                      </span>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="overview-activity__meta">
                       <span>{item.action}</span>
                       <span>{item.status}</span>
                     </div>
@@ -307,17 +626,21 @@ function OverviewView({ onNavigate }) {
         </div>
       ) : null}
 
-      <section className="space-y-4">
-        <h3 className="vendor-section-title">Snapshot</h3>
-        <div className="grid gap-4 sm:grid-cols-3">
+      <section id="overview-snapshot" className="overview-section">
+        <div className="overview-section__header">
+          <div>
+            <h3 className="overview-section__title">Snapshot</h3>
+          </div>
+        </div>
+        <div className="overview-metric-grid">
           {vendorSnapshot.highlights.map((item) => (
-            <div key={item.id} className="vendor-card overflow-hidden border border-muted/40 bg-white/95 p-5 shadow-card">
-              <div className="flex items-center justify-between">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.label}</p>
-                <span className="vendor-pill bg-linear-to-r from-brand-soft/70 to-brand-soft/30 text-brand">{item.trend}</span>
+            <div key={item.id} className="overview-metric-card">
+              <div className="overview-metric-card__head">
+                <p>{item.label}</p>
+                <span>{item.trend}</span>
               </div>
-              <p className="mt-3 text-2xl font-semibold text-surface-foreground">{item.value}</p>
-              <div className="mt-4 vendor-progress">
+              <h4>{item.value}</h4>
+              <div className="overview-metric-card__bar">
                 <span style={{ width: item.id === 'orders' ? '78%' : item.id === 'inventory' ? '64%' : '92%' }} />
               </div>
             </div>
@@ -325,26 +648,38 @@ function OverviewView({ onNavigate }) {
         </div>
       </section>
 
-      <section className="space-y-3">
-        <h3 className="vendor-section-title">Quick actions</h3>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {quickActions.map((action, idx) => (
+      <section id="overview-quick-actions" className="overview-section">
+        <div className="overview-section__header">
+          <div>
+            <h3 className="overview-section__title">Quick actions</h3>
+          </div>
+        </div>
+        <div className="overview-callout-grid">
+          {quickActions.map((action) => (
             <button
               key={action.label}
               type="button"
-              onClick={() => onNavigate(action.target)}
+              onClick={() => {
+                if (action.action) {
+                  openPanel(action.action)
+                } else if (action.target) {
+                  onNavigate(action.target)
+                }
+              }}
               className={cn(
-                'vendor-action-card text-left transition hover:-translate-y-1',
+                'overview-callout',
                 action.tone === 'orange'
-                  ? 'vendor-action-card--orange'
+                  ? 'is-warn'
                   : action.tone === 'teal'
-                  ? 'vendor-action-card--teal'
-                  : 'vendor-action-card--green',
+                  ? 'is-teal'
+                  : 'is-success',
               )}
             >
-              <action.icon className="mb-3 h-5 w-5 text-brand" />
-              <p className="text-sm font-semibold text-surface-foreground">{action.label}</p>
-              <p className="text-xs text-surface-foreground/70">{action.description}</p>
+              <span className="overview-callout__icon">
+                <action.icon className="h-5 w-5" />
+              </span>
+              <span className="overview-callout__label">{action.label}</span>
+              <span className="overview-callout__note">{action.description}</span>
             </button>
           ))}
         </div>
@@ -353,11 +688,49 @@ function OverviewView({ onNavigate }) {
   )
 }
 
-function InventoryView() {
+function InventoryView({ openPanel }) {
+  const inventory = vendorSnapshot.inventory
+  const totalSkus = inventory.length
+  const criticalCount = inventory.filter((item) => item.status === 'Critical').length
+  const lowCount = inventory.filter((item) => item.status === 'Low').length
+  const healthyCount = totalSkus - criticalCount - lowCount
+
+  const topStats = [
+    { label: 'Critical alerts', value: criticalCount, note: 'Needs procurement', tone: 'warn' },
+    { label: 'Low stock items', value: lowCount, note: 'Monitor buffers', tone: 'teal' },
+  ]
+
   const inventoryStats = [
-    { label: 'Total SKUs', value: '18', meta: '+2 added this week', tone: 'success' },
-    { label: 'Critical SKUs', value: '3', meta: 'Needs procurement', tone: 'warn' },
-    { label: 'Average stock health', value: '74%', meta: 'Based on safety buffers', tone: 'success' },
+    { label: 'Total SKUs', value: `${totalSkus}`, meta: `${healthyCount} healthy`, tone: 'success' },
+    { label: 'Critical SKUs', value: `${criticalCount}`, meta: 'Escalate in 24h', tone: 'warn' },
+    { label: 'Average stock health', value: '74%', meta: 'Against safety buffers', tone: 'success' },
+    { label: 'Reorder points', value: `${lowCount}`, meta: 'Monitor closely', tone: 'teal' },
+  ]
+
+  const metricIcons = [BoxIcon, ChartIcon, SparkIcon, TruckIcon]
+
+  const alerts = [
+    {
+      title: 'Restock advisory',
+      body: 'Micro nutrients trending low. Raise request before cutoff.',
+      badge: 'Lead time • 3 days',
+      tone: 'warn',
+      action: 'Raise request',
+    },
+    {
+      title: 'Vendor coordination',
+      body: 'Confirm NPK 24:24:0 availability with admin hub.',
+      badge: 'Supplier • Admin hub',
+      tone: 'teal',
+      action: 'Ping admin',
+    },
+    {
+      title: 'Document updates',
+      body: '2 SKUs awaiting quality certificates before dispatch.',
+      badge: 'QC pending',
+      tone: 'neutral',
+      action: 'Upload docs',
+    },
   ]
 
   const stockProgress = {
@@ -368,80 +741,164 @@ function InventoryView() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-2">
-        <h2 className="vendor-section-title">Your Inventory</h2>
-        <p className="vendor-section-subtitle">
-          Keep fulfilment ready by tracking safety buffers, pricing and replenishment in one place.
-        </p>
-      </header>
+      <section id="inventory-hero" className="inventory-hero">
+        <div className="inventory-hero__shell">
+          <div className="inventory-hero__headline">
+            <span className="inventory-hero__chip">Inventory hub</span>
+            <h3 className="inventory-hero__title">{totalSkus} active products</h3>
+            <p className="inventory-hero__meta">
+              {criticalCount} critical • {lowCount} low stock • {healthyCount} healthy
+            </p>
+            <div className="inventory-hero__actions">
+              {[
+                { label: 'Add SKU', icon: SparkIcon, action: 'add-sku' },
+                { label: 'Reorder', icon: TruckIcon, action: 'reorder' },
+                { label: 'Supplier list', icon: HomeIcon, action: 'supplier-list' },
+                { label: 'Stock report', icon: ChartIcon, action: 'stock-report' },
+              ].map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  className="inventory-hero__action"
+                  onClick={() => action.action && openPanel(action.action)}
+                >
+                  <span className="inventory-hero__action-icon">
+                    <action.icon className="h-4 w-4" />
+                  </span>
+                  <span>{action.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="inventory-hero__statgrid">
+            {topStats.map((stat) => (
+              <div
+                key={stat.label}
+                className={cn(
+                  'inventory-hero__stat',
+                  stat.tone === 'warn' ? 'is-warn' : stat.tone === 'teal' ? 'is-teal' : 'is-success',
+                )}
+              >
+                <p>{stat.label}</p>
+                <span>{stat.value}</span>
+                <small>{stat.note}</small>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {inventoryStats.map((stat) => (
-          <div
-            key={stat.label}
-            className="vendor-card border border-muted/35 bg-white/95 p-4 shadow-card transition hover:-translate-y-1 hover:border-brand/40"
-          >
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">{stat.label}</p>
-            <p className="mt-2 text-xl font-semibold text-surface-foreground">{stat.value}</p>
-            <p
+      <section className="inventory-section">
+        <div className="overview-section__header">
+          <div>
+            <h3 className="overview-section__title">Stock snapshot</h3>
+          </div>
+        </div>
+        <div className="inventory-metric-grid">
+          {inventoryStats.map((stat, index) => {
+            const Icon = metricIcons[index % metricIcons.length]
+            return (
+              <div key={stat.label} className="inventory-metric-card">
+                <span className="inventory-metric-icon">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div className="inventory-metric-body">
+                  <p>{stat.label}</p>
+                  <span>{stat.value}</span>
+                  <small>{stat.meta}</small>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="inventory-section">
+        <div className="overview-section__header">
+          <div>
+            <h3 className="overview-section__title">Alerts & follow ups</h3>
+          </div>
+        </div>
+        <div className="inventory-alert-grid">
+          {alerts.map((card) => (
+            <div
+              key={card.title}
               className={cn(
-                'mt-2 inline-flex items-center gap-1 text-xs font-semibold',
-                stat.tone === 'success' ? 'text-brand' : 'text-accent',
+                'inventory-alert-card',
+                card.tone === 'warn' ? 'is-warn' : card.tone === 'teal' ? 'is-teal' : 'is-neutral',
               )}
             >
-              {stat.meta}
-            </p>
-          </div>
-        ))}
-      </div>
+              <header>
+                <span className="inventory-alert-card__badge">{card.badge}</span>
+                <h4>{card.title}</h4>
+              </header>
+              <p>{card.body}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (card.title === 'Restock advisory') {
+                    openPanel('raise-request')
+                  } else if (card.title === 'Vendor coordination') {
+                    openPanel('ping-admin')
+                  } else if (card.title === 'Document updates') {
+                    openPanel('upload-docs')
+                  }
+                }}
+              >
+                {card.action}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="space-y-4">
         {vendorSnapshot.inventory.map((item) => (
-          <div key={item.id} className="vendor-card relative overflow-hidden border border-muted/45 bg-white p-4 shadow-card">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-linear-to-br from-brand-soft to-brand text-white shadow-inner">
-                  <BoxIcon className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-surface-foreground">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">Stock: {item.stock}</p>
-                </div>
+          <article key={item.id} className="inventory-sku-card">
+            <header className="inventory-sku-card__header">
+              <div className="inventory-sku-card__icon">
+                <BoxIcon className="h-4 w-4" />
+              </div>
+              <div className="inventory-sku-card__title">
+                <h4>{item.name}</h4>
+                <p>On hand • {item.stock}</p>
               </div>
               <span
                 className={cn(
-                  'rounded-full px-3 py-1 text-xs font-semibold',
+                  'inventory-sku-card__status',
                   item.status === 'Healthy'
-                    ? 'bg-brand-soft text-brand'
+                    ? 'is-healthy'
                     : item.status === 'Low'
-                    ? 'bg-accent/20 text-accent'
-                    : 'bg-accent/30 text-accent',
+                    ? 'is-low'
+                    : 'is-critical',
                 )}
               >
                 {item.status}
               </span>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <div className="rounded-2xl bg-[#f2f5f1] px-3 py-2 font-semibold text-surface-foreground">
-                Purchase: {item.purchase}
+            </header>
+            <div className="inventory-sku-card__metrics">
+              <div>
+                <span>Purchase</span>
+                <strong>{item.purchase}</strong>
               </div>
-              <div className="rounded-2xl bg-[#f2f0f5] px-3 py-2 font-semibold text-surface-foreground">
-                Selling: {item.selling}
+              <div>
+                <span>Selling</span>
+                <strong>{item.selling}</strong>
               </div>
             </div>
-            <div className="mt-3 flex items-center justify-between">
-              <div className="vendor-progress w-2/3">
+            <footer className="inventory-sku-card__footer">
+              <div className="vendor-progress inventory-sku-card__progress">
                 <span style={{ width: `${stockProgress[item.status] ?? 40}%` }} />
               </div>
-              <button className="rounded-full border border-brand/40 bg-brand-soft/70 px-4 py-1.5 text-xs font-semibold text-brand">
+              <button type="button" className="inventory-sku-card__cta" onClick={() => openPanel('update-stock', { itemId: item.id, currentStock: item.stock })}>
                 Update stock
               </button>
-            </div>
-          </div>
+            </footer>
+          </article>
         ))}
       </div>
 
-      <div className="vendor-card border border-brand/20 bg-white px-5 py-4 shadow-card">
+      <div id="inventory-restock" className="vendor-card border border-brand/20 bg-white px-5 py-4 shadow-card">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-surface-foreground">Restock advisory</p>
@@ -451,7 +908,10 @@ function InventoryView() {
           </div>
           <div className="flex items-center gap-2">
             <span className="vendor-chip warn">Lead time • 3 days</span>
-            <button className="rounded-full bg-brand px-5 py-2 text-xs font-semibold text-brand-foreground">
+            <button
+              className="rounded-full bg-brand px-5 py-2 text-xs font-semibold text-brand-foreground"
+              onClick={() => openPanel('raise-request')}
+            >
               Raise request
             </button>
           </div>
@@ -461,7 +921,9 @@ function InventoryView() {
   )
 }
 
-function OrdersView() {
+function OrdersView({ openPanel }) {
+  const [selectedFilter, setSelectedFilter] = useState('all')
+
   const STAGES = ['Awaiting', 'Processing', 'Delivered']
 
   const stageIndex = (status) => {
@@ -472,107 +934,253 @@ function OrdersView() {
     return 0
   }
 
+  const orders = vendorSnapshot.orders
+  const totals = orders.reduce(
+    (acc, order) => {
+      const index = stageIndex(order.status)
+      if (index === 2) {
+        acc.delivered += 1
+      } else if (index === 1) {
+        acc.processing += 1
+      } else {
+        acc.awaiting += 1
+      }
+      return acc
+    },
+    { awaiting: 0, processing: 0, delivered: 0 },
+  )
+  const totalOrders = orders.length
+
   const filterChips = [
-    { label: 'All orders', value: '24', active: true },
-    { label: 'Awaiting', value: '6' },
-    { label: 'Processing', value: '11' },
-    { label: 'Delivered', value: '7' },
+    { id: 'all', label: 'All orders', value: totalOrders },
+    { id: 'awaiting', label: 'Awaiting', value: totals.awaiting },
+    { id: 'processing', label: 'Processing', value: totals.processing },
+    { id: 'delivered', label: 'Delivered', value: totals.delivered },
   ]
 
+  const getHeroStats = (filter) => {
+    switch (filter) {
+      case 'all':
+        return [
+          {
+            label: 'Awaiting confirmation',
+            value: totals.awaiting,
+            meta: 'Needs vendor response',
+            tone: 'warn',
+          },
+          {
+            label: 'Processing orders',
+            value: totals.processing,
+            meta: 'Packaging & dispatch',
+            tone: 'teal',
+          },
+          {
+            label: 'Delivery ready',
+            value: totals.delivered,
+            meta: 'Track handover',
+            tone: 'success',
+          },
+        ]
+      case 'awaiting':
+        return [
+          {
+            label: 'Pending response',
+            value: totals.awaiting,
+            meta: 'Action required',
+            tone: 'warn',
+          },
+          {
+            label: 'Average wait time',
+            value: '2.5h',
+            meta: 'Response window',
+            tone: 'teal',
+          },
+          {
+            label: 'Urgent orders',
+            value: Math.max(0, totals.awaiting - 2),
+            meta: 'Exceeding SLA',
+            tone: 'warn',
+          },
+        ]
+      case 'processing':
+        return [
+          {
+            label: 'In packaging',
+            value: Math.floor(totals.processing * 0.6),
+            meta: 'Being prepared',
+            tone: 'teal',
+          },
+          {
+            label: 'Ready for dispatch',
+            value: Math.floor(totals.processing * 0.4),
+            meta: 'Awaiting pickup',
+            tone: 'success',
+          },
+          {
+            label: 'Avg. process time',
+            value: '4.2h',
+            meta: 'From confirmation',
+            tone: 'teal',
+          },
+        ]
+      case 'delivered':
+        return [
+          {
+            label: 'Completed today',
+            value: totals.delivered,
+            meta: 'Successfully delivered',
+            tone: 'success',
+          },
+          {
+            label: 'On-time rate',
+            value: '94%',
+            meta: 'SLA compliance',
+            tone: 'success',
+          },
+          {
+            label: 'Avg. delivery time',
+            value: '18.5h',
+            meta: 'From order placed',
+            tone: 'teal',
+          },
+        ]
+      default:
+        return []
+    }
+  }
+
+  const heroStats = getHeroStats(selectedFilter)
+
   return (
-    <div className="space-y-6">
-      <header className="space-y-3">
-        <h2 className="vendor-section-title">Orders workflow</h2>
-        <p className="vendor-section-subtitle">
-          Confirm availability, keep dispatches on schedule, and maintain top-tier service ratings.
-        </p>
-        <div className="flex flex-wrap gap-2">
+    <div className="orders-view space-y-6">
+      <section id="orders-hero" className="orders-hero">
+        <div className="orders-hero__shell">
+          <div className="orders-hero__headline">
+            <span className="orders-hero__chip">Orders queue</span>
+            <h3 className="orders-hero__title">{totalOrders} active orders</h3>
+            <p className="orders-hero__meta">
+              {totals.awaiting} awaiting • {totals.processing} processing • {totals.delivered} delivered
+            </p>
+          </div>
+          <div className="orders-hero__filters" role="group" aria-label="Filter orders">
           {filterChips.map((chip) => (
-            <span
-              key={chip.label}
+              <button
+              key={chip.id}
+                type="button"
+                className={cn('orders-hero__filter', selectedFilter === chip.id && 'is-active')}
+                aria-pressed={selectedFilter === chip.id}
+                onClick={() => setSelectedFilter(chip.id)}
+              >
+                <span>{chip.label}</span>
+                <strong>{chip.value}</strong>
+              </button>
+            ))}
+          </div>
+          <div className="orders-hero__stats">
+            {heroStats.map((stat) => (
+              <div
+                key={stat.label}
               className={cn(
-                'rounded-full px-3 py-1 text-xs font-semibold',
-                chip.active ? 'bg-brand-soft text-brand' : 'border border-muted/40 bg-white text-muted-foreground',
+                  'orders-hero__stat',
+                  stat.tone === 'warn' ? 'is-warn' : stat.tone === 'teal' ? 'is-teal' : 'is-success',
               )}
             >
-              {chip.label} • {chip.value}
-            </span>
+                <small>{stat.label}</small>
+                <span>{stat.value}</span>
+                <p>{stat.meta}</p>
+              </div>
           ))}
         </div>
-      </header>
-
-      <div className="space-y-4">
-        {vendorSnapshot.orders.map((order) => (
-          <div key={order.id} className="vendor-card border border-muted/45 bg-white/95 p-4 shadow-card">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-linear-to-br from-accent/40 to-accent/10 text-accent">
-                  <TruckIcon className="h-5 w-5" />
                 </div>
+      </section>
+
+      <section id="orders-tracker" className="orders-section">
+        <div className="overview-section__header">
                 <div>
-                  <p className="text-sm font-semibold text-surface-foreground">{order.farmer}</p>
-                  <p className="text-xs text-muted-foreground">{order.value}</p>
+            <h3 className="overview-section__title">Orders</h3>
                 </div>
+          <button type="button" className="orders-section__cta" onClick={() => openPanel('view-sla-policy')}>
+            View SLA policy
+          </button>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-semibold text-brand">{order.payment}</p>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{order.status}</p>
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-center justify-between rounded-2xl bg-[#f0f4ef] px-3 py-2 text-xs text-brand">
-              <span className="font-semibold uppercase tracking-wide">Next</span>
-              <span>{order.next}</span>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
-              {STAGES.map((stage, index) => (
-                <div key={stage} className="flex flex-col items-center gap-1">
-                  <span
-                    className={cn(
-                      'flex h-7 w-7 items-center justify-center rounded-full border text-[11px] font-semibold transition',
-                      index <= stageIndex(order.status)
-                        ? 'border-brand bg-brand text-white'
-                        : 'border-muted/60 bg-white text-muted-foreground',
-                    )}
-                  >
-                    {index + 1}
+        <div className="orders-list">
+          {orders.map((order) => (
+            <article key={order.id} className="orders-card">
+              <header className="orders-card__header">
+                <div className="orders-card__identity">
+                  <span className="orders-card__icon">
+                    <TruckIcon className="h-5 w-5" />
                   </span>
-                  <span>{stage}</span>
+                  <div className="orders-card__details">
+                    <p className="orders-card__name">{order.farmer}</p>
+                    <p className="orders-card__value">{order.value}</p>
+              </div>
+            </div>
+                <div className="orders-card__status">
+                  <span className="orders-card__payment">{order.payment}</span>
+                  <span className="orders-card__stage-label">{order.status}</span>
+            </div>
+              </header>
+              <div className="orders-card__next">
+                <span className="orders-card__next-label">Next</span>
+                <span className="orders-card__next-value">{order.next}</span>
+              </div>
+              <div className="orders-card__stages">
+              {STAGES.map((stage, index) => (
+                  <div
+                    key={stage}
+                    className={cn('orders-card__stage', index <= stageIndex(order.status) && 'is-active')}
+                  >
+                    <span className="orders-card__stage-index">{index + 1}</span>
+                    <span className="orders-card__stage-text">{stage}</span>
                 </div>
               ))}
             </div>
-
-            <div className="mt-4 flex gap-2">
-              <button className="flex-1 rounded-full bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground shadow-sm">
+              <div className="orders-card__actions">
+                <button
+                  type="button"
+                  className="orders-card__action is-primary"
+                  onClick={() => openPanel('order-available', { orderId: order.id })}
+                >
                 Available
               </button>
-              <button className="flex-1 rounded-full border border-accent/40 bg-white px-4 py-2 text-xs font-semibold text-accent">
+                <button
+                  type="button"
+                  className="orders-card__action is-secondary"
+                  onClick={() => openPanel('order-not-available', { orderId: order.id })}
+                >
                 Not available
               </button>
             </div>
-          </div>
+            </article>
         ))}
       </div>
+      </section>
 
-      <div className="vendor-card border border-muted/40 bg-white px-5 py-4 shadow-card">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section id="orders-fallback" className="orders-section">
+        <div className="overview-section__header">
           <div>
-            <p className="text-sm font-semibold text-surface-foreground">Fallback logistics</p>
-            <p className="text-xs text-muted-foreground">
+            <h3 className="overview-section__title">Fallback logistics</h3>
+            
+          </div>
+        </div>
+        <div className="orders-fallback-card">
+          <p className="orders-fallback-card__body">
               Western hub reporting a mild delay. Redirect low-priority orders to Admin fulfilment if SLA exceeds 24h.
             </p>
-          </div>
-          <button className="rounded-full border border-brand/40 px-4 py-2 text-xs font-semibold text-brand">
+          <div className="orders-fallback-card__footer">
+            <span className="orders-fallback-card__badge">Delay • Western hub</span>
+            <button type="button" className="orders-fallback-card__cta" onClick={() => openPanel('escalate-to-admin')}>
             Escalate to admin
           </button>
         </div>
       </div>
+      </section>
     </div>
   )
 }
 
-function CreditView() {
+function CreditView({ openPanel }) {
   const credit = vendorSnapshot.credit
   const usedPercent = Math.min(
     Math.round(
@@ -581,79 +1189,164 @@ function CreditView() {
     100,
   )
 
+  const creditMetrics = [
+    { label: 'Credit limit', value: credit.limit, icon: CreditIcon, tone: 'success' },
+    { label: 'Remaining', value: credit.remaining, icon: WalletIcon, tone: 'success' },
+    { label: 'Used', value: credit.used, icon: ChartIcon, tone: 'warn' },
+    { label: 'Due date', value: credit.due, icon: ReportIcon, tone: 'teal' },
+  ]
+
+  const penaltyTimeline = [
+    { period: 'Day 0-5', description: 'Grace window with reminders sent automatically.', tone: 'success' },
+    { period: 'Day 6-10', description: 'Penalty applied, finance receives escalation.', tone: 'warn' },
+    { period: 'Day 11+', description: 'New credit blocked until dues cleared.', tone: 'critical' },
+  ]
+
   return (
-    <div className="space-y-6">
-      <section className="vendor-card border border-brand/30 bg-linear-to-br from-brand-soft/60 via-white to-white p-6 shadow-card">
-        <div className="grid gap-6 sm:grid-cols-[auto_1fr]">
-          <div className="flex items-center justify-center">
-            <div className="relative flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-inner">
-              <div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: `conic-gradient(rgba(16,185,129,0.85) ${usedPercent}%, rgba(209,213,219,0.35) ${usedPercent}% 100%)`,
-                }}
-              />
-              <div className="relative h-20 w-20 rounded-full bg-white shadow-inner" />
-              <span className="absolute text-sm font-semibold text-brand">{usedPercent}% used</span>
+    <div className="credit-view space-y-6">
+
+      <section id="credit-status" className="credit-status-section">
+        <div className="credit-status-card">
+          <div className="credit-status-card__main">
+            <div className="credit-status-card__progress-wrapper">
+              <div className="credit-status-card__progress-ring">
+                <svg className="credit-status-card__progress-svg" viewBox="0 0 120 120">
+                  <circle
+                    className="credit-status-card__progress-bg"
+                    cx="60"
+                    cy="60"
+                    r="54"
+                    fill="none"
+                    strokeWidth="8"
+                  />
+                  <circle
+                    className="credit-status-card__progress-fill"
+                    cx="60"
+                    cy="60"
+                    r="54"
+                    fill="none"
+                    strokeWidth="8"
+                    strokeDasharray={`${2 * Math.PI * 54}`}
+                    strokeDashoffset={`${2 * Math.PI * 54 * (1 - usedPercent / 100)}`}
+                    transform="rotate(-90 60 60)"
+                  />
+                </svg>
+                <div className="credit-status-card__progress-content">
+                  <span className="credit-status-card__progress-percent">{usedPercent}%</span>
+                  <span className="credit-status-card__progress-label">Used</span>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 text-sm font-semibold text-surface-foreground">
-            <div>
-              <p className="text-xs text-muted-foreground">Credit limit</p>
-              <p className="mt-1 text-lg">{credit.limit}</p>
+              <div className="credit-status-card__details">
+                <div className="credit-status-card__amount">
+                  <span className="credit-status-card__amount-value">{credit.used}</span>
+                  <span className="credit-status-card__amount-label">Credit Utilized</span>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Remaining</p>
-              <p className="mt-1 text-lg">{credit.remaining}</p>
+                <div className="credit-status-card__quick-info">
+                  <div className="credit-status-card__info-item">
+                    <span className="credit-status-card__info-label">Available</span>
+                    <span className="credit-status-card__info-value">{credit.remaining}</span>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Used</p>
-              <p className="mt-1 text-lg">{credit.used}</p>
+                  <div className="credit-status-card__info-item">
+                    <span className="credit-status-card__info-label">Total Limit</span>
+                    <span className="credit-status-card__info-value">{credit.limit}</span>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Due date</p>
-              <p className="mt-1 text-lg">{credit.due}</p>
             </div>
           </div>
         </div>
-        <p className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-brand shadow-sm">
-          {credit.penalty}
-        </p>
+          </div>
+          <div className="credit-status-card__footer">
+            <div className="credit-status-card__status-badge">
+              <span className="credit-status-card__status-text">{credit.penalty}</span>
+            </div>
+            <button type="button" className="credit-status-card__action" onClick={() => openPanel('view-details')}>
+              View Details
+            </button>
+          </div>
+        </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <div className="vendor-card flex items-start gap-3 border border-brand/20 bg-white/95 p-5 shadow-card">
-          <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-linear-to-br from-brand-soft to-brand text-white">
-            <WalletIcon className="h-5 w-5" />
+      <section id="credit-summary" className="credit-section">
+        <div className="overview-section__header">
+          <div>
+            <h3 className="overview-section__title">Credit summary</h3>
           </div>
-          <div className="flex-1 space-y-3">
+        </div>
+        <div className="credit-metric-grid">
+          {creditMetrics.map((metric) => {
+            const Icon = metric.icon
+            return (
+              <div key={metric.label} className="credit-metric-card">
+                <span className={cn('credit-metric-icon', metric.tone === 'warn' ? 'is-warn' : metric.tone === 'teal' ? 'is-teal' : 'is-success')}>
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div className="credit-metric-body">
+                  <p>{metric.label}</p>
+                  <span>{metric.value}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div className="credit-usage-card">
+          <div className="credit-usage-card__header">
+            <span className="credit-usage-card__label">Credit usage</span>
+            <span className="credit-usage-card__percent">{usedPercent}%</span>
+          </div>
+          <div className="credit-usage-card__progress">
+            <span style={{ width: `${usedPercent}%` }} />
+          </div>
+          <div className="credit-usage-card__footer">
+            <span className="credit-usage-card__badge">{credit.penalty}</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="credit-actions" className="credit-section">
+        <div className="overview-section__header">
             <div>
-              <p className="text-sm font-semibold text-surface-foreground">Need to reorder?</p>
-              <p className="text-xs text-muted-foreground">
+            <h3 className="overview-section__title">Credit management</h3>
+          </div>
+        </div>
+        <div className="credit-action-grid">
+          <div className="credit-action-card">
+            <header>
+              <span className="credit-action-card__icon">
+                <WalletIcon className="h-5 w-5" />
+              </span>
+              <h4 className="credit-action-card__title">Need to reorder?</h4>
+            </header>
+            <p className="credit-action-card__body">
                 Minimum purchase value ₹50,000. Credit order requests go to Admin for approval before stock updates.
               </p>
-            </div>
-            <button className="w-full rounded-full border border-brand/50 bg-white py-2 text-xs font-semibold text-brand">
+            <button type="button" className="credit-action-card__cta" onClick={() => openPanel('place-credit-purchase')}>
               Place credit purchase request
             </button>
           </div>
         </div>
-        <div className="vendor-card border border-muted/35 bg-white/95 p-5 shadow-card">
-          <p className="text-sm font-semibold text-surface-foreground">Penalty timeline</p>
-          <p className="text-xs text-muted-foreground">
-            Grace period: 5 days • Penalty accrues daily thereafter until repayment is confirmed.
-          </p>
-          <div className="mt-4 space-y-2 text-xs text-muted-foreground">
-            {[
-              'Day 0-5 • Grace window with reminders sent automatically.',
-              'Day 6-10 • Penalty applied, finance receives escalation.',
-              'Day 11+ • New credit blocked until dues cleared.',
-            ].map((line) => (
-              <div key={line} className="rounded-2xl bg-[#f4f6f3] px-3 py-2 font-semibold text-surface-foreground/75">
-                {line}
+      </section>
+
+      <section id="credit-penalty" className="credit-section">
+        <div className="overview-section__header">
+          <div>
+            <h3 className="overview-section__title">Penalty timeline</h3>
               </div>
-            ))}
           </div>
+        <div className="credit-timeline">
+          {penaltyTimeline.map((item) => (
+            <div
+              key={item.period}
+              className={cn(
+                'credit-timeline-item',
+                item.tone === 'critical' ? 'is-critical' : item.tone === 'warn' ? 'is-warn' : 'is-success',
+              )}
+            >
+              <div className="credit-timeline-item__marker" />
+              <div className="credit-timeline-item__content">
+                <span className="credit-timeline-item__period">{item.period}</span>
+                <p className="credit-timeline-item__description">{item.description}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
     </div>
@@ -662,63 +1355,519 @@ function CreditView() {
 
 function ReportsView() {
   const topVendors = [
-    { name: 'HarvestLink Pvt Ltd', revenue: '₹1.4 Cr', change: '+12%' },
-    { name: 'GreenGrow Supplies', revenue: '₹1.1 Cr', change: '+9%' },
-    { name: 'GrowSure Traders', revenue: '₹82 L', change: '+4%' },
+    { name: 'HarvestLink Pvt Ltd', revenue: '₹1.4 Cr', change: '+12%', tone: 'success' },
+    { name: 'GreenGrow Supplies', revenue: '₹1.1 Cr', change: '+9%', tone: 'success' },
+    { name: 'GrowSure Traders', revenue: '₹82 L', change: '+4%', tone: 'teal' },
   ]
 
+  const reportIcons = [ChartIcon, WalletIcon, CreditIcon, HomeIcon]
+
+  const [activeTab, setActiveTab] = useState('revenue')
+  const [timePeriod, setTimePeriod] = useState('week')
+
+  const tabs = [
+    { id: 'revenue', label: 'Revenue Analytics' },
+    { id: 'performance', label: 'Performance' },
+    { id: 'trends', label: 'Trends' },
+    { id: 'insights', label: 'Insights' },
+  ]
+
+  const timePeriods = [
+    { id: 'week', label: '1 Week' },
+    { id: 'month', label: '1 Month' },
+    { id: 'year', label: '1 Year' },
+    { id: 'all', label: 'All Time' },
+  ]
+
+  const getRevenueData = (period) => {
+    switch (period) {
+      case 'week':
+        return {
+          labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+          revenue: [28.5, 32.8, 29.2, 35.6, 38.4, 34.1, 31.2],
+          orders: [42, 48, 45, 52, 58, 50, 46],
+        }
+      case 'month':
+        return {
+          labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+          revenue: [125.6, 142.3, 138.9, 156.2],
+          orders: [185, 210, 205, 232],
+        }
+      case 'year':
+        return {
+          labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+          revenue: [485.2, 562.8, 598.4, 642.1],
+          orders: [720, 835, 890, 955],
+        }
+      case 'all':
+        return {
+          labels: ['Year 1', 'Year 2', 'Year 3', 'Year 4'],
+          revenue: [1850.5, 2156.8, 2489.2, 2856.4],
+          orders: [2750, 3200, 3690, 4240],
+        }
+      default:
+        return {
+          labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+          revenue: [28.5, 32.8, 29.2, 35.6, 38.4, 34.1, 31.2],
+          orders: [42, 48, 45, 52, 58, 50, 46],
+        }
+    }
+  }
+
+  const chartData = getRevenueData(timePeriod)
+  const maxValue = Math.max(...chartData.revenue, ...chartData.orders)
+  const yAxisSteps = 5
+  const yAxisLabels = Array.from({ length: yAxisSteps + 1 }, (_, i) => {
+    const value = (maxValue / yAxisSteps) * (yAxisSteps - i)
+    return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toFixed(0)
+  })
+
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <h2 className="vendor-section-title">Reports & insights</h2>
-        <p className="vendor-section-subtitle">
-          Weekly snapshot of revenue, order velocity, partner performance, and fulfilment quality.
-        </p>
-      </header>
+    <div className="reports-view space-y-6">
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        {vendorSnapshot.reports.map((report) => (
-          <div key={report.label} className="vendor-card flex items-center gap-3 border border-muted/45 bg-white/95 px-4 py-4 shadow-card">
-            <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-linear-to-br from-brand-soft to-brand/70 text-brand-foreground">
-              <ChartIcon className="h-5 w-5" />
+      <section id="reports-summary" className="reports-summary-section">
+        <div className="reports-summary-card">
+          <div className="reports-summary-card__content">
+            <div className="reports-summary-card__main">
+              <div className="reports-summary-card__icon">
+                <ChartIcon className="h-6 w-6" />
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-surface-foreground">{report.label}</p>
-              <p className="text-base font-semibold text-brand">{report.value}</p>
-              <p className="text-xs text-muted-foreground">{report.meta}</p>
+              <div className="reports-summary-card__stats">
+                <div className="reports-summary-card__stat">
+                  <span className="reports-summary-card__stat-label">Total Revenue</span>
+                  <span className="reports-summary-card__stat-value">₹28.6L</span>
             </div>
+                <div className="reports-summary-card__stat">
+                  <span className="reports-summary-card__stat-label">Growth Rate</span>
+                  <span className="reports-summary-card__stat-value is-positive">+15.2%</span>
           </div>
-        ))}
-      </section>
-
-      <section className="vendor-card grid gap-4 border border-muted/40 bg-white/95 p-5 shadow-card sm:grid-cols-[1.2fr_auto]">
-        <div>
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-surface-foreground">Revenue vs fulfilment</p>
-            <span className="vendor-chip success">Last 30 days</span>
-          </div>
-          <div className="mt-4 h-40 rounded-2xl bg-linear-to-br from-brand-soft/40 via-white to-white p-4">
-            <div className="h-full rounded-xl border border-dashed border-brand/30 bg-white/70" />
+              </div>
+            </div>
+            <div className="reports-summary-card__insights">
+              <div className="reports-summary-card__insight">
+                <span className="reports-summary-card__insight-icon">📈</span>
+                <span className="reports-summary-card__insight-text">Revenue up 15% from last month</span>
+              </div>
+              <div className="reports-summary-card__insight">
+                <span className="reports-summary-card__insight-icon">⚡</span>
+                <span className="reports-summary-card__insight-text">84 orders processed this week</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="flex flex-col justify-between gap-3">
-          <button className="self-start rounded-full border border-brand/40 px-4 py-2 text-xs font-semibold text-brand">
-            Export latest report
+      </section>
+
+      <section id="reports-metrics" className="reports-section">
+        <div className="overview-section__header">
+        <div>
+            <h3 className="overview-section__title">Performance metrics</h3>
+          </div>
+          </div>
+        <div className="reports-metric-grid">
+          {vendorSnapshot.reports.map((report, index) => {
+            const Icon = reportIcons[index % reportIcons.length]
+            return (
+              <div key={report.label} className="reports-metric-card">
+                <span className="reports-metric-icon">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div className="reports-metric-body">
+                  <p>{report.label}</p>
+                  <span>{report.value}</span>
+                  <small>{report.meta}</small>
+        </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      <section id="reports-analytics" className="reports-tab-section">
+        <div className="reports-tab-header">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={cn('reports-tab-button', activeTab === tab.id && 'is-active')}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
           </button>
-          <div className="space-y-2">
+          ))}
+        </div>
+        <div className="reports-tab-content">
+          {activeTab === 'revenue' && (
+            <div className="reports-tab-panel is-active">
+              <div className="reports-analytics-card">
+                <div className="reports-analytics-card__header">
+                  <div className="reports-analytics-card__header-top">
+                    <div>
+                      <h4 className="reports-analytics-card__title">Revenue by orders</h4>
+                      <span className="reports-analytics-card__subtitle">
+                        {timePeriod === 'week' && 'Last 7 days'}
+                        {timePeriod === 'month' && 'Last 30 days'}
+                        {timePeriod === 'year' && 'Last 12 months'}
+                        {timePeriod === 'all' && 'From start'}
+                      </span>
+                    </div>
+                    <div className="reports-time-period-selector">
+                      {timePeriods.map((period) => (
+                        <button
+                          key={period.id}
+                          type="button"
+                          className={cn(
+                            'reports-time-period-button',
+                            timePeriod === period.id && 'is-active',
+                          )}
+                          onClick={() => setTimePeriod(period.id)}
+                        >
+                          {period.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="reports-analytics-card__chart">
+                  <div className="reports-line-chart">
+                    <div className="reports-line-chart__legend">
+                      <div className="reports-line-chart__legend-item">
+                        <span className="reports-line-chart__legend-dot is-revenue" />
+                        <span className="reports-line-chart__legend-label">Revenue (₹L)</span>
+                      </div>
+                      <div className="reports-line-chart__legend-item">
+                        <span className="reports-line-chart__legend-dot is-orders" />
+                        <span className="reports-line-chart__legend-label">Orders</span>
+                      </div>
+                    </div>
+                    <div className="reports-line-chart__container">
+                      <div className="reports-line-chart__y-axis">
+                        {yAxisLabels.map((label, index) => (
+                          <span key={index} className="reports-line-chart__y-label">
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="reports-line-chart__graph">
+                        <svg className="reports-line-chart__svg" viewBox={`0 0 ${(chartData.labels.length - 1) * 100} 200`} preserveAspectRatio="none">
+                          <defs>
+                            <linearGradient id="revenueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                              <stop offset="0%" stopColor="rgba(43, 118, 79, 0.3)" />
+                              <stop offset="100%" stopColor="rgba(43, 118, 79, 0.05)" />
+                            </linearGradient>
+                            <linearGradient id="ordersGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                              <stop offset="0%" stopColor="rgba(33, 150, 173, 0.3)" />
+                              <stop offset="100%" stopColor="rgba(33, 150, 173, 0.05)" />
+                            </linearGradient>
+                          </defs>
+                          {/* Grid lines */}
+                          {yAxisLabels.map((_, index) => {
+                            const y = (index / yAxisSteps) * 200
+                            return (
+                              <line
+                                key={index}
+                                x1="0"
+                                y1={y}
+                                x2={(chartData.labels.length - 1) * 100}
+                                y2={y}
+                                stroke="rgba(34, 94, 65, 0.08)"
+                                strokeWidth="1"
+                                strokeDasharray="2,2"
+                              />
+                            )
+                          })}
+                          {/* Revenue area */}
+                          <path
+                            d={`M 0,${200 - (chartData.revenue[0] / maxValue) * 200} ${chartData.revenue
+                              .slice(1)
+                              .map((value, index) => `L ${(index + 1) * 100},${200 - (value / maxValue) * 200}`)
+                              .join(' ')} L ${(chartData.labels.length - 1) * 100},200 L 0,200 Z`}
+                            fill="url(#revenueGradient)"
+                          />
+                          {/* Orders area */}
+                          <path
+                            d={`M 0,${200 - (chartData.orders[0] / maxValue) * 200} ${chartData.orders
+                              .slice(1)
+                              .map((value, index) => `L ${(index + 1) * 100},${200 - (value / maxValue) * 200}`)
+                              .join(' ')} L ${(chartData.labels.length - 1) * 100},200 L 0,200 Z`}
+                            fill="url(#ordersGradient)"
+                          />
+                          {/* Revenue line */}
+                          <path
+                            d={`M 0,${200 - (chartData.revenue[0] / maxValue) * 200} ${chartData.revenue
+                              .slice(1)
+                              .map((value, index) => `L ${(index + 1) * 100},${200 - (value / maxValue) * 200}`)
+                              .join(' ')}`}
+                            fill="none"
+                            stroke="rgba(43, 118, 79, 0.9)"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          {/* Orders line */}
+                          <path
+                            d={`M 0,${200 - (chartData.orders[0] / maxValue) * 200} ${chartData.orders
+                              .slice(1)
+                              .map((value, index) => `L ${(index + 1) * 100},${200 - (value / maxValue) * 200}`)
+                              .join(' ')}`}
+                            fill="none"
+                            stroke="rgba(33, 150, 173, 0.9)"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          {/* Data points */}
+                          {chartData.revenue.map((value, index) => (
+                            <circle
+                              key={`revenue-${index}`}
+                              cx={index * 100}
+                              cy={200 - (value / maxValue) * 200}
+                              r="4"
+                              fill="rgba(43, 118, 79, 0.95)"
+                              stroke="rgba(255, 255, 255, 0.9)"
+                              strokeWidth="2"
+                            />
+                          ))}
+                          {chartData.orders.map((value, index) => (
+                            <circle
+                              key={`orders-${index}`}
+                              cx={index * 100}
+                              cy={200 - (value / maxValue) * 200}
+                              r="4"
+                              fill="rgba(33, 150, 173, 0.95)"
+                              stroke="rgba(255, 255, 255, 0.9)"
+                              strokeWidth="2"
+                            />
+                          ))}
+                        </svg>
+                        <div className="reports-line-chart__x-axis">
+                          {chartData.labels.map((label, index) => (
+                            <span key={index} className="reports-line-chart__x-label">
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="reports-line-chart__stats">
+                      <div className="reports-line-chart__stat">
+                        <span className="reports-line-chart__stat-label">Revenue</span>
+                        <span className="reports-line-chart__stat-value">
+                          {(
+                            chartData.revenue.reduce((a, b) => a + b, 0) /
+                            chartData.revenue.length
+                          ).toFixed(1)}
+                          {timePeriod === 'year' || timePeriod === 'all' ? 'k' : ''} ₹L
+                        </span>
+                        <span className="reports-line-chart__stat-change is-positive">+12.5%</span>
+                      </div>
+                      <div className="reports-line-chart__stat">
+                        <span className="reports-line-chart__stat-label">Orders</span>
+                        <span className="reports-line-chart__stat-value">
+                          {Math.round(
+                            chartData.orders.reduce((a, b) => a + b, 0) / chartData.orders.length,
+                          )}
+                        </span>
+                        <span className="reports-line-chart__stat-change is-positive">+8.3%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {activeTab === 'performance' && (
+            <div className="reports-tab-panel is-active">
+              <div className="reports-analytics-card">
+                <div className="reports-analytics-card__header">
+                  <span className="reports-analytics-card__badge">Last 30 days</span>
+                  <h4 className="reports-analytics-card__title">Order fulfillment performance</h4>
+                </div>
+                <div className="reports-analytics-card__chart">
+                  <div className="reports-chart">
+                    <div className="reports-chart__legend">
+                      <div className="reports-chart__legend-item">
+                        <span className="reports-chart__legend-dot is-revenue" />
+                        <span className="reports-chart__legend-label">On-time delivery</span>
+                      </div>
+                      <div className="reports-chart__legend-item">
+                        <span className="reports-chart__legend-dot is-fulfilment" />
+                        <span className="reports-chart__legend-label">Average delay</span>
+                      </div>
+                    </div>
+                    <div className="reports-chart__bars">
+                      {[
+                        { label: 'Week 1', revenue: 92, fulfilment: 8 },
+                        { label: 'Week 2', revenue: 88, fulfilment: 12 },
+                        { label: 'Week 3', revenue: 95, fulfilment: 5 },
+                        { label: 'Week 4', revenue: 90, fulfilment: 10 },
+                      ].map((week, index) => (
+                        <div key={index} className="reports-chart__bar-group">
+                          <div className="reports-chart__bar-container">
+                            <div className="reports-chart__bar is-revenue" style={{ height: `${week.revenue}%` }}>
+                              <span className="reports-chart__bar-value">{week.revenue}%</span>
+                            </div>
+                            <div className="reports-chart__bar is-fulfilment" style={{ height: `${week.fulfilment}%` }}>
+                              <span className="reports-chart__bar-value">{week.fulfilment}%</span>
+                            </div>
+                          </div>
+                          <span className="reports-chart__bar-label">{week.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="reports-performance-metrics">
+                  <div className="reports-performance-metric">
+                    <span className="reports-performance-metric__label">Avg. fulfillment time</span>
+                    <span className="reports-performance-metric__value">18.5h</span>
+                  </div>
+                  <div className="reports-performance-metric">
+                    <span className="reports-performance-metric__label">Order accuracy</span>
+                    <span className="reports-performance-metric__value">96.2%</span>
+                  </div>
+                  <div className="reports-performance-metric">
+                    <span className="reports-performance-metric__label">Customer rating</span>
+                    <span className="reports-performance-metric__value">4.7/5</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {activeTab === 'trends' && (
+            <div className="reports-tab-panel is-active">
+              <div className="reports-analytics-card">
+                <div className="reports-analytics-card__header">
+                  <span className="reports-analytics-card__badge">Last 3 months</span>
+                  <h4 className="reports-analytics-card__title">Growth trends & patterns</h4>
+                </div>
+                <div className="reports-analytics-card__chart">
+                  <div className="reports-chart">
+                    <div className="reports-chart__legend">
+                      <div className="reports-chart__legend-item">
+                        <span className="reports-chart__legend-dot is-revenue" />
+                        <span className="reports-chart__legend-label">Order volume</span>
+                      </div>
+                      <div className="reports-chart__legend-item">
+                        <span className="reports-chart__legend-dot is-fulfilment" />
+                        <span className="reports-chart__legend-label">Revenue growth</span>
+                      </div>
+                    </div>
+                    <div className="reports-chart__bars">
+                      {[
+                        { label: 'Month 1', revenue: 68, fulfilment: 72 },
+                        { label: 'Month 2', revenue: 75, fulfilment: 78 },
+                        { label: 'Month 3', revenue: 82, fulfilment: 85 },
+                      ].map((month, index) => (
+                        <div key={index} className="reports-chart__bar-group">
+                          <div className="reports-chart__bar-container">
+                            <div className="reports-chart__bar is-revenue" style={{ height: `${month.revenue}%` }}>
+                              <span className="reports-chart__bar-value">{month.revenue}%</span>
+                            </div>
+                            <div className="reports-chart__bar is-fulfilment" style={{ height: `${month.fulfilment}%` }}>
+                              <span className="reports-chart__bar-value">{month.fulfilment}%</span>
+                            </div>
+                          </div>
+                          <span className="reports-chart__bar-label">{month.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="reports-trends-insights">
+                  <div className="reports-trend-item">
+                    <span className="reports-trend-item__icon">📈</span>
+                    <div className="reports-trend-item__content">
+                      <span className="reports-trend-item__label">Peak season approaching</span>
+                      <span className="reports-trend-item__value">+24% expected growth</span>
+                    </div>
+                  </div>
+                  <div className="reports-trend-item">
+                    <span className="reports-trend-item__icon">🌾</span>
+                    <div className="reports-trend-item__content">
+                      <span className="reports-trend-item__label">Top product category</span>
+                      <span className="reports-trend-item__value">Organic fertilizers</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {activeTab === 'insights' && (
+            <div className="reports-tab-panel is-active">
+              <div className="reports-analytics-card">
+                <div className="reports-analytics-card__header">
+                  <span className="reports-analytics-card__badge">AI-powered insights</span>
+                  <h4 className="reports-analytics-card__title">Key recommendations</h4>
+                </div>
+                <div className="reports-insights-list">
+                  <div className="reports-insight-card">
+                    <div className="reports-insight-card__icon is-success">✓</div>
+                    <div className="reports-insight-card__content">
+                      <h5 className="reports-insight-card__title">Optimize inventory levels</h5>
+                      <p className="reports-insight-card__description">
+                        Your top 3 products show 15% higher demand. Consider increasing stock by 20% to meet peak season.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="reports-insight-card">
+                    <div className="reports-insight-card__icon is-warn">⚠</div>
+                    <div className="reports-insight-card__content">
+                      <h5 className="reports-insight-card__title">Delivery time improvement</h5>
+                      <p className="reports-insight-card__description">
+                        Western hub routes show 8% delay. Consider alternative logistics partners for faster fulfillment.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="reports-insight-card">
+                    <div className="reports-insight-card__icon is-info">💡</div>
+                    <div className="reports-insight-card__content">
+                      <h5 className="reports-insight-card__title">Credit utilization</h5>
+                      <p className="reports-insight-card__description">
+                        Your credit usage is optimal at 68%. You can safely increase order volume by 25% without risk.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="reports-insight-card">
+                    <div className="reports-insight-card__icon is-success">📊</div>
+                    <div className="reports-insight-card__content">
+                      <h5 className="reports-insight-card__title">Customer retention</h5>
+                      <p className="reports-insight-card__description">
+                        Repeat order rate increased by 12% this month. Focus on maintaining quality standards.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section id="reports-top-vendors" className="reports-section">
+        <div className="overview-section__header">
+          <div>
+            <h3 className="overview-section__title">Top performers</h3>
+          </div>
+        </div>
+        <div className="reports-vendors-list">
             {topVendors.map((vendor) => (
               <div
                 key={vendor.name}
-                className="rounded-2xl border border-muted/40 bg-[#f6f8f5] px-4 py-3 text-xs text-surface-foreground"
-              >
-                <p className="font-semibold">{vendor.name}</p>
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>{vendor.revenue}</span>
-                  <span className="text-brand">{vendor.change}</span>
+              className={cn(
+                'reports-vendor-card',
+                vendor.tone === 'teal' ? 'is-teal' : 'is-success',
+              )}
+            >
+              <div className="reports-vendor-card__info">
+                <h4 className="reports-vendor-card__name">{vendor.name}</h4>
+                <div className="reports-vendor-card__metrics">
+                  <span className="reports-vendor-card__revenue">{vendor.revenue}</span>
+                  <span className="reports-vendor-card__change">{vendor.change}</span>
                 </div>
               </div>
+              <div className="reports-vendor-card__indicator" />
+              </div>
             ))}
-          </div>
         </div>
       </section>
     </div>

@@ -1,37 +1,83 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cn } from '../../../lib/cn'
-import { CloseIcon, MenuIcon } from './icons'
-import iraSathiLogo from '../../../assets/IRA Sathi.png'
+import { CloseIcon, MenuIcon, SearchIcon } from './icons'
+import iraSathiLogo from '../../../assets/IRA SathiNew.png'
+import { MapPinIcon } from './icons'
 
-export function MobileShell({ title, subtitle, children, navigation, menuContent }) {
+export function MobileShell({ title, subtitle, children, navigation, menuContent, onSearchClick }) {
   const [open, setOpen] = useState(false)
+  const [compact, setCompact] = useState(false)
+
+  useEffect(() => {
+    let ticking = false
+    let lastScrollY = 0
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY
+          // Use hysteresis: different thresholds for expanding vs collapsing to prevent flickering
+          if (currentScrollY > lastScrollY) {
+            // Scrolling down - collapse at 30px
+            setCompact(currentScrollY > 30)
+          } else {
+            // Scrolling up - expand at 20px
+            setCompact(currentScrollY > 20)
+          }
+          lastScrollY = currentScrollY
+          ticking = false
+        })
+        ticking = true
+      }
+    }
+
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   return (
-    <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-[#f5f7f3] text-surface-foreground">
-      <header className="sticky top-0 z-30 flex items-center justify-between rounded-b-3xl bg-white px-4 pb-3 pt-5 shadow-[0_12px_30px_-26px_rgba(15,23,42,0.35)]">
-        <div className="flex items-center gap-2 px-1.5">
-          <img src={iraSathiLogo} alt="IRA Sathi" className="vendor-logo" />
+    <div className="vendor-shell">
+      <header className={cn('vendor-shell-header', compact && 'is-compact')}>
+        <div className="vendor-shell-header__glow" />
+        <div className="vendor-shell-header__controls">
+          <div className="vendor-shell-header__brand">
+            <img src={iraSathiLogo} alt="IRA Sathi" className="vendor-logo" />
+          </div>
+          <div className="vendor-shell-header__actions">
+            <button
+              type="button"
+              onClick={onSearchClick}
+              className="vendor-icon-button"
+              aria-label="Search"
+            >
+              <SearchIcon className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="vendor-icon-button"
+              aria-label="Open menu"
+            >
+              <MenuIcon className="h-5 w-5" />
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-muted/60 bg-white shadow-sm"
-          aria-label="Open menu"
-        >
-          <MenuIcon className="h-5 w-5 text-surface-foreground" />
-        </button>
+        <div className={cn('vendor-shell-header__info', compact && 'is-compact')}>
+          {title ? <span className="vendor-brand-title">{title}</span> : null}
+          <p className="vendor-shell-header__hint">
+            <MapPinIcon className="mr-2 inline h-3.5 w-3.5" />
+            {subtitle}
+          </p>
+        </div>
       </header>
 
-      <main className="flex-1 px-4 pb-28">
-        <div className="mb-6 pt-4">
-          <h1 className="text-xl font-semibold text-surface-foreground">{title}</h1>
-          {subtitle ? <p className="mt-1 text-xs text-muted-foreground leading-snug">{subtitle}</p> : null}
-        </div>
-        <div className="space-y-6 pb-4">{children}</div>
+      <main className="vendor-shell-content">
+        <div className="space-y-6">{children}</div>
       </main>
 
-      <nav className="fixed bottom-0 left-1/2 z-20 w-full max-w-md -translate-x-1/2 rounded-t-3xl bg-white px-4 py-2.5">
-        <div className="flex justify-between gap-4">{navigation}</div>
+      <nav className="vendor-shell-bottom-nav">
+        <div className="vendor-shell-bottom-nav__inner">{navigation}</div>
       </nav>
 
       <div
@@ -63,6 +109,7 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
           {typeof menuContent === 'function'
             ? menuContent({
                 close: () => setOpen(false),
+                onNavigate: () => setOpen(false),
               })
             : menuContent}
         </div>

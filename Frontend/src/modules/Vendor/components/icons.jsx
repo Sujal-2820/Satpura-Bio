@@ -80,6 +80,29 @@ export function CloseIcon({ className = 'h-5 w-5' }) {
   )
 }
 
+export function SearchIcon({ className = 'h-5 w-5' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <circle cx="11" cy="11" r="6" strokeWidth="1.5" />
+      <path d="m17 17 3 3" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function MapPinIcon({ className = 'h-5 w-5' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+        d="M12 21c4.5-4.2 6.75-7.533 6.75-10.05A6.75 6.75 0 1 0 5.25 10.95C5.25 13.467 7.5 16.8 12 21Z"
+      />
+      <circle cx="12" cy="10.5" r="1.8" fill="currentColor" />
+    </svg>
+  )
+}
+
 export function SparkIcon({ className = 'h-5 w-5' }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none">
