@@ -30,26 +30,26 @@ const NAV_ITEMS = [
   },
   {
     id: 'inventory',
-    label: 'Inventory Manager',
+    label: 'Stock Manager',
     description: 'Current stock status',
     icon: BoxIcon,
   },
   {
     id: 'orders',
-    label: 'Order Queue',
+    label: 'Orders',
     description: 'Confirm availability and delivery',
     icon: CartIcon,
   },
   {
     id: 'credit',
-    label: 'Credit Health',
-    description: 'Limits, penalties, repayment',
+    label: 'Loan Status',
+    description: 'Loan limit, fines, payment',
     icon: CreditIcon,
   },
   {
     id: 'reports',
-    label: 'Reports',
-    description: 'Weekly / monthly performance',
+    label: 'Summary',
+    description: 'Weekly / monthly summary',
     icon: ReportIcon,
   },
 ]
@@ -72,8 +72,8 @@ export function VendorDashboard({ onLogout }) {
       [
         {
           id: 'search-overview-hero',
-          label: 'Morning brief & wallet balance',
-          keywords: ['overview', 'brief', 'wallet', 'balance', 'welcome'],
+          label: 'Today\'s summary & available money',
+          keywords: ['overview', 'summary', 'wallet', 'balance', 'welcome', 'money'],
           tab: 'overview',
           targetId: 'overview-hero',
         },
@@ -93,8 +93,8 @@ export function VendorDashboard({ onLogout }) {
         },
         {
           id: 'search-overview-snapshot',
-          label: 'Snapshot KPIs',
-          keywords: ['overview', 'snapshot', 'kpi', 'metrics', 'highlights'],
+          label: 'Quick summary',
+          keywords: ['overview', 'snapshot', 'summary', 'highlights'],
           tab: 'overview',
           targetId: 'overview-snapshot',
         },
@@ -107,64 +107,64 @@ export function VendorDashboard({ onLogout }) {
         },
         {
           id: 'search-inventory-header',
-          label: 'Inventory status',
-          keywords: ['inventory', 'stock', 'skus', 'health'],
+          label: 'Stock status',
+          keywords: ['inventory', 'stock', 'products', 'items', 'health'],
           tab: 'inventory',
           targetId: 'inventory-header',
         },
         {
           id: 'search-inventory-restock',
-          label: 'Restock advisory',
-          keywords: ['inventory', 'restock', 'advisory', 'credit'],
+          label: 'Need to order more',
+          keywords: ['inventory', 'restock', 'order', 'loan', 'stock'],
           tab: 'inventory',
           targetId: 'inventory-restock',
         },
         {
           id: 'search-orders-header',
-          label: 'Orders workflow',
-          keywords: ['orders', 'workflow', 'queue', 'availability'],
+          label: 'Orders',
+          keywords: ['orders', 'queue', 'availability'],
           tab: 'orders',
           targetId: 'orders-header',
         },
         {
           id: 'search-orders-tracker',
-          label: 'Order status tracker',
-          keywords: ['orders', 'tracker', 'stages', 'processing'],
+          label: 'Order status',
+          keywords: ['orders', 'tracker', 'stages', 'processing', 'status'],
           tab: 'orders',
           targetId: 'orders-tracker',
         },
         {
           id: 'search-orders-fallback',
-          label: 'Fallback logistics',
-          keywords: ['orders', 'fallback', 'logistics', 'escalate'],
+          label: 'Backup delivery',
+          keywords: ['orders', 'backup', 'delivery', 'admin', 'send'],
           tab: 'orders',
           targetId: 'orders-fallback',
         },
         {
           id: 'search-credit-summary',
-          label: 'Credit summary & usage',
-          keywords: ['credit', 'limit', 'usage', 'penalty'],
+          label: 'Loan summary & usage',
+          keywords: ['credit', 'loan', 'limit', 'usage', 'fine'],
           tab: 'credit',
           targetId: 'credit-summary',
         },
         {
           id: 'search-credit-penalty',
-          label: 'Penalty timeline',
-          keywords: ['credit', 'penalty', 'timeline', 'repayment'],
+          label: 'Fine timeline',
+          keywords: ['credit', 'loan', 'penalty', 'fine', 'timeline', 'payment'],
           tab: 'credit',
           targetId: 'credit-penalty',
         },
         {
           id: 'search-reports-overview',
-          label: 'Reports overview',
-          keywords: ['reports', 'insights', 'analytics'],
+          label: 'Summary overview',
+          keywords: ['reports', 'summary', 'insights', 'tips'],
           tab: 'reports',
           targetId: 'reports-overview',
         },
         {
           id: 'search-reports-top-vendors',
-          label: 'Top vendor leaderboard',
-          keywords: ['reports', 'vendors', 'leaderboard', 'performance'],
+          label: 'Top sellers',
+          keywords: ['reports', 'summary', 'vendors', 'sellers', 'top'],
           tab: 'reports',
           targetId: 'reports-top-vendors',
         },
@@ -323,7 +323,7 @@ export function VendorDashboard({ onLogout }) {
                     closeSearch()
                   }
                 }}
-                placeholder="Search inventory, orders, reports..."
+                placeholder="Search stock, orders, summary..."
                 className="vendor-search-input"
                 aria-label="Search vendor console"
               />
@@ -387,44 +387,44 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
   const [servicePage, setServicePage] = useState(0)
 
   const services = [
-    { label: 'Inventory', note: 'Reorder stock', tone: 'success', target: 'inventory', icon: BoxIcon, action: null },
-    { label: 'Pricing', note: 'Update MRP', tone: 'warn', target: 'inventory', icon: ReportIcon, action: 'update-mrp' },
-    { label: 'Dispatch', note: 'Arrange truck', tone: 'success', target: 'orders', icon: TruckIcon, action: null },
-    { label: 'Wallet', note: 'View payouts', tone: 'success', target: 'credit', icon: WalletIcon, action: 'view-payouts' },
-    { label: 'Performance', note: 'Reports', tone: 'success', target: 'reports', icon: ChartIcon, action: null },
-    { label: 'Support', note: 'Raise ticket', tone: 'warn', target: 'orders', icon: MenuIcon, action: null },
+    { label: 'Stock', note: 'Reorder stock', tone: 'success', target: 'inventory', icon: BoxIcon, action: null },
+    { label: 'Pricing', note: 'Update price', tone: 'warn', target: 'inventory', icon: ReportIcon, action: 'update-mrp' },
+    { label: 'Send', note: 'Arrange truck', tone: 'success', target: 'orders', icon: TruckIcon, action: null },
+    { label: 'Wallet', note: 'View payments', tone: 'success', target: 'credit', icon: WalletIcon, action: 'view-payouts' },
+    { label: 'Performance', note: 'Summary', tone: 'success', target: 'reports', icon: ChartIcon, action: null },
+    { label: 'Support', note: 'Get help', tone: 'warn', target: 'orders', icon: MenuIcon, action: null },
     { label: 'Network', note: 'Partner list', tone: 'success', target: 'reports', icon: HomeIcon, action: null },
-    { label: 'Settings', note: 'Profile & KYC', tone: 'success', target: 'credit', icon: CreditIcon, action: 'profile-settings' },
+    { label: 'Settings', note: 'Profile & verification', tone: 'success', target: 'credit', icon: CreditIcon, action: 'profile-settings' },
   ]
 
   const transactions = [
     { name: 'Farm Fresh Traders', action: 'Order accepted', amount: '+₹86,200', status: 'Completed', avatar: 'FF' },
-    { name: 'Green Valley Hub', action: 'Credit repayment', amount: '-₹40,000', status: 'Pending', avatar: 'GV' },
-    { name: 'HarvestLink Pvt Ltd', action: 'Dispatch scheduled', amount: '+₹21,500', status: 'Scheduled', avatar: 'HL' },
+    { name: 'Green Valley Hub', action: 'Loan repayment', amount: '-₹40,000', status: 'Pending', avatar: 'GV' },
+    { name: 'HarvestLink Pvt Ltd', action: 'Delivery scheduled', amount: '+₹21,500', status: 'Scheduled', avatar: 'HL' },
   ]
 
   const walletBalance = vendorSnapshot.credit.remaining || '₹0'
 
   const quickActions = [
     {
-      label: 'Confirm delivery slot',
-      description: 'Assign logistics window',
+      label: 'Confirm delivery time',
+      description: 'Set delivery time',
       target: 'orders',
       icon: TruckIcon,
       tone: 'green',
       action: 'confirm-delivery-slot',
     },
     {
-      label: 'Update inventory batch',
-      description: 'Add new GRN / update stock',
+      label: 'Update stock',
+      description: 'Add new stock / update stock',
       target: 'inventory',
       icon: BoxIcon,
       tone: 'orange',
       action: 'update-inventory-batch',
     },
     {
-      label: 'Raise credit order',
-      description: 'Request refill from admin',
+      label: 'Request loan order',
+      description: 'Request stock from admin',
       target: 'credit',
       icon: CreditIcon,
       tone: 'teal',
@@ -464,7 +464,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
           </div>
           <div className="overview-hero__core">
             <div className="overview-hero__identity">
-              <span className="overview-hero__greeting">Morning brief</span>
+              <span className="overview-hero__greeting">Today's summary</span>
               <h2 className="overview-hero__welcome">{welcomeName}</h2>
             </div>
             <div className="overview-hero__badge">
@@ -473,19 +473,19 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
           </div>
           <div className="overview-hero__balance">
             <div>
-              <p className="overview-hero__label">Wallet balance</p>
+              <p className="overview-hero__label">Available money</p>
               <p className="overview-hero__value">{walletBalance}</p>
             </div>
             <button type="button" onClick={() => openPanel('check-credit')} className="overview-hero__cta">
-              Check credit
+              Check loan
             </button>
           </div>
           <div className="overview-hero__stats">
             {[
-              { label: 'Order confirmations pending', value: '02' },
-              { label: 'Credit reminder today', value: '₹1.2L' },
+              { label: 'Orders waiting for your reply', value: '02' },
+              { label: 'Loan reminder today', value: '₹1.2L' },
               { label: 'Average delivery time', value: '21h' },
-              { label: 'Pending reviews', value: '05' },
+              { label: 'Reviews waiting', value: '05' },
             ].map((item) => (
               <div key={item.label} className="overview-stat-card">
                 <p>{item.label}</p>
@@ -629,7 +629,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
       <section id="overview-snapshot" className="overview-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Snapshot</h3>
+            <h3 className="overview-section__title">Quick summary</h3>
           </div>
         </div>
         <div className="overview-metric-grid">
@@ -696,38 +696,38 @@ function InventoryView({ openPanel }) {
   const healthyCount = totalSkus - criticalCount - lowCount
 
   const topStats = [
-    { label: 'Critical alerts', value: criticalCount, note: 'Needs procurement', tone: 'warn' },
-    { label: 'Low stock items', value: lowCount, note: 'Monitor buffers', tone: 'teal' },
+    { label: 'Urgent alerts', value: criticalCount, note: 'Need to buy more', tone: 'warn' },
+    { label: 'Low stock items', value: lowCount, note: 'Keep an eye on', tone: 'teal' },
   ]
 
   const inventoryStats = [
-    { label: 'Total SKUs', value: `${totalSkus}`, meta: `${healthyCount} healthy`, tone: 'success' },
-    { label: 'Critical SKUs', value: `${criticalCount}`, meta: 'Escalate in 24h', tone: 'warn' },
-    { label: 'Average stock health', value: '74%', meta: 'Against safety buffers', tone: 'success' },
-    { label: 'Reorder points', value: `${lowCount}`, meta: 'Monitor closely', tone: 'teal' },
+    { label: 'Total products', value: `${totalSkus}`, meta: `${healthyCount} healthy`, tone: 'success' },
+    { label: 'Urgent products', value: `${criticalCount}`, meta: 'Take action in 24 hours', tone: 'warn' },
+    { label: 'Overall stock level', value: '74%', meta: 'Compared to safe levels', tone: 'success' },
+    { label: 'Need to order more', value: `${lowCount}`, meta: 'Keep an eye on', tone: 'teal' },
   ]
 
   const metricIcons = [BoxIcon, ChartIcon, SparkIcon, TruckIcon]
 
   const alerts = [
     {
-      title: 'Restock advisory',
-      body: 'Micro nutrients trending low. Raise request before cutoff.',
-      badge: 'Lead time • 3 days',
+      title: 'Need to order more',
+      body: 'Micro nutrients getting low. Request before deadline.',
+      badge: 'Time to get • 3 days',
       tone: 'warn',
       action: 'Raise request',
     },
     {
-      title: 'Vendor coordination',
+      title: 'Talk to supplier',
       body: 'Confirm NPK 24:24:0 availability with admin hub.',
       badge: 'Supplier • Admin hub',
       tone: 'teal',
-      action: 'Ping admin',
+      action: 'Contact admin',
     },
     {
-      title: 'Document updates',
-      body: '2 SKUs awaiting quality certificates before dispatch.',
-      badge: 'QC pending',
+      title: 'Papers to upload',
+      body: '2 products waiting for quality certificates before sending.',
+      badge: 'Quality check pending',
       tone: 'neutral',
       action: 'Upload docs',
     },
@@ -744,17 +744,17 @@ function InventoryView({ openPanel }) {
       <section id="inventory-hero" className="inventory-hero">
         <div className="inventory-hero__shell">
           <div className="inventory-hero__headline">
-            <span className="inventory-hero__chip">Inventory hub</span>
+            <span className="inventory-hero__chip">Stock hub</span>
             <h3 className="inventory-hero__title">{totalSkus} active products</h3>
             <p className="inventory-hero__meta">
-              {criticalCount} critical • {lowCount} low stock • {healthyCount} healthy
+              {criticalCount} urgent • {lowCount} low stock • {healthyCount} healthy
             </p>
             <div className="inventory-hero__actions">
               {[
-                { label: 'Add SKU', icon: SparkIcon, action: 'add-sku' },
+                { label: 'Add product', icon: SparkIcon, action: 'add-sku' },
                 { label: 'Reorder', icon: TruckIcon, action: 'reorder' },
                 { label: 'Supplier list', icon: HomeIcon, action: 'supplier-list' },
-                { label: 'Stock report', icon: ChartIcon, action: 'stock-report' },
+                { label: 'Stock summary', icon: ChartIcon, action: 'stock-report' },
               ].map((action) => (
                 <button
                   key={action.label}
@@ -859,9 +859,9 @@ function InventoryView({ openPanel }) {
               <div className="inventory-sku-card__icon">
                 <BoxIcon className="h-4 w-4" />
               </div>
-              <div className="inventory-sku-card__title">
+                <div className="inventory-sku-card__title">
                 <h4>{item.name}</h4>
-                <p>On hand • {item.stock}</p>
+                <p>Available • {item.stock}</p>
               </div>
               <span
                 className={cn(
@@ -873,16 +873,16 @@ function InventoryView({ openPanel }) {
                     : 'is-critical',
                 )}
               >
-                {item.status}
+                {item.status === 'Critical' ? 'Urgent' : item.status}
               </span>
             </header>
             <div className="inventory-sku-card__metrics">
               <div>
-                <span>Purchase</span>
+                <span>Cost price</span>
                 <strong>{item.purchase}</strong>
               </div>
               <div>
-                <span>Selling</span>
+                <span>Sale price</span>
                 <strong>{item.selling}</strong>
               </div>
             </div>
@@ -901,13 +901,13 @@ function InventoryView({ openPanel }) {
       <div id="inventory-restock" className="vendor-card border border-brand/20 bg-white px-5 py-4 shadow-card">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-surface-foreground">Restock advisory</p>
+            <p className="text-sm font-semibold text-surface-foreground">Need to order more</p>
             <p className="text-xs text-muted-foreground">
-              Micro Nutrients trending towards critical. Submit a credit requisition within 48h to avoid disruptions.
+              Micro Nutrients getting low. Submit a loan request within 48h to avoid problems.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="vendor-chip warn">Lead time • 3 days</span>
+            <span className="vendor-chip warn">Time to get • 3 days</span>
             <button
               className="rounded-full bg-brand px-5 py-2 text-xs font-semibold text-brand-foreground"
               onClick={() => openPanel('raise-request')}
@@ -963,28 +963,28 @@ function OrdersView({ openPanel }) {
       case 'all':
         return [
           {
-            label: 'Awaiting confirmation',
+            label: 'Waiting for your reply',
             value: totals.awaiting,
-            meta: 'Needs vendor response',
+            meta: 'Needs your reply',
             tone: 'warn',
           },
           {
-            label: 'Processing orders',
+            label: 'Orders being prepared',
             value: totals.processing,
-            meta: 'Packaging & dispatch',
+            meta: 'Packing & sending',
             tone: 'teal',
           },
           {
-            label: 'Delivery ready',
+            label: 'Ready to deliver',
             value: totals.delivered,
-            meta: 'Track handover',
+            meta: 'Track delivery',
             tone: 'success',
           },
         ]
       case 'awaiting':
         return [
           {
-            label: 'Pending response',
+            label: 'Waiting for your reply',
             value: totals.awaiting,
             meta: 'Action required',
             tone: 'warn',
@@ -992,34 +992,34 @@ function OrdersView({ openPanel }) {
           {
             label: 'Average wait time',
             value: '2.5h',
-            meta: 'Response window',
+            meta: 'Time to reply',
             tone: 'teal',
           },
           {
             label: 'Urgent orders',
             value: Math.max(0, totals.awaiting - 2),
-            meta: 'Exceeding SLA',
+            meta: 'Taking too long',
             tone: 'warn',
           },
         ]
       case 'processing':
         return [
           {
-            label: 'In packaging',
+            label: 'Being packed',
             value: Math.floor(totals.processing * 0.6),
             meta: 'Being prepared',
             tone: 'teal',
           },
           {
-            label: 'Ready for dispatch',
+            label: 'Ready to send',
             value: Math.floor(totals.processing * 0.4),
-            meta: 'Awaiting pickup',
+            meta: 'Waiting to be picked up',
             tone: 'success',
           },
           {
-            label: 'Avg. process time',
+            label: 'Average time to prepare',
             value: '4.2h',
-            meta: 'From confirmation',
+            meta: 'After you confirm',
             tone: 'teal',
           },
         ]
@@ -1032,15 +1032,15 @@ function OrdersView({ openPanel }) {
             tone: 'success',
           },
           {
-            label: 'On-time rate',
+            label: 'Delivered on time',
             value: '94%',
-            meta: 'SLA compliance',
+            meta: 'On-time delivery',
             tone: 'success',
           },
           {
-            label: 'Avg. delivery time',
+            label: 'Average delivery time',
             value: '18.5h',
-            meta: 'From order placed',
+            meta: 'After order placed',
             tone: 'teal',
           },
         ]
@@ -1056,10 +1056,10 @@ function OrdersView({ openPanel }) {
       <section id="orders-hero" className="orders-hero">
         <div className="orders-hero__shell">
           <div className="orders-hero__headline">
-            <span className="orders-hero__chip">Orders queue</span>
+            <span className="orders-hero__chip">Orders</span>
             <h3 className="orders-hero__title">{totalOrders} active orders</h3>
             <p className="orders-hero__meta">
-              {totals.awaiting} awaiting • {totals.processing} processing • {totals.delivered} delivered
+              {totals.awaiting} waiting • {totals.processing} preparing • {totals.delivered} delivered
             </p>
           </div>
           <div className="orders-hero__filters" role="group" aria-label="Filter orders">
@@ -1100,7 +1100,7 @@ function OrdersView({ openPanel }) {
             <h3 className="overview-section__title">Orders</h3>
                 </div>
           <button type="button" className="orders-section__cta" onClick={() => openPanel('view-sla-policy')}>
-            View SLA policy
+            View delivery policy
           </button>
               </div>
         <div className="orders-list">
@@ -1160,18 +1160,18 @@ function OrdersView({ openPanel }) {
       <section id="orders-fallback" className="orders-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Fallback logistics</h3>
+            <h3 className="overview-section__title">Backup delivery</h3>
             
           </div>
         </div>
         <div className="orders-fallback-card">
           <p className="orders-fallback-card__body">
-              Western hub reporting a mild delay. Redirect low-priority orders to Admin fulfilment if SLA exceeds 24h.
+              Western hub reporting a mild delay. Send low-priority orders to Admin delivery if it takes more than 24 hours.
             </p>
           <div className="orders-fallback-card__footer">
             <span className="orders-fallback-card__badge">Delay • Western hub</span>
             <button type="button" className="orders-fallback-card__cta" onClick={() => openPanel('escalate-to-admin')}>
-            Escalate to admin
+            Send to admin
           </button>
         </div>
       </div>
@@ -1190,16 +1190,16 @@ function CreditView({ openPanel }) {
   )
 
   const creditMetrics = [
-    { label: 'Credit limit', value: credit.limit, icon: CreditIcon, tone: 'success' },
+    { label: 'Loan limit', value: credit.limit, icon: CreditIcon, tone: 'success' },
     { label: 'Remaining', value: credit.remaining, icon: WalletIcon, tone: 'success' },
     { label: 'Used', value: credit.used, icon: ChartIcon, tone: 'warn' },
     { label: 'Due date', value: credit.due, icon: ReportIcon, tone: 'teal' },
   ]
 
   const penaltyTimeline = [
-    { period: 'Day 0-5', description: 'Grace window with reminders sent automatically.', tone: 'success' },
-    { period: 'Day 6-10', description: 'Penalty applied, finance receives escalation.', tone: 'warn' },
-    { period: 'Day 11+', description: 'New credit blocked until dues cleared.', tone: 'critical' },
+    { period: 'Day 0-5', description: 'Free time with reminders sent automatically.', tone: 'success' },
+    { period: 'Day 6-10', description: 'Fine added, finance team notified.', tone: 'warn' },
+    { period: 'Day 11+', description: 'New loan blocked until payment done.', tone: 'critical' },
   ]
 
   return (
@@ -1239,7 +1239,7 @@ function CreditView({ openPanel }) {
               <div className="credit-status-card__details">
                 <div className="credit-status-card__amount">
                   <span className="credit-status-card__amount-value">{credit.used}</span>
-                  <span className="credit-status-card__amount-label">Credit Utilized</span>
+                  <span className="credit-status-card__amount-label">Loan Used</span>
             </div>
                 <div className="credit-status-card__quick-info">
                   <div className="credit-status-card__info-item">
@@ -1247,7 +1247,7 @@ function CreditView({ openPanel }) {
                     <span className="credit-status-card__info-value">{credit.remaining}</span>
             </div>
                   <div className="credit-status-card__info-item">
-                    <span className="credit-status-card__info-label">Total Limit</span>
+                    <span className="credit-status-card__info-label">Total loan limit</span>
                     <span className="credit-status-card__info-value">{credit.limit}</span>
             </div>
             </div>
@@ -1256,7 +1256,7 @@ function CreditView({ openPanel }) {
           </div>
           <div className="credit-status-card__footer">
             <div className="credit-status-card__status-badge">
-              <span className="credit-status-card__status-text">{credit.penalty}</span>
+              <span className="credit-status-card__status-text">{credit.penalty === 'No penalty' ? 'No fine' : credit.penalty}</span>
             </div>
             <button type="button" className="credit-status-card__action" onClick={() => openPanel('view-details')}>
               View Details
@@ -1268,7 +1268,7 @@ function CreditView({ openPanel }) {
       <section id="credit-summary" className="credit-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Credit summary</h3>
+            <h3 className="overview-section__title">Loan summary</h3>
           </div>
         </div>
         <div className="credit-metric-grid">
@@ -1289,14 +1289,14 @@ function CreditView({ openPanel }) {
         </div>
         <div className="credit-usage-card">
           <div className="credit-usage-card__header">
-            <span className="credit-usage-card__label">Credit usage</span>
+            <span className="credit-usage-card__label">Loan usage</span>
             <span className="credit-usage-card__percent">{usedPercent}%</span>
           </div>
           <div className="credit-usage-card__progress">
             <span style={{ width: `${usedPercent}%` }} />
           </div>
           <div className="credit-usage-card__footer">
-            <span className="credit-usage-card__badge">{credit.penalty}</span>
+            <span className="credit-usage-card__badge">{credit.penalty === 'No penalty' ? 'No fine' : credit.penalty}</span>
           </div>
         </div>
       </section>
@@ -1304,7 +1304,7 @@ function CreditView({ openPanel }) {
       <section id="credit-actions" className="credit-section">
         <div className="overview-section__header">
             <div>
-            <h3 className="overview-section__title">Credit management</h3>
+            <h3 className="overview-section__title">Loan management</h3>
           </div>
         </div>
         <div className="credit-action-grid">
@@ -1316,10 +1316,10 @@ function CreditView({ openPanel }) {
               <h4 className="credit-action-card__title">Need to reorder?</h4>
             </header>
             <p className="credit-action-card__body">
-                Minimum purchase value ₹50,000. Credit order requests go to Admin for approval before stock updates.
+                Minimum order amount ₹50,000. Loan order requests go to Admin for approval before stock updates.
               </p>
             <button type="button" className="credit-action-card__cta" onClick={() => openPanel('place-credit-purchase')}>
-              Place credit purchase request
+              Request loan order
             </button>
           </div>
         </div>
@@ -1328,7 +1328,7 @@ function CreditView({ openPanel }) {
       <section id="credit-penalty" className="credit-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Penalty timeline</h3>
+            <h3 className="overview-section__title">Fine timeline</h3>
               </div>
           </div>
         <div className="credit-timeline">
@@ -1366,10 +1366,10 @@ function ReportsView() {
   const [timePeriod, setTimePeriod] = useState('week')
 
   const tabs = [
-    { id: 'revenue', label: 'Revenue Analytics' },
+    { id: 'revenue', label: 'Earnings Summary' },
     { id: 'performance', label: 'Performance' },
     { id: 'trends', label: 'Trends' },
-    { id: 'insights', label: 'Insights' },
+    { id: 'insights', label: 'Tips' },
   ]
 
   const timePeriods = [
@@ -1434,11 +1434,11 @@ function ReportsView() {
             </div>
               <div className="reports-summary-card__stats">
                 <div className="reports-summary-card__stat">
-                  <span className="reports-summary-card__stat-label">Total Revenue</span>
+                  <span className="reports-summary-card__stat-label">Total Earnings</span>
                   <span className="reports-summary-card__stat-value">₹28.6L</span>
             </div>
                 <div className="reports-summary-card__stat">
-                  <span className="reports-summary-card__stat-label">Growth Rate</span>
+                  <span className="reports-summary-card__stat-label">Growth</span>
                   <span className="reports-summary-card__stat-value is-positive">+15.2%</span>
           </div>
               </div>
@@ -1446,11 +1446,11 @@ function ReportsView() {
             <div className="reports-summary-card__insights">
               <div className="reports-summary-card__insight">
                 <span className="reports-summary-card__insight-icon">📈</span>
-                <span className="reports-summary-card__insight-text">Revenue up 15% from last month</span>
+                <span className="reports-summary-card__insight-text">Earnings up 15% from last month</span>
               </div>
               <div className="reports-summary-card__insight">
                 <span className="reports-summary-card__insight-icon">⚡</span>
-                <span className="reports-summary-card__insight-text">84 orders processed this week</span>
+                <span className="reports-summary-card__insight-text">84 orders completed this week</span>
               </div>
             </div>
           </div>
@@ -1502,7 +1502,7 @@ function ReportsView() {
                 <div className="reports-analytics-card__header">
                   <div className="reports-analytics-card__header-top">
                     <div>
-                      <h4 className="reports-analytics-card__title">Revenue by orders</h4>
+                      <h4 className="reports-analytics-card__title">Earnings from orders</h4>
                       <span className="reports-analytics-card__subtitle">
                         {timePeriod === 'week' && 'Last 7 days'}
                         {timePeriod === 'month' && 'Last 30 days'}
@@ -1532,7 +1532,7 @@ function ReportsView() {
                     <div className="reports-line-chart__legend">
                       <div className="reports-line-chart__legend-item">
                         <span className="reports-line-chart__legend-dot is-revenue" />
-                        <span className="reports-line-chart__legend-label">Revenue (₹L)</span>
+                        <span className="reports-line-chart__legend-label">Earnings (₹L)</span>
                       </div>
                       <div className="reports-line-chart__legend-item">
                         <span className="reports-line-chart__legend-dot is-orders" />
@@ -1650,7 +1650,7 @@ function ReportsView() {
                     </div>
                     <div className="reports-line-chart__stats">
                       <div className="reports-line-chart__stat">
-                        <span className="reports-line-chart__stat-label">Revenue</span>
+                        <span className="reports-line-chart__stat-label">Earnings</span>
                         <span className="reports-line-chart__stat-value">
                           {(
                             chartData.revenue.reduce((a, b) => a + b, 0) /
@@ -1680,7 +1680,7 @@ function ReportsView() {
               <div className="reports-analytics-card">
                 <div className="reports-analytics-card__header">
                   <span className="reports-analytics-card__badge">Last 30 days</span>
-                  <h4 className="reports-analytics-card__title">Order fulfillment performance</h4>
+                  <h4 className="reports-analytics-card__title">Order delivery performance</h4>
                 </div>
                 <div className="reports-analytics-card__chart">
                   <div className="reports-chart">
@@ -1718,11 +1718,11 @@ function ReportsView() {
                 </div>
                 <div className="reports-performance-metrics">
                   <div className="reports-performance-metric">
-                    <span className="reports-performance-metric__label">Avg. fulfillment time</span>
+                    <span className="reports-performance-metric__label">Average time to deliver</span>
                     <span className="reports-performance-metric__value">18.5h</span>
                   </div>
                   <div className="reports-performance-metric">
-                    <span className="reports-performance-metric__label">Order accuracy</span>
+                    <span className="reports-performance-metric__label">Order correctness</span>
                     <span className="reports-performance-metric__value">96.2%</span>
                   </div>
                   <div className="reports-performance-metric">
@@ -1738,18 +1738,18 @@ function ReportsView() {
               <div className="reports-analytics-card">
                 <div className="reports-analytics-card__header">
                   <span className="reports-analytics-card__badge">Last 3 months</span>
-                  <h4 className="reports-analytics-card__title">Growth trends & patterns</h4>
+                  <h4 className="reports-analytics-card__title">Growth summary</h4>
                 </div>
                 <div className="reports-analytics-card__chart">
                   <div className="reports-chart">
                     <div className="reports-chart__legend">
                       <div className="reports-chart__legend-item">
                         <span className="reports-chart__legend-dot is-revenue" />
-                        <span className="reports-chart__legend-label">Order volume</span>
+                        <span className="reports-chart__legend-label">Number of orders</span>
                       </div>
                       <div className="reports-chart__legend-item">
                         <span className="reports-chart__legend-dot is-fulfilment" />
-                        <span className="reports-chart__legend-label">Revenue growth</span>
+                        <span className="reports-chart__legend-label">Earnings growth</span>
                       </div>
                     </div>
                     <div className="reports-chart__bars">
@@ -1777,7 +1777,7 @@ function ReportsView() {
                   <div className="reports-trend-item">
                     <span className="reports-trend-item__icon">📈</span>
                     <div className="reports-trend-item__content">
-                      <span className="reports-trend-item__label">Peak season approaching</span>
+                      <span className="reports-trend-item__label">Busy season coming</span>
                       <span className="reports-trend-item__value">+24% expected growth</span>
                     </div>
                   </div>
@@ -1796,43 +1796,43 @@ function ReportsView() {
             <div className="reports-tab-panel is-active">
               <div className="reports-analytics-card">
                 <div className="reports-analytics-card__header">
-                  <span className="reports-analytics-card__badge">AI-powered insights</span>
-                  <h4 className="reports-analytics-card__title">Key recommendations</h4>
+                  <span className="reports-analytics-card__badge">Smart suggestions</span>
+                  <h4 className="reports-analytics-card__title">Important tips</h4>
                 </div>
                 <div className="reports-insights-list">
                   <div className="reports-insight-card">
                     <div className="reports-insight-card__icon is-success">✓</div>
                     <div className="reports-insight-card__content">
-                      <h5 className="reports-insight-card__title">Optimize inventory levels</h5>
+                      <h5 className="reports-insight-card__title">Manage stock better</h5>
                       <p className="reports-insight-card__description">
-                        Your top 3 products show 15% higher demand. Consider increasing stock by 20% to meet peak season.
+                        Your top 3 products show 15% higher demand. Consider increasing stock by 20% to meet busy season.
                       </p>
                     </div>
                   </div>
                   <div className="reports-insight-card">
                     <div className="reports-insight-card__icon is-warn">⚠</div>
                     <div className="reports-insight-card__content">
-                      <h5 className="reports-insight-card__title">Delivery time improvement</h5>
+                      <h5 className="reports-insight-card__title">Faster delivery</h5>
                       <p className="reports-insight-card__description">
-                        Western hub routes show 8% delay. Consider alternative logistics partners for faster fulfillment.
+                        Western hub routes show 8% delay. Consider other delivery partners for faster delivery.
                       </p>
                     </div>
                   </div>
                   <div className="reports-insight-card">
                     <div className="reports-insight-card__icon is-info">💡</div>
                     <div className="reports-insight-card__content">
-                      <h5 className="reports-insight-card__title">Credit utilization</h5>
+                      <h5 className="reports-insight-card__title">Loan usage</h5>
                       <p className="reports-insight-card__description">
-                        Your credit usage is optimal at 68%. You can safely increase order volume by 25% without risk.
+                        Your loan usage is good at 68%. You can safely increase number of orders by 25% without risk.
                       </p>
                     </div>
                   </div>
                   <div className="reports-insight-card">
                     <div className="reports-insight-card__icon is-success">📊</div>
                     <div className="reports-insight-card__content">
-                      <h5 className="reports-insight-card__title">Customer retention</h5>
+                      <h5 className="reports-insight-card__title">Repeat customers</h5>
                       <p className="reports-insight-card__description">
-                        Repeat order rate increased by 12% this month. Focus on maintaining quality standards.
+                        Repeat orders increased by 12% this month. Focus on maintaining quality standards.
                       </p>
                     </div>
                   </div>
@@ -1846,7 +1846,7 @@ function ReportsView() {
       <section id="reports-top-vendors" className="reports-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Top performers</h3>
+            <h3 className="overview-section__title">Top sellers</h3>
           </div>
         </div>
         <div className="reports-vendors-list">

@@ -6,8 +6,8 @@ export const vendorSnapshot = {
   },
   highlights: [
     { id: 'orders', label: 'Orders Today', value: 12, trend: '+3 vs yesterday' },
-    { id: 'inventory', label: 'Critical Stock', value: 4, trend: 'Items to restock' },
-    { id: 'credit', label: 'Credit Balance', value: '₹12.4L', trend: 'Due in 8 days' },
+    { id: 'inventory', label: 'Urgent Stock', value: 4, trend: 'Items to restock' },
+    { id: 'credit', label: 'Loan Balance', value: '₹12.4L', trend: 'Due in 8 days' },
   ],
   inventory: [
     {
@@ -62,8 +62,8 @@ export const vendorSnapshot = {
   },
   reports: [
     { label: 'Orders this week', value: '84', meta: '+12% growth' },
-    { label: 'Revenue this month', value: '₹18.6L', meta: 'Processing ₹4.2L' },
-    { label: 'Credit purchases', value: '₹9.4L', meta: 'Across 3 requisitions' },
+    { label: 'Earnings this month', value: '₹18.6L', meta: 'Processing ₹4.2L' },
+    { label: 'Loan purchases', value: '₹9.4L', meta: 'Across 3 requests' },
     { label: 'Customer satisfaction', value: '4.7/5', meta: 'Based on 156 reviews' },
   ],
 }

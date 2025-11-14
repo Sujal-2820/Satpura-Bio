@@ -185,7 +185,7 @@
 .vendor-shell-content {
   flex: 1;
   padding: 1.5rem 1.25rem 6rem;
-  padding-top: calc(1.5rem + 160px);
+  padding-top: calc(1.5rem + 115px);
   padding-bottom: calc(1.5rem + 80px);
 }
 
@@ -2234,7 +2234,7 @@
 .credit-status-section {
   margin-left: -0.65rem;
   margin-right: -0.65rem;
-  margin-top: -0.3rem;
+  margin-top: 1.5rem;
 }
 
 .credit-status-card {
@@ -2752,7 +2752,7 @@
 .reports-summary-section {
   margin-left: -0.65rem;
   margin-right: -0.65rem;
-  margin-top: -0.3rem;
+  margin-top: 1.5rem;
 }
 
 .reports-summary-card {
