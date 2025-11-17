@@ -38,11 +38,11 @@
     align-items: center;
     gap: 0.5rem;
     border-radius: 9999px;
-    background-color: hsl(134 45% 88%);
+    background-color: hsl(142 45% 25%);
     padding: 0.25rem 0.75rem;
     font-size: 0.875rem;
     font-weight: 500;
-    color: hsl(134 45% 38%);
+    color: hsl(142 52% 52%);
   }
 }
 

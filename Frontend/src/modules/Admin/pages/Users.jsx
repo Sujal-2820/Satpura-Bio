@@ -19,18 +19,18 @@ export function UsersPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 5 • User Management</p>
-          <h2 className="text-2xl font-semibold text-surface-foreground">User Trust & Compliance</h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 5 • User Management</p>
+          <h2 className="text-2xl font-bold text-gray-900">User Trust & Compliance</h2>
+          <p className="text-sm text-gray-600">
             Monitor orders, payments, and support escalations. Disable risky accounts with a single action.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="inline-flex items-center gap-2 rounded-full border border-muted/60 bg-surface px-4 py-2 text-sm text-muted-foreground transition hover:border-brand hover:text-brand">
+          <button className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)]">
             <Search className="h-4 w-4" />
             Advanced Search
           </button>
-          <button className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground transition hover:bg-brand/90">
+          <button className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(249,115,22,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(249,115,22,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]">
             <UserCheck className="h-4 w-4" />
             Verify Account
           </button>
@@ -60,9 +60,9 @@ export function UsersPage() {
       />
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4 rounded-3xl border border-muted/60 bg-white/80 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-surface-foreground">User Verification Workflow</h3>
-          <p className="text-sm text-muted-foreground">
+        <div className="space-y-4 rounded-3xl border border-orange-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <h3 className="text-lg font-bold text-orange-700">User Verification Workflow</h3>
+          <p className="text-sm text-gray-600">
             Ensure every user is mapped to a seller, with payment visibility and support ticket insights.
           </p>
           <div className="space-y-3">
@@ -83,24 +83,24 @@ export function UsersPage() {
                 status: 'Pending',
               },
             ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-muted/60 bg-surface p-4 hover:-translate-y-1 hover:shadow-card">
+              <div key={item.title} className="rounded-2xl border border-gray-200 bg-white p-4 hover:-translate-y-1 hover:shadow-[0_6px_20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-surface-foreground">{item.title}</p>
+                  <p className="text-sm font-bold text-gray-900">{item.title}</p>
                   <StatusBadge tone={item.status === 'Completed' ? 'success' : item.status === 'In Progress' ? 'warning' : 'neutral'}>
                     {item.status}
                   </StatusBadge>
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">{item.description}</p>
+                <p className="mt-2 text-xs text-gray-600">{item.description}</p>
               </div>
             ))}
           </div>
         </div>
-        <div className="space-y-4 rounded-3xl border border-accent/40 bg-accent/10 p-6 shadow-sm">
+        <div className="space-y-4 rounded-3xl border border-red-200 bg-gradient-to-br from-red-50 to-red-100/50 p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
           <div className="flex items-center gap-3">
-            <Ban className="h-5 w-5 text-accent" />
+            <Ban className="h-5 w-5 text-red-600" />
             <div>
-              <h3 className="text-lg font-semibold text-surface-foreground">Suspicious Accounts</h3>
-              <p className="text-sm text-accent">
+              <h3 className="text-lg font-bold text-gray-900">Suspicious Accounts</h3>
+              <p className="text-sm text-red-700">
                 Pattern-based alerts combining payment delays, refund rate, and support escalations.
               </p>
             </div>
@@ -120,9 +120,9 @@ export function UsersPage() {
                 detail: 'Payment lapsed twice in 45 days. Credit risk flagged.',
               },
             ].map((item) => (
-              <div key={item.user} className="rounded-2xl border border-accent/40 bg-white/70 px-4 py-3">
-                <p className="text-sm font-semibold text-surface-foreground">{item.user}</p>
-                <p className="text-xs text-accent">{item.detail}</p>
+              <div key={item.user} className="rounded-2xl border border-red-200 bg-white px-4 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)]">
+                <p className="text-sm font-bold text-gray-900">{item.user}</p>
+                <p className="text-xs text-red-700">{item.detail}</p>
               </div>
             ))}
           </div>

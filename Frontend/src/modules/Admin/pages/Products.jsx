@@ -3,6 +3,7 @@ import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { FilterBar } from '../components/FilterBar'
 import { productInventory } from '../services/adminData'
+import { cn } from '../../../lib/cn'
 
 const columns = [
   { Header: 'Product', accessor: 'name' },
@@ -15,17 +16,26 @@ const columns = [
 ]
 
 export function ProductsPage() {
+  const regionColors = [
+    { border: 'border-green-200', bg: 'bg-gradient-to-br from-green-50 to-green-100/50', text: 'text-green-700', progress: 'bg-gradient-to-r from-green-500 to-green-600' },
+    { border: 'border-yellow-200', bg: 'bg-gradient-to-br from-yellow-50 to-yellow-100/50', text: 'text-yellow-700', progress: 'bg-gradient-to-r from-yellow-500 to-yellow-600' },
+    { border: 'border-blue-200', bg: 'bg-gradient-to-br from-blue-50 to-blue-100/50', text: 'text-blue-700', progress: 'bg-gradient-to-r from-blue-500 to-blue-600' },
+    { border: 'border-purple-200', bg: 'bg-gradient-to-br from-purple-50 to-purple-100/50', text: 'text-purple-700', progress: 'bg-gradient-to-r from-purple-500 to-purple-600' },
+    { border: 'border-indigo-200', bg: 'bg-gradient-to-br from-indigo-50 to-indigo-100/50', text: 'text-indigo-700', progress: 'bg-gradient-to-r from-indigo-500 to-indigo-600' },
+    { border: 'border-orange-200', bg: 'bg-gradient-to-br from-orange-50 to-orange-100/50', text: 'text-orange-700', progress: 'bg-gradient-to-r from-orange-500 to-orange-600' },
+  ]
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 2 • Master Product Management</p>
-          <h2 className="text-2xl font-semibold text-surface-foreground">Central Catalogue Control</h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 2 • Master Product Management</p>
+          <h2 className="text-2xl font-bold text-gray-900">Central Catalogue Control</h2>
+          <p className="text-sm text-gray-600">
             Manage pricing, stock distribution, and regional visibility with batch-level precision.
           </p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-brand-foreground transition hover:bg-brand/90">
+        <button className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(168,85,247,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(168,85,247,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]">
           <Layers3 className="h-4 w-4" />
           Add Product
         </button>
@@ -51,8 +61,8 @@ export function ProductsPage() {
                 )
               : column.accessor === 'region'
               ? (row) => (
-                  <div className="inline-flex items-center gap-2 rounded-full border border-muted/60 bg-surface px-3 py-1 text-xs">
-                    <MapPin className="h-3.5 w-3.5 text-brand" />
+                  <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 px-3 py-1 text-xs text-blue-700 font-bold shadow-[0_2px_8px_rgba(59,130,246,0.2),inset_0_1px_0_rgba(255,255,255,0.8)]">
+                    <MapPin className="h-3.5 w-3.5" />
                     {row.region}
                   </div>
                 )
@@ -63,10 +73,12 @@ export function ProductsPage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-3xl border border-muted/60 bg-white/80 p-5 shadow-sm lg:col-span-2">
-          <h3 className="text-lg font-semibold text-surface-foreground">Regional Assignment Snapshot</h3>
-          <p className="text-sm text-muted-foreground">Ensure region-specific pricing and stock buffers are within threshold.</p>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="rounded-3xl border border-purple-200 bg-white p-5 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] lg:col-span-2">
+          <header className="border-b border-purple-200 pb-3 mb-5">
+            <h3 className="text-lg font-bold text-purple-700">Regional Assignment Snapshot</h3>
+            <p className="text-sm text-gray-600">Ensure region-specific pricing and stock buffers are within threshold.</p>
+          </header>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {[
               { region: 'West', coverage: '32 vendors', fill: 78, tone: 'success' },
               { region: 'North', coverage: '24 vendors', fill: 62, tone: 'warning' },
@@ -74,40 +86,58 @@ export function ProductsPage() {
               { region: 'Central', coverage: '12 vendors', fill: 58 },
               { region: 'North East', coverage: '8 vendors', fill: 39 },
               { region: 'East', coverage: '28 vendors', fill: 71, tone: 'success' },
-            ].map((item) => (
-              <div key={item.region} className="rounded-2xl border border-muted/60 bg-surface p-4">
-                <div className="flex items-center justify-between text-sm font-semibold text-surface-foreground">
-                  <span>{item.region}</span>
-                  <span>{item.coverage}</span>
+            ].map((item, index) => {
+              const colors = item.tone === 'success' 
+                ? regionColors[0] 
+                : item.tone === 'warning' 
+                ? regionColors[1] 
+                : regionColors[index % regionColors.length]
+              return (
+                <div
+                  key={item.region}
+                  className={cn(
+                    'rounded-2xl border p-4 transition-all duration-300 hover:scale-105 hover:shadow-[0_6px_20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]',
+                    colors.border,
+                    colors.bg,
+                  )}
+                >
+                  <div className="flex items-center justify-between text-sm font-bold text-gray-900">
+                    <span>{item.region}</span>
+                    <span className={colors.text}>{item.coverage}</span>
+                  </div>
+                  <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
+                    <div
+                      className={cn('h-full rounded-full transition-all duration-500 shadow-[0_2px_8px_rgba(0,0,0,0.2)]', colors.progress)}
+                      style={{ width: `${item.fill}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={
-                      item.tone === 'success'
-                        ? 'h-full rounded-full bg-brand'
-                        : item.tone === 'warning'
-                        ? 'h-full rounded-full bg-accent'
-                        : 'h-full rounded-full bg-brand/70'
-                    }
-                    style={{ width: `${item.fill}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
-        <div className="space-y-3 rounded-3xl border border-muted/60 bg-white/80 p-5 shadow-sm">
-          <h3 className="text-lg font-semibold text-surface-foreground">Visibility Controls</h3>
-          <p className="text-sm text-muted-foreground">
-            Toggle product availability and orchestrate upcoming launches or sunset batches.
-          </p>
+        <div className="space-y-3 rounded-3xl border border-orange-200 bg-white p-5 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <header className="border-b border-orange-200 pb-3">
+            <h3 className="text-lg font-bold text-orange-700">Visibility Controls</h3>
+            <p className="text-sm text-gray-600">
+              Toggle product availability and orchestrate upcoming launches or sunset batches.
+            </p>
+          </header>
           {productInventory.map((product) => (
-            <div key={product.id} className="flex items-center justify-between rounded-2xl border border-muted/60 bg-surface px-4 py-3">
+            <div
+              key={product.id}
+              className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 transition-all duration-200 hover:bg-gray-50 hover:scale-[1.02] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)]"
+            >
               <div>
-                <p className="text-sm font-semibold text-surface-foreground">{product.name}</p>
-                <p className="text-xs text-muted-foreground">Batch expiry • {product.expiry}</p>
+                <p className="text-sm font-bold text-gray-900">{product.name}</p>
+                <p className="text-xs text-gray-600">Batch expiry • {product.expiry}</p>
               </div>
-              <button className="inline-flex items-center gap-1 rounded-full border border-muted/60 bg-white/70 px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:border-brand hover:text-brand">
+              <button className={cn(
+                'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold transition-all duration-200 hover:scale-105',
+                product.visibility === 'Active' 
+                  ? 'border-green-200 bg-gradient-to-br from-green-500 to-green-600 text-white shadow-[0_2px_8px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)]' 
+                  : 'border-gray-200 bg-white text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] hover:border-yellow-300 hover:bg-yellow-50 hover:text-yellow-700'
+              )}>
                 <ToggleRight className="h-4 w-4" />
                 {product.visibility === 'Active' ? 'Active' : 'Inactive'}
               </button>

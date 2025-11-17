@@ -21,13 +21,13 @@ export function SellersPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 4 • Seller Management</p>
-          <h2 className="text-2xl font-semibold text-surface-foreground">Sales Network HQ</h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 4 • Seller Management</p>
+          <h2 className="text-2xl font-bold text-gray-900">Sales Network HQ</h2>
+          <p className="text-sm text-gray-600">
             Incentivise performance, track targets, and manage wallet payouts with clarity.
           </p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-brand-foreground transition hover:bg-brand/90">
+        <button className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-yellow-500 to-yellow-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(234,179,8,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(234,179,8,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]">
           <Award className="h-4 w-4" />
           Create Seller Profile
         </button>
@@ -44,8 +44,8 @@ export function SellersPage() {
                       <span>{row.achieved}%</span>
                       <span>{row.sales}</span>
                     </div>
-                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-brand" style={{ width: `${row.achieved}%` }} />
+                    <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
+                      <div className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-yellow-600 shadow-[0_2px_8px_rgba(234,179,8,0.3)]" style={{ width: `${row.achieved}%` }} />
                     </div>
                   </div>
                 )
@@ -62,9 +62,9 @@ export function SellersPage() {
       />
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4 rounded-3xl border border-muted/60 bg-white/80 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-surface-foreground">Incentive Engine</h3>
-          <p className="text-sm text-muted-foreground">
+        <div className="space-y-4 rounded-3xl border border-yellow-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <h3 className="text-lg font-bold text-yellow-700">Incentive Engine</h3>
+          <p className="text-sm text-gray-600">
             Configure cashback tiers, commission slabs, and performance accelerators for each cohort.
           </p>
           <div className="space-y-3">
@@ -91,21 +91,20 @@ export function SellersPage() {
                 icon: Users,
               },
             ].map((item) => (
-              <div key={item.title} className="flex gap-4 rounded-2xl border border-muted/60 bg-surface p-4 hover:-translate-y-1 hover:shadow-card">
-                <span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-brand-soft/70 text-brand">
+              <div key={item.title} className="flex gap-4 rounded-2xl border border-gray-200 bg-white p-4 hover:-translate-y-1 hover:shadow-[0_6px_20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]">
+                <span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-[0_4px_15px_rgba(234,179,8,0.4),inset_0_1px_0_rgba(255,255,255,0.2)]">
                   <item.icon className="h-5 w-5" />
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-surface-foreground">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.description}</p>
-                  <p className="mt-2 text-xs font-semibold text-brand">{item.meta}</p>
+                  <p className="text-sm font-bold text-gray-900">{item.title}</p>
+                  <p className="text-xs text-gray-600">{item.description}</p>
+                  <p className="mt-2 text-xs font-bold text-yellow-700">{item.meta}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
         <ProgressList
-          className="bg-white/80"
           items={[
             { label: 'Seller Wallet Requests', progress: 42, tone: 'warning', meta: '₹8.2 L awaiting admin approval' },
             { label: 'Monthly Target Achievement', progress: 68, tone: 'success', meta: 'Average across all sellers' },

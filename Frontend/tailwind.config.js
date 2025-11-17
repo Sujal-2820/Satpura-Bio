@@ -6,21 +6,48 @@ export default {
     extend: {
       colors: {
         surface: {
-          DEFAULT: 'hsl(45 52% 97%)',
-          foreground: 'hsl(24 32% 18%)',
+          DEFAULT: 'hsl(220 20% 12%)',
+          foreground: 'hsl(0 0% 95%)',
+          secondary: 'hsl(220 18% 18%)',
         },
         brand: {
-          DEFAULT: 'hsl(134 45% 38%)',
+          DEFAULT: 'hsl(142 52% 52%)',
           foreground: 'hsl(0 0% 99%)',
-          soft: 'hsl(134 45% 88%)',
+          soft: 'hsl(142 45% 25%)',
+          light: 'hsl(142 50% 35%)',
         },
         muted: {
-          DEFAULT: 'hsl(36 28% 90%)',
-          foreground: 'hsl(24 18% 35%)',
+          DEFAULT: 'hsl(220 15% 25%)',
+          foreground: 'hsl(220 10% 65%)',
         },
         accent: {
-          DEFAULT: 'hsl(26 64% 54%)',
-          foreground: 'hsl(36 84% 96%)',
+          DEFAULT: 'hsl(38 92% 58%)',
+          foreground: 'hsl(0 0% 99%)',
+          soft: 'hsl(38 60% 25%)',
+        },
+        info: {
+          DEFAULT: 'hsl(210 80% 58%)',
+          soft: 'hsl(210 50% 25%)',
+        },
+        warning: {
+          DEFAULT: 'hsl(38 92% 58%)',
+          soft: 'hsl(38 60% 25%)',
+        },
+        success: {
+          DEFAULT: 'hsl(142 52% 52%)',
+          soft: 'hsl(142 45% 25%)',
+        },
+        danger: {
+          DEFAULT: 'hsl(0 72% 58%)',
+          soft: 'hsl(0 50% 25%)',
+        },
+        purple: {
+          DEFAULT: 'hsl(270 60% 58%)',
+          soft: 'hsl(270 45% 25%)',
+        },
+        blue: {
+          DEFAULT: 'hsl(210 80% 58%)',
+          soft: 'hsl(210 50% 25%)',
         },
       },
       fontFamily: {
@@ -31,7 +58,8 @@ export default {
         xl: '20px',
       },
       boxShadow: {
-        card: '0 18px 40px -24px rgba(15, 23, 42, 0.35)',
+        card: '0 18px 40px -24px rgba(0, 0, 0, 0.5)',
+        'card-hover': '0 24px 48px -16px rgba(0, 0, 0, 0.6)',
       },
     },
   },
