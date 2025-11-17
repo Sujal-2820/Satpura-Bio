@@ -12,6 +12,7 @@ import { SearchView } from './views/SearchView'
 import { ProductDetailView } from './views/ProductDetailView'
 import { CartView } from './views/CartView'
 import { CheckoutView } from './views/CheckoutView'
+import { OrderConfirmationView } from './views/OrderConfirmationView'
 import { AccountView } from './views/AccountView'
 import { FavouritesView } from './views/FavouritesView'
 import { CategoryProductsView } from './views/CategoryProductsView'
@@ -58,6 +59,7 @@ function UserDashboardContent({ onLogout }) {
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [showCheckout, setShowCheckout] = useState(false)
+  const [orderConfirmation, setOrderConfirmation] = useState(null)
   const { toasts, dismissToast, success, error, warning, info } = useToast()
   const [searchMounted, setSearchMounted] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -379,6 +381,10 @@ function UserDashboardContent({ onLogout }) {
                 setSelectedProduct(null)
                 setActiveTab('home')
               }}
+              onProductClick={(productId) => {
+                setSelectedProduct(productId)
+                setActiveTab('product-detail')
+              }}
             />
           )}
           {activeTab === 'cart' && (
@@ -386,22 +392,34 @@ function UserDashboardContent({ onLogout }) {
               onUpdateQuantity={handleUpdateCartQuantity}
               onRemove={handleRemoveFromCart}
               onCheckout={handleProceedToCheckout}
+              onAddToCart={handleAddToCart}
             />
           )}
-          {activeTab === 'checkout' && showCheckout && (
-            <CheckoutView
-              onBack={() => {
-                setShowCheckout(false)
-                setActiveTab('cart')
-              }}
-              onOrderPlaced={(order) => {
-                dispatch({ type: 'ADD_ORDER', payload: order })
-                dispatch({ type: 'CLEAR_CART' })
-                success('Order placed successfully!')
-                setShowCheckout(false)
-                setActiveTab('account')
+          {orderConfirmation ? (
+            <OrderConfirmationView
+              order={orderConfirmation}
+              onBackToHome={() => {
+                setOrderConfirmation(null)
+                setActiveTab('home')
               }}
             />
+          ) : (
+            <>
+              {activeTab === 'checkout' && showCheckout && (
+                <CheckoutView
+                  onBack={() => {
+                    setShowCheckout(false)
+                    setActiveTab('cart')
+                  }}
+                  onOrderPlaced={(order) => {
+                    dispatch({ type: 'ADD_ORDER', payload: order })
+                    dispatch({ type: 'CLEAR_CART' })
+                    setOrderConfirmation(order)
+                    setShowCheckout(false)
+                  }}
+                />
+              )}
+            </>
           )}
           {activeTab === 'orders' && <OrdersView />}
           {activeTab === 'account' && <AccountView />}

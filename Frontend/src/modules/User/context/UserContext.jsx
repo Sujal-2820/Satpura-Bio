@@ -106,6 +106,11 @@ function reducer(state, action) {
           isDefault: addr.id === action.payload.id,
         })),
       }
+    case 'DELETE_ADDRESS':
+      return {
+        ...state,
+        addresses: state.addresses.filter((addr) => addr.id !== action.payload.id),
+      }
     case 'ADD_TO_FAVOURITES':
       if (state.favourites.includes(action.payload.productId)) {
         return state

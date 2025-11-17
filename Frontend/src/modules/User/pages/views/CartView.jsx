@@ -4,8 +4,17 @@ import { userSnapshot, MIN_ORDER_VALUE } from '../../services/userData'
 import { PlusIcon, MinusIcon, TrashIcon, TruckIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 
-export function CartView({ onUpdateQuantity, onRemove, onCheckout }) {
+export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }) {
   const { cart } = useUserState()
+
+  // Get suggested products (exclude items already in cart)
+  const suggestedProducts = useMemo(() => {
+    const cartProductIds = cart.map((item) => item.productId)
+    const available = userSnapshot.products.filter((p) => !cartProductIds.includes(p.id))
+    // Shuffle and take 8
+    const shuffled = [...available].sort(() => Math.random() - 0.5)
+    return shuffled.slice(0, 8)
+  }, [cart])
 
   const cartItems = useMemo(() => {
     return cart.map((item) => {
@@ -34,7 +43,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout }) {
 
   if (cartItems.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="user-cart-view space-y-4">
         <div className="text-center py-12">
           <p className="text-lg font-semibold text-[rgba(26,42,34,0.75)] mb-2">Your cart is empty</p>
           <p className="text-sm text-[rgba(26,42,34,0.55)]">Add some products to get started</p>
@@ -44,7 +53,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="user-cart-view space-y-6">
       <div className="mb-4">
         <h2 className="text-xl font-bold text-[#172022] mb-1">Shopping Cart</h2>
         <p className="text-sm text-[rgba(26,42,34,0.65)]">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</p>
@@ -130,6 +139,34 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout }) {
           </div>
         )}
       </div>
+
+      {/* Suggested Items Section */}
+      {suggestedProducts.length > 0 && (
+        <div className="user-cart-suggested">
+          <h3 className="text-base font-bold text-[#172022] mb-3">You might also like</h3>
+          <div className="user-cart-suggested__rail">
+            {suggestedProducts.map((product) => (
+              <div key={product.id} className="user-cart-suggested__card">
+                <div className="user-cart-suggested__image-wrapper">
+                  <img src={product.image} alt={product.name} className="user-cart-suggested__image" />
+                </div>
+                <div className="user-cart-suggested__content">
+                  <h4 className="user-cart-suggested__title">{product.name}</h4>
+                  <div className="user-cart-suggested__price">₹{product.price.toLocaleString('en-IN')}</div>
+                  <button
+                    type="button"
+                    className="user-cart-suggested__add-btn"
+                    onClick={() => onAddToCart?.(product.id, 1)}
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                    <span>Add</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="sticky bottom-0 left-0 right-0 p-4 bg-white border-t border-[rgba(34,94,65,0.1)] -mx-5">
         <button
