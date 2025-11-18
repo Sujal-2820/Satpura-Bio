@@ -1,0 +1,161 @@
+import { Building2, MapPin, IndianRupee, Calendar, TrendingUp, AlertTriangle, History } from 'lucide-react'
+import { Modal } from './Modal'
+import { StatusBadge } from './StatusBadge'
+import { Timeline } from './Timeline'
+import { cn } from '../../../lib/cn'
+
+export function VendorDetailModal({ isOpen, onClose, vendor, onUpdateCreditPolicy }) {
+  if (!vendor) return null
+
+  const formatCurrency = (value) => {
+    if (typeof value === 'string') {
+      return value
+    }
+    if (value >= 100000) {
+      return `₹${(value / 100000).toFixed(1)} L`
+    }
+    return `₹${value.toLocaleString('en-IN')}`
+  }
+
+  const creditLimit = typeof vendor.creditLimit === 'number' 
+    ? vendor.creditLimit 
+    : parseFloat(vendor.creditLimit?.replace(/[₹,\sL]/g, '') || '0') * 100000
+
+  const dues = typeof vendor.dues === 'number'
+    ? vendor.dues
+    : parseFloat(vendor.dues?.replace(/[₹,\sL]/g, '') || '0') * 100000
+
+  const creditUtilization = creditLimit > 0 ? ((dues / creditLimit) * 100).toFixed(1) : 0
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Vendor Details & Performance" size="xl">
+      <div className="space-y-6">
+        {/* Vendor Header */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg">
+                <Building2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">{vendor.name}</h3>
+                <p className="text-sm text-gray-600">Vendor ID: {vendor.id}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-600">{vendor.region}</span>
+                </div>
+              </div>
+            </div>
+            <StatusBadge tone={vendor.status === 'On Track' || vendor.status === 'on_track' ? 'success' : vendor.status === 'Delayed' || vendor.status === 'delayed' ? 'warning' : 'neutral'}>
+              {vendor.status || 'Unknown'}
+            </StatusBadge>
+          </div>
+        </div>
+
+        {/* Credit Performance Metrics */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="text-xs text-gray-500">Credit Limit</p>
+            <p className="mt-1 text-lg font-bold text-gray-900">
+              {formatCurrency(creditLimit)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="text-xs text-gray-500">Outstanding Dues</p>
+            <p className="mt-1 text-lg font-bold text-red-600">
+              {formatCurrency(dues)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="text-xs text-gray-500">Credit Utilization</p>
+            <p className="mt-1 text-lg font-bold text-gray-900">
+              {creditUtilization}%
+            </p>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-100">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all',
+                  parseFloat(creditUtilization) > 80 ? 'bg-gradient-to-r from-red-500 to-red-600' : parseFloat(creditUtilization) > 60 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' : 'bg-gradient-to-r from-green-500 to-green-600',
+                )}
+                style={{ width: `${Math.min(creditUtilization, 100)}%` }}
+              />
+            </div>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="text-xs text-gray-500">Repayment Days</p>
+            <p className="mt-1 text-lg font-bold text-gray-900">
+              {vendor.repaymentDays || vendor.repayment || 'N/A'}
+            </p>
+          </div>
+        </div>
+
+        {/* Credit Policy */}
+        <div className="rounded-xl border border-green-200 bg-green-50 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-bold text-green-900">Credit Policy</h4>
+              <div className="mt-2 grid gap-2 text-xs text-green-800 sm:grid-cols-3">
+                <div>
+                  <span className="font-semibold">Limit: </span>
+                  <span>{formatCurrency(creditLimit)}</span>
+                </div>
+                <div>
+                  <span className="font-semibold">Repayment: </span>
+                  <span>{vendor.repaymentDays || vendor.repayment || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="font-semibold">Penalty: </span>
+                  <span>{vendor.penaltyRate || vendor.penalty || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+            {onUpdateCreditPolicy && (
+              <button
+                type="button"
+                onClick={() => onUpdateCreditPolicy(vendor)}
+                className="rounded-lg border border-green-300 bg-white px-4 py-2 text-xs font-bold text-green-700 transition-all hover:bg-green-100"
+              >
+                Update Policy
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Repayment History */}
+        {vendor.repaymentHistory && vendor.repaymentHistory.length > 0 && (
+          <div className="rounded-xl border border-blue-200 bg-white p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <History className="h-5 w-5 text-blue-600" />
+              <h4 className="text-sm font-bold text-gray-900">Repayment History</h4>
+            </div>
+            <Timeline
+              events={vendor.repaymentHistory.map((entry, index) => ({
+                id: `history-${index}`,
+                title: entry.title || `Payment ${index + 1}`,
+                timestamp: entry.date || entry.timestamp || 'N/A',
+                description: entry.description || formatCurrency(entry.amount || 0),
+                status: entry.status || 'completed',
+              }))}
+            />
+          </div>
+        )}
+
+        {/* Performance Alerts */}
+        {parseFloat(creditUtilization) > 80 && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-600" />
+              <div>
+                <p className="text-sm font-bold text-red-900">High Credit Utilization Alert</p>
+                <p className="mt-1 text-xs text-red-700">
+                  This vendor has exceeded 80% credit utilization. Consider reviewing their credit limit or requesting immediate repayment.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+

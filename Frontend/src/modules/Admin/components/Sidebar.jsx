@@ -1,4 +1,4 @@
-import { BarChart3, Building2, Factory, Home, Layers3, ShieldCheck, Users2, Wallet } from 'lucide-react'
+import { BarChart3, Building2, Factory, Home, Layers3, ShieldCheck, Users2, Wallet, Settings } from 'lucide-react'
 import { cn } from '../../../lib/cn'
 
 const links = [
@@ -9,6 +9,7 @@ const links = [
   { id: 'users', label: 'Users', icon: Users2, description: 'User status & help requests', color: 'orange' },
   { id: 'orders', label: 'Orders', icon: Building2, description: 'Approvals & delivery', color: 'red' },
   { id: 'finance', label: 'Credits', icon: Wallet, description: 'Advance payments & pending amounts', color: 'pink' },
+  { id: 'operations', label: 'Operations', icon: Settings, description: 'Logistics, escalations & notifications', color: 'teal' },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, description: 'Area & group patterns', color: 'indigo' },
 ]
 
@@ -68,6 +69,13 @@ const colorStyles = {
     text: 'text-indigo-600',
     border: 'border-indigo-200',
     hover: 'hover:bg-indigo-50 hover:border-indigo-300',
+  },
+  teal: {
+    active: 'bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-[0_2px_6px_rgba(0,0,0,0.1)]',
+    bg: 'bg-teal-50',
+    text: 'text-teal-600',
+    border: 'border-teal-200',
+    hover: 'hover:bg-teal-50 hover:border-teal-300',
   },
 }
 

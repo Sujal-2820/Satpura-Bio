@@ -22,6 +22,47 @@ The system ensures that:
 
 ---
 
+## Client Suggestions & New Requirements
+
+1. **User Checkout Enhancements**
+   - Add an explicit option in the User Dashboard checkout to pay **100% of the total amount** upfront.
+   - When the 100% payment option is selected, **delivery charges become free** for that order and the checkout must proceed with the full advance payment.
+   - All other orders continue to follow the existing 30% / 70% split flow.
+
+2. **Dashboard Header Styling**
+   - Update the header backgrounds across **User, Vendor, and IRA Partner (Seller)** dashboards to use a **dark gradient**.
+   - The gradient should start as **dark green at the top** and fade to **white at the bottom**, ensuring visual consistency across every dashboard.
+
+3. **Brand Logo Watermark**
+   - Create a **very light / low-contrast** version of the brand logo.
+   - Display this watermark **centered horizontally and vertically** on every possible screen and view inside all dashboards (User, Vendor, IRA Partner).
+   - The watermark should remain subtle so it reinforces branding without distracting from primary UI elements.
+
+4. **Terminology Update**
+   - Replace the user-facing term **“Seller”** with **“IRA Partner”** throughout the dashboards, documentation, and communications to align with the new branding directive.
+
+5. **IRA Partner Commission Rules**
+   - At the start of each month, the **purchase tally for every user linked to an IRA Partner ID resets to zero**.
+   - Commission is calculated **per connected user per month** using the following slabs:
+     - **Up to ₹50,000 cumulative purchases** (within the month): IRA Partner earns **2% commission** on that user’s purchase total.
+     - **Above ₹50,000 cumulative purchases** (within the month): IRA Partner earns **3% commission** on that user’s purchase total once the threshold is crossed.
+   - Every purchase made by a connected user contributes to the month’s tally, regardless of whether purchases happen in a single order or multiple orders.
+
+6. **Delivery Policy Adjustments**
+   - Standard delivery cost is now **static at ₹50**, with **no express delivery option**.
+   - Normal delivery must be completed **within 24 hours**.
+   - Orders where users opt for **100% upfront payment** automatically receive **free delivery** (see Suggestion 1).
+
+7. **Vendor Coverage & Assignment**
+   - Reinforce the geographic rule that within any **20 km radius there can be only one vendor**.
+   - Ensure the system prevents overlapping coverage areas or two vendors operating within the same 20 km range.
+
+8. **Vendor Order Status Workflow**
+   - Vendors must **manually update the status** of every order they handle using the states: **Awaiting**, **Dispatched**, and **Delivered**.
+   - These status updates must be **persisted** and surfaced in the **User Dashboard** so users can see the live status of their specific orders.
+
+---
+
 ## User Application Flow
 
 ### Step 1: Onboarding & Authentication

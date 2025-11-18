@@ -377,6 +377,38 @@ export function useAdminApi() {
     [callApi, dispatch],
   )
 
+  const getFinancialParameters = useCallback(() => callApi(adminApi.getFinancialParameters), [callApi])
+
+  const updateFinancialParameters = useCallback(
+    (parameters) => {
+      return callApi(adminApi.updateFinancialParameters, parameters).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_FINANCE_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const getVendorCreditBalances = useCallback((params) => callApi(adminApi.getVendorCreditBalances, params), [callApi])
+
+  const applyPenalty = useCallback(
+    (vendorId) => {
+      return callApi(adminApi.applyPenalty, vendorId).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_FINANCE_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const getOutstandingCredits = useCallback(() => callApi(adminApi.getOutstandingCredits), [callApi])
+
+  const getRecoveryStatus = useCallback(() => callApi(adminApi.getRecoveryStatus), [callApi])
+
   const updateGlobalParameters = useCallback(
     (parameters) => {
       return callApi(adminApi.updateGlobalParameters, parameters).then((result) => {
@@ -402,6 +434,73 @@ export function useAdminApi() {
   )
 
   const getVendorCreditHistory = useCallback((vendorId, params) => callApi(adminApi.getVendorCreditHistory, vendorId, params), [callApi])
+
+  // Operations & Controls APIs
+  const getLogisticsSettings = useCallback(() => callApi(adminApi.getLogisticsSettings), [callApi])
+
+  const updateLogisticsSettings = useCallback(
+    (settings) => {
+      return callApi(adminApi.updateLogisticsSettings, settings).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_ORDERS_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const getEscalatedOrders = useCallback(() => callApi(adminApi.getEscalatedOrders), [callApi])
+
+  const fulfillOrderFromWarehouse = useCallback(
+    (orderId, fulfillmentData) => {
+      return callApi(adminApi.fulfillOrderFromWarehouse, orderId, fulfillmentData).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_ORDERS_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const getNotifications = useCallback(() => callApi(adminApi.getNotifications), [callApi])
+
+  const createNotification = useCallback(
+    (notificationData) => {
+      return callApi(adminApi.createNotification, notificationData).then((result) => {
+        if (result.data) {
+          // Could dispatch a notification update action if needed
+        }
+        return result
+      })
+    },
+    [callApi],
+  )
+
+  const updateNotification = useCallback(
+    (notificationId, notificationData) => {
+      return callApi(adminApi.updateNotification, notificationId, notificationData).then((result) => {
+        if (result.data) {
+          // Could dispatch a notification update action if needed
+        }
+        return result
+      })
+    },
+    [callApi],
+  )
+
+  const deleteNotification = useCallback(
+    (notificationId) => {
+      return callApi(adminApi.deleteNotification, notificationId).then((result) => {
+        if (result.data) {
+          // Could dispatch a notification update action if needed
+        }
+        return result
+      })
+    },
+    [callApi],
+  )
 
   // Analytics & Reports APIs
   const getAnalyticsData = useCallback(
@@ -466,9 +565,24 @@ export function useAdminApi() {
     generateInvoice,
     // Finance
     getFinanceData,
+    getFinancialParameters,
+    updateFinancialParameters,
+    getVendorCreditBalances,
+    applyPenalty,
+    getOutstandingCredits,
+    getRecoveryStatus,
     updateGlobalParameters,
     applyVendorPenalty,
     getVendorCreditHistory,
+    // Operations
+    getLogisticsSettings,
+    updateLogisticsSettings,
+    getEscalatedOrders,
+    fulfillOrderFromWarehouse,
+    getNotifications,
+    createNotification,
+    updateNotification,
+    deleteNotification,
     // Analytics
     getAnalyticsData,
     exportReports,

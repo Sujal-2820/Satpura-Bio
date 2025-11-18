@@ -1227,7 +1227,7 @@
   transform: scale(0.98);
 }
 
-/* Reduce spacing between header and title for Favourites, Cart, Orders, ProductDetail, and Checkout */
+/* Reduce spacing between header and title for Favourites, Cart, Orders, ProductDetail, Checkout, Category Products, and Order Confirmation */
 .user-shell-content .user-favourites-view {
   margin-top: -3.5rem;
 }
@@ -1245,6 +1245,10 @@
 }
 
 .user-shell-content .user-checkout-view {
+  margin-top: -3.5rem;
+}
+
+.user-shell-content .user-category-products-view {
   margin-top: -3.5rem;
 }
 

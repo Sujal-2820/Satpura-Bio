@@ -1,7 +1,12 @@
-import { Layers3, MapPin, ToggleRight } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Layers3, MapPin, ToggleRight, Edit2, Trash2 } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { FilterBar } from '../components/FilterBar'
+import { Modal } from '../components/Modal'
+import { ProductForm } from '../components/ProductForm'
+import { useAdminState } from '../context/AdminContext'
+import { useAdminApi } from '../hooks/useAdminApi'
 import { productInventory } from '../services/adminData'
 import { cn } from '../../../lib/cn'
 
@@ -13,9 +18,17 @@ const columns = [
   { Header: 'Expiry / Batch', accessor: 'expiry' },
   { Header: 'Region', accessor: 'region' },
   { Header: 'Visibility', accessor: 'visibility' },
+  { Header: 'Actions', accessor: 'actions' },
 ]
 
 export function ProductsPage() {
+  const { products } = useAdminState()
+  const { getProducts, createProduct, updateProduct, deleteProduct, toggleProductVisibility, loading } = useAdminApi()
+  
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState(null)
+  const [productsList, setProductsList] = useState([])
+
   const regionColors = [
     { border: 'border-green-200', bg: 'bg-gradient-to-br from-green-50 to-green-100/50', text: 'text-green-700', progress: 'bg-gradient-to-r from-green-500 to-green-600' },
     { border: 'border-yellow-200', bg: 'bg-gradient-to-br from-yellow-50 to-yellow-100/50', text: 'text-yellow-700', progress: 'bg-gradient-to-r from-yellow-500 to-yellow-600' },
@@ -24,6 +37,165 @@ export function ProductsPage() {
     { border: 'border-indigo-200', bg: 'bg-gradient-to-br from-indigo-50 to-indigo-100/50', text: 'text-indigo-700', progress: 'bg-gradient-to-r from-indigo-500 to-indigo-600' },
     { border: 'border-orange-200', bg: 'bg-gradient-to-br from-orange-50 to-orange-100/50', text: 'text-orange-700', progress: 'bg-gradient-to-r from-orange-500 to-orange-600' },
   ]
+
+  // Format product data for display
+  const formatProductForDisplay = (product) => {
+    const stockValue = typeof product.stock === 'number' ? product.stock : parseFloat(product.stock?.replace(/[^\d.]/g, '') || '0')
+    const stockUnit = product.stockUnit || 'kg'
+    const stockFormatted = `${stockValue.toLocaleString('en-IN')} ${stockUnit}`
+    
+    const vendorPrice = typeof product.vendorPrice === 'number' ? product.vendorPrice : parseFloat(product.vendorPrice?.replace(/[₹,]/g, '') || '0')
+    const userPrice = typeof product.userPrice === 'number' ? product.userPrice : parseFloat(product.userPrice?.replace(/[₹,]/g, '') || '0')
+    
+    // Format expiry date
+    let expiryFormatted = product.expiry || ''
+    if (product.expiry && product.expiry.includes('-')) {
+      const date = new Date(product.expiry)
+      expiryFormatted = date.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+    }
+
+    const visibility = product.visibility === 'active' || product.visibility === 'Active' ? 'Active' : 'Inactive'
+
+    return {
+      ...product,
+      stock: stockFormatted,
+      vendorPrice: `₹${vendorPrice.toLocaleString('en-IN')}`,
+      userPrice: `₹${userPrice.toLocaleString('en-IN')}`,
+      expiry: expiryFormatted,
+      visibility: visibility,
+    }
+  }
+
+  // Fetch products
+  const fetchProducts = useCallback(async () => {
+    const result = await getProducts()
+    if (result.data?.products) {
+      const formatted = result.data.products.map(formatProductForDisplay)
+      setProductsList(formatted)
+    } else {
+      // Fallback to mock data
+      setProductsList(productInventory.map(formatProductForDisplay))
+    }
+  }, [getProducts])
+
+  useEffect(() => {
+    fetchProducts()
+  }, [fetchProducts])
+
+  // Refresh when products are updated
+  useEffect(() => {
+    if (products.updated) {
+      fetchProducts()
+    }
+  }, [products.updated, fetchProducts])
+
+  const handleAddProduct = () => {
+    setSelectedProduct(null)
+    setIsModalOpen(true)
+  }
+
+  const handleEditProduct = (product) => {
+    // Find original product data (before formatting)
+    const originalProduct = products.data?.products?.find((p) => p.id === product.id) || product
+    setSelectedProduct(originalProduct)
+    setIsModalOpen(true)
+  }
+
+  const handleDeleteProduct = async (productId) => {
+    if (window.confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+      const result = await deleteProduct(productId)
+      if (result.data) {
+        fetchProducts()
+      }
+    }
+  }
+
+  const handleToggleVisibility = async (product) => {
+    const currentVisibility = product.visibility === 'Active' || product.visibility === 'active' ? 'active' : 'inactive'
+    const newVisibility = currentVisibility === 'active' ? 'inactive' : 'active'
+    
+    const result = await toggleProductVisibility(product.id, { visibility: newVisibility })
+    if (result.data) {
+      fetchProducts()
+    }
+  }
+
+  const handleFormSubmit = async (formData) => {
+    if (selectedProduct) {
+      // Update existing product
+      const result = await updateProduct(selectedProduct.id, formData)
+      if (result.data) {
+        setIsModalOpen(false)
+        setSelectedProduct(null)
+        fetchProducts()
+      }
+    } else {
+      // Create new product
+      const result = await createProduct(formData)
+      if (result.data) {
+        setIsModalOpen(false)
+        fetchProducts()
+      }
+    }
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedProduct(null)
+  }
+
+  const tableColumns = columns.map((column) => {
+    if (column.accessor === 'visibility') {
+      return {
+        ...column,
+        Cell: (row) => (
+          <StatusBadge tone={row.visibility === 'Active' ? 'success' : 'warning'}>
+            {row.visibility}
+          </StatusBadge>
+        ),
+      }
+    }
+    if (column.accessor === 'region') {
+      return {
+        ...column,
+        Cell: (row) => (
+          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 px-3 py-1 text-xs text-blue-700 font-bold shadow-[0_2px_8px_rgba(59,130,246,0.2),inset_0_1px_0_rgba(255,255,255,0.8)]">
+            <MapPin className="h-3.5 w-3.5" />
+            {row.region}
+          </div>
+        ),
+      }
+    }
+    if (column.accessor === 'actions') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const originalProduct = products.data?.products?.find((p) => p.id === row.id) || row
+          return (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleEditProduct(originalProduct)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
+                title="Edit product"
+              >
+                <Edit2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteProduct(row.id)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-red-600 transition-all hover:border-red-500 hover:bg-red-50"
+                title="Delete product"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          )
+        },
+      }
+    }
+    return column
+  })
 
   return (
     <div className="space-y-6">
@@ -35,7 +207,10 @@ export function ProductsPage() {
             Manage pricing, stock distribution, and regional visibility with batch-level precision.
           </p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(168,85,247,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(168,85,247,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]">
+        <button
+          onClick={handleAddProduct}
+          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(168,85,247,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(168,85,247,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]"
+        >
           <Layers3 className="h-4 w-4" />
           Add Product
         </button>
@@ -50,25 +225,8 @@ export function ProductsPage() {
       />
 
       <DataTable
-        columns={columns.map((column) => ({
-          ...column,
-          Cell:
-            column.accessor === 'visibility'
-              ? (row) => (
-                  <StatusBadge tone={row.visibility === 'Active' ? 'success' : 'warning'}>
-                    {row.visibility}
-                  </StatusBadge>
-                )
-              : column.accessor === 'region'
-              ? (row) => (
-                  <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 px-3 py-1 text-xs text-blue-700 font-bold shadow-[0_2px_8px_rgba(59,130,246,0.2),inset_0_1px_0_rgba(255,255,255,0.8)]">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {row.region}
-                  </div>
-                )
-              : undefined,
-        }))}
-        rows={productInventory}
+        columns={tableColumns}
+        rows={productsList}
         emptyState="No products found in the catalogue"
       />
 
@@ -123,7 +281,9 @@ export function ProductsPage() {
               Toggle product availability and orchestrate upcoming launches or sunset batches.
             </p>
           </header>
-          {productInventory.map((product) => (
+          {productsList.map((product) => {
+            const originalProduct = products.data?.products?.find((p) => p.id === product.id) || product
+            return (
             <div
               key={product.id}
               className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 transition-all duration-200 hover:bg-gray-50 hover:scale-[1.02] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)]"
@@ -132,19 +292,38 @@ export function ProductsPage() {
                 <p className="text-sm font-bold text-gray-900">{product.name}</p>
                 <p className="text-xs text-gray-600">Batch expiry • {product.expiry}</p>
               </div>
-              <button className={cn(
+                <button
+                  onClick={() => handleToggleVisibility(originalProduct)}
+                  className={cn(
                 'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold transition-all duration-200 hover:scale-105',
                 product.visibility === 'Active' 
                   ? 'border-green-200 bg-gradient-to-br from-green-500 to-green-600 text-white shadow-[0_2px_8px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)]' 
                   : 'border-gray-200 bg-white text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] hover:border-yellow-300 hover:bg-yellow-50 hover:text-yellow-700'
-              )}>
+                  )}
+                >
                 <ToggleRight className="h-4 w-4" />
                 {product.visibility === 'Active' ? 'Active' : 'Inactive'}
               </button>
             </div>
-          ))}
+            )
+          })}
         </div>
       </div>
+
+      {/* Product Form Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        title={selectedProduct ? 'Edit Product' : 'Add New Product'}
+        size="md"
+      >
+        <ProductForm
+          product={selectedProduct}
+          onSubmit={handleFormSubmit}
+          onCancel={handleCloseModal}
+          loading={loading}
+        />
+      </Modal>
     </div>
   )
 }

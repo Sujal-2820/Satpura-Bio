@@ -1,8 +1,16 @@
-import { Award, Gift, Users } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Award, Gift, Users, Edit2, Eye, Wallet } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { ProgressList } from '../components/ProgressList'
-import { sellers } from '../services/adminData'
+import { Modal } from '../components/Modal'
+import { SellerForm } from '../components/SellerForm'
+import { SellerDetailModal } from '../components/SellerDetailModal'
+import { WithdrawalRequestModal } from '../components/WithdrawalRequestModal'
+import { useAdminState } from '../context/AdminContext'
+import { useAdminApi } from '../hooks/useAdminApi'
+import { sellers as mockSellers } from '../services/adminData'
+import { cn } from '../../../lib/cn'
 
 const columns = [
   { Header: 'Seller', accessor: 'name' },
@@ -14,9 +22,234 @@ const columns = [
   { Header: 'Referred Users', accessor: 'referrals' },
   { Header: 'Total Sales', accessor: 'sales' },
   { Header: 'Status', accessor: 'status' },
+  { Header: 'Actions', accessor: 'actions' },
 ]
 
 export function SellersPage() {
+  const { sellers: sellersState } = useAdminState()
+  const {
+    getSellers,
+    createSeller,
+    updateSeller,
+    deleteSeller,
+    getSellerWithdrawalRequests,
+    approveSellerWithdrawal,
+    rejectSellerWithdrawal,
+    loading,
+  } = useAdminApi()
+
+  const [sellersList, setSellersList] = useState([])
+  const [withdrawalRequests, setWithdrawalRequests] = useState([])
+  
+  // Modal states
+  const [sellerModalOpen, setSellerModalOpen] = useState(false)
+  const [selectedSeller, setSelectedSeller] = useState(null)
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [selectedSellerForDetail, setSelectedSellerForDetail] = useState(null)
+  const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false)
+  const [selectedWithdrawalRequest, setSelectedWithdrawalRequest] = useState(null)
+
+  // Format seller data for display
+  const formatSellerForDisplay = (seller) => {
+    const monthlyTarget = typeof seller.monthlyTarget === 'number'
+      ? seller.monthlyTarget
+      : parseFloat(seller.target?.replace(/[₹,\sL]/g, '') || '0') * 100000
+
+    const totalSales = typeof seller.totalSales === 'number'
+      ? seller.totalSales
+      : parseFloat(seller.sales?.replace(/[₹,\sL]/g, '') || '0') * 100000
+
+    const achieved = typeof seller.achieved === 'number'
+      ? seller.achieved
+      : typeof seller.progress === 'number'
+      ? seller.progress
+      : monthlyTarget > 0 ? ((totalSales / monthlyTarget) * 100).toFixed(1) : 0
+
+    const cashbackRate = typeof seller.cashbackRate === 'number'
+      ? seller.cashbackRate
+      : parseFloat(seller.cashback?.replace(/[%\s]/g, '') || '0')
+
+    const commissionRate = typeof seller.commissionRate === 'number'
+      ? seller.commissionRate
+      : parseFloat(seller.commission?.replace(/[%\s]/g, '') || '0')
+
+    return {
+      ...seller,
+      cashback: `${cashbackRate}%`,
+      commission: `${commissionRate}%`,
+      target: monthlyTarget >= 100000 ? `₹${(monthlyTarget / 100000).toFixed(1)} L` : `₹${monthlyTarget.toLocaleString('en-IN')}`,
+      achieved: parseFloat(achieved),
+      sales: totalSales >= 100000 ? `₹${(totalSales / 100000).toFixed(1)} L` : `₹${totalSales.toLocaleString('en-IN')}`,
+      referrals: seller.referrals || seller.referredUsers || 0,
+    }
+  }
+
+  // Fetch sellers
+  const fetchSellers = useCallback(async () => {
+    const result = await getSellers()
+    if (result.data?.sellers) {
+      const formatted = result.data.sellers.map(formatSellerForDisplay)
+      setSellersList(formatted)
+    } else {
+      // Fallback to mock data
+      setSellersList(mockSellers.map(formatSellerForDisplay))
+    }
+  }, [getSellers])
+
+  // Fetch withdrawal requests
+  const fetchWithdrawalRequests = useCallback(async () => {
+    const result = await getSellerWithdrawalRequests({ status: 'pending' })
+    if (result.data?.withdrawals) {
+      setWithdrawalRequests(result.data.withdrawals)
+    }
+  }, [getSellerWithdrawalRequests])
+
+  useEffect(() => {
+    fetchSellers()
+    fetchWithdrawalRequests()
+  }, [fetchSellers, fetchWithdrawalRequests])
+
+  // Refresh when sellers are updated
+  useEffect(() => {
+    if (sellersState.updated) {
+      fetchSellers()
+      fetchWithdrawalRequests()
+    }
+  }, [sellersState.updated, fetchSellers, fetchWithdrawalRequests])
+
+  const handleCreateSeller = () => {
+    setSelectedSeller(null)
+    setSellerModalOpen(true)
+  }
+
+  const handleEditSeller = (seller) => {
+    const originalSeller = sellersState.data?.sellers?.find((s) => s.id === seller.id) || seller
+    setSelectedSeller(originalSeller)
+    setSellerModalOpen(true)
+  }
+
+  const handleViewSellerDetails = (seller) => {
+    const originalSeller = sellersState.data?.sellers?.find((s) => s.id === seller.id) || seller
+    setSelectedSellerForDetail(originalSeller)
+    setDetailModalOpen(true)
+  }
+
+  const handleDeleteSeller = async (sellerId) => {
+    if (window.confirm('Are you sure you want to delete this seller? This action cannot be undone.')) {
+      const result = await deleteSeller(sellerId)
+      if (result.data) {
+        fetchSellers()
+      }
+    }
+  }
+
+  const handleFormSubmit = async (formData) => {
+    if (selectedSeller) {
+      // Update existing seller
+      const result = await updateSeller(selectedSeller.id, formData)
+      if (result.data) {
+        setSellerModalOpen(false)
+        setSelectedSeller(null)
+        fetchSellers()
+      }
+    } else {
+      // Create new seller
+      const result = await createSeller(formData)
+      if (result.data) {
+        setSellerModalOpen(false)
+        fetchSellers()
+      }
+    }
+  }
+
+  const handleApproveWithdrawal = async (requestId) => {
+    const result = await approveSellerWithdrawal(requestId)
+    if (result.data) {
+      setWithdrawalModalOpen(false)
+      setSelectedWithdrawalRequest(null)
+      fetchWithdrawalRequests()
+    }
+  }
+
+  const handleRejectWithdrawal = async (requestId, rejectionData) => {
+    const result = await rejectSellerWithdrawal(requestId, rejectionData)
+    if (result.data) {
+      setWithdrawalModalOpen(false)
+      setSelectedWithdrawalRequest(null)
+      fetchWithdrawalRequests()
+    }
+  }
+
+  const tableColumns = columns.map((column) => {
+    if (column.accessor === 'achieved') {
+      return {
+        ...column,
+        Cell: (row) => (
+          <div className="w-32">
+            <div className="flex items-center justify-between text-xs text-gray-600">
+              <span>{row.achieved}%</span>
+              <span>{row.sales}</span>
+            </div>
+            <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
+              <div
+                className={cn(
+                  'h-full rounded-full shadow-[0_2px_8px_rgba(234,179,8,0.3)]',
+                  row.achieved >= 100
+                    ? 'bg-gradient-to-r from-green-500 to-green-600'
+                    : row.achieved >= 80
+                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                    : 'bg-gradient-to-r from-orange-500 to-orange-600',
+                )}
+                style={{ width: `${Math.min(row.achieved, 100)}%` }}
+              />
+            </div>
+          </div>
+        ),
+      }
+    }
+    if (column.accessor === 'status') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const status = row.status || 'Unknown'
+          const tone = status === 'On Track' || status === 'on_track' ? 'success' : 'warning'
+          return <StatusBadge tone={tone}>{status}</StatusBadge>
+        },
+      }
+    }
+    if (column.accessor === 'actions') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const originalSeller = sellersState.data?.sellers?.find((s) => s.id === row.id) || row
+          return (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleViewSellerDetails(originalSeller)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
+                title="View details"
+              >
+                <Eye className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleEditSeller(originalSeller)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-yellow-500 hover:bg-yellow-50 hover:text-yellow-700"
+                title="Edit seller"
+              >
+                <Edit2 className="h-4 w-4" />
+              </button>
+            </div>
+          )
+        },
+      }
+    }
+    return column
+  })
+
+  const totalPendingWithdrawals = withdrawalRequests.reduce((sum, req) => sum + (req.amount || 0), 0)
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -27,37 +260,32 @@ export function SellersPage() {
             Incentivise performance, track targets, and manage wallet payouts with clarity.
           </p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-yellow-500 to-yellow-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(234,179,8,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(234,179,8,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]">
+        <div className="flex gap-2">
+          {withdrawalRequests.length > 0 && (
+            <button
+              onClick={() => {
+                setSelectedWithdrawalRequest(withdrawalRequests[0])
+                setWithdrawalModalOpen(true)
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105"
+            >
+              <Wallet className="h-4 w-4" />
+              Withdrawals ({withdrawalRequests.length})
+            </button>
+          )}
+          <button
+            onClick={handleCreateSeller}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-yellow-500 to-yellow-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(234,179,8,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(234,179,8,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]"
+          >
           <Award className="h-4 w-4" />
           Create Seller Profile
         </button>
+        </div>
       </header>
 
       <DataTable
-        columns={columns.map((column) => ({
-          ...column,
-          Cell:
-            column.accessor === 'achieved'
-              ? (row) => (
-                  <div className="w-32">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{row.achieved}%</span>
-                      <span>{row.sales}</span>
-                    </div>
-                    <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
-                      <div className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-yellow-600 shadow-[0_2px_8px_rgba(234,179,8,0.3)]" style={{ width: `${row.achieved}%` }} />
-                    </div>
-                  </div>
-                )
-              : column.accessor === 'status'
-              ? (row) => (
-                  <StatusBadge tone={row.status === 'On Track' ? 'success' : 'warning'}>
-                    {row.status}
-                  </StatusBadge>
-                )
-              : undefined,
-        }))}
-        rows={sellers}
+        columns={tableColumns}
+        rows={sellersList}
         emptyState="No sellers found in the network"
       />
 
@@ -106,12 +334,68 @@ export function SellersPage() {
         </div>
         <ProgressList
           items={[
-            { label: 'Seller Wallet Requests', progress: 42, tone: 'warning', meta: '₹8.2 L awaiting admin approval' },
+            { 
+              label: 'Seller Wallet Requests', 
+              progress: withdrawalRequests.length > 0 ? Math.min((withdrawalRequests.length / 10) * 100, 100) : 42, 
+              tone: 'warning', 
+              meta: withdrawalRequests.length > 0 
+                ? `${withdrawalRequests.length} requests (${totalPendingWithdrawals >= 100000 ? `₹${(totalPendingWithdrawals / 100000).toFixed(1)} L` : `₹${totalPendingWithdrawals.toLocaleString('en-IN')}`} pending)` 
+                : '₹8.2 L awaiting admin approval' 
+            },
             { label: 'Monthly Target Achievement', progress: 68, tone: 'success', meta: 'Average across all sellers' },
             { label: 'Top Performer Retention', progress: 92, tone: 'success', meta: 'Proactive incentives reduce attrition' },
           ]}
         />
       </section>
+
+      {/* Seller Form Modal */}
+      <Modal
+        isOpen={sellerModalOpen}
+        onClose={() => {
+          setSellerModalOpen(false)
+          setSelectedSeller(null)
+        }}
+        title={selectedSeller ? 'Edit Seller Profile' : 'Create New Seller'}
+        size="md"
+      >
+        <SellerForm
+          seller={selectedSeller}
+          onSubmit={handleFormSubmit}
+          onCancel={() => {
+            setSellerModalOpen(false)
+            setSelectedSeller(null)
+          }}
+          loading={loading}
+        />
+      </Modal>
+
+      {/* Seller Detail Modal */}
+      <SellerDetailModal
+        isOpen={detailModalOpen}
+        onClose={() => {
+          setDetailModalOpen(false)
+          setSelectedSellerForDetail(null)
+        }}
+        seller={selectedSellerForDetail}
+        onEdit={(seller) => {
+          setDetailModalOpen(false)
+          setSelectedSeller(seller)
+          setSellerModalOpen(true)
+        }}
+      />
+
+      {/* Withdrawal Request Modal */}
+      <WithdrawalRequestModal
+        isOpen={withdrawalModalOpen}
+        onClose={() => {
+          setWithdrawalModalOpen(false)
+          setSelectedWithdrawalRequest(null)
+        }}
+        request={selectedWithdrawalRequest}
+        onApprove={handleApproveWithdrawal}
+        onReject={handleRejectWithdrawal}
+        loading={loading}
+      />
     </div>
   )
 }

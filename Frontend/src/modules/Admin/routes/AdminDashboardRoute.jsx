@@ -9,6 +9,7 @@ import { SellersPage } from '../pages/Sellers'
 import { UsersPage } from '../pages/Users'
 import { OrdersPage } from '../pages/Orders'
 import { FinancePage } from '../pages/Finance'
+import { OperationsPage } from '../pages/Operations'
 import { AnalyticsPage } from '../pages/Analytics'
 
 const routeConfig = [
@@ -19,6 +20,7 @@ const routeConfig = [
   { id: 'users', element: UsersPage },
   { id: 'orders', element: OrdersPage },
   { id: 'finance', element: FinancePage },
+  { id: 'operations', element: OperationsPage },
   { id: 'analytics', element: AnalyticsPage },
 ]
 

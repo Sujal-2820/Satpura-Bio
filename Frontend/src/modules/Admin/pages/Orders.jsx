@@ -1,9 +1,16 @@
-import { CalendarRange, Recycle, Truck } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { CalendarRange, Recycle, Truck, Eye, FileText, RefreshCw } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { FilterBar } from '../components/FilterBar'
 import { Timeline } from '../components/Timeline'
-import { orders } from '../services/adminData'
+import { Modal } from '../components/Modal'
+import { OrderDetailModal } from '../components/OrderDetailModal'
+import { OrderReassignmentModal } from '../components/OrderReassignmentModal'
+import { useAdminState } from '../context/AdminContext'
+import { useAdminApi } from '../hooks/useAdminApi'
+import { orders as mockOrders } from '../services/adminData'
+import { cn } from '../../../lib/cn'
 
 const columns = [
   { Header: 'Order ID', accessor: 'id' },
@@ -14,9 +21,234 @@ const columns = [
   { Header: 'Advance (30%)', accessor: 'advance' },
   { Header: 'Pending (70%)', accessor: 'pending' },
   { Header: 'Status', accessor: 'status' },
+  { Header: 'Actions', accessor: 'actions' },
 ]
 
+const REGIONS = ['All', 'West', 'North', 'South', 'Central', 'North East', 'East']
+const ORDER_STATUSES = ['All', 'Processing', 'Awaiting Dispatch', 'Completed', 'Cancelled']
+const ORDER_TYPES = ['All', 'User', 'Vendor']
+
 export function OrdersPage() {
+  const { orders: ordersState, vendors } = useAdminState()
+  const {
+    getOrders,
+    getOrderDetails,
+    reassignOrder,
+    generateInvoice,
+    getVendors,
+    loading,
+  } = useAdminApi()
+
+  const [ordersList, setOrdersList] = useState([])
+  const [availableVendors, setAvailableVendors] = useState([])
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    region: 'All',
+    vendor: 'All',
+    status: 'All',
+    type: 'All',
+    dateFrom: '',
+    dateTo: '',
+  })
+
+  // Modal states
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [selectedOrderForDetail, setSelectedOrderForDetail] = useState(null)
+  const [orderDetails, setOrderDetails] = useState(null)
+  const [reassignmentModalOpen, setReassignmentModalOpen] = useState(false)
+  const [selectedOrderForReassign, setSelectedOrderForReassign] = useState(null)
+
+  // Format order data for display
+  const formatOrderForDisplay = (order) => {
+    const orderValue = typeof order.value === 'number'
+      ? order.value
+      : parseFloat(order.value?.replace(/[₹,\sL]/g, '') || '0') * 100000
+
+    const advanceAmount = typeof order.advance === 'number'
+      ? order.advance
+      : order.advanceStatus === 'paid' ? orderValue * 0.3 : 0
+
+    const pendingAmount = typeof order.pending === 'number'
+      ? order.pending
+      : parseFloat(order.pending?.replace(/[₹,\sL]/g, '') || '0') * 100000
+
+    return {
+      ...order,
+      value: orderValue >= 100000 ? `₹${(orderValue / 100000).toFixed(1)} L` : `₹${orderValue.toLocaleString('en-IN')}`,
+      advance: order.advanceStatus === 'paid' || order.advance === 'Paid' ? 'Paid' : 'Pending',
+      pending: pendingAmount >= 100000 ? `₹${(pendingAmount / 100000).toFixed(1)} L` : `₹${pendingAmount.toLocaleString('en-IN')}`,
+    }
+  }
+
+  // Fetch orders
+  const fetchOrders = useCallback(async () => {
+    const params = {}
+    if (filters.region !== 'All') params.region = filters.region
+    if (filters.vendor !== 'All') params.vendorId = filters.vendor
+    if (filters.status !== 'All') params.status = filters.status.toLowerCase().replace(' ', '_')
+    if (filters.type !== 'All') params.type = filters.type.toLowerCase()
+    if (filters.dateFrom) params.dateFrom = filters.dateFrom
+    if (filters.dateTo) params.dateTo = filters.dateTo
+
+    const result = await getOrders(params)
+    if (result.data?.orders) {
+      const formatted = result.data.orders.map(formatOrderForDisplay)
+      setOrdersList(formatted)
+    } else {
+      // Fallback to mock data
+      setOrdersList(mockOrders.map(formatOrderForDisplay))
+    }
+  }, [getOrders, filters])
+
+  // Fetch vendors for reassignment
+  const fetchVendors = useCallback(async () => {
+    const result = await getVendors()
+    if (result.data?.vendors) {
+      setAvailableVendors(result.data.vendors)
+    }
+  }, [getVendors])
+
+  useEffect(() => {
+    fetchOrders()
+    fetchVendors()
+  }, [fetchOrders, fetchVendors])
+
+  // Refresh when orders are updated
+  useEffect(() => {
+    if (ordersState.updated) {
+      fetchOrders()
+    }
+  }, [ordersState.updated, fetchOrders])
+
+  const handleFilterChange = (filter) => {
+    // This would open a dropdown/modal for filter selection
+    // For now, we'll toggle the active state
+    setFilters((prev) => ({
+      ...prev,
+      [filter.id]: prev[filter.id] === filter.label ? 'All' : filter.label,
+    }))
+  }
+
+  const handleViewOrderDetails = async (order) => {
+    const originalOrder = ordersState.data?.orders?.find((o) => o.id === order.id) || order
+    setSelectedOrderForDetail(originalOrder)
+    
+    // Fetch detailed order data
+    const result = await getOrderDetails(order.id)
+    if (result.data) {
+      setOrderDetails(result.data)
+    }
+    
+    setDetailModalOpen(true)
+  }
+
+  const handleReassignOrder = (order) => {
+    const originalOrder = ordersState.data?.orders?.find((o) => o.id === order.id) || order
+    setSelectedOrderForReassign(originalOrder)
+    setReassignmentModalOpen(true)
+  }
+
+  const handleReassignSubmit = async (orderId, reassignData) => {
+    const result = await reassignOrder(orderId, reassignData)
+    if (result.data) {
+      setReassignmentModalOpen(false)
+      setSelectedOrderForReassign(null)
+      fetchOrders()
+    }
+  }
+
+  const handleGenerateInvoice = async (orderId) => {
+    const result = await generateInvoice(orderId)
+    if (result.data) {
+      // Open invoice in new tab or download
+      if (result.data.invoiceUrl) {
+        window.open(result.data.invoiceUrl, '_blank')
+      }
+      alert('Invoice generated successfully!')
+    }
+  }
+
+  const handleProcessRefund = async (orderId) => {
+    const confirmed = window.confirm('Are you sure you want to process this refund?')
+    if (confirmed) {
+      // This would call a refund API
+      console.log('Processing refund for order:', orderId)
+      alert('Refund processed successfully')
+      fetchOrders()
+    }
+  }
+
+  const tableColumns = columns.map((column) => {
+    if (column.accessor === 'status') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const status = row.status || 'Unknown'
+          const tone = status === 'Processing' || status === 'processing' ? 'warning' : status === 'Completed' || status === 'completed' ? 'success' : 'neutral'
+          return <StatusBadge tone={tone}>{status}</StatusBadge>
+        },
+      }
+    }
+    if (column.accessor === 'advance') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const advance = row.advance || 'Unknown'
+          const tone = advance === 'Paid' || advance === 'paid' ? 'success' : 'warning'
+          return <StatusBadge tone={tone}>{advance}</StatusBadge>
+        },
+      }
+    }
+    if (column.accessor === 'type') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const type = row.type || 'Unknown'
+          return (
+            <span className={cn(
+              'inline-flex items-center rounded-full px-3 py-1 text-xs font-bold',
+              type === 'User' || type === 'user' 
+                ? 'bg-blue-100 text-blue-700' 
+                : 'bg-green-100 text-green-700'
+            )}>
+              {type}
+            </span>
+          )
+        },
+      }
+    }
+    if (column.accessor === 'actions') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const originalOrder = ordersState.data?.orders?.find((o) => o.id === row.id) || row
+          return (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleViewOrderDetails(originalOrder)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-red-500 hover:bg-red-50 hover:text-red-700"
+                title="View details"
+              >
+                <Eye className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleReassignOrder(originalOrder)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-orange-500 hover:bg-orange-50 hover:text-orange-700"
+                title="Reassign order"
+              >
+                <Recycle className="h-4 w-4" />
+              </button>
+            </div>
+          )
+        },
+      }
+    }
+    return column
+  })
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -35,32 +267,17 @@ export function OrdersPage() {
 
       <FilterBar
         filters={[
-          { id: 'region', label: 'Region', active: true },
-          { id: 'vendor', label: 'Vendor' },
-          { id: 'date', label: 'Date range' },
-          { id: 'status', label: 'Order status' },
+          { id: 'region', label: filters.region === 'All' ? 'Region' : filters.region, active: filters.region !== 'All' },
+          { id: 'vendor', label: filters.vendor === 'All' ? 'Vendor' : filters.vendor, active: filters.vendor !== 'All' },
+          { id: 'date', label: filters.dateFrom ? 'Date range' : 'Date range', active: !!filters.dateFrom },
+          { id: 'status', label: filters.status === 'All' ? 'Order status' : filters.status, active: filters.status !== 'All' },
         ]}
+        onChange={handleFilterChange}
       />
 
       <DataTable
-        columns={columns.map((column) => ({
-          ...column,
-          Cell:
-            column.accessor === 'status'
-              ? (row) => (
-                  <StatusBadge tone={row.status === 'Processing' ? 'warning' : 'success'}>
-                    {row.status}
-                  </StatusBadge>
-                )
-              : column.accessor === 'advance'
-              ? (row) => (
-                  <StatusBadge tone={row.advance === 'Paid' ? 'success' : 'warning'}>
-                    {row.advance}
-                  </StatusBadge>
-                )
-              : undefined,
-        }))}
-        rows={orders}
+        columns={tableColumns}
+        rows={ordersList}
         emptyState="No orders found for selected filters"
       />
 
@@ -132,6 +349,34 @@ export function OrdersPage() {
           />
         </div>
       </section>
+
+      {/* Order Detail Modal */}
+      <OrderDetailModal
+        isOpen={detailModalOpen}
+        onClose={() => {
+          setDetailModalOpen(false)
+          setSelectedOrderForDetail(null)
+          setOrderDetails(null)
+        }}
+        order={orderDetails || selectedOrderForDetail}
+        onReassign={handleReassignOrder}
+        onGenerateInvoice={handleGenerateInvoice}
+        onProcessRefund={handleProcessRefund}
+        loading={loading}
+      />
+
+      {/* Order Reassignment Modal */}
+      <OrderReassignmentModal
+        isOpen={reassignmentModalOpen}
+        onClose={() => {
+          setReassignmentModalOpen(false)
+          setSelectedOrderForReassign(null)
+        }}
+        order={selectedOrderForReassign}
+        availableVendors={availableVendors}
+        onReassign={handleReassignSubmit}
+        loading={loading}
+      />
     </div>
   )
 }

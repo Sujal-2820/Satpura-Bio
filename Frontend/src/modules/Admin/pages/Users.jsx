@@ -1,7 +1,13 @@
-import { Ban, Search, UserCheck } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Ban, Search, UserCheck, Eye, MessageSquare } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
-import { users } from '../services/adminData'
+import { Modal } from '../components/Modal'
+import { UserDetailModal } from '../components/UserDetailModal'
+import { SupportTicketModal } from '../components/SupportTicketModal'
+import { useAdminState } from '../context/AdminContext'
+import { useAdminApi } from '../hooks/useAdminApi'
+import { users as mockUsers } from '../services/adminData'
 
 const columns = [
   { Header: 'User', accessor: 'name' },
@@ -12,9 +18,237 @@ const columns = [
   { Header: 'Payments', accessor: 'payments' },
   { Header: 'Support Tickets', accessor: 'supportTickets' },
   { Header: 'Status', accessor: 'status' },
+  { Header: 'Actions', accessor: 'actions' },
 ]
 
 export function UsersPage() {
+  const { users: usersState } = useAdminState()
+  const {
+    getUsers,
+    getUserDetails,
+    blockUser,
+    deactivateUser,
+    activateUser,
+    loading,
+  } = useAdminApi()
+
+  const [usersList, setUsersList] = useState([])
+  
+  // Modal states
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [selectedUserForDetail, setSelectedUserForDetail] = useState(null)
+  const [userDetails, setUserDetails] = useState(null)
+  const [supportTicketModalOpen, setSupportTicketModalOpen] = useState(false)
+  const [selectedUserForTickets, setSelectedUserForTickets] = useState(null)
+  const [userTickets, setUserTickets] = useState([])
+
+  // Fetch users
+  const fetchUsers = useCallback(async () => {
+    const result = await getUsers()
+    if (result.data?.users) {
+      setUsersList(result.data.users)
+    } else {
+      // Fallback to mock data
+      setUsersList(mockUsers)
+    }
+  }, [getUsers])
+
+  // Fetch user details
+  const fetchUserDetails = useCallback(async (userId) => {
+    const result = await getUserDetails(userId)
+    if (result.data) {
+      setUserDetails(result.data)
+      return result.data
+    }
+    return null
+  }, [getUserDetails])
+
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers])
+
+  // Refresh when users are updated
+  useEffect(() => {
+    if (usersState.updated) {
+      fetchUsers()
+    }
+  }, [usersState.updated, fetchUsers])
+
+  const handleViewUserDetails = async (user) => {
+    const originalUser = usersState.data?.users?.find((u) => u.id === user.id) || user
+    setSelectedUserForDetail(originalUser)
+    
+    // Fetch detailed user data
+    const details = await fetchUserDetails(user.id)
+    if (details) {
+      setUserDetails(details)
+    }
+    
+    setDetailModalOpen(true)
+  }
+
+  const handleViewSupportTickets = async (user) => {
+    const originalUser = usersState.data?.users?.find((u) => u.id === user.id) || user
+    setSelectedUserForTickets(originalUser)
+    
+    // Fetch user details to get tickets
+    const details = await fetchUserDetails(user.id)
+    if (details && details.supportTickets) {
+      setUserTickets(details.supportTickets)
+    } else {
+      // Mock tickets for demo
+      setUserTickets([
+        {
+          id: 'TKT-001',
+          ticketId: 'TKT-001',
+          subject: 'Order delivery issue',
+          description: 'Order #ORD-12345 was not delivered on time. Need assistance.',
+          status: 'open',
+          createdAt: '2024-01-15',
+          conversation: [
+            { from: 'User', message: 'Order #ORD-12345 was not delivered on time. Need assistance.', timestamp: '2024-01-15 10:00' },
+            { from: 'Admin', message: 'We are looking into this issue. Will update you soon.', timestamp: '2024-01-15 11:30' },
+          ],
+        },
+      ])
+    }
+    
+    setSupportTicketModalOpen(true)
+  }
+
+  const handleBlockUser = async (userId) => {
+    const reason = window.prompt('Please provide a reason for blocking this user:')
+    if (reason) {
+      const result = await blockUser(userId, { reason })
+      if (result.data) {
+        fetchUsers()
+        setDetailModalOpen(false)
+        setSelectedUserForDetail(null)
+      }
+    }
+  }
+
+  const handleDeactivateUser = async (userId) => {
+    const reason = window.prompt('Please provide a reason for deactivating this user:')
+    if (reason) {
+      const result = await deactivateUser(userId, { reason })
+      if (result.data) {
+        fetchUsers()
+        setDetailModalOpen(false)
+        setSelectedUserForDetail(null)
+      }
+    }
+  }
+
+  const handleActivateUser = async (userId) => {
+    const result = await activateUser(userId)
+    if (result.data) {
+      fetchUsers()
+      setDetailModalOpen(false)
+      setSelectedUserForDetail(null)
+    }
+  }
+
+  const handleResolveTicket = async (ticketId) => {
+    // This would call an API to resolve the ticket
+    console.log('Resolving ticket:', ticketId)
+    // Update local state
+    setUserTickets((prev) =>
+      prev.map((ticket) =>
+        ticket.id === ticketId ? { ...ticket, status: 'resolved' } : ticket,
+      ),
+    )
+  }
+
+  const handleCloseTicket = async (ticketId) => {
+    // This would call an API to close the ticket
+    console.log('Closing ticket:', ticketId)
+    // Update local state
+    setUserTickets((prev) =>
+      prev.map((ticket) =>
+        ticket.id === ticketId ? { ...ticket, status: 'closed' } : ticket,
+      ),
+    )
+  }
+
+  const tableColumns = columns.map((column) => {
+    if (column.accessor === 'payments') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const payments = row.payments || 'Unknown'
+          const tone = payments === 'On Time' || payments === 'on_time' ? 'success' : 'warning'
+          return <StatusBadge tone={tone}>{payments}</StatusBadge>
+        },
+      }
+    }
+    if (column.accessor === 'status') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const status = row.status || 'Unknown'
+          const tone = status === 'Active' || status === 'active' ? 'success' : status === 'Blocked' || status === 'blocked' ? 'neutral' : 'warning'
+          return <StatusBadge tone={tone}>{status}</StatusBadge>
+        },
+      }
+    }
+    if (column.accessor === 'supportTickets') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const count = row.supportTickets || 0
+          return (
+            <div className="flex items-center gap-2">
+              <span className={count > 0 ? 'font-bold text-orange-600' : 'text-gray-600'}>
+                {count}
+              </span>
+              {count > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleViewSupportTickets(row)}
+                  className="text-xs text-orange-600 hover:text-orange-700 font-semibold"
+                >
+                  View
+                </button>
+              )}
+            </div>
+          )
+        },
+      }
+    }
+    if (column.accessor === 'actions') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const originalUser = usersState.data?.users?.find((u) => u.id === row.id) || row
+          return (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleViewUserDetails(originalUser)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-orange-500 hover:bg-orange-50 hover:text-orange-700"
+                title="View details"
+              >
+                <Eye className="h-4 w-4" />
+              </button>
+              {row.supportTickets > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleViewSupportTickets(originalUser)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-orange-600 transition-all hover:border-orange-500 hover:bg-orange-50"
+                  title="View support tickets"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          )
+        },
+      }
+    }
+    return column
+  })
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -38,24 +272,8 @@ export function UsersPage() {
       </header>
 
       <DataTable
-        columns={columns.map((column) => ({
-          ...column,
-          Cell:
-            column.accessor === 'payments'
-              ? (row) => (
-                  <StatusBadge tone={row.payments === 'On Time' ? 'success' : 'warning'}>
-                    {row.payments}
-                  </StatusBadge>
-                )
-              : column.accessor === 'status'
-              ? (row) => (
-                  <StatusBadge tone={row.status === 'Active' ? 'success' : 'warning'}>
-                    {row.status}
-                  </StatusBadge>
-                )
-              : undefined,
-        }))}
-        rows={users}
+        columns={tableColumns}
+        rows={usersList}
         emptyState="No user accounts found"
       />
 
@@ -128,6 +346,36 @@ export function UsersPage() {
           </div>
         </div>
       </section>
+
+      {/* User Detail Modal */}
+      <UserDetailModal
+        isOpen={detailModalOpen}
+        onClose={() => {
+          setDetailModalOpen(false)
+          setSelectedUserForDetail(null)
+          setUserDetails(null)
+        }}
+        user={userDetails || selectedUserForDetail}
+        onBlock={handleBlockUser}
+        onDeactivate={handleDeactivateUser}
+        onActivate={handleActivateUser}
+        onViewSupportTickets={handleViewSupportTickets}
+      />
+
+      {/* Support Ticket Modal */}
+      <SupportTicketModal
+        isOpen={supportTicketModalOpen}
+        onClose={() => {
+          setSupportTicketModalOpen(false)
+          setSelectedUserForTickets(null)
+          setUserTickets([])
+        }}
+        tickets={userTickets}
+        user={selectedUserForTickets}
+        onResolve={handleResolveTicket}
+        onCloseTicket={handleCloseTicket}
+        loading={loading}
+      />
     </div>
   )
 }
