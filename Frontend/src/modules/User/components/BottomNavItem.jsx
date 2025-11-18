@@ -10,10 +10,8 @@ export function BottomNavItem({ label, icon, active, onClick, badge }) {
     >
       <span className="relative flex items-center justify-center w-11 h-11 rounded-2xl transition-all duration-200"
         style={{
-          background: active
-            ? 'linear-gradient(140deg, rgba(43, 118, 79, 0.22), rgba(43, 118, 79, 0.08))'
-            : 'rgba(238, 245, 237, 0.7)',
-          color: active ? '#1b8f5b' : '#1b8f5b',
+          background: active ? '#1b8f5b' : 'rgba(238, 245, 237, 0.7)',
+          color: active ? '#ffffff' : '#1b8f5b',
           boxShadow: active
             ? '0 12px 20px -14px rgba(24, 63, 44, 0.6), inset 0 0 0 1px rgba(43, 118, 79, 0.16)'
             : 'inset 0 0 0 1px rgba(30, 82, 54, 0.06)',
