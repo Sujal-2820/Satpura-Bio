@@ -10,7 +10,7 @@ const roles = [
   },
   {
     id: 'seller',
-    label: 'Seller',
+    label: 'IRA Partner',
     description: 'Refer farmers, earn commissions, and track payouts.',
     icon: Users,
   },
@@ -34,7 +34,7 @@ export function RoleSelect({ onSelect, onBack }) {
         <div>
           <h1 className="text-3xl font-semibold text-surface-foreground">Who are you?</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Tell us your role to customise the experience. आप Vendor हैं या Seller?
+            Tell us your role to customise the experience. आप Vendor हैं या IRA Partner?
           </p>
         </div>
 

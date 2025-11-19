@@ -28,7 +28,7 @@ export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, on
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Seller Withdrawal Request Review" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="IRA Partner Withdrawal Request Review" size="md">
       <div className="space-y-6">
         {/* Request Header */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -41,10 +41,10 @@ export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, on
                 <h3 className="text-lg font-bold text-gray-900">Request #{request.id || request.requestId}</h3>
                 <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
                   <User className="h-4 w-4" />
-                  <span>{request.sellerName || request.seller?.name || 'Unknown Seller'}</span>
+                  <span>{request.sellerName || request.seller?.name || 'Unknown IRA Partner'}</span>
                 </div>
                 {request.sellerId && (
-                  <p className="mt-1 text-xs text-gray-500">Seller ID: {request.sellerId || request.seller?.sellerId}</p>
+                  <p className="mt-1 text-xs text-gray-500">IRA Partner ID: {request.sellerId || request.seller?.sellerId}</p>
                 )}
                 {request.date && (
                   <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
@@ -98,7 +98,7 @@ export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, on
 
           {request.sellerPerformance && (
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-              <p className="mb-2 text-xs font-bold text-blue-900">Seller Performance Summary</p>
+              <p className="mb-2 text-xs font-bold text-blue-900">IRA Partner Performance Summary</p>
               <div className="grid gap-2 text-xs text-blue-800 sm:grid-cols-2">
                 {request.sellerPerformance.totalSales && (
                   <div>

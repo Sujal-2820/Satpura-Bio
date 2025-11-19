@@ -13,8 +13,8 @@ import { sellers as mockSellers } from '../services/adminData'
 import { cn } from '../../../lib/cn'
 
 const columns = [
-  { Header: 'Seller', accessor: 'name' },
-  { Header: 'Seller ID', accessor: 'id' },
+  { Header: 'IRA Partner', accessor: 'name' },
+  { Header: 'IRA Partner ID', accessor: 'id' },
   { Header: 'Cashback %', accessor: 'cashback' },
   { Header: 'Commission %', accessor: 'commission' },
   { Header: 'Monthly Target', accessor: 'target' },
@@ -254,7 +254,7 @@ export function SellersPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 4 • Seller Management</p>
+          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 4 • IRA Partner Management</p>
           <h2 className="text-2xl font-bold text-gray-900">Sales Network HQ</h2>
           <p className="text-sm text-gray-600">
             Incentivise performance, track targets, and manage wallet payouts with clarity.
@@ -278,7 +278,7 @@ export function SellersPage() {
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-yellow-500 to-yellow-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(234,179,8,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(234,179,8,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]"
           >
           <Award className="h-4 w-4" />
-          Create Seller Profile
+          Create IRA Partner Profile
         </button>
         </div>
       </header>
@@ -286,7 +286,7 @@ export function SellersPage() {
       <DataTable
         columns={tableColumns}
         rows={sellersList}
-        emptyState="No sellers found in the network"
+        emptyState="No IRA Partners found in the network"
       />
 
       <section className="grid gap-6 lg:grid-cols-2">

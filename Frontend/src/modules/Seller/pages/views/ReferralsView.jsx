@@ -15,25 +15,49 @@ export function ReferralsView({ onNavigate }) {
   const [searchQuery, setSearchQuery] = useState('')
 
   const referrals = sellerSnapshot.referrals
+  const commissionPolicy = sellerSnapshot.commissionPolicy
+
+  const formatCurrency = (value = 0) => {
+    const amount = Number(value) || 0
+    return `₹${amount.toLocaleString('en-IN')}`
+  }
+
+  const getCommissionInfo = (amount) => {
+    const purchaseAmount = Number(amount) || 0
+    const rate = purchaseAmount > 50000 ? 0.03 : 0.02
+    const commissionAmount = Math.round(purchaseAmount * rate)
+    return {
+      purchaseAmount,
+      rate,
+      commissionAmount,
+    }
+  }
+
+  const currentMonthLabel =
+    commissionPolicy?.currentMonth ||
+    new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 
   // Calculate summary stats
   const stats = useMemo(() => {
     const total = referrals.length
     const active = referrals.filter((r) => r.status === 'Active').length
-    const totalCommission = referrals.reduce((sum, r) => {
-      const amount = parseFloat(r.commissionEarned.replace(/[₹,\s]/g, '')) || 0
-      return sum + amount
-    }, 0)
-    const totalSales = referrals.reduce((sum, r) => {
-      const amount = parseFloat(r.totalAmount.replace(/[₹,\sL]/g, '')) || 0
-      return sum + amount
-    }, 0)
+    const aggregates = referrals.reduce(
+      (acc, referral) => {
+        const lifetimeAmount = parseFloat(referral.totalAmount.replace(/[₹,\sL]/g, '')) || 0
+        const commissionInfo = getCommissionInfo(referral.monthlyPurchases)
+        acc.totalSales += lifetimeAmount
+        acc.monthlyPurchases += commissionInfo.purchaseAmount
+        acc.monthlyCommission += commissionInfo.commissionAmount
+        return acc
+      },
+      { totalSales: 0, monthlyPurchases: 0, monthlyCommission: 0 },
+    )
 
     return {
       total,
       active,
-      totalCommission: `₹${(totalCommission / 1000).toFixed(1)}K`,
-      totalSales: `₹${(totalSales / 1000).toFixed(1)}K`,
+      monthlyCommission: formatCurrency(aggregates.monthlyCommission),
+      monthlyPurchases: formatCurrency(aggregates.monthlyPurchases),
     }
   }, [referrals])
 
@@ -99,14 +123,30 @@ export function ReferralsView({ onNavigate }) {
               <span className="seller-referrals-stat__value">{stats.active}</span>
             </div>
             <div className="seller-referrals-stat">
-              <p className="seller-referrals-stat__label">Total Commission</p>
-              <span className="seller-referrals-stat__value">{stats.totalCommission}</span>
+              <p className="seller-referrals-stat__label">This Month Commission</p>
+              <span className="seller-referrals-stat__value">{stats.monthlyCommission}</span>
             </div>
             <div className="seller-referrals-stat">
-              <p className="seller-referrals-stat__label">Total Sales</p>
-              <span className="seller-referrals-stat__value">{stats.totalSales}</span>
+              <p className="seller-referrals-stat__label">This Month Purchases</p>
+              <span className="seller-referrals-stat__value">{stats.monthlyPurchases}</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Commission Policy Notice */}
+      <section className="seller-section">
+        <div className="rounded-2xl border border-[rgba(34,94,65,0.15)] bg-white/80 p-4">
+          <p className="text-sm font-semibold text-[#172022]">
+            Monthly commission tally resets on day {commissionPolicy?.resetDay || 1} of every month.
+          </p>
+          <p className="mt-1 text-xs text-[rgba(26,42,34,0.7)]">
+            Current cycle: {currentMonthLabel}. Commission rates apply per connected user:
+          </p>
+          <ul className="mt-3 space-y-1 text-xs text-[rgba(26,42,34,0.7)]">
+            <li>• Up to ₹50,000 cumulative purchases: earn 2% commission.</li>
+            <li>• Above ₹50,000: the entire month’s purchases earn 3%.</li>
+          </ul>
         </div>
       </section>
 
@@ -152,11 +192,20 @@ export function ReferralsView({ onNavigate }) {
           </div>
         ) : (
           <div className="seller-referrals-list">
-            {filteredReferrals.map((referral) => (
-              <div
-                key={referral.id}
-                className={cn('seller-referral-card', expandedId === referral.id && 'is-expanded')}
-              >
+            {filteredReferrals.map((referral) => {
+              const commissionInfo = getCommissionInfo(referral.monthlyPurchases)
+              const monthlyPurchaseDisplay = formatCurrency(commissionInfo.purchaseAmount)
+              const commissionDisplay = formatCurrency(commissionInfo.commissionAmount)
+              const commissionRateLabel = `${Math.round(commissionInfo.rate * 100)}%`
+              const amountToNextSlab = Math.max(50000 - commissionInfo.purchaseAmount, 0)
+              const amountToNextSlabDisplay = formatCurrency(amountToNextSlab)
+              const lifetimeTotal = referral.totalAmount
+
+              return (
+                <div
+                  key={referral.id}
+                  className={cn('seller-referral-card', expandedId === referral.id && 'is-expanded')}
+                >
                 <div
                   className="seller-referral-card__header"
                   onClick={() => setExpandedId(expandedId === referral.id ? null : referral.id)}
@@ -196,14 +245,24 @@ export function ReferralsView({ onNavigate }) {
                         <span className="seller-referral-stat__value">{referral.totalPurchases}</span>
                       </div>
                       <div className="seller-referral-stat">
-                        <p className="seller-referral-stat__label">Total Amount</p>
-                        <span className="seller-referral-stat__value">{referral.totalAmount}</span>
+                        <p className="seller-referral-stat__label">Lifetime Amount</p>
+                        <span className="seller-referral-stat__value">{lifetimeTotal}</span>
                       </div>
                       <div className="seller-referral-stat">
-                        <p className="seller-referral-stat__label">Commission Earned</p>
+                        <p className="seller-referral-stat__label">This Month Purchases</p>
+                        <span className="seller-referral-stat__value">{monthlyPurchaseDisplay}</span>
+                        <p className="mt-1 text-[0.7rem] text-[rgba(26,42,34,0.6)]">
+                          {commissionInfo.purchaseAmount >= 50000
+                            ? '3% slab unlocked for this user.'
+                            : `${amountToNextSlabDisplay} more unlocks 3% rate.`}
+                        </p>
+                      </div>
+                      <div className="seller-referral-stat">
+                        <p className="seller-referral-stat__label">Commission (This Month)</p>
                         <span className="seller-referral-stat__value seller-referral-stat__value--commission">
-                          {referral.commissionEarned}
+                          {commissionDisplay}
                         </span>
+                        <p className="mt-1 text-[0.7rem] text-[rgba(26,42,34,0.6)]">Current rate: {commissionRateLabel}</p>
                       </div>
                       <div className="seller-referral-stat">
                         <p className="seller-referral-stat__label">Last Purchase</p>
@@ -223,23 +282,24 @@ export function ReferralsView({ onNavigate }) {
                   </div>
                 )}
 
-                {/* Quick Stats (always visible) */}
-                <div className="seller-referral-card__quick-stats">
-                  <div className="seller-referral-quick-stat">
-                    <span className="seller-referral-quick-stat__label">Purchases</span>
-                    <span className="seller-referral-quick-stat__value">{referral.totalPurchases}</span>
-                  </div>
-                  <div className="seller-referral-quick-stat">
-                    <span className="seller-referral-quick-stat__label">Total</span>
-                    <span className="seller-referral-quick-stat__value">{referral.totalAmount}</span>
-                  </div>
-                  <div className="seller-referral-quick-stat seller-referral-quick-stat--commission">
-                    <span className="seller-referral-quick-stat__label">Commission</span>
-                    <span className="seller-referral-quick-stat__value">{referral.commissionEarned}</span>
+                  {/* Quick Stats (always visible) */}
+                  <div className="seller-referral-card__quick-stats">
+                    <div className="seller-referral-quick-stat">
+                      <span className="seller-referral-quick-stat__label">Purchases</span>
+                      <span className="seller-referral-quick-stat__value">{referral.totalPurchases}</span>
+                    </div>
+                    <div className="seller-referral-quick-stat">
+                      <span className="seller-referral-quick-stat__label">This Month</span>
+                      <span className="seller-referral-quick-stat__value">{monthlyPurchaseDisplay}</span>
+                    </div>
+                    <div className="seller-referral-quick-stat seller-referral-quick-stat--commission">
+                      <span className="seller-referral-quick-stat__label">Commission</span>
+                      <span className="seller-referral-quick-stat__value">{commissionDisplay}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>

@@ -164,8 +164,21 @@ export async function getOrders(params = {}) {
  * Get Order Details
  * GET /vendors/orders/:orderId
  * 
+ * IMPORTANT: The response should include item-level stock availability:
+ * - Each order item should have: { itemId, productId, name, quantity, availableStock, status: 'in_stock' | 'out_of_stock' | 'insufficient' }
+ * - This allows vendor to see which items they can fulfill and which need to be escalated
+ * 
  * @param {string} orderId - Order ID
- * @returns {Promise<Object>} - Detailed order information
+ * @returns {Promise<Object>} - { 
+ *   order: {
+ *     id: string,
+ *     items: Array<{ itemId, productId, name, quantity, availableStock, status }>,
+ *     farmer: string,
+ *     value: string,
+ *     payment: string,
+ *     status: string
+ *   }
+ * }
  */
 export async function getOrderDetails(orderId) {
   return apiRequest(`/vendors/orders/${orderId}`)
@@ -187,6 +200,68 @@ export async function acceptOrder(orderId) {
         data: {
           message: 'Order accepted successfully',
           order: { id: orderId, status: 'processing' },
+        },
+      })
+    }, 1000)
+  })
+}
+
+/**
+ * Accept Order Partially (Accept some items, reject others)
+ * POST /vendors/orders/:orderId/accept-partial
+ * 
+ * IMPORTANT: This API handles partial order fulfillment where:
+ * - Items that vendor has in stock → Vendor fulfills those items
+ * - Items that vendor doesn't have (or insufficient quantity) → Escalated to Admin
+ * 
+ * The backend should:
+ * 1. Split the order into two parts:
+ *    - Vendor fulfillment: Items accepted by vendor
+ *    - Admin fulfillment: Items rejected/escalated to admin
+ * 2. Create separate order tracking for each part
+ * 3. Notify user about partial fulfillment
+ * 4. Update vendor inventory for accepted items
+ * 
+ * @param {string} orderId - Order ID
+ * @param {Object} partialData - {
+ *   acceptedItems: Array<{ itemId: string, quantity: number }>, // Items vendor can fulfill
+ *   rejectedItems: Array<{ itemId: string, quantity: number, reason?: string }>, // Items to escalate to Admin
+ *   notes?: string
+ * }
+ * @returns {Promise<Object>} - { 
+ *   message: 'Order partially accepted',
+ *   vendorOrder: Object, // Order for vendor to fulfill
+ *   adminOrder: Object, // Order escalated to admin
+ *   order: Object // Original order with split status
+ * }
+ */
+export async function acceptOrderPartially(orderId, partialData) {
+  // Simulate API call
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        success: true,
+        data: {
+          message: 'Order partially accepted. Some items will be fulfilled by Admin.',
+          vendorOrder: {
+            id: `${orderId}-vendor`,
+            parentOrderId: orderId,
+            items: partialData.acceptedItems,
+            status: 'processing',
+            fulfillmentBy: 'vendor',
+          },
+          adminOrder: {
+            id: `${orderId}-admin`,
+            parentOrderId: orderId,
+            items: partialData.rejectedItems,
+            status: 'pending',
+            fulfillmentBy: 'admin',
+          },
+          order: {
+            id: orderId,
+            status: 'partially_accepted',
+            split: true,
+          },
         },
       })
     }, 1000)
@@ -220,19 +295,41 @@ export async function rejectOrder(orderId, reasonData) {
  * Update Order Status
  * PUT /vendors/orders/:orderId/status
  * 
+ * IMPORTANT: This status update must be persisted and immediately reflected in the User Dashboard.
+ * The backend should:
+ * 1. Update the order status in the database
+ * 2. Add an entry to the order's statusTimeline array with timestamp
+ * 3. Notify the user via real-time notification (WebSocket/SSE) about the status change
+ * 4. Make the updated status available via GET /users/orders/:orderId
+ * 
  * @param {string} orderId - Order ID
- * @param {Object} statusData - { status: 'processing' | 'delivered', notes?: string }
- * @returns {Promise<Object>} - { message: 'Status updated', order: Object }
+ * @param {Object} statusData - { status: 'awaiting' | 'dispatched' | 'delivered', notes?: string }
+ * @returns {Promise<Object>} - { message: 'Status updated', order: Object with statusTimeline }
  */
 export async function updateOrderStatus(orderId, statusData) {
   // Simulate API call
   return new Promise((resolve) => {
     setTimeout(() => {
+      const now = new Date().toISOString()
       resolve({
         success: true,
         data: {
           message: 'Order status updated successfully',
-          order: { id: orderId, status: statusData.status },
+          order: {
+            id: orderId,
+            status: statusData.status,
+            notes: statusData.notes || '',
+            updatedAt: now,
+            statusTimeline: [
+              { status: 'awaiting', timestamp: now },
+              ...(statusData.status === 'dispatched' || statusData.status === 'delivered'
+                ? [{ status: 'dispatched', timestamp: now }]
+                : []),
+              ...(statusData.status === 'delivered'
+                ? [{ status: 'delivered', timestamp: now }]
+                : []),
+            ],
+          },
         },
       })
     }, 1000)

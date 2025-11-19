@@ -7,10 +7,53 @@ import { useToast } from '../../components/ToastNotification'
 
 const FILTER_TABS = [
   { id: 'all', label: 'All' },
-  { id: 'pending', label: 'Pending' },
-  { id: 'added_to_cart', label: 'Added to cart' },
+  { id: 'awaiting', label: 'Awaiting' },
+  { id: 'dispatched', label: 'Dispatched' },
   { id: 'delivered', label: 'Delivered' },
+  { id: 'added_to_cart', label: 'In Cart' },
 ]
+
+const USER_ORDER_STATUSES = ['awaiting', 'dispatched', 'delivered']
+const STATUS_LABELS = {
+  awaiting: 'Awaiting',
+  dispatched: 'Dispatched',
+  delivered: 'Delivered',
+}
+const STATUS_DESCRIPTIONS = {
+  awaiting: 'Vendor is confirming stock and assigning a delivery partner.',
+  dispatched: 'Order handed over for delivery. Track updates in real time.',
+  delivered: 'Order delivered. Complete remaining payment if pending.',
+}
+
+const getStatusKey = (status) => {
+  if (!status) return 'awaiting'
+  const normalized = status.toLowerCase()
+  if (normalized.includes('deliver')) return 'delivered'
+  if (normalized.includes('dispatch')) return 'dispatched'
+  if (normalized.includes('await')) return 'awaiting'
+  return normalized
+}
+
+const getDisplayStatus = (status) => {
+  if (status === 'added_to_cart') return 'In Cart'
+  const key = getStatusKey(status)
+  return STATUS_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1)
+}
+
+const formatTimelineTimestamp = (timestamp) => {
+  if (!timestamp) return ''
+  try {
+    const date = new Date(timestamp)
+    return date.toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  } catch {
+    return timestamp
+  }
+}
 
 export function OrdersView() {
   const { orders, cart } = useUserState()
@@ -21,11 +64,15 @@ export function OrdersView() {
 
   // Combine orders and cart items
   const allItems = useMemo(() => {
-    const orderItems = orders.map((order) => ({
-      ...order,
-      type: 'order',
-      status: order.status || 'pending',
-    }))
+    const orderItems = orders.map((order) => {
+      const normalizedStatus = getStatusKey(order.status)
+      return {
+        ...order,
+        type: 'order',
+        status: normalizedStatus,
+        statusTimeline: order.statusTimeline || [],
+      }
+    })
 
     // Add cart items as "added_to_cart" status
     const cartItems = cart.length > 0
@@ -57,29 +104,21 @@ export function OrdersView() {
   }, [allItems, activeFilter])
 
   const getStatusIcon = (status) => {
-    switch (status) {
-      case 'pending':
-        return <ClockIcon className="h-4 w-4" />
-      case 'added_to_cart':
-        return <PackageIcon className="h-4 w-4" />
-      case 'delivered':
-        return <CheckCircleIcon className="h-4 w-4" />
-      default:
-        return <PackageIcon className="h-4 w-4" />
-    }
+    if (status === 'added_to_cart') return <PackageIcon className="h-4 w-4" />
+    const key = getStatusKey(status)
+    if (key === 'awaiting') return <ClockIcon className="h-4 w-4" />
+    if (key === 'dispatched') return <TruckIcon className="h-4 w-4" />
+    if (key === 'delivered') return <CheckCircleIcon className="h-4 w-4" />
+    return <PackageIcon className="h-4 w-4" />
   }
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-700'
-      case 'added_to_cart':
-        return 'bg-blue-100 text-blue-700'
-      case 'delivered':
-        return 'bg-green-100 text-[#1b8f5b]'
-      default:
-        return 'bg-gray-100 text-gray-700'
-    }
+    if (status === 'added_to_cart') return 'bg-blue-100 text-blue-700'
+    const key = getStatusKey(status)
+    if (key === 'awaiting') return 'bg-yellow-100 text-yellow-700'
+    if (key === 'dispatched') return 'bg-indigo-100 text-indigo-700'
+    if (key === 'delivered') return 'bg-green-100 text-[#1b8f5b]'
+    return 'bg-gray-100 text-gray-700'
   }
 
   const formatDate = (dateString) => {
@@ -149,6 +188,39 @@ export function OrdersView() {
     }
   }
 
+  const renderStatusTracker = (item) => {
+    if (item.type !== 'order') return null
+    const currentStatus = getStatusKey(item.status)
+    const currentIndex = USER_ORDER_STATUSES.indexOf(currentStatus)
+    return (
+      <div className="user-orders-view__tracker">
+        {USER_ORDER_STATUSES.map((status, index) => {
+          const timelineEntry = item.statusTimeline?.find((entry) => entry.status === status)
+          return (
+            <div
+              key={`${item.id}-${status}`}
+              className={cn(
+                'user-orders-view__tracker-step',
+                index <= currentIndex && 'user-orders-view__tracker-step--active',
+              )}
+            >
+              <span className="user-orders-view__tracker-step-index">{index + 1}</span>
+              <div className="user-orders-view__tracker-step-body">
+                <p className="user-orders-view__tracker-step-title">{STATUS_LABELS[status]}</p>
+                <p className="user-orders-view__tracker-step-desc">{STATUS_DESCRIPTIONS[status]}</p>
+                {timelineEntry?.timestamp && (
+                  <p className="user-orders-view__tracker-step-time">
+                    {formatTimelineTimestamp(timelineEntry.timestamp)}
+                  </p>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div className="user-orders-view space-y-6">
       <div className="user-orders-view__header">
@@ -199,16 +271,12 @@ export function OrdersView() {
                 <div className={cn('user-orders-view__card-status', getStatusColor(item.status))}>
                   {getStatusIcon(item.status)}
                   <span className="user-orders-view__card-status-text">
-                    {item.status === 'added_to_cart'
-                      ? 'In Cart'
-                      : item.status === 'pending'
-                        ? 'Pending'
-                        : item.status === 'delivered'
-                          ? 'Delivered'
-                          : item.status}
+                    {getDisplayStatus(item.status)}
                   </span>
                 </div>
               </div>
+
+              {renderStatusTracker(item)}
 
               <div className="user-orders-view__card-items">
                 {item.items?.map((orderItem, index) => (

@@ -314,14 +314,28 @@ export async function checkVendorStock(data) {
  * Create Order
  * POST /users/orders
  * 
+ * IMPORTANT: The backend should handle partial fulfillment scenarios:
+ * - When vendor has some items but not all, the order should be split:
+ *   - Items in stock → Vendor fulfills
+ *   - Items out of stock/insufficient → Escalated to Admin
+ * - The response should indicate if order is split and provide details
+ * 
  * @param {Object} orderData - {
- *   items: Array,
+ *   items: Array<{ productId: string, quantity: number }>,
  *   addressId: string,
  *   shippingMethod: string,
  *   vendorId: string,
- *   paymentMethod: string
+ *   paymentMethod: string,
+ *   paymentPreference: 'partial' | 'full',
+ *   payInFull: boolean,
+ *   upfrontAmount: number,
+ *   deliveryChargeWaived?: boolean
  * }
- * @returns {Promise<Object>} - { order: Object, paymentIntent: Object }
+ * @returns {Promise<Object>} - { 
+ *   order: Object,
+ *   paymentIntent: Object,
+ *   splitOrder?: { vendorOrder: Object, adminOrder: Object } // If partial fulfillment
+ * }
  */
 export async function createOrder(orderData) {
   return apiRequest('/users/orders', {
@@ -334,8 +348,13 @@ export async function createOrder(orderData) {
  * Get Orders
  * GET /users/orders
  * 
+ * IMPORTANT: Orders returned should include the latest status updates from vendors.
+ * Each order should have:
+ * - status: 'awaiting' | 'dispatched' | 'delivered'
+ * - statusTimeline: Array of { status: string, timestamp: ISO string }
+ * 
  * @param {Object} params - { status, limit, offset }
- * @returns {Promise<Object>} - { orders: Array, total: number }
+ * @returns {Promise<Object>} - { orders: Array with status and statusTimeline, total: number }
  */
 export async function getOrders(params = {}) {
   const queryParams = new URLSearchParams(params).toString()

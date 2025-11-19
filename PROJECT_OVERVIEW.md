@@ -30,8 +30,9 @@ The system ensures that:
    - All other orders continue to follow the existing 30% / 70% split flow.
 
 2. **Dashboard Header Styling**
-   - Update the header backgrounds across **User, Vendor, and IRA Partner (Seller)** dashboards to use a **dark gradient**.
-   - The gradient should start as **dark green at the top** and fade to **white at the bottom**, ensuring visual consistency across every dashboard.
+   - Update the header backgrounds across **User, Vendor, and IRA Partner (Seller)** dashboards to use a **solid green color (shpould be slightly light in shade)**.
+   - Make the elements inside the header, **light colored** so that they are visible in Dark background as well.
+
 
 3. **Brand Logo Watermark**
    - Create a **very light / low-contrast** version of the brand logo.
@@ -107,12 +108,21 @@ The system ensures that:
 2. User pays 30% amount → transaction verified → order confirmed
 3. Payment status = "Partial Paid"
 
-### Step 5: Order Assignment
+### Step 5: Order Assignment & Partial Fulfillment
 
-1. Backend verifies stock from vendor:
-   - If vendor has stock → vendor receives order notification
-   - If vendor doesn't have stock → vendor must mark "Not Available" with reason → order gets escalated to Admin
-2. Admin arranges delivery via master warehouse
+1. Backend verifies stock from vendor for each item in the order:
+   - **Full Availability**: If vendor has all items in stock → vendor receives order notification → vendor accepts and fulfills
+   - **No Availability**: If vendor doesn't have any items → vendor marks "Not Available" with reason → entire order escalated to Admin
+   - **Partial Availability**: If vendor has some items but not all:
+     - Vendor can accept items that are in stock (sufficient quantity)
+     - Vendor rejects items that are out of stock or insufficient quantity
+     - System automatically splits the order:
+       - **Vendor Order**: Items accepted by vendor (vendor fulfills from local stock)
+       - **Admin Order**: Items rejected/escalated (admin fulfills from master warehouse)
+     - Both orders are tracked separately but linked to the original order
+     - User receives notification about partial fulfillment with details of which items will come from vendor and which from admin
+2. Admin arranges delivery via master warehouse for escalated items
+3. User may receive deliveries from both vendor and admin separately, or combined delivery can be arranged
 
 ### Step 6: Order Delivery & Remaining Payment
 
@@ -167,13 +177,20 @@ Main sections:
 
 1. When user in vendor's region places an order:
    - Vendor receives notification
-   - Vendor checks stock availability
+   - Vendor checks stock availability for each item in the order
 2. Vendor options:
-   - "Available" → accepts order → arranges delivery
-   - "Not Available" → must provide reason (e.g., out of stock, delay in shipment)
-     - System redirects order to Admin for fulfillment
+   - **"Available"** → accepts entire order → arranges delivery
+   - **"Not Available"** → rejects entire order with reason → System redirects order to Admin for fulfillment
+   - **"Partial Acceptance"** → Vendor can accept some items and reject others:
+     - Items that vendor has in stock (sufficient quantity) → Vendor fulfills those items
+     - Items that vendor doesn't have (or insufficient quantity) → Those items are automatically escalated to Admin
+     - System splits the order into two parts:
+       - **Vendor Order**: Items accepted by vendor (vendor fulfills)
+       - **Admin Order**: Items rejected/escalated to admin (admin fulfills from master warehouse)
+     - User receives notification about partial fulfillment
+     - Both orders are tracked separately but linked to the original order
 3. Vendor updates order status:
-   - Accepted → Processing → Delivered
+   - Accepted → Processing → Delivered (for vendor-fulfilled items)
 4. Vendor can see payment status (advance received / pending balance)
 
 ### Step 5: Purchase from Admin
@@ -394,7 +411,11 @@ Daily, weekly, and monthly summaries:
 
 ```
 User → Cart → Checkout → Payment (30%) → Vendor Assignment → 
-Stock Check → Delivery → Payment (70%) → Cashback to Seller
+Stock Check → [Full/Partial/No Availability] → 
+  - Full: Vendor Fulfills → Delivery → Payment (70%) → Cashback
+  - Partial: Vendor Fulfills (some items) + Admin Fulfills (other items) → 
+    Combined/Separate Deliveries → Payment (70%) → Cashback
+  - No: Admin Fulfills → Delivery → Payment (70%) → Cashback
 ```
 
 ### Vendor Credit Flow
@@ -416,3 +437,7 @@ Cashback Calculation → Wallet Credit → Withdrawal Request → Admin Approval
 *Document Version: 1.0*  
 *Last Updated: 2024*
 
+
+MONGODB pass = IRASathi#123
+User ID = yash007patidar_db_user
+User Password = oTtWNuYdLNaGKMe6

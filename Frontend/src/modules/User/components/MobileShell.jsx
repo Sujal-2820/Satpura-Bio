@@ -47,7 +47,7 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
             <button
               type="button"
               onClick={onSearchClick}
-              className="flex items-center justify-center w-10 h-10 rounded-2xl border-none bg-transparent text-[rgba(26,42,34,0.95)] transition-transform duration-200 hover:-translate-y-0.5 hover:opacity-85"
+              className="flex items-center justify-center w-10 h-10 rounded-2xl border-none bg-transparent text-white transition-transform duration-200 hover:-translate-y-0.5 hover:opacity-85"
               aria-label="Search"
             >
               <SearchIcon className="h-5 w-5 stroke-[2.5]" />
@@ -55,7 +55,7 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
             <button
               type="button"
               onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className="relative flex items-center justify-center w-10 h-10 rounded-2xl border-none bg-transparent text-[rgba(26,42,34,0.95)] transition-transform duration-200 hover:-translate-y-0.5 hover:opacity-85"
+              className="relative flex items-center justify-center w-10 h-10 rounded-2xl border-none bg-transparent text-white transition-transform duration-200 hover:-translate-y-0.5 hover:opacity-85"
               aria-label="Notifications"
             >
               <BellIcon className="h-5 w-5 stroke-[2.5]" />
@@ -68,7 +68,7 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
             <button
               type="button"
               onClick={() => setOpen(true)}
-              className="flex items-center justify-center w-10 h-10 rounded-2xl border-none bg-transparent text-[rgba(26,42,34,0.95)] transition-transform duration-200 hover:-translate-y-0.5 hover:opacity-85"
+              className="flex items-center justify-center w-10 h-10 rounded-2xl border-none bg-transparent text-white transition-transform duration-200 hover:-translate-y-0.5 hover:opacity-85"
               aria-label="Open menu"
             >
               <MenuIcon className="h-5 w-5 stroke-[2.5]" />
@@ -77,9 +77,9 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
         </div>
         {title && (
           <div className={cn('relative z-10 flex flex-col gap-1 opacity-100 transition-all duration-300 pointer-events-auto', compact && 'user-shell-header__info is-compact')}>
-            <span className="relative z-10 text-[0.95rem] font-bold text-[rgba(26,42,34,0.85)] tracking-[0.01em]">{title}</span>
+            <span className="relative z-10 text-[0.95rem] font-bold text-white tracking-[0.01em]">{title}</span>
             {subtitle && (
-              <p className="relative z-10 text-[0.72rem] font-medium text-[rgba(26,42,34,0.65)] tracking-[0.04em] uppercase">
+              <p className="relative z-10 text-[0.72rem] font-medium text-white/90 tracking-[0.04em] uppercase">
                 <MapPinIcon className="mr-2 inline h-3.5 w-3.5" />
                 {subtitle}
               </p>

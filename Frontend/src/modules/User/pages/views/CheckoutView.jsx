@@ -37,6 +37,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
   })
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false)
   const [pendingOrder, setPendingOrder] = useState(null)
+  const [paymentPreference, setPaymentPreference] = useState('partial') // 'partial' | 'full'
 
   // Remove duplicates from addresses
   const uniqueAddresses = useMemo(() => {
@@ -146,31 +147,71 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
     })
   }, [cart])
 
+  const isFullPayment = paymentPreference === 'full'
+
+  const paymentOptions = [
+    {
+      id: 'partial',
+      title: 'Pay 30% now, 70% later',
+      description: 'Keep the standard split. Remaining amount is collected after delivery.',
+      badge: 'Standard',
+      helper: 'Best when you prefer COD for the remaining balance.',
+    },
+    {
+      id: 'full',
+      title: 'Pay 100% now',
+      description: 'Settle the entire order upfront and skip delivery charges automatically.',
+      badge: 'Free Delivery',
+      helper: 'Unlocks complimentary delivery and faster dispatch handling.',
+    },
+  ]
+
   const shippingOptions = [
-    { id: 'standard', label: 'Standard Delivery', cost: 50, time: '3-5 days' },
-    { id: 'express', label: 'Express Delivery', cost: 100, time: '1-2 days' },
-    { id: 'free', label: 'Free Delivery', cost: 0, time: '5-7 days', minOrder: 5000 },
+    { id: 'standard', label: 'Standard Delivery', cost: 50, time: '24 hours' },
   ]
 
   const selectedShipping = shippingOptions.find((s) => s.id === shippingMethod) || shippingOptions[0]
 
   const totals = useMemo(() => {
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-    const delivery = subtotal >= (selectedShipping.minOrder || Infinity) ? 0 : selectedShipping.cost
+    const deliveryBeforeBenefit = subtotal >= (selectedShipping.minOrder || Infinity) ? 0 : selectedShipping.cost
+    const delivery = paymentPreference === 'full' ? 0 : deliveryBeforeBenefit
     const discount = 0 // Promo code discount would be calculated here
     const total = subtotal + delivery - discount
-    const advance = Math.round((total * ADVANCE_PAYMENT_PERCENTAGE) / 100)
+    const advance =
+      paymentPreference === 'full'
+        ? total
+        : Math.round((total * ADVANCE_PAYMENT_PERCENTAGE) / 100)
     const remaining = total - advance
 
     return {
       subtotal,
       delivery,
+      deliveryBeforeBenefit,
       discount,
       total,
       advance,
       remaining,
     }
-  }, [cartItems, selectedShipping])
+  }, [cartItems, selectedShipping, paymentPreference])
+
+  const amountDueNow = totals.advance
+  const amountDueLater = totals.remaining
+  const paymentDueNowLabel = isFullPayment ? 'Full Payment (100%)' : `Advance (${ADVANCE_PAYMENT_PERCENTAGE}%)`
+  const paymentDueLaterLabel = isFullPayment
+    ? 'After Delivery'
+    : `Remaining (${REMAINING_PAYMENT_PERCENTAGE}%)`
+
+  const modalOrderTotal = pendingOrder?.total ?? totals.total
+  const pendingPaymentPreference = pendingOrder?.uiPayment?.paymentPreference || paymentPreference
+  const modalAmountDueNow = pendingOrder?.uiPayment?.amountDueNow ?? amountDueNow
+  const modalAmountDueLater = pendingOrder?.uiPayment?.amountDueLater ?? amountDueLater
+  const modalDueNowLabel =
+    pendingPaymentPreference === 'full' ? 'Full Payment (100%)' : `Advance (${ADVANCE_PAYMENT_PERCENTAGE}%)`
+  const modalDueLaterLabel =
+    pendingPaymentPreference === 'full' ? 'After Delivery' : `Remaining (${REMAINING_PAYMENT_PERCENTAGE}%)`
+  const modalDeliveryWaived =
+    pendingOrder?.uiPayment?.deliveryWaived ?? (isFullPayment && totals.deliveryBeforeBenefit > 0)
 
   // Assign vendor based on selected address location (20km radius)
   useEffect(() => {
@@ -229,6 +270,10 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       addressId: selectedAddress,
       shippingMethod: selectedShipping.id,
       paymentMethod: paymentMethod,
+      paymentPreference,
+      payInFull: isFullPayment,
+      upfrontAmount: amountDueNow,
+      deliveryChargeWaived: isFullPayment && totals.deliveryBeforeBenefit > 0,
     }
 
     try {
@@ -239,7 +284,13 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       }
 
       const order = orderResult.data.order
-      setPendingOrder(order)
+      const uiPayment = {
+        paymentPreference,
+        amountDueNow,
+        amountDueLater,
+        deliveryWaived: isFullPayment && totals.deliveryBeforeBenefit > 0,
+      }
+      setPendingOrder({ ...order, uiPayment })
       setShowPaymentConfirm(true)
     } catch (err) {
       showError('Failed to create order. Please try again.')
@@ -250,10 +301,13 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
     if (!pendingOrder) return
 
     try {
+      const paymentAmount = pendingOrder.uiPayment?.amountDueNow ?? amountDueNow
+      const paymentPlan = pendingOrder.uiPayment?.paymentPreference ?? paymentPreference
+
       // Create payment intent
       const paymentIntentResult = await createPaymentIntent(
         pendingOrder.id,
-        totals.advance,
+        paymentAmount,
         paymentMethod
       )
 
@@ -286,7 +340,11 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
         return
       }
 
-      success('Order placed successfully! Advance payment confirmed.')
+      success(
+        paymentPlan === 'full'
+          ? 'Order fully paid and confirmed!'
+          : 'Order placed successfully! Advance payment confirmed.'
+      )
       onOrderPlaced?.(pendingOrder)
       setShowPaymentConfirm(false)
       setPendingOrder(null)
@@ -346,9 +404,16 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-[rgba(26,42,34,0.65)]">Delivery</span>
-              <span className="font-semibold text-[#172022]">
-                {totals.delivery === 0 ? 'Free' : `₹${totals.delivery}`}
-              </span>
+              <div className="text-right">
+                <span className="font-semibold text-[#172022]">
+                  {totals.delivery === 0 ? 'Free' : `₹${totals.delivery}`}
+                </span>
+                {totals.delivery === 0 && totals.deliveryBeforeBenefit > 0 && isFullPayment && (
+                  <p className="text-[10px] text-[#1b8f5b] font-semibold leading-tight">
+                    Waived with 100% payment
+                  </p>
+                )}
+              </div>
             </div>
             {totals.discount > 0 && (
               <div className="flex items-center justify-between text-xs">
@@ -457,22 +522,71 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
             </div>
           </div>
 
+          {/* Payment Preference */}
+          <div className="p-4 rounded-xl border border-[rgba(34,94,65,0.12)] bg-white">
+            <h3 className="text-sm font-semibold text-[#172022] mb-3">Payment Preference</h3>
+            <div className="grid gap-3">
+              {paymentOptions.map((option) => (
+                <button
+                  type="button"
+                  key={option.id}
+                  onClick={() => setPaymentPreference(option.id)}
+                  className={cn(
+                    'text-left p-4 rounded-xl border-2 transition-all',
+                    paymentPreference === option.id
+                      ? 'border-[#1b8f5b] bg-[rgba(240,245,242,0.6)] shadow-sm'
+                      : 'border-[rgba(34,94,65,0.15)] bg-white hover:border-[rgba(34,94,65,0.25)]',
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-sm font-semibold text-[#172022]">{option.title}</span>
+                    {option.badge && (
+                      <span
+                        className={cn(
+                          'text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full',
+                          option.id === 'full'
+                            ? 'bg-[#1b8f5b] text-white'
+                            : 'bg-[rgba(34,94,65,0.08)] text-[#1b8f5b]',
+                        )}
+                      >
+                        {option.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[rgba(26,42,34,0.7)]">{option.description}</p>
+                  {option.helper && (
+                    <p className="text-xs font-semibold text-[#1b8f5b] mt-2">{option.helper}</p>
+                  )}
+                </button>
+              ))}
+            </div>
+            {isFullPayment && (
+              <p className="text-xs text-[#1b8f5b] font-semibold mt-3 flex items-center gap-2">
+                <CheckIcon className="h-3.5 w-3.5" />
+                Delivery fee automatically waived for this order.
+              </p>
+            )}
+          </div>
+
           {/* Payment Breakdown */}
           <div className="p-4 rounded-xl border border-[rgba(34,94,65,0.12)] bg-white">
             <h3 className="text-sm font-semibold text-[#172022] mb-3">Payment Breakdown</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
                 <p className="text-xs font-semibold text-[rgba(26,42,34,0.65)] uppercase tracking-wide mb-1">
-                  Advance (30%)
+                  {paymentDueNowLabel}
                 </p>
-                <p className="text-lg font-bold text-[#1b8f5b]">₹{totals.advance.toLocaleString('en-IN')}</p>
+                <p className="text-lg font-bold text-[#1b8f5b]">₹{amountDueNow.toLocaleString('en-IN')}</p>
+                <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">Pay now</p>
               </div>
               <div className="p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
                 <p className="text-xs font-semibold text-[rgba(26,42,34,0.65)] uppercase tracking-wide mb-1">
-                  Remaining (70%)
+                  {paymentDueLaterLabel}
                 </p>
-                <p className="text-lg font-bold text-[#1b8f5b]">₹{totals.remaining.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">Pay after delivery</p>
+                <p className="text-lg font-bold text-[#1b8f5b]">₹{amountDueLater.toLocaleString('en-IN')}</p>
+                <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">
+                  {isFullPayment ? 'No pending payment after delivery' : 'Pay after delivery'}
+                </p>
               </div>
             </div>
           </div>
@@ -601,9 +715,16 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-semibold text-[#172022]">{option.label}</span>
-                        <span className="text-sm font-bold text-[#1b8f5b]">
-                          {option.cost === 0 ? 'Free' : `₹${option.cost}`}
-                        </span>
+                        <div className="text-right">
+                          <span className="text-sm font-bold text-[#1b8f5b]">
+                            {option.cost === 0 || isFullPayment ? 'Free' : `₹${option.cost}`}
+                          </span>
+                          {isFullPayment && option.cost > 0 && (
+                            <p className="text-[10px] text-[#1b8f5b] font-semibold leading-tight">
+                              Savings: ₹{option.cost}
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs text-[rgba(26,42,34,0.6)]">
                         Estimated delivery: {option.time}
@@ -675,9 +796,16 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[rgba(26,42,34,0.65)]">Delivery</span>
-                <span className="font-semibold text-[#172022]">
-                  {totals.delivery === 0 ? 'Free' : `₹${totals.delivery}`}
-                </span>
+                <div className="text-right">
+                  <span className="font-semibold text-[#172022]">
+                    {totals.delivery === 0 ? 'Free' : `₹${totals.delivery}`}
+                  </span>
+                  {totals.delivery === 0 && totals.deliveryBeforeBenefit > 0 && isFullPayment && (
+                    <p className="text-[10px] text-[#1b8f5b] font-semibold leading-tight">
+                      Waived with 100% payment
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-[rgba(34,94,65,0.1)]">
                 <span className="text-base font-bold text-[#172022]">Total</span>
@@ -686,15 +814,15 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
               <div className="grid grid-cols-2 gap-3 pt-3 border-t border-[rgba(34,94,65,0.1)]">
                 <div className="p-2 rounded-lg bg-white border border-[rgba(34,94,65,0.15)]">
                   <p className="text-xs font-semibold text-[rgba(26,42,34,0.65)] uppercase tracking-wide mb-1">
-                    Advance (30%)
+                    {paymentDueNowLabel}
                   </p>
-                  <p className="text-base font-bold text-[#1b8f5b]">₹{totals.advance.toLocaleString('en-IN')}</p>
+                  <p className="text-base font-bold text-[#1b8f5b]">₹{amountDueNow.toLocaleString('en-IN')}</p>
                 </div>
                 <div className="p-2 rounded-lg bg-white border border-[rgba(34,94,65,0.15)]">
                   <p className="text-xs font-semibold text-[rgba(26,42,34,0.65)] uppercase tracking-wide mb-1">
-                    Remaining (70%)
+                    {paymentDueLaterLabel}
                   </p>
-                  <p className="text-base font-bold text-[#1b8f5b]">₹{totals.remaining.toLocaleString('en-IN')}</p>
+                  <p className="text-base font-bold text-[#1b8f5b]">₹{amountDueLater.toLocaleString('en-IN')}</p>
                 </div>
               </div>
             </div>
@@ -731,10 +859,12 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
               onClick={handlePlaceOrder}
               disabled={!selectedAddress}
             >
-              Pay ₹{totals.advance.toLocaleString('en-IN')} & Place Order
+              Pay ₹{amountDueNow.toLocaleString('en-IN')} & Place Order
             </button>
             <p className="text-xs text-center text-[rgba(26,42,34,0.65)]">
-              You will pay the remaining ₹{totals.remaining.toLocaleString('en-IN')} after delivery
+              {amountDueLater > 0
+                ? `You will pay the remaining ₹${amountDueLater.toLocaleString('en-IN')} after delivery`
+                : 'This order will be fully prepaid and delivery is complimentary.'}
             </p>
           </>
         )}
@@ -776,18 +906,26 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
             <div className="user-payment-confirm-modal__details">
               <div className="user-payment-confirm-modal__detail-row">
                 <span className="user-payment-confirm-modal__detail-label">Order Total</span>
-                <span className="user-payment-confirm-modal__detail-value">₹{pendingOrder.total.toLocaleString('en-IN')}</span>
-              </div>
-              <div className="user-payment-confirm-modal__detail-row">
-                <span className="user-payment-confirm-modal__detail-label">Advance Payment (30%)</span>
-                <span className="user-payment-confirm-modal__detail-value user-payment-confirm-modal__detail-value--highlight">
-                  ₹{pendingOrder.advancePaid.toLocaleString('en-IN')}
+                <span className="user-payment-confirm-modal__detail-value">
+                  ₹{modalOrderTotal.toLocaleString('en-IN')}
                 </span>
               </div>
               <div className="user-payment-confirm-modal__detail-row">
-                <span className="user-payment-confirm-modal__detail-label">Remaining (Pay on Delivery)</span>
-                <span className="user-payment-confirm-modal__detail-value">₹{pendingOrder.remaining.toLocaleString('en-IN')}</span>
+                <span className="user-payment-confirm-modal__detail-label">{modalDueNowLabel}</span>
+                <span className="user-payment-confirm-modal__detail-value user-payment-confirm-modal__detail-value--highlight">
+                  ₹{modalAmountDueNow.toLocaleString('en-IN')}
+                </span>
               </div>
+              {modalAmountDueLater > 0 && (
+                <div className="user-payment-confirm-modal__detail-row">
+                  <span className="user-payment-confirm-modal__detail-label">
+                    {modalDueLaterLabel}
+                  </span>
+                  <span className="user-payment-confirm-modal__detail-value">
+                    ₹{modalAmountDueLater.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="user-payment-confirm-modal__info">
@@ -797,8 +935,18 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
               </div>
               <div className="user-payment-confirm-modal__info-item">
                 <CheckIcon className="h-5 w-5 text-[#1b8f5b]" />
-                <span>Remaining amount payable on delivery</span>
+                <span>
+                  {modalAmountDueLater > 0
+                    ? 'Remaining amount payable on delivery'
+                    : 'Delivery charges waived automatically'}
+                </span>
               </div>
+              {modalAmountDueLater === 0 && modalDeliveryWaived && (
+                <div className="user-payment-confirm-modal__info-item">
+                  <CheckIcon className="h-5 w-5 text-[#1b8f5b]" />
+                  <span>Get priority processing for prepaid orders</span>
+                </div>
+              )}
             </div>
 
             <div className="user-payment-confirm-modal__actions">
@@ -818,7 +966,9 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
                 disabled={loading}
                 className="user-payment-confirm-modal__btn user-payment-confirm-modal__btn--confirm"
               >
-                {loading ? 'Processing...' : `Pay ₹${pendingOrder.advancePaid.toLocaleString('en-IN')} & Place Order`}
+                {loading
+                  ? 'Processing...'
+                  : `Pay ₹${modalAmountDueNow.toLocaleString('en-IN')} & Place Order`}
               </button>
             </div>
           </div>

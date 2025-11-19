@@ -17,8 +17,8 @@ export function SellerLogin({ onSubmit }) {
     <div className="flex min-h-screen items-center justify-center bg-surface px-6 py-12">
       <div className="w-full max-w-sm rounded-3xl border border-muted/60 bg-white/90 p-6 shadow-card">
         <div className="mb-6 text-center">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Seller Sign in</p>
-          <h1 className="mt-2 text-2xl font-semibold text-surface-foreground">Access your seller console</h1>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">IRA Partner Sign in</p>
+          <h1 className="mt-2 text-2xl font-semibold text-surface-foreground">Access your IRA Partner console</h1>
         </div>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-1.5">

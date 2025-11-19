@@ -89,35 +89,78 @@ export function VendorDetailModal({ isOpen, onClose, vendor, onUpdateCreditPolic
           </div>
         </div>
 
-        {/* Credit Policy */}
-        <div className="rounded-xl border border-green-200 bg-green-50 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-sm font-bold text-green-900">Credit Policy</h4>
-              <div className="mt-2 grid gap-2 text-xs text-green-800 sm:grid-cols-3">
-                <div>
-                  <span className="font-semibold">Limit: </span>
-                  <span>{formatCurrency(creditLimit)}</span>
-                </div>
-                <div>
-                  <span className="font-semibold">Repayment: </span>
-                  <span>{vendor.repaymentDays || vendor.repayment || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="font-semibold">Penalty: </span>
-                  <span>{vendor.penaltyRate || vendor.penalty || 'N/A'}</span>
+        {/* Coverage & Policy */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-blue-900">Coverage Radius</h4>
+                <p className="mt-2 text-2xl font-bold text-blue-900">
+                  {vendor.coverageRadius ? `${vendor.coverageRadius} km` : 'N/A'}
+                </p>
+                {vendor.serviceArea && (
+                  <p className="text-xs text-blue-700">{vendor.serviceArea}</p>
+                )}
+              </div>
+              <StatusBadge tone={vendor.coverageConflicts?.length ? 'warning' : 'success'}>
+                {vendor.coverageConflicts?.length ? 'Conflict' : 'Compliant'}
+              </StatusBadge>
+            </div>
+            {vendor.coverageConflicts?.length ? (
+              <ul className="mt-4 space-y-2 text-xs text-blue-900">
+                {vendor.coverageConflicts.map((conflict) => {
+                  const otherVendor =
+                    conflict.vendorA.id === vendor.id ? conflict.vendorB : conflict.vendorA
+                  return (
+                    <li
+                      key={`${vendor.id}-${otherVendor.id}`}
+                      className="rounded-lg border border-blue-200 bg-white/80 px-3 py-2"
+                    >
+                      <p className="font-semibold">{otherVendor.name}</p>
+                      <p className="text-[0.7rem] text-blue-700">
+                        Distance: {conflict.distanceKm} km • Overlap: {conflict.overlapKm} km
+                      </p>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <p className="mt-4 text-xs text-blue-800">
+                No overlapping vendors detected within the 20 km exclusivity rule.
+              </p>
+            )}
+          </div>
+
+          {/* Credit Policy */}
+          <div className="rounded-xl border border-green-200 bg-green-50 p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-green-900">Credit Policy</h4>
+                <div className="mt-2 grid gap-2 text-xs text-green-800 sm:grid-cols-3">
+                  <div>
+                    <span className="font-semibold">Limit: </span>
+                    <span>{formatCurrency(creditLimit)}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Repayment: </span>
+                    <span>{vendor.repaymentDays || vendor.repayment || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Penalty: </span>
+                    <span>{vendor.penaltyRate || vendor.penalty || 'N/A'}</span>
+                  </div>
                 </div>
               </div>
+              {onUpdateCreditPolicy && (
+                <button
+                  type="button"
+                  onClick={() => onUpdateCreditPolicy(vendor)}
+                  className="rounded-lg border border-green-300 bg-white px-4 py-2 text-xs font-bold text-green-700 transition-all hover:bg-green-100"
+                >
+                  Update Policy
+                </button>
+              )}
             </div>
-            {onUpdateCreditPolicy && (
-              <button
-                type="button"
-                onClick={() => onUpdateCreditPolicy(vendor)}
-                className="rounded-lg border border-green-300 bg-white px-4 py-2 text-xs font-bold text-green-700 transition-all hover:bg-green-100"
-              >
-                Update Policy
-              </button>
-            )}
           </div>
         </div>
 

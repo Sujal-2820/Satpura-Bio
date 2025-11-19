@@ -1,10 +1,19 @@
-import { Building2, CheckCircle, XCircle, FileText, MapPin, Phone, Mail } from 'lucide-react'
+import { Building2, CheckCircle, XCircle, FileText, MapPin, Phone, Mail, AlertTriangle } from 'lucide-react'
 import { Modal } from './Modal'
 import { StatusBadge } from './StatusBadge'
 import { cn } from '../../../lib/cn'
 
 export function VendorApprovalModal({ isOpen, onClose, vendor, onApprove, onReject, loading }) {
   if (!vendor) return null
+
+  const hasCoverageConflict = vendor.coverageConflicts?.length > 0
+  const hasLocation = vendor.location?.lat && vendor.location?.lng
+  const firstConflict = hasCoverageConflict ? vendor.coverageConflicts[0] : null
+  const conflictingVendorName = firstConflict
+    ? firstConflict.vendorA.id === vendor.id
+      ? firstConflict.vendorB.name
+      : firstConflict.vendorA.name
+    : null
 
   const handleApprove = () => {
     onApprove(vendor.id)
@@ -57,6 +66,54 @@ export function VendorApprovalModal({ isOpen, onClose, vendor, onApprove, onReje
                 </div>
               )}
             </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-bold text-blue-900">Coverage Compliance</h4>
+              <p className="mt-1 text-xs text-blue-700">
+                Vendors must operate exclusively within a {vendor.coverageRadius || 20} km radius without overlap.
+              </p>
+            </div>
+            <StatusBadge tone={hasCoverageConflict ? 'warning' : 'success'}>
+              {hasCoverageConflict ? 'Conflict Detected' : 'Compliant'}
+            </StatusBadge>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-white/70 bg-white p-4">
+              <p className="text-xs text-gray-500">Coverage Radius</p>
+              <p className="mt-1 text-lg font-bold text-gray-900">
+                {vendor.coverageRadius ? `${vendor.coverageRadius} km` : 'N/A'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/70 bg-white p-4">
+              <p className="text-xs text-gray-500">Geo Coordinates</p>
+              <p className="mt-1 text-lg font-bold text-gray-900">
+                {hasLocation ? `${vendor.location.lat.toFixed(4)}, ${vendor.location.lng.toFixed(4)}` : 'Missing'}
+              </p>
+            </div>
+          </div>
+          {hasCoverageConflict && firstConflict ? (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-600" />
+                <div>
+                  <p className="font-semibold text-red-900">Overlapping Coverage Alert</p>
+                  <p className="mt-1">
+                    {conflictingVendorName} operates only {firstConflict.distanceKm} km away. Resolve the overlap before
+                    approving this application.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-4 text-xs text-blue-800">
+              {hasLocation
+                ? 'No overlapping vendors detected for this application.'
+                : 'Location coordinates are required before approval.'}
+            </p>
           )}
         </div>
 
@@ -116,11 +173,22 @@ export function VendorApprovalModal({ isOpen, onClose, vendor, onApprove, onReje
             <button
               type="button"
               onClick={handleApprove}
-              disabled={loading}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+              disabled={loading || hasCoverageConflict || !hasLocation}
+              className={cn(
+                'flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white transition-all',
+                loading || hasCoverageConflict || !hasLocation
+                  ? 'bg-gray-400 shadow-none'
+                  : 'bg-gradient-to-r from-green-500 to-green-600 shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)]',
+              )}
             >
               <CheckCircle className="h-4 w-4" />
-              {loading ? 'Processing...' : 'Approve Vendor'}
+              {hasCoverageConflict
+                ? 'Resolve Coverage Conflicts'
+                : !hasLocation
+                  ? 'Add Location Details'
+                  : loading
+                    ? 'Processing...'
+                    : 'Approve Vendor'}
             </button>
           </div>
         </div>

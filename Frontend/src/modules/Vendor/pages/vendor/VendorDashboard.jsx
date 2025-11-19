@@ -58,7 +58,7 @@ const NAV_ITEMS = [
 export function VendorDashboard({ onLogout }) {
   const { profile } = useVendorState()
   const dispatch = useVendorDispatch()
-  const { acceptOrder, rejectOrder, updateInventoryStock, requestCreditPurchase, updateOrderStatus } = useVendorApi()
+  const { acceptOrder, acceptOrderPartially, rejectOrder, updateInventoryStock, requestCreditPurchase, updateOrderStatus } = useVendorApi()
   const [activeTab, setActiveTab] = useState('overview')
   const welcomeName = (profile?.name || vendorSnapshot.welcome.name || 'Partner').split(' ')[0]
   const { isOpen, isMounted, currentAction, openPanel, closePanel } = useButtonAction()
@@ -131,7 +131,7 @@ export function VendorDashboard({ onLogout }) {
         {
           id: 'search-orders-tracker',
           label: 'Order status',
-          keywords: ['orders', 'tracker', 'stages', 'processing', 'status'],
+          keywords: ['orders', 'tracker', 'stages', 'dispatched', 'status'],
           tab: 'orders',
           targetId: 'orders-tracker',
         },
@@ -381,6 +381,39 @@ export function VendorDashboard({ onLogout }) {
                   success('Order rejected and forwarded to Admin')
                 } else if (result.error) {
                   error(result.error.message || 'Failed to reject order')
+                }
+              } else if (buttonId === 'order-partial-accept' && data.orderId && data.orderItems) {
+                // Handle partial order acceptance
+                const acceptedItems = data.orderItems.filter((item) => item.action === 'accept')
+                const rejectedItems = data.orderItems.filter((item) => item.action === 'reject')
+                
+                if (acceptedItems.length === 0 && rejectedItems.length === 0) {
+                  error('Please select at least one item to accept or reject')
+                  return
+                }
+                
+                const partialData = {
+                  acceptedItems: acceptedItems.map((item) => ({
+                    itemId: item.itemId,
+                    quantity: item.quantity,
+                  })),
+                  rejectedItems: rejectedItems.map((item) => ({
+                    itemId: item.itemId,
+                    quantity: item.quantity,
+                    reason: item.reason || 'Insufficient stock',
+                  })),
+                  notes: data.notes || '',
+                }
+                
+                const result = await acceptOrderPartially(data.orderId, partialData)
+                if (result.data) {
+                  const acceptedCount = acceptedItems.length
+                  const rejectedCount = rejectedItems.length
+                  success(
+                    `Order partially accepted. ${acceptedCount} item(s) will be fulfilled by you, ${rejectedCount} item(s) escalated to Admin.`
+                  )
+                } else if (result.error) {
+                  error(result.error.message || 'Failed to accept order partially')
                 }
               } else if (buttonId === 'update-order-status' && data.orderId && data.status) {
                 const result = await updateOrderStatus(data.orderId, { status: data.status })
@@ -1028,37 +1061,41 @@ function OrdersView({ openPanel }) {
     })
   }, [getOrders, selectedFilter, dispatch])
 
-  const STAGES = ['Awaiting', 'Processing', 'Delivered']
+  const STATUS_FLOW = ['awaiting', 'dispatched', 'delivered']
+  const STAGES = ['Awaiting', 'Dispatched', 'Delivered']
+
+  const normalizeStatus = (status) => {
+    if (!status) return 'awaiting'
+    const normalized = status.toLowerCase()
+    if (normalized.includes('deliver')) return 'delivered'
+    if (normalized.includes('dispatch')) return 'dispatched'
+    return 'awaiting'
+  }
 
   const stageIndex = (status) => {
-    if (!status) return 0
-    const normalized = status.toLowerCase()
-    if (normalized.includes('delivered')) return 2
-    if (normalized.includes('processing')) return 1
+    const key = normalizeStatus(status)
+    if (key === 'delivered') return 2
+    if (key === 'dispatched') return 1
     return 0
   }
 
-  const orders = ordersData?.orders || dashboard.orders?.orders || vendorSnapshot.orders
+  const orders = dashboard.orders?.orders || ordersData?.orders || vendorSnapshot.orders
   const totals = orders.reduce(
     (acc, order) => {
       const index = stageIndex(order.status)
-      if (index === 2) {
-        acc.delivered += 1
-      } else if (index === 1) {
-        acc.processing += 1
-      } else {
-        acc.awaiting += 1
-      }
+      if (index === 2) acc.delivered += 1
+      else if (index === 1) acc.dispatched += 1
+      else acc.awaiting += 1
       return acc
     },
-    { awaiting: 0, processing: 0, delivered: 0 },
+    { awaiting: 0, dispatched: 0, delivered: 0 },
   )
   const totalOrders = orders.length
 
   const filterChips = [
     { id: 'all', label: 'All orders', value: totalOrders },
     { id: 'awaiting', label: 'Awaiting', value: totals.awaiting },
-    { id: 'processing', label: 'Processing', value: totals.processing },
+    { id: 'dispatched', label: 'Dispatched', value: totals.dispatched },
     { id: 'delivered', label: 'Delivered', value: totals.delivered },
   ]
 
@@ -1073,9 +1110,9 @@ function OrdersView({ openPanel }) {
             tone: 'warn',
           },
           {
-            label: 'Orders being prepared',
-            value: totals.processing,
-            meta: 'Packing & sending',
+            label: 'Orders in transit',
+            value: totals.dispatched,
+            meta: 'Delivery in progress',
             tone: 'teal',
           },
           {
@@ -1106,24 +1143,24 @@ function OrdersView({ openPanel }) {
             tone: 'warn',
           },
         ]
-      case 'processing':
+      case 'dispatched':
         return [
           {
-            label: 'Being packed',
-            value: Math.floor(totals.processing * 0.6),
-            meta: 'Being prepared',
+            label: 'In transit',
+            value: totals.dispatched,
+            meta: 'On the way to farmer',
             tone: 'teal',
           },
           {
-            label: 'Ready to send',
-            value: Math.floor(totals.processing * 0.4),
-            meta: 'Waiting to be picked up',
+            label: 'Awaiting delivery',
+            value: Math.max(0, totals.dispatched - totals.delivered),
+            meta: 'Deliver within 24h SLA',
             tone: 'success',
           },
           {
-            label: 'Average time to prepare',
+            label: 'Average dispatch time',
             value: '4.2h',
-            meta: 'After you confirm',
+            meta: 'After confirmation',
             tone: 'teal',
           },
         ]
@@ -1163,7 +1200,7 @@ function OrdersView({ openPanel }) {
             <span className="orders-hero__chip">Orders</span>
             <h3 className="orders-hero__title">{totalOrders} active orders</h3>
             <p className="orders-hero__meta">
-              {totals.awaiting} waiting • {totals.processing} preparing • {totals.delivered} delivered
+              {totals.awaiting} awaiting • {totals.dispatched} dispatched • {totals.delivered} delivered
             </p>
           </div>
           <div className="orders-hero__filters" role="group" aria-label="Filter orders">
@@ -1208,7 +1245,18 @@ function OrdersView({ openPanel }) {
           </button>
               </div>
         <div className="orders-list">
-          {orders.map((order) => (
+          {orders.map((order) => {
+            const normalizedStatus = normalizeStatus(order.status)
+            const showAvailabilityActions = normalizedStatus === 'awaiting'
+            const nextMessage =
+              order.next ||
+              (normalizedStatus === 'awaiting'
+                ? 'Confirm availability within 1 hour'
+                : normalizedStatus === 'dispatched'
+                  ? 'Deliver before the 24h SLA'
+                  : 'Mark payment as collected')
+
+            return (
             <article key={order.id} className="orders-card">
               <header className="orders-card__header">
                 <div className="orders-card__identity">
@@ -1222,13 +1270,15 @@ function OrdersView({ openPanel }) {
             </div>
                 <div className="orders-card__status">
                   <span className="orders-card__payment">{order.payment}</span>
-                  <span className="orders-card__stage-label">{order.status}</span>
+                  <span className="orders-card__stage-label">
+                    {normalizedStatus === 'awaiting' ? 'Awaiting' : normalizedStatus === 'dispatched' ? 'Dispatched' : normalizedStatus === 'delivered' ? 'Delivered' : order.status}
+                  </span>
             </div>
               </header>
-              <div className="orders-card__next">
-                <span className="orders-card__next-label">Next</span>
-                <span className="orders-card__next-value">{order.next}</span>
-              </div>
+                <div className="orders-card__next">
+                  <span className="orders-card__next-label">Next</span>
+                  <span className="orders-card__next-value">{nextMessage}</span>
+                </div>
               <div className="orders-card__stages">
               {STAGES.map((stage, index) => (
                   <div
@@ -1244,20 +1294,36 @@ function OrdersView({ openPanel }) {
                 <button
                   type="button"
                   className="orders-card__action is-primary"
-                  onClick={() => openPanel('order-available', { orderId: order.id })}
+                  onClick={() =>
+                    openPanel('update-order-status', {
+                      orderId: order.id,
+                      status: normalizedStatus,
+                    })
+                  }
                 >
-                Available
-              </button>
-                <button
-                  type="button"
-                  className="orders-card__action is-secondary"
-                  onClick={() => openPanel('order-not-available', { orderId: order.id })}
-                >
-                Not available
-              </button>
-            </div>
+                  Update status
+                </button>
+                {showAvailabilityActions && (
+                  <>
+                    <button
+                      type="button"
+                      className="orders-card__action is-secondary"
+                      onClick={() => openPanel('order-available', { orderId: order.id })}
+                    >
+                      Available
+                    </button>
+                    <button
+                      type="button"
+                      className="orders-card__action is-secondary"
+                      onClick={() => openPanel('order-not-available', { orderId: order.id })}
+                    >
+                      Not available
+                    </button>
+                  </>
+                )}
+              </div>
             </article>
-        ))}
+          )})}
       </div>
       </section>
 

@@ -103,7 +103,7 @@ export function SellerDashboard({ onLogout }) {
       id: 'logout',
       label: 'Sign out',
       icon: <MenuIcon className="h-4 w-4" />,
-      description: 'Log out from seller account',
+      description: 'Log out from IRA Partner account',
       onSelect: () => {
         handleLogout()
         close()

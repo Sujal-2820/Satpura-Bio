@@ -7,7 +7,7 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
   const [copied, setCopied] = useState(false)
   const sellerId = sellerSnapshot.profile.sellerId
   const sellerName = sellerSnapshot.profile.name
-  const shareText = `Hello! I'm ${sellerName}, your local IRA Sathi seller. Use my unique Seller ID: *${sellerId}* when you register or place an order on the IRA Sathi app to get exclusive benefits and support. Download the app here: https://irasathi.com/download`
+  const shareText = `Hello! I'm ${sellerName}, your local IRA Sathi IRA Partner. Use my unique IRA Partner ID: *${sellerId}* when you register or place an order on the IRA Sathi app to get exclusive benefits and support. Download the app here: https://irasathi.com/download`
   const shareUrl = `https://irasathi.com/register?seller=${sellerId}`
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
   const handleShareLink = () => {
     if (navigator.share) {
       navigator.share({
-        title: 'Share IRA Sathi Seller ID',
+        title: 'Share IRA Sathi IRA Partner ID',
         text: shareText,
         url: shareUrl,
       })
@@ -72,7 +72,7 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
               <ShareIcon className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="seller-panel__title">Share Seller ID</h3>
+              <h3 className="seller-panel__title">Share IRA Partner ID</h3>
               <p className="seller-panel__subtitle">Help users register with your unique ID</p>
             </div>
           </div>
@@ -82,7 +82,7 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
         </div>
         <div className="seller-panel__body">
           <div className="seller-share-id__display">
-            <span className="seller-share-id__label">Your Unique Seller ID</span>
+            <span className="seller-share-id__label">Your Unique IRA Partner ID</span>
             <span className="seller-share-id__value">{sellerId}</span>
             <button
               type="button"

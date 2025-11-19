@@ -117,7 +117,7 @@ export function OrderConfirmationView({ order, onBackToHome }) {
                   <span className="user-order-confirmation__info-icon">🚚</span>
                   <div>
                     <strong>Delivery Updates</strong>
-                    <p>Track your order in real-time. Estimated delivery: {order?.deliveryTime || '3-5 business days'}.</p>
+                    <p>Track your order in real-time. Estimated delivery: {order?.deliveryTime || '24 hours'}.</p>
                   </div>
                 </li>
                 <li>

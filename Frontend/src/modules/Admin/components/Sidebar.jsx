@@ -5,7 +5,7 @@ const links = [
   { id: 'dashboard', label: 'Dashboard', icon: Home, description: 'Overview & important updates', color: 'blue' },
   { id: 'products', label: 'Products', icon: Layers3, description: 'All products list', color: 'purple' },
   { id: 'vendors', label: 'Vendors', icon: Factory, description: 'Payment & how well they are doing', color: 'green' },
-  { id: 'sellers', label: 'Sellers', icon: ShieldCheck, description: 'Goals & earnings', color: 'yellow' },
+  { id: 'sellers', label: 'IRA Partners', icon: ShieldCheck, description: 'Goals & earnings', color: 'yellow' },
   { id: 'users', label: 'Users', icon: Users2, description: 'User status & help requests', color: 'orange' },
   { id: 'orders', label: 'Orders', icon: Building2, description: 'Approvals & delivery', color: 'red' },
   { id: 'finance', label: 'Credits', icon: Wallet, description: 'Advance payments & pending amounts', color: 'pink' },

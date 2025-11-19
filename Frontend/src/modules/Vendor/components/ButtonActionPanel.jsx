@@ -156,8 +156,20 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
         return
       }
 
+      const submissionData = { ...formData }
+      // Preserve orderId and other metadata from action.data (passed via openPanel)
+      // Always include these if they exist in action.data, even if they're in formData
+      if (data?.orderId) {
+        submissionData.orderId = data.orderId
+      }
+      if (data?.itemId) {
+        submissionData.itemId = data.itemId
+      }
+      if (data?.currentStock !== undefined) {
+        submissionData.currentStock = data.currentStock
+      }
       // Simulate API call
-      onAction?.({ type: 'update', data: formData, buttonId })
+      onAction?.({ type: 'update', data: submissionData, buttonId })
       onShowNotification?.('Changes saved successfully', 'success')
       onClose()
     } else if (intent === BUTTON_INTENT.FILE_UPLOAD) {
@@ -224,11 +236,16 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                     value={formData[field.name] || field.value || ''}
                     onChange={(e) => handleFormChange(field.name, e.target.value)}
                   >
-                    {field.options?.map((option) => (
-                      <option key={option} value={option}>
-                        {option.charAt(0).toUpperCase() + option.slice(1)}
-                      </option>
-                    ))}
+                    {field.options?.map((option) => {
+                      // Handle both string and object options
+                      const optionValue = typeof option === 'object' ? option.value : option
+                      const optionLabel = typeof option === 'object' ? option.label : option.charAt(0).toUpperCase() + option.slice(1)
+                      return (
+                        <option key={optionValue} value={optionValue}>
+                          {optionLabel}
+                        </option>
+                      )
+                    })}
                   </select>
                 ) : field.type === 'file' ? (
                   <div className="vendor-action-panel__file-field">

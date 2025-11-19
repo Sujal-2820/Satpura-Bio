@@ -184,14 +184,60 @@ export const BUTTON_CONFIGS = {
       cancelLabel: 'Cancel',
     },
   },
+  'order-partial-accept': {
+    intent: BUTTON_INTENT.UPDATION,
+    title: 'Accept Order Partially',
+    data: {
+      type: 'partial_order',
+      fields: [
+        {
+          name: 'orderItems',
+          label: 'Select Items to Accept/Reject',
+          value: [],
+          type: 'item_selection',
+          required: true,
+        },
+        {
+          name: 'notes',
+          label: 'Notes (optional)',
+          value: '',
+          type: 'textarea',
+        },
+      ],
+    },
+  },
   'escalate-to-admin': {
     intent: BUTTON_INTENT.INSTANT_ACTION,
     title: 'Escalate to Admin',
     data: {
-      type: 'confirmation',
-      message: 'Escalate this order to admin fulfillment?',
-      confirmLabel: 'Escalate',
-      cancelLabel: 'Cancel',
+      type: 'escalation',
+    },
+  },
+  'update-order-status': {
+    intent: BUTTON_INTENT.UPDATION,
+    title: 'Update Order Status',
+    data: {
+      type: 'order_status',
+      fields: [
+        {
+          name: 'status',
+          label: 'Select Status',
+          value: 'awaiting',
+          type: 'select',
+          required: true,
+          options: [
+            { value: 'awaiting', label: 'Awaiting' },
+            { value: 'dispatched', label: 'Dispatched' },
+            { value: 'delivered', label: 'Delivered' },
+          ],
+        },
+        {
+          name: 'notes',
+          label: 'Notes (optional)',
+          value: '',
+          type: 'textarea',
+        },
+      ],
     },
   },
 

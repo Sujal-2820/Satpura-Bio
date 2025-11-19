@@ -256,13 +256,18 @@ export const userSnapshot = {
         name: 'Green Valley Hub',
         location: 'Kolhapur, Maharashtra',
       },
-      deliveryTime: '3 hours',
+      deliveryTime: 'Delivered on Dec 15, 09:45 AM',
+      statusTimeline: [
+        { status: 'awaiting', timestamp: '2024-12-15T06:15:00' },
+        { status: 'dispatched', timestamp: '2024-12-15T07:30:00' },
+        { status: 'delivered', timestamp: '2024-12-15T09:45:00' },
+      ],
       deliveryDate: '2024-12-15',
     },
     {
       id: 'ORD-002',
       date: '2024-12-18',
-      status: 'processing',
+      status: 'dispatched',
       paymentStatus: 'partial_paid',
       items: [
         { productId: 'prod-2', name: 'Organic Compost 50kg', quantity: 3, price: 850 },
@@ -275,13 +280,17 @@ export const userSnapshot = {
         name: 'Farm Fresh Traders',
         location: 'Kolhapur, Maharashtra',
       },
-      deliveryTime: '4 hours',
+      deliveryTime: 'On the way - arriving within 24 hours',
+      statusTimeline: [
+        { status: 'awaiting', timestamp: '2024-12-18T08:10:00' },
+        { status: 'dispatched', timestamp: '2024-12-18T11:30:00' },
+      ],
       deliveryDate: null,
     },
     {
       id: 'ORD-003',
       date: '2024-12-20',
-      status: 'pending',
+      status: 'awaiting',
       paymentStatus: 'pending',
       items: [
         { productId: 'prod-5', name: 'Urea 46-0-0 Fertilizer', quantity: 1, price: 920 },
@@ -290,7 +299,10 @@ export const userSnapshot = {
       advancePaid: 0,
       remaining: 920,
       vendor: null,
-      deliveryTime: null,
+      deliveryTime: 'Awaiting vendor confirmation',
+      statusTimeline: [
+        { status: 'awaiting', timestamp: '2024-12-20T10:05:00' },
+      ],
       deliveryDate: null,
     },
   ],

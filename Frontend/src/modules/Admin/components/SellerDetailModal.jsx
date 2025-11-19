@@ -41,9 +41,9 @@ export function SellerDetailModal({ isOpen, onClose, seller, onEdit }) {
   const referrals = seller.referrals || seller.referredUsers || 0
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Seller Performance Details" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="IRA Partner Performance Details" size="lg">
       <div className="space-y-6">
-        {/* Seller Header */}
+        {/* IRA Partner Header */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4">
@@ -52,7 +52,7 @@ export function SellerDetailModal({ isOpen, onClose, seller, onEdit }) {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900">{seller.name}</h3>
-                <p className="text-sm text-gray-600">Seller ID: {seller.sellerId || seller.id}</p>
+                <p className="text-sm text-gray-600">IRA Partner ID: {seller.sellerId || seller.id}</p>
                 {seller.area && (
                   <p className="mt-1 text-xs text-gray-500">{seller.area}</p>
                 )}

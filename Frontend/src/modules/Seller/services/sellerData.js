@@ -6,7 +6,7 @@ export const sellerSnapshot = {
     phone: '+91 98765 43210',
     email: 'priya.nair@irasathi.com',
     assignedVendor: 'Green Valley Hub',
-    commissionRate: '5%',
+    commissionRate: '2% - 3%',
     cashbackRate: '2.5%',
   },
   overview: {
@@ -25,6 +25,15 @@ export const sellerSnapshot = {
     { id: 'target', label: 'Target Progress', value: '68%', trend: 'On track to achieve' },
     { id: 'wallet', label: 'Wallet Balance', value: '₹18,450', trend: 'Available to withdraw' },
   ],
+  commissionPolicy: {
+    currentMonth: 'January 2025',
+    resetDay: 1,
+    lastReset: '2025-01-01',
+    slabs: [
+      { label: 'Up to ₹50,000 per user (monthly)', rate: '2%' },
+      { label: 'Above ₹50,000 per user (monthly)', rate: '3%' },
+    ],
+  },
   recentActivity: [
     {
       id: 'act-1',
@@ -185,7 +194,7 @@ export const sellerSnapshot = {
       registeredDate: '2024-11-15',
       totalPurchases: 8,
       totalAmount: '₹48,600',
-      commissionEarned: '₹2,430',
+      monthlyPurchases: 68450,
       lastPurchase: '2 hours ago',
       status: 'Active',
       avatar: 'AK',
@@ -197,7 +206,7 @@ export const sellerSnapshot = {
       registeredDate: '2024-11-10',
       totalPurchases: 5,
       totalAmount: '₹32,400',
-      commissionEarned: '₹1,620',
+      monthlyPurchases: 32400,
       lastPurchase: '5 hours ago',
       status: 'Active',
       avatar: 'MS',
@@ -209,7 +218,7 @@ export const sellerSnapshot = {
       registeredDate: '2024-12-01',
       totalPurchases: 0,
       totalAmount: '₹0',
-      commissionEarned: '₹0',
+      monthlyPurchases: 0,
       lastPurchase: 'Never',
       status: 'Registered',
       avatar: 'RP',

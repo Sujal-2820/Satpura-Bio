@@ -22,6 +22,25 @@
   color: var(--user-ink);
   overflow-x: hidden;
   font-family: 'Manrope', system-ui, sans-serif;
+  isolation: isolate;
+}
+
+.user-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(65%, 420px);
+  height: min(65%, 420px);
+  background-image: url('../../assets/IRA SathiNew.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.04;
+  filter: grayscale(1) brightness(1.18);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .user-shell-header {
@@ -36,7 +55,7 @@
   padding: 0.75rem 1.25rem 0.5rem;
   border-bottom-left-radius: 26px;
   border-bottom-right-radius: 26px;
-  background: linear-gradient(180deg, rgba(27, 143, 91, 0.4), rgba(67, 160, 110, 0.28), rgba(248, 252, 249, 1));
+  background: #8fc4a5;
   border-bottom: 1px solid transparent;
   box-shadow: 0 4px 16px -8px rgba(34, 94, 65, 0.15), 0 0 0 0 rgba(34, 94, 65, 0.08);
   overflow: visible;
@@ -2708,6 +2727,72 @@
 }
 
 .user-orders-view__card-payment-status {
+  font-weight: 600;
+}
+
+.user-orders-view__tracker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(34, 94, 65, 0.12);
+  background: rgba(240, 245, 242, 0.6);
+  margin: 0.75rem 0 1rem;
+}
+
+.user-orders-view__tracker-step {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+
+.user-orders-view__tracker-step--active {
+  opacity: 1;
+}
+
+.user-orders-view__tracker-step-index {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 94, 65, 0.22);
+  background: #fff;
+  color: #1b8f5b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(34, 94, 65, 0.1);
+}
+
+.user-orders-view__tracker-step-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.user-orders-view__tracker-step-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #172022;
+  margin: 0;
+}
+
+.user-orders-view__tracker-step-desc {
+  font-size: 0.72rem;
+  color: rgba(26, 42, 34, 0.65);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.user-orders-view__tracker-step-time {
+  font-size: 0.7rem;
+  color: rgba(26, 42, 34, 0.5);
   font-weight: 600;
 }
 

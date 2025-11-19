@@ -7,7 +7,7 @@ import { cn } from '../../../lib/cn'
  * For now, uses a static map image. Can be replaced with Google Maps, Mapbox, etc.
  */
 export function VendorMap({ vendor, className }) {
-  const { location, region, name } = vendor || {}
+  const { location, region, name, coverageRadius, serviceArea, coverageConflicts } = vendor || {}
   
   // If we have lat/lng, we can use Google Maps Static API or similar
   // For now, we'll show a placeholder with region info
@@ -38,14 +38,32 @@ export function VendorMap({ vendor, className }) {
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg">
           <MapPin className="h-8 w-8" />
         </div>
-        <div>
+        <div className="space-y-1 text-center">
           <p className="text-sm font-bold text-gray-900">{name || 'Vendor Location'}</p>
           <p className="text-xs text-gray-600">{region || 'Location not available'}</p>
           {location?.lat && location?.lng ? (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="text-xs text-gray-500">
               {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
             </p>
-          ) : null}
+          ) : (
+            <p className="text-xs text-gray-500">Geo coordinates missing</p>
+          )}
+          <p className="text-xs text-gray-600">
+            Coverage Radius: {coverageRadius ? `${coverageRadius} km` : 'N/A'}
+          </p>
+          {serviceArea && <p className="text-[0.7rem] text-gray-500">{serviceArea}</p>}
+          {coverageConflicts?.length ? (
+            <p className="text-xs font-semibold text-red-600">
+              Overlaps with{' '}
+              {coverageConflicts
+                .map((conflict) =>
+                  conflict.vendorA.id === vendor.id ? conflict.vendorB.name : conflict.vendorA.name,
+                )
+                .join(', ')}
+            </p>
+          ) : (
+            <p className="text-xs font-semibold text-green-600">No overlap detected</p>
+          )}
         </div>
       </div>
     </div>
