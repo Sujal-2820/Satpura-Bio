@@ -51,7 +51,7 @@ const vendorSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected', 'suspended'],
+    enum: ['pending', 'approved', 'rejected', 'suspended', 'temporarily_banned', 'permanently_banned'],
     default: 'pending',
   },
   creditLimit: {
@@ -77,6 +77,59 @@ const vendorSchema = new mongoose.Schema({
     },
     dueDate: Date,
   },
+  // Escalation tracking
+  escalationCount: {
+    type: Number,
+    default: 0,
+    // Track number of times vendor escalated orders to admin
+  },
+  escalationHistory: [{
+    orderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Order',
+    },
+    escalatedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    reason: String,
+  }],
+  // Ban management
+  banInfo: {
+    isBanned: {
+      type: Boolean,
+      default: false,
+    },
+    banType: {
+      type: String,
+      enum: ['none', 'temporary', 'permanent'],
+      default: 'none',
+    },
+    bannedAt: Date,
+    bannedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin',
+    },
+    banReason: String,
+    banExpiry: Date, // For temporary bans
+    revokedAt: Date, // When temporary ban was revoked
+    revokedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin',
+    },
+    revocationReason: String,
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+    // Soft delete for permanent ban (vendor ID deleted but activities persist)
+  },
+  deletedAt: Date,
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+  },
+  deletionReason: String,
   otp: {
     code: String,
     expiresAt: Date,

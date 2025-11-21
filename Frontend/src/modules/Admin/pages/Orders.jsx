@@ -9,6 +9,7 @@ import { OrderDetailModal } from '../components/OrderDetailModal'
 import { OrderReassignmentModal } from '../components/OrderReassignmentModal'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
+import { useToast } from '../components/ToastNotification'
 import { orders as mockOrders } from '../services/adminData'
 import { cn } from '../../../lib/cn'
 
@@ -38,6 +39,7 @@ export function OrdersPage() {
     getVendors,
     loading,
   } = useAdminApi()
+  const { success, error: showError, warning: showWarning } = useToast()
 
   const [ordersList, setOrdersList] = useState([])
   const [availableVendors, setAvailableVendors] = useState([])
@@ -150,22 +152,42 @@ export function OrdersPage() {
   }
 
   const handleReassignSubmit = async (orderId, reassignData) => {
-    const result = await reassignOrder(orderId, reassignData)
-    if (result.data) {
-      setReassignmentModalOpen(false)
-      setSelectedOrderForReassign(null)
-      fetchOrders()
+    try {
+      const result = await reassignOrder(orderId, reassignData)
+      if (result.data) {
+        setReassignmentModalOpen(false)
+        setSelectedOrderForReassign(null)
+        fetchOrders()
+        success('Order reassigned successfully!', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to reassign order'
+        if (errorMessage.includes('vendor') || errorMessage.includes('unavailable') || errorMessage.includes('stock')) {
+          showWarning(errorMessage, 6000)
+        } else {
+          showError(errorMessage, 5000)
+        }
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to reassign order', 5000)
     }
   }
 
   const handleGenerateInvoice = async (orderId) => {
-    const result = await generateInvoice(orderId)
-    if (result.data) {
-      // Open invoice in new tab or download
-      if (result.data.invoiceUrl) {
-        window.open(result.data.invoiceUrl, '_blank')
+    try {
+      const result = await generateInvoice(orderId)
+      if (result.data) {
+        // Invoice is automatically downloaded and opened for printing
+        success(result.data.message || 'Invoice generated successfully! Use browser print (Ctrl+P) to save as PDF.', 5000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to generate invoice'
+        if (errorMessage.includes('not found') || errorMessage.includes('cannot')) {
+          showWarning(errorMessage, 6000)
+        } else {
+          showError(errorMessage, 5000)
+        }
       }
-      alert('Invoice generated successfully!')
+    } catch (error) {
+      showError(error.message || 'Failed to generate invoice', 5000)
     }
   }
 

@@ -31,6 +31,13 @@ router.post('/auth/request-otp', sellerController.requestOTP);
 router.post('/auth/verify-otp', sellerController.verifyOTP);
 
 /**
+ * @route   POST /api/sellers/auth/login
+ * @desc    Seller login (alias for verify-otp)
+ * @access  Public
+ */
+router.post('/auth/login', sellerController.verifyOTP);
+
+/**
  * @route   POST /api/sellers/auth/logout
  * @desc    Seller logout
  * @access  Private (Seller)
@@ -38,11 +45,39 @@ router.post('/auth/verify-otp', sellerController.verifyOTP);
 router.post('/auth/logout', authorizeSeller, sellerController.logout);
 
 /**
+ * @route   POST /api/sellers/logout
+ * @desc    Seller logout (alias)
+ * @access  Private (Seller)
+ */
+router.post('/logout', authorizeSeller, sellerController.logout);
+
+/**
  * @route   GET /api/sellers/auth/profile
  * @desc    Get seller profile
  * @access  Private (Seller)
  */
 router.get('/auth/profile', authorizeSeller, sellerController.getProfile);
+
+/**
+ * @route   GET /api/sellers/profile
+ * @desc    Get seller profile (alias)
+ * @access  Private (Seller)
+ */
+router.get('/profile', authorizeSeller, sellerController.getProfile);
+
+/**
+ * @route   PUT /api/sellers/profile
+ * @desc    Update seller profile
+ * @access  Private (Seller)
+ */
+router.put('/profile', authorizeSeller, sellerController.updateProfile);
+
+/**
+ * @route   PUT /api/sellers/password
+ * @desc    Change seller password
+ * @access  Private (Seller)
+ */
+router.put('/password', authorizeSeller, sellerController.changePassword);
 
 // ============================================================================
 // DASHBOARD ROUTES
@@ -83,6 +118,20 @@ router.get('/dashboard/referrals', authorizeSeller, sellerController.getReferral
  */
 router.get('/dashboard/performance', authorizeSeller, sellerController.getPerformance);
 
+/**
+ * @route   GET /api/sellers/dashboard/highlights
+ * @desc    Get dashboard highlights/metrics
+ * @access  Private (Seller)
+ */
+router.get('/dashboard/highlights', authorizeSeller, sellerController.getDashboardHighlights);
+
+/**
+ * @route   GET /api/sellers/dashboard/activity
+ * @desc    Get recent activity feed
+ * @access  Private (Seller)
+ */
+router.get('/dashboard/activity', authorizeSeller, sellerController.getRecentActivity);
+
 // ============================================================================
 // WALLET & COMMISSION ROUTES
 // ============================================================================
@@ -114,6 +163,13 @@ router.post('/wallet/withdraw', authorizeSeller, sellerController.requestWithdra
  * @access  Private (Seller)
  */
 router.get('/wallet/withdrawals', authorizeSeller, sellerController.getWithdrawals);
+
+/**
+ * @route   GET /api/sellers/wallet/withdrawals/:requestId
+ * @desc    Get withdrawal request details
+ * @access  Private (Seller)
+ */
+router.get('/wallet/withdrawals/:requestId', authorizeSeller, sellerController.getWithdrawalDetails);
 
 // ============================================================================
 // REFERRALS & COMMISSIONS ROUTES
@@ -156,11 +212,135 @@ router.get('/referrals/:referralId', authorizeSeller, sellerController.getReferr
 router.get('/target', authorizeSeller, sellerController.getTarget);
 
 /**
+ * @route   GET /api/sellers/targets/current
+ * @desc    Get monthly target and progress (alias)
+ * @access  Private (Seller)
+ */
+router.get('/targets/current', authorizeSeller, sellerController.getTarget);
+
+/**
+ * @route   GET /api/sellers/targets/history
+ * @desc    Get target history
+ * @access  Private (Seller)
+ */
+router.get('/targets/history', authorizeSeller, sellerController.getTargetHistory);
+
+/**
+ * @route   GET /api/sellers/targets/incentives
+ * @desc    Get target achievement incentives
+ * @access  Private (Seller)
+ */
+router.get('/targets/incentives', authorizeSeller, sellerController.getTargetIncentives);
+
+/**
  * @route   GET /api/sellers/performance
  * @desc    Get performance analytics
  * @access  Private (Seller)
  */
 router.get('/performance', authorizeSeller, sellerController.getPerformanceAnalytics);
+
+// ============================================================================
+// ANNOUNCEMENTS & NOTIFICATIONS ROUTES
+// ============================================================================
+
+/**
+ * @route   GET /api/sellers/announcements
+ * @desc    Get announcements
+ * @access  Private (Seller)
+ */
+router.get('/announcements', authorizeSeller, sellerController.getAnnouncements);
+
+/**
+ * @route   PUT /api/sellers/announcements/:id/read
+ * @desc    Mark announcement as read
+ * @access  Private (Seller)
+ */
+router.put('/announcements/:id/read', authorizeSeller, sellerController.markAnnouncementRead);
+
+/**
+ * @route   PUT /api/sellers/announcements/read-all
+ * @desc    Mark all announcements as read
+ * @access  Private (Seller)
+ */
+router.put('/announcements/read-all', authorizeSeller, sellerController.markAllAnnouncementsRead);
+
+/**
+ * @route   GET /api/sellers/notifications
+ * @desc    Get notifications
+ * @access  Private (Seller)
+ */
+router.get('/notifications', authorizeSeller, sellerController.getNotifications);
+
+/**
+ * @route   PUT /api/sellers/notifications/:id/read
+ * @desc    Mark notification as read
+ * @access  Private (Seller)
+ */
+router.put('/notifications/:id/read', authorizeSeller, sellerController.markNotificationRead);
+
+/**
+ * @route   PUT /api/sellers/notifications/read-all
+ * @desc    Mark all notifications as read
+ * @access  Private (Seller)
+ */
+router.put('/notifications/read-all', authorizeSeller, sellerController.markAllNotificationsRead);
+
+/**
+ * @route   GET /api/sellers/notifications/preferences
+ * @desc    Get notification preferences
+ * @access  Private (Seller)
+ */
+router.get('/notifications/preferences', authorizeSeller, sellerController.getNotificationPreferences);
+
+/**
+ * @route   PUT /api/sellers/notifications/preferences
+ * @desc    Update notification preferences
+ * @access  Private (Seller)
+ */
+router.put('/notifications/preferences', authorizeSeller, sellerController.updateNotificationPreferences);
+
+// ============================================================================
+// SHARING ROUTES
+// ============================================================================
+
+/**
+ * @route   GET /api/sellers/share-link
+ * @desc    Get seller ID share link
+ * @access  Private (Seller)
+ */
+router.get('/share-link', authorizeSeller, sellerController.getShareLink);
+
+/**
+ * @route   POST /api/sellers/share/track
+ * @desc    Track share action
+ * @access  Private (Seller)
+ */
+router.post('/share/track', authorizeSeller, sellerController.trackShareAction);
+
+// ============================================================================
+// SUPPORT ROUTES
+// ============================================================================
+
+/**
+ * @route   POST /api/sellers/support/report
+ * @desc    Report issue/create support ticket
+ * @access  Private (Seller)
+ */
+router.post('/support/report', authorizeSeller, sellerController.reportIssue);
+
+/**
+ * @route   GET /api/sellers/support/tickets
+ * @desc    Get support tickets
+ * @access  Private (Seller)
+ */
+router.get('/support/tickets', authorizeSeller, sellerController.getSupportTickets);
+
+/**
+ * @route   GET /api/sellers/support/tickets/:ticketId
+ * @desc    Get support ticket details
+ * @access  Private (Seller)
+ */
+router.get('/support/tickets/:ticketId', authorizeSeller, sellerController.getSupportTicketDetails);
 
 module.exports = router;
 

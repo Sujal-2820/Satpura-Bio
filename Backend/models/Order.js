@@ -180,6 +180,11 @@ const orderSchema = new mongoose.Schema({
     // Calculated: createdAt + DELIVERY_TIMELINE_HOURS
   },
   deliveredAt: Date,
+  trackingNumber: {
+    type: String,
+    trim: true,
+    // Tracking number for order fulfillment
+  },
   // Cancellation
   cancelledAt: Date,
   cancellationReason: String,

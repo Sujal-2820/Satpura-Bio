@@ -15,11 +15,23 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
  * API Response Handler
  */
 async function handleResponse(response) {
+  const data = await response.json().catch(() => ({ 
+    success: false,
+    error: { message: 'An error occurred' }
+  }))
+  
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'An error occurred' }))
-    throw new Error(error.message || `HTTP error! status: ${response.status}`)
+    // Return error in same format as success response for consistent error handling
+    return {
+      success: false,
+      error: {
+        message: data.message || data.error?.message || `HTTP error! status: ${response.status}`,
+        status: response.status,
+      },
+    }
   }
-  return response.json()
+  
+  return data
 }
 
 /**
@@ -53,89 +65,43 @@ async function apiRequest(endpoint, options = {}) {
  * @returns {Promise<Object>} - { message: 'OTP sent successfully', expiresIn: 300 }
  */
 export async function requestSellerOTP(data) {
-  // Mock implementation for testing - accepts any data
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          message: 'OTP sent successfully',
-          expiresIn: 300,
-        },
-      })
-    }, 1000)
+  return apiRequest('/sellers/auth/request-otp', {
+    method: 'POST',
+    body: JSON.stringify(data),
   })
-  // Uncomment when backend is ready:
-  // return apiRequest('/sellers/auth/request-otp', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  // })
 }
 
 /**
- * Register Seller (IRA Partner) with OTP
+ * Register Seller (IRA Partner)
  * POST /sellers/auth/register
+ * Note: This sends OTP. Use verifyOTP to complete registration.
  * 
- * @param {Object} data - { fullName, phone, otp }
- * @returns {Promise<Object>} - { token, seller: { id, name, phone, sellerId } }
+ * @param {Object} data - { name, phone, area }
+ * @returns {Promise<Object>} - { message, sellerId, requiresApproval, expiresIn }
  */
 export async function registerSeller(data) {
-  // Mock implementation for testing - accepts any data
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          token: 'mock_seller_token_' + Date.now(),
-          seller: {
-            id: 'seller_' + Date.now(),
-            name: data.fullName,
-            phone: data.phone,
-            sellerId: 'SLR-' + Math.floor(Math.random() * 1000).toString().padStart(3, '0'),
-          },
-        },
-      })
-    }, 1000)
+  return apiRequest('/sellers/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: data.fullName || data.name,
+      phone: data.phone,
+      area: data.area || '',
+    }),
   })
-  // Uncomment when backend is ready:
-  // return apiRequest('/sellers/auth/register', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  // })
 }
 
 /**
  * Login Seller (IRA Partner) with OTP
- * POST /sellers/auth/login
+ * POST /sellers/auth/verify-otp
  * 
  * @param {Object} data - { phone, otp }
- * @returns {Promise<Object>} - { token, seller: { id, name, sellerId, phone, area, commissionRate } }
+ * @returns {Promise<Object>} - { token, seller: { id, sellerId, name, phone, area, status, isActive } }
  */
 export async function loginSellerWithOtp(data) {
-  // Mock implementation for testing - accepts any data
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          token: 'mock_seller_token_' + Date.now(),
-          seller: {
-            id: 'seller_' + Date.now(),
-            name: 'IRA Partner',
-            phone: data.phone,
-            sellerId: 'SLR-001',
-            area: 'Kolhapur',
-            commissionRate: '2% - 3%',
-          },
-        },
-      })
-    }, 1000)
+  return apiRequest('/sellers/auth/verify-otp', {
+    method: 'POST',
+    body: JSON.stringify(data),
   })
-  // Uncomment when backend is ready:
-  // return apiRequest('/sellers/auth/login', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  // })
 }
 
 /**
@@ -154,24 +120,24 @@ export async function sellerLogin(credentials) {
 
 /**
  * Seller Logout
- * POST /sellers/logout
+ * POST /sellers/auth/logout
  * 
  * @returns {Promise<Object>} - { message: 'Logged out successfully' }
  */
 export async function sellerLogout() {
-  return apiRequest('/sellers/logout', {
+  return apiRequest('/sellers/auth/logout', {
     method: 'POST',
   })
 }
 
 /**
  * Get Seller Profile
- * GET /sellers/profile
+ * GET /sellers/auth/profile
  * 
  * @returns {Promise<Object>} - Seller profile data
  */
 export async function getSellerProfile() {
-  return apiRequest('/sellers/profile')
+  return apiRequest('/sellers/auth/profile')
 }
 
 /**

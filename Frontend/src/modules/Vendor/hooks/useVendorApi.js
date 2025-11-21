@@ -19,15 +19,20 @@ export function useVendorApi() {
       try {
         const result = await apiFunction(...args)
         if (result.success) {
-          return { data: result.data, error: null }
+          // Extract data from response: { success: true, data: {...} } -> {...}
+          const responseData = result.data || result
+          return { data: responseData, error: null }
         } else {
-          setError(result.error)
-          return { data: null, error: result.error }
+          const error = result.error || { message: 'An error occurred' }
+          setError(error)
+          return { data: null, error: error }
         }
       } catch (err) {
-        const errorMsg = { message: err.message || 'An unexpected error occurred' }
-        setError(errorMsg)
-        return { data: null, error: errorMsg }
+        // Handle errors from handleResponse function
+        const errorMsg = err.error?.message || err.message || 'An unexpected error occurred'
+        const errorObj = err.error || { message: errorMsg }
+        setError(errorObj)
+        return { data: null, error: errorObj }
       } finally {
         setLoading(false)
       }

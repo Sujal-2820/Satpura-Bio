@@ -16,7 +16,9 @@ const WithdrawalRequest = require('../models/WithdrawalRequest');
 const User = require('../models/User');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
-const { VENDOR_COVERAGE_RADIUS_KM, MIN_VENDOR_PURCHASE } = require('../utils/constants');
+const Settings = require('../models/Settings');
+const Notification = require('../models/Notification');
+const { VENDOR_COVERAGE_RADIUS_KM, MIN_VENDOR_PURCHASE, DELIVERY_TIMELINE_HOURS } = require('../utils/constants');
 
 const { generateOTP, sendOTP } = require('../config/sms');
 const { OTP_EXPIRY_MINUTES } = require('../utils/constants');
@@ -981,10 +983,16 @@ exports.getVendors = async (req, res, next) => {
       search,
       sortBy = 'createdAt',
       sortOrder = 'desc',
+      includeDeleted = 'false',
     } = req.query;
 
     // Build query
     const query = {};
+
+    // By default, exclude deleted vendors unless explicitly requested
+    if (includeDeleted !== 'true') {
+      query.isDeleted = { $ne: true };
+    }
 
     if (status) {
       query.status = status;
@@ -1018,7 +1026,46 @@ exports.getVendors = async (req, res, next) => {
       .skip(skip)
       .limit(limitNum)
       .select('-__v -otp')
-      .populate('approvedBy', 'name email');
+      .populate('approvedBy', 'name email')
+      .populate('deletedBy', 'name email')
+      .lean();
+    
+    // Manually populate nested banInfo fields if they exist
+    const mongoose = require('mongoose');
+    const adminIdsToPopulate = new Set();
+    
+    vendors.forEach(vendor => {
+      if (vendor.banInfo?.bannedBy && mongoose.Types.ObjectId.isValid(vendor.banInfo.bannedBy)) {
+        adminIdsToPopulate.add(vendor.banInfo.bannedBy);
+      }
+      if (vendor.banInfo?.revokedBy && mongoose.Types.ObjectId.isValid(vendor.banInfo.revokedBy)) {
+        adminIdsToPopulate.add(vendor.banInfo.revokedBy);
+      }
+    });
+    
+    // Fetch all admins at once for efficiency
+    const adminsMap = new Map();
+    if (adminIdsToPopulate.size > 0) {
+      const adminIdsArray = Array.from(adminIdsToPopulate).map(id => new mongoose.Types.ObjectId(id));
+      const admins = await Admin.find({ _id: { $in: adminIdsArray } })
+        .select('name email')
+        .lean();
+      admins.forEach(admin => {
+        adminsMap.set(admin._id.toString(), { name: admin.name, email: admin.email });
+      });
+    }
+    
+    // Populate the banInfo fields
+    vendors.forEach(vendor => {
+      if (vendor.banInfo?.bannedBy) {
+        const adminId = vendor.banInfo.bannedBy.toString();
+        vendor.banInfo.bannedBy = adminsMap.get(adminId) || null;
+      }
+      if (vendor.banInfo?.revokedBy) {
+        const adminId = vendor.banInfo.revokedBy.toString();
+        vendor.banInfo.revokedBy = adminsMap.get(adminId) || null;
+      }
+    });
 
     const total = await Vendor.countDocuments(query);
 
@@ -1088,6 +1135,12 @@ exports.getVendorDetails = async (req, res, next) => {
           utilization: Math.round(creditUtilization * 100) / 100,
           dueDate: vendor.creditPolicy.dueDate,
         },
+        escalationInfo: {
+          count: vendor.escalationCount || 0,
+          history: vendor.escalationHistory || [],
+          canBan: (vendor.escalationCount || 0) > 3,
+        },
+        banInfo: vendor.banInfo || {},
         purchases,
         assignments,
       },
@@ -1229,6 +1282,14 @@ exports.updateVendorCreditPolicy = async (req, res, next) => {
     const { vendorId } = req.params;
     const { limit, repaymentDays, penaltyRate } = req.body;
 
+    // Validate vendor ID
+    if (!vendorId || !require('mongoose').Types.ObjectId.isValid(vendorId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid vendor ID',
+      });
+    }
+
     const vendor = await Vendor.findById(vendorId);
 
     if (!vendor) {
@@ -1241,8 +1302,39 @@ exports.updateVendorCreditPolicy = async (req, res, next) => {
     if (vendor.status !== 'approved') {
       return res.status(400).json({
         success: false,
-        message: 'Can only set credit policy for approved vendors',
+        message: 'Can only set credit policy for approved vendors. Current status: ' + vendor.status,
       });
+    }
+
+    // Validate input values
+    if (limit !== undefined && (isNaN(limit) || limit < 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Credit limit must be a valid number greater than or equal to 0',
+      });
+    }
+
+    if (repaymentDays !== undefined && (isNaN(repaymentDays) || repaymentDays <= 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Repayment days must be a valid number greater than 0',
+      });
+    }
+
+    if (penaltyRate !== undefined && (isNaN(penaltyRate) || penaltyRate < 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Penalty rate must be a valid number greater than or equal to 0',
+      });
+    }
+
+    // Ensure creditPolicy object exists
+    if (!vendor.creditPolicy) {
+      vendor.creditPolicy = {
+        limit: 0,
+        repaymentDays: 30,
+        penaltyRate: 0,
+      };
     }
 
     // Update credit policy
@@ -1281,7 +1373,90 @@ exports.updateVendorCreditPolicy = async (req, res, next) => {
 };
 
 /**
- * @desc    Get vendor purchase requests
+ * @desc    Get all vendor purchase requests (global)
+ * @route   GET /api/admin/vendors/purchases
+ * @access  Private (Admin)
+ */
+exports.getAllVendorPurchases = async (req, res, next) => {
+  try {
+    const { status, vendorId, page = 1, limit = 20, search, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+
+    // Build query
+    const query = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (vendorId) {
+      query.vendorId = vendorId;
+    }
+
+    // Search functionality (by vendor name or purchase amount)
+    if (search) {
+      // If search is provided, we'll need to populate vendor first and filter
+      // For now, we can search by amount or use text search if available
+      const searchNum = parseFloat(search);
+      if (!isNaN(searchNum)) {
+        // Search by amount
+        query.totalAmount = { $gte: searchNum * 0.9, $lte: searchNum * 1.1 }; // Allow 10% tolerance
+      }
+    }
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sort
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Execute query with vendor population
+    const purchases = await CreditPurchase.find(query)
+      .populate('vendorId', 'name phone email location')
+      .populate('items.productId', 'name sku category priceToVendor')
+      .populate('reviewedBy', 'name email')
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .select('-__v');
+
+    // If search was provided and it's a string, filter by vendor name
+    let filteredPurchases = purchases;
+    if (search && isNaN(parseFloat(search))) {
+      filteredPurchases = purchases.filter(purchase => {
+        const vendorName = purchase.vendorId?.name || '';
+        return vendorName.toLowerCase().includes(search.toLowerCase());
+      });
+    }
+
+    // Get total count (after search filter if applicable)
+    let total = await CreditPurchase.countDocuments(query);
+    if (search && isNaN(parseFloat(search))) {
+      // Recalculate total for string searches (approximate)
+      total = filteredPurchases.length;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        purchases: filteredPurchases,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
+          totalItems: total,
+          itemsPerPage: limitNum,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get vendor purchase requests (vendor-specific)
  * @route   GET /api/admin/vendors/:vendorId/purchases
  * @access  Private (Admin)
  */
@@ -1454,6 +1629,241 @@ exports.rejectVendorPurchase = async (req, res, next) => {
       data: {
         purchase,
         message: 'Purchase request rejected successfully',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Ban vendor (temporary or permanent) - requires >3 escalations
+ * @route   PUT /api/admin/vendors/:vendorId/ban
+ * @access  Private (Admin)
+ */
+exports.banVendor = async (req, res, next) => {
+  try {
+    const { vendorId } = req.params;
+    const { banType = 'temporary', banReason, banExpiry } = req.body; // banType: 'temporary' or 'permanent'
+
+    if (!['temporary', 'permanent'].includes(banType)) {
+      return res.status(400).json({
+        success: false,
+        message: "banType must be 'temporary' or 'permanent'",
+      });
+    }
+
+    const vendor = await Vendor.findById(vendorId);
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    // Check escalation count (requires >3 escalations)
+    if ((vendor.escalationCount || 0) <= 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot ban vendor. Requires more than 3 escalations. Current escalation count: ' + (vendor.escalationCount || 0),
+      });
+    }
+
+    // Check if vendor is already banned
+    if (vendor.banInfo.isBanned) {
+      return res.status(400).json({
+        success: false,
+        message: `Vendor is already banned (${vendor.banInfo.banType}). Please unban first if you want to change the ban type.`,
+      });
+    }
+
+    // Set ban information
+    vendor.banInfo.isBanned = true;
+    vendor.banInfo.banType = banType;
+    vendor.banInfo.bannedAt = new Date();
+    vendor.banInfo.bannedBy = req.admin._id;
+    vendor.banInfo.banReason = banReason || 'Banned due to multiple order escalations';
+
+    // Set ban expiry for temporary bans
+    if (banType === 'temporary') {
+      if (banExpiry) {
+        vendor.banInfo.banExpiry = new Date(banExpiry);
+      } else {
+        // Default: 30 days from now
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + 30);
+        vendor.banInfo.banExpiry = expiryDate;
+      }
+    } else {
+      // Permanent ban - no expiry
+      vendor.banInfo.banExpiry = undefined;
+    }
+
+    // Update vendor status
+    vendor.status = banType === 'temporary' ? 'temporarily_banned' : 'permanently_banned';
+    vendor.isActive = false;
+
+    await vendor.save();
+
+    // TODO: Send notification to vendor
+    console.log(`🚫 Vendor banned: ${vendor.name} (${vendor.phone}) - Type: ${banType}${banReason ? ` - Reason: ${banReason}` : ''}`);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        vendor: {
+          id: vendor._id,
+          name: vendor.name,
+          phone: vendor.phone,
+          status: vendor.status,
+          banInfo: vendor.banInfo,
+        },
+        message: `Vendor ${banType === 'temporary' ? 'temporarily' : 'permanently'} banned successfully`,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Revoke temporary ban
+ * @route   PUT /api/admin/vendors/:vendorId/unban
+ * @access  Private (Admin)
+ */
+exports.unbanVendor = async (req, res, next) => {
+  try {
+    const { vendorId } = req.params;
+    const { revocationReason } = req.body;
+
+    const vendor = await Vendor.findById(vendorId);
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    // Check if vendor is banned
+    if (!vendor.banInfo.isBanned) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vendor is not currently banned',
+      });
+    }
+
+    // Can only unban temporary bans (permanent bans require deletion)
+    if (vendor.banInfo.banType === 'permanent') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot unban a permanently banned vendor. Use delete vendor instead if needed.',
+      });
+    }
+
+    // Revoke ban
+    vendor.banInfo.isBanned = false;
+    vendor.banInfo.banType = 'none';
+    vendor.banInfo.revokedAt = new Date();
+    vendor.banInfo.revokedBy = req.admin._id;
+    vendor.banInfo.revocationReason = revocationReason || 'Ban revoked by admin';
+
+    // Update vendor status
+    vendor.status = 'approved';
+    vendor.isActive = true;
+
+    await vendor.save();
+
+    // TODO: Send notification to vendor
+    console.log(`✅ Vendor ban revoked: ${vendor.name} (${vendor.phone})${revocationReason ? ` - Reason: ${revocationReason}` : ''}`);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        vendor: {
+          id: vendor._id,
+          name: vendor.name,
+          phone: vendor.phone,
+          status: vendor.status,
+          banInfo: vendor.banInfo,
+        },
+        message: 'Vendor ban revoked successfully',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Permanently delete vendor (soft delete - activities persist) - requires >3 escalations
+ * @route   DELETE /api/admin/vendors/:vendorId
+ * @access  Private (Admin)
+ */
+exports.deleteVendor = async (req, res, next) => {
+  try {
+    const { vendorId } = req.params;
+    const { deletionReason } = req.body;
+
+    const vendor = await Vendor.findById(vendorId);
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    // Check if vendor is already deleted
+    if (vendor.isDeleted) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vendor is already deleted',
+      });
+    }
+
+    // Check escalation count (requires >3 escalations)
+    if ((vendor.escalationCount || 0) <= 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete vendor. Requires more than 3 escalations. Current escalation count: ' + (vendor.escalationCount || 0),
+      });
+    }
+
+    // Soft delete vendor (activities persist)
+    vendor.isDeleted = true;
+    vendor.deletedAt = new Date();
+    vendor.deletedBy = req.admin._id;
+    vendor.deletionReason = deletionReason || 'Deleted due to multiple order escalations';
+    vendor.status = 'permanently_banned';
+    vendor.isActive = false;
+
+    // Also update ban info if not already set
+    if (!vendor.banInfo.isBanned) {
+      vendor.banInfo.isBanned = true;
+      vendor.banInfo.banType = 'permanent';
+      vendor.banInfo.bannedAt = new Date();
+      vendor.banInfo.bannedBy = req.admin._id;
+      vendor.banInfo.banReason = 'Permanently banned and deleted';
+    }
+
+    await vendor.save();
+
+    // TODO: Send notification
+    console.log(`🗑️ Vendor deleted: ${vendor.name} (${vendor.phone})${deletionReason ? ` - Reason: ${deletionReason}` : ''}`);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        vendor: {
+          id: vendor._id,
+          name: vendor.name,
+          phone: vendor.phone,
+          isDeleted: vendor.isDeleted,
+          deletedAt: vendor.deletedAt,
+        },
+        message: 'Vendor deleted successfully (soft delete - activities persist)',
       },
     });
   } catch (error) {
@@ -1801,7 +2211,87 @@ exports.setSellerTarget = async (req, res, next) => {
 };
 
 /**
- * @desc    Get seller withdrawal requests
+ * @desc    Get all seller withdrawal requests (global)
+ * @route   GET /api/admin/sellers/withdrawals
+ * @access  Private (Admin)
+ */
+exports.getAllSellerWithdrawals = async (req, res, next) => {
+  try {
+    const { status, sellerId, page = 1, limit = 20, search, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+
+    // Build query
+    const query = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (sellerId) {
+      query.sellerId = sellerId;
+    }
+
+    // Search functionality (by seller name or amount)
+    if (search) {
+      const searchNum = parseFloat(search);
+      if (!isNaN(searchNum)) {
+        // Search by amount
+        query.amount = { $gte: searchNum * 0.9, $lte: searchNum * 1.1 }; // Allow 10% tolerance
+      }
+    }
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sort
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Execute query with seller population
+    const withdrawals = await WithdrawalRequest.find(query)
+      .populate('sellerId', 'sellerId name phone email wallet')
+      .populate('reviewedBy', 'name email')
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .select('-__v');
+
+    // If search was provided and it's a string, filter by seller name
+    let filteredWithdrawals = withdrawals;
+    if (search && isNaN(parseFloat(search))) {
+      filteredWithdrawals = withdrawals.filter(withdrawal => {
+        const sellerName = withdrawal.sellerId?.name || '';
+        return sellerName.toLowerCase().includes(search.toLowerCase());
+      });
+    }
+
+    // Get total count (after search filter if applicable)
+    let total = await WithdrawalRequest.countDocuments(query);
+    if (search && isNaN(parseFloat(search))) {
+      // Recalculate total for string searches (approximate)
+      total = filteredWithdrawals.length;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        withdrawals: filteredWithdrawals,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
+          totalItems: total,
+          itemsPerPage: limitNum,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get seller withdrawal requests (seller-specific)
  * @route   GET /api/admin/sellers/:sellerId/withdrawals
  * @access  Private (Admin)
  */
@@ -2108,29 +2598,57 @@ exports.getUserDetails = async (req, res, next) => {
       });
     }
 
-    // TODO: Get user's orders count (when Order model is created)
-    // const ordersCount = await Order.countDocuments({ userId });
-    // const totalSpent = await Order.aggregate([
-    //   { $match: { userId: user._id } },
-    //   { $group: { _id: null, total: { $sum: '$totalAmount' } } }
-    // ]);
+    // Get user's orders count and stats
+    const Order = require('../models/Order');
+    const Payment = require('../models/Payment');
+    
+    const ordersCount = await Order.countDocuments({ userId: user._id });
+    const totalSpentResult = await Order.aggregate([
+      { $match: { userId: user._id, status: 'delivered', paymentStatus: 'fully_paid' } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+    ]);
+    const totalSpent = totalSpentResult[0]?.total || 0;
 
-    // TODO: Get user's payments (when Payment model is created)
-    // const payments = await Payment.find({ userId })
-    //   .sort({ createdAt: -1 })
-    //   .limit(10)
-    //   .select('-__v');
+    // Get user's recent orders
+    const recentOrders = await Order.find({ userId: user._id })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select('orderNumber totalAmount status createdAt paymentStatus')
+      .lean();
+
+    // Get user's payments
+    const payments = await Payment.find({ userId: user._id })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate('orderId', 'orderNumber totalAmount')
+      .select('-__v');
 
     res.status(200).json({
       success: true,
       data: {
         user,
         stats: {
-          // ordersCount: ordersCount || 0,
-          // totalSpent: totalSpent[0]?.total || 0,
-          // Will be implemented when Order/Payment models are created
+          ordersCount,
+          totalSpent,
+          recentOrders: recentOrders.length,
         },
-        // payments: payments || [],
+        recentOrders: recentOrders.map(order => ({
+          id: order._id,
+          orderNumber: order.orderNumber,
+          value: order.totalAmount,
+          date: order.createdAt,
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+        })),
+        payments: payments.map(payment => ({
+          id: payment._id,
+          paymentId: payment.paymentId,
+          amount: payment.amount,
+          date: payment.createdAt,
+          description: `Payment for Order ${payment.orderId?.orderNumber || 'N/A'}`,
+          status: payment.status === 'fully_paid' ? 'completed' : payment.status,
+          orderNumber: payment.orderId?.orderNumber,
+        })),
       },
     });
   } catch (error) {
@@ -2340,6 +2858,540 @@ exports.getOrderDetails = async (req, res, next) => {
           totalPending,
           remaining: order.totalAmount - totalPaid,
         },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Generate invoice PDF for order
+ * @route   GET /api/admin/orders/:orderId/invoice
+ * @access  Private (Admin)
+ */
+exports.generateInvoice = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId)
+      .populate('userId', 'name phone email location')
+      .populate('vendorId', 'name phone location')
+      .populate('seller', 'sellerId name phone')
+      .populate('items.productId', 'name sku category priceToUser')
+      .select('-__v');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    // Get order payments
+    const payments = await Payment.find({ orderId })
+      .sort({ createdAt: -1 })
+      .select('-__v');
+
+    const totalPaid = payments
+      .filter(p => p.status === 'fully_paid' || p.status === 'partial_paid')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    // Format date
+    const formatDate = (date) => {
+      if (!date) return 'N/A';
+      return new Date(date).toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    };
+
+    // Format currency
+    const formatCurrency = (amount) => {
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+      }).format(amount || 0);
+    };
+
+    // Generate HTML invoice
+    const invoiceHTML = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice - ${order.orderNumber}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 40px;
+      background: #f5f5f5;
+    }
+    .invoice-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
+      padding-bottom: 20px;
+      border-bottom: 3px solid #10b981;
+    }
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      color: #10b981;
+    }
+    .invoice-title {
+      text-align: right;
+    }
+    .invoice-title h1 {
+      font-size: 32px;
+      color: #1f2937;
+      margin-bottom: 5px;
+    }
+    .invoice-title p {
+      color: #6b7280;
+      font-size: 14px;
+    }
+    .details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+    .detail-section h3 {
+      color: #374151;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .detail-section p {
+      color: #6b7280;
+      font-size: 14px;
+      margin: 5px 0;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+    .items-table thead {
+      background: #f3f4f6;
+    }
+    .items-table th {
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #374151;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .items-table td {
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+      color: #1f2937;
+    }
+    .items-table tbody tr:hover {
+      background: #f9fafb;
+    }
+    .text-right {
+      text-align: right;
+    }
+    .totals {
+      margin-top: 20px;
+      margin-left: auto;
+      width: 300px;
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .total-row:last-child {
+      border-bottom: none;
+    }
+    .total-label {
+      font-weight: 600;
+      color: #374151;
+    }
+    .total-amount {
+      font-weight: bold;
+      color: #1f2937;
+    }
+    .grand-total {
+      background: #10b981;
+      color: white;
+      padding: 15px;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+    .grand-total .total-label {
+      color: white;
+      font-size: 18px;
+    }
+    .grand-total .total-amount {
+      color: white;
+      font-size: 20px;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+      text-align: center;
+      color: #6b7280;
+      font-size: 12px;
+    }
+    .payment-info {
+      background: #fef3c7;
+      padding: 15px;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+    .payment-info h4 {
+      color: #92400e;
+      margin-bottom: 8px;
+    }
+    .payment-info p {
+      color: #78350f;
+      font-size: 13px;
+      margin: 3px 0;
+    }
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .invoice-container {
+        box-shadow: none;
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="invoice-container">
+    <div class="header">
+      <div class="logo">IRA SATHI</div>
+      <div class="invoice-title">
+        <h1>INVOICE</h1>
+        <p>Order #${order.orderNumber}</p>
+      </div>
+    </div>
+
+    <div class="details">
+      <div class="detail-section">
+        <h3>Bill To</h3>
+        <p><strong>${order.userId?.name || 'N/A'}</strong></p>
+        <p>${order.deliveryAddress?.phone || order.userId?.phone || 'N/A'}</p>
+        <p>${order.deliveryAddress?.address || order.userId?.location || 'N/A'}</p>
+        <p>${order.deliveryAddress?.city || ''} ${order.deliveryAddress?.state || ''} - ${order.deliveryAddress?.pincode || ''}</p>
+      </div>
+      <div class="detail-section">
+        <h3>Invoice Details</h3>
+        <p><strong>Invoice Date:</strong> ${formatDate(order.createdAt)}</p>
+        <p><strong>Order Date:</strong> ${formatDate(order.createdAt)}</p>
+        <p><strong>Order Number:</strong> ${order.orderNumber}</p>
+        <p><strong>Payment Status:</strong> <span style="text-transform: capitalize;">${order.paymentStatus?.replace('_', ' ') || 'Pending'}</span></p>
+        ${order.vendorId ? `<p><strong>Vendor:</strong> ${order.vendorId.name || 'N/A'}</p>` : ''}
+      </div>
+    </div>
+
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Quantity</th>
+          <th class="text-right">Unit Price</th>
+          <th class="text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${order.items.map((item) => `
+          <tr>
+            <td>
+              <strong>${item.productName || item.productId?.name || 'Product'}</strong>
+              ${item.productId?.sku ? `<br><small style="color: #6b7280;">SKU: ${item.productId.sku}</small>` : ''}
+            </td>
+            <td>${item.quantity}</td>
+            <td class="text-right">${formatCurrency(item.unitPrice)}</td>
+            <td class="text-right"><strong>${formatCurrency(item.totalPrice)}</strong></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <div class="totals">
+      <div class="total-row">
+        <span class="total-label">Subtotal</span>
+        <span class="total-amount">${formatCurrency(order.subtotal)}</span>
+      </div>
+      ${order.deliveryCharge > 0 ? `
+      <div class="total-row">
+        <span class="total-label">Delivery Charge</span>
+        <span class="total-amount">${formatCurrency(order.deliveryCharge)}</span>
+      </div>
+      ` : ''}
+      <div class="total-row grand-total">
+        <span class="total-label">Grand Total</span>
+        <span class="total-amount">${formatCurrency(order.totalAmount)}</span>
+      </div>
+    </div>
+
+    <div class="payment-info">
+      <h4>Payment Information</h4>
+      <p><strong>Payment Preference:</strong> ${order.paymentPreference === 'partial' ? 'Partial Payment (30% Advance + 70% Remaining)' : 'Full Payment'}</p>
+      <p><strong>Upfront Amount:</strong> ${formatCurrency(order.upfrontAmount)}</p>
+      ${order.remainingAmount > 0 ? `<p><strong>Remaining Amount:</strong> ${formatCurrency(order.remainingAmount)}</p>` : ''}
+      <p><strong>Total Paid:</strong> ${formatCurrency(totalPaid)}</p>
+      <p><strong>Balance Due:</strong> ${formatCurrency(order.totalAmount - totalPaid)}</p>
+    </div>
+
+    <div class="footer">
+      <p>Thank you for your business!</p>
+      <p>For any queries, please contact our support team.</p>
+      <p style="margin-top: 10px;">Invoice generated on ${formatDate(new Date())}</p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    // Set headers for HTML response
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Disposition', `inline; filename="invoice-${order.orderNumber}.html"`);
+    res.send(invoiceHTML);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get escalated orders (assigned to admin)
+ * @route   GET /api/admin/orders/escalated
+ * @access  Private (Admin)
+ */
+exports.getEscalatedOrders = async (req, res, next) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      dateFrom,
+      dateTo,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = req.query;
+
+    // Build query for escalated orders (assigned to admin)
+    const query = {
+      assignedTo: 'admin',
+    };
+
+    // Filter by status if provided
+    if (status) {
+      query.status = status;
+    } else {
+      // By default, exclude delivered and cancelled escalated orders
+      query.status = { $nin: ['delivered', 'cancelled'] };
+    }
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) {
+        query.createdAt.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = toDate;
+      }
+    }
+
+    // Search by order number
+    if (search) {
+      query.orderNumber = { $regex: search, $options: 'i' };
+    }
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sort
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Execute query
+    const orders = await Order.find(query)
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .populate('userId', 'name phone email location')
+      .populate('vendorId', 'name phone location')
+      .populate('seller', 'sellerId name')
+      .populate('items.productId', 'name sku category')
+      .select('-__v')
+      .lean();
+
+    const total = await Order.countDocuments(query);
+
+    // Transform orders for frontend
+    const transformedOrders = orders.map(order => {
+      const vendor = order.vendorId;
+      const user = order.userId;
+      
+      // Find escalation timestamp from status timeline
+      const escalationEntry = order.statusTimeline?.find(
+        entry => entry.status === 'rejected' && entry.updatedBy === 'vendor'
+      );
+      
+      return {
+        id: order._id.toString(),
+        orderNumber: order.orderNumber,
+        vendor: vendor?.name || 'N/A',
+        vendorId: vendor?._id?.toString() || null,
+        value: order.totalAmount || 0,
+        orderValue: order.totalAmount || 0,
+        escalatedAt: escalationEntry?.timestamp || order.createdAt,
+        status: order.status || 'rejected',
+        items: order.items?.map(item => ({
+          id: item.productId?._id?.toString() || item._id?.toString(),
+          name: item.productId?.name || item.productName,
+          quantity: item.quantity,
+          price: item.unitPrice,
+          totalPrice: item.totalPrice,
+        })) || [],
+        userId: user?._id?.toString(),
+        userName: user?.name,
+        deliveryAddress: order.deliveryAddress,
+        notes: order.notes,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        orders: transformedOrders,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
+          totalItems: total,
+          itemsPerPage: limitNum,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Fulfill escalated order from warehouse
+ * @route   POST /api/admin/orders/:orderId/fulfill
+ * @access  Private (Admin)
+ */
+exports.fulfillOrderFromWarehouse = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const { note, deliveryDate, trackingNumber } = req.body;
+
+    const order = await Order.findById(orderId)
+      .populate('userId', 'name phone email')
+      .populate('items.productId', 'name sku');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    // Check if order is assigned to admin (escalated)
+    if (order.assignedTo !== 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Order is not escalated to admin. Only escalated orders can be fulfilled from warehouse.',
+      });
+    }
+
+    // Check if order can be fulfilled
+    if (order.status === 'delivered' || order.status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot fulfill order with status: ${order.status}`,
+      });
+    }
+
+    // Update order status to processing (admin is handling fulfillment)
+    const previousStatus = order.status;
+    order.status = 'processing';
+    order.assignedTo = 'admin'; // Keep assigned to admin
+
+    // Add admin fulfillment notes
+    if (note) {
+      order.notes = `${order.notes || ''}\n[Admin Warehouse Fulfillment] ${note}`.trim();
+    }
+
+    // Set delivery date if provided
+    if (deliveryDate) {
+      order.expectedDeliveryDate = new Date(deliveryDate);
+    } else {
+      // Default: set delivery date to 4 hours from now
+      order.expectedDeliveryDate = new Date(Date.now() + 4 * 60 * 60 * 1000);
+    }
+
+    // Add tracking number if provided
+    if (trackingNumber) {
+      order.trackingNumber = trackingNumber;
+    }
+
+    // Update status timeline
+    order.statusTimeline.push({
+      status: 'processing',
+      timestamp: new Date(),
+      updatedBy: 'admin',
+      note: `Order fulfilled from warehouse by admin.${note ? ` Note: ${note}` : ''}`,
+    });
+
+    await order.save();
+
+    // TODO: Send notifications
+    // - Notify user that order is being processed by admin
+    // - Update inventory if needed (when inventory system is implemented)
+
+    console.log(`✅ Escalated order ${order.orderNumber} fulfilled from warehouse by admin. Previous status: ${previousStatus}`);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        order: {
+          id: order._id,
+          orderNumber: order.orderNumber,
+          status: order.status,
+          assignedTo: order.assignedTo,
+          expectedDeliveryDate: order.expectedDeliveryDate,
+          trackingNumber: order.trackingNumber,
+        },
+        message: 'Order fulfilled from warehouse successfully',
       },
     });
   } catch (error) {
@@ -2671,6 +3723,217 @@ exports.getCredits = async (req, res, next) => {
           itemsPerPage: limitNum,
         },
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get vendor credit history
+ * @route   GET /api/admin/finance/vendors/:vendorId/history
+ * @access  Private (Admin)
+ */
+exports.getVendorCreditHistory = async (req, res, next) => {
+  try {
+    const { vendorId } = req.params;
+    const { page = 1, limit = 20, startDate, endDate } = req.query;
+
+    const vendor = await Vendor.findById(vendorId);
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    // Build query for credit purchases and payments
+    const query = { vendorId };
+
+    // Date range filter
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const toDate = new Date(endDate);
+        toDate.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = toDate;
+      }
+    }
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get credit purchases
+    const creditPurchases = await CreditPurchase.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .populate('items.productId', 'name sku')
+      .select('-__v');
+
+    // Get payments related to this vendor (through orders)
+    const vendorOrders = await Order.find({ vendorId }).select('_id orderNumber');
+    const orderIds = vendorOrders.map(o => o._id);
+    
+    const payments = await Payment.find({ orderId: { $in: orderIds } })
+      .sort({ createdAt: -1 })
+      .populate('orderId', 'orderNumber totalAmount')
+      .select('-__v')
+      .limit(limitNum);
+
+    const totalPurchases = await CreditPurchase.countDocuments(query);
+
+    // Transform credit purchases to history format
+    const history = [
+      ...creditPurchases.map(purchase => ({
+        id: purchase._id,
+        type: 'credit_purchase',
+        amount: purchase.totalAmount,
+        date: purchase.createdAt,
+        description: `Credit purchase - ${purchase.items.length} item(s)`,
+        status: purchase.status,
+        products: purchase.items.map(item => ({
+          name: item.productId?.name || item.productName,
+          quantity: item.quantity,
+          price: item.unitPrice,
+        })),
+      })),
+      ...payments.map(payment => ({
+        id: payment._id,
+        type: 'repayment',
+        amount: payment.amount,
+        date: payment.createdAt,
+        description: `Repayment for Order ${payment.orderId?.orderNumber || 'N/A'}`,
+        status: payment.status === 'fully_paid' ? 'completed' : payment.status,
+        orderNumber: payment.orderId?.orderNumber,
+      })),
+    ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        vendor: {
+          id: vendor._id,
+          name: vendor.name,
+          phone: vendor.phone,
+          creditLimit: vendor.creditPolicy.limit,
+          creditUsed: vendor.creditUsed,
+          creditRemaining: vendor.creditPolicy.limit - vendor.creditUsed,
+        },
+        history: history.slice(0, limitNum),
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(totalPurchases / limitNum),
+          totalItems: history.length,
+          itemsPerPage: limitNum,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get financial parameters
+ * @route   GET /api/admin/finance/parameters
+ * @access  Private (Admin)
+ */
+exports.getFinancialParameters = async (req, res, next) => {
+  try {
+    const { ADVANCE_PAYMENT_PERCENTAGE, MIN_ORDER_VALUE, MIN_VENDOR_PURCHASE } = require('../utils/constants');
+
+    // Try to get from database, fallback to constants
+    const financialParams = await Settings.getSetting('FINANCIAL_PARAMETERS', {
+      userAdvancePaymentPercent: ADVANCE_PAYMENT_PERCENTAGE,
+      minimumUserOrder: MIN_ORDER_VALUE,
+      minimumVendorPurchase: MIN_VENDOR_PURCHASE,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        userAdvancePaymentPercent: financialParams.userAdvancePaymentPercent || ADVANCE_PAYMENT_PERCENTAGE,
+        minimumUserOrder: financialParams.minimumUserOrder || MIN_ORDER_VALUE,
+        minimumVendorPurchase: financialParams.minimumVendorPurchase || MIN_VENDOR_PURCHASE,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update financial parameters
+ * @route   PUT /api/admin/finance/parameters
+ * @access  Private (Admin)
+ */
+exports.updateFinancialParameters = async (req, res, next) => {
+  try {
+    const { userAdvancePaymentPercent, minimumUserOrder, minimumVendorPurchase } = req.body;
+    const adminId = req.admin?.id || req.user?.id; // Get admin ID from auth middleware
+
+    // Validation
+    if (userAdvancePaymentPercent !== undefined) {
+      if (typeof userAdvancePaymentPercent !== 'number' || userAdvancePaymentPercent < 0 || userAdvancePaymentPercent > 100) {
+        return res.status(400).json({
+          success: false,
+          message: 'Advance payment percentage must be a number between 0 and 100.',
+        });
+      }
+    }
+
+    if (minimumUserOrder !== undefined) {
+      if (typeof minimumUserOrder !== 'number' || minimumUserOrder < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Minimum order value must be a positive number.',
+        });
+      }
+    }
+
+    if (minimumVendorPurchase !== undefined) {
+      if (typeof minimumVendorPurchase !== 'number' || minimumVendorPurchase < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Minimum vendor purchase must be a positive number.',
+        });
+      }
+    }
+
+    // Get current values from database or constants
+    const { ADVANCE_PAYMENT_PERCENTAGE, MIN_ORDER_VALUE, MIN_VENDOR_PURCHASE } = require('../utils/constants');
+    const currentParams = await Settings.getSetting('FINANCIAL_PARAMETERS', {
+      userAdvancePaymentPercent: ADVANCE_PAYMENT_PERCENTAGE,
+      minimumUserOrder: MIN_ORDER_VALUE,
+      minimumVendorPurchase: MIN_VENDOR_PURCHASE,
+    });
+
+    // Update only provided values
+    const updatedParams = {
+      userAdvancePaymentPercent: userAdvancePaymentPercent !== undefined ? userAdvancePaymentPercent : currentParams.userAdvancePaymentPercent,
+      minimumUserOrder: minimumUserOrder !== undefined ? minimumUserOrder : currentParams.minimumUserOrder,
+      minimumVendorPurchase: minimumVendorPurchase !== undefined ? minimumVendorPurchase : currentParams.minimumVendorPurchase,
+    };
+
+    // Save to database
+    await Settings.setSetting(
+      'FINANCIAL_PARAMETERS',
+      updatedParams,
+      'Financial parameters: Advance payment %, Minimum order value, Minimum vendor purchase',
+      adminId
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Financial parameters updated successfully.',
+      data: updatedParams,
     });
   } catch (error) {
     next(error);
@@ -3092,6 +4355,290 @@ exports.generateReports = async (req, res, next) => {
         type,
         period,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// OPERATIONS & LOGISTICS CONTROLLERS
+// ============================================================================
+
+/**
+ * @desc    Get logistics settings
+ * @route   GET /api/admin/operations/logistics-settings
+ * @access  Private (Admin)
+ */
+exports.getLogisticsSettings = async (req, res, next) => {
+  try {
+    const { DELIVERY_TIMELINE_HOURS } = require('../utils/constants');
+    
+    // Try to get from database, fallback to constants
+    const logisticsSettings = await Settings.getSetting('LOGISTICS_SETTINGS', {
+      defaultDeliveryTime: DELIVERY_TIMELINE_HOURS === 3 ? '3h' : DELIVERY_TIMELINE_HOURS === 4 ? '4h' : '1d',
+      availableDeliveryOptions: ['3h', '4h', '1d'],
+      enableExpressDelivery: true,
+      enableStandardDelivery: true,
+      enableNextDayDelivery: true,
+      deliveryTimelineHours: DELIVERY_TIMELINE_HOURS,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: logisticsSettings,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update logistics settings
+ * @route   PUT /api/admin/operations/logistics-settings
+ * @access  Private (Admin)
+ */
+exports.updateLogisticsSettings = async (req, res, next) => {
+  try {
+    const { defaultDeliveryTime, availableDeliveryOptions, enableExpressDelivery, enableStandardDelivery, enableNextDayDelivery } = req.body;
+    const adminId = req.admin?.id || req.user?.id;
+
+    // Validation
+    if (defaultDeliveryTime && !['3h', '4h', '1d'].includes(defaultDeliveryTime)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Default delivery time must be one of: 3h, 4h, 1d',
+      });
+    }
+
+    // Get current settings
+    const { DELIVERY_TIMELINE_HOURS } = require('../utils/constants');
+    const currentSettings = await Settings.getSetting('LOGISTICS_SETTINGS', {
+      defaultDeliveryTime: DELIVERY_TIMELINE_HOURS === 3 ? '3h' : DELIVERY_TIMELINE_HOURS === 4 ? '4h' : '1d',
+      availableDeliveryOptions: ['3h', '4h', '1d'],
+      enableExpressDelivery: true,
+      enableStandardDelivery: true,
+      enableNextDayDelivery: true,
+    });
+
+    // Update only provided values
+    const updatedSettings = {
+      defaultDeliveryTime: defaultDeliveryTime !== undefined ? defaultDeliveryTime : currentSettings.defaultDeliveryTime,
+      availableDeliveryOptions: availableDeliveryOptions !== undefined ? availableDeliveryOptions : currentSettings.availableDeliveryOptions,
+      enableExpressDelivery: enableExpressDelivery !== undefined ? enableExpressDelivery : currentSettings.enableExpressDelivery,
+      enableStandardDelivery: enableStandardDelivery !== undefined ? enableStandardDelivery : currentSettings.enableStandardDelivery,
+      enableNextDayDelivery: enableNextDayDelivery !== undefined ? enableNextDayDelivery : currentSettings.enableNextDayDelivery,
+    };
+
+    // Save to database
+    await Settings.setSetting(
+      'LOGISTICS_SETTINGS',
+      updatedSettings,
+      'Logistics settings: Delivery times and options',
+      adminId
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Logistics settings updated successfully',
+      data: updatedSettings,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get all platform notifications
+ * @route   GET /api/admin/operations/notifications
+ * @access  Private (Admin)
+ */
+exports.getNotifications = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 50, targetAudience, isActive, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+
+    // Build query
+    const query = {};
+    if (targetAudience) query.targetAudience = targetAudience;
+    if (isActive !== undefined) query.isActive = isActive === 'true';
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sort
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Get notifications
+    const notifications = await Notification.find(query)
+      .populate('createdBy', 'name email')
+      .populate('updatedBy', 'name email')
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .select('-__v');
+
+    const total = await Notification.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        notifications,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
+          totalItems: total,
+          itemsPerPage: limitNum,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Create platform notification
+ * @route   POST /api/admin/operations/notifications
+ * @access  Private (Admin)
+ */
+exports.createNotification = async (req, res, next) => {
+  try {
+    const { title, message, targetAudience, priority, isActive, actionUrl, actionText, startDate, endDate } = req.body;
+    const adminId = req.admin?.id || req.user?.id;
+
+    // Validation
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Notification title is required',
+      });
+    }
+    if (!message || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Notification message is required',
+      });
+    }
+
+    // Create notification
+    const notification = new Notification({
+      title: title.trim(),
+      message: message.trim(),
+      targetAudience: targetAudience || 'all',
+      priority: priority || 'normal',
+      isActive: isActive !== undefined ? isActive : true,
+      actionUrl,
+      actionText,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      createdBy: adminId,
+    });
+
+    await notification.save();
+
+    // Populate createdBy
+    await notification.populate('createdBy', 'name email');
+
+    res.status(201).json({
+      success: true,
+      message: 'Notification created successfully',
+      data: {
+        notification,
+      },
+    });
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: Object.values(error.errors).map(e => e.message).join(', '),
+      });
+    }
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update platform notification
+ * @route   PUT /api/admin/operations/notifications/:notificationId
+ * @access  Private (Admin)
+ */
+exports.updateNotification = async (req, res, next) => {
+  try {
+    const { notificationId } = req.params;
+    const { title, message, targetAudience, priority, isActive, actionUrl, actionText, startDate, endDate } = req.body;
+    const adminId = req.admin?.id || req.user?.id;
+
+    const notification = await Notification.findById(notificationId);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+      });
+    }
+
+    // Update fields
+    if (title !== undefined) notification.title = title.trim();
+    if (message !== undefined) notification.message = message.trim();
+    if (targetAudience !== undefined) notification.targetAudience = targetAudience;
+    if (priority !== undefined) notification.priority = priority;
+    if (isActive !== undefined) notification.isActive = isActive;
+    if (actionUrl !== undefined) notification.actionUrl = actionUrl;
+    if (actionText !== undefined) notification.actionText = actionText;
+    if (startDate !== undefined) notification.startDate = startDate ? new Date(startDate) : null;
+    if (endDate !== undefined) notification.endDate = endDate ? new Date(endDate) : null;
+    notification.updatedBy = adminId;
+
+    await notification.save();
+
+    // Populate fields
+    await notification.populate('createdBy', 'name email');
+    await notification.populate('updatedBy', 'name email');
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification updated successfully',
+      data: {
+        notification,
+      },
+    });
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: Object.values(error.errors).map(e => e.message).join(', '),
+      });
+    }
+    next(error);
+  }
+};
+
+/**
+ * @desc    Delete platform notification
+ * @route   DELETE /api/admin/operations/notifications/:notificationId
+ * @access  Private (Admin)
+ */
+exports.deleteNotification = async (req, res, next) => {
+  try {
+    const { notificationId } = req.params;
+
+    const notification = await Notification.findById(notificationId);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+      });
+    }
+
+    await Notification.findByIdAndDelete(notificationId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification deleted successfully',
     });
   } catch (error) {
     next(error);

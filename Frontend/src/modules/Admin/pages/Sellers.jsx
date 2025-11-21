@@ -9,6 +9,7 @@ import { SellerDetailModal } from '../components/SellerDetailModal'
 import { WithdrawalRequestModal } from '../components/WithdrawalRequestModal'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
+import { useToast } from '../components/ToastNotification'
 import { sellers as mockSellers } from '../services/adminData'
 import { cn } from '../../../lib/cn'
 
@@ -37,6 +38,7 @@ export function SellersPage() {
     rejectSellerWithdrawal,
     loading,
   } = useAdminApi()
+  const { success, error: showError, warning: showWarning } = useToast()
 
   const [sellersList, setSellersList] = useState([])
   const [withdrawalRequests, setWithdrawalRequests] = useState([])
@@ -136,47 +138,99 @@ export function SellersPage() {
 
   const handleDeleteSeller = async (sellerId) => {
     if (window.confirm('Are you sure you want to delete this seller? This action cannot be undone.')) {
-      const result = await deleteSeller(sellerId)
-      if (result.data) {
-        fetchSellers()
+      try {
+        const result = await deleteSeller(sellerId)
+        if (result.data) {
+          fetchSellers()
+          success('Seller deleted successfully!', 3000)
+        } else if (result.error) {
+          const errorMessage = result.error.message || 'Failed to delete seller'
+          if (errorMessage.includes('active') || errorMessage.includes('cannot')) {
+            showWarning(errorMessage, 6000)
+          } else {
+            showError(errorMessage, 5000)
+          }
+        }
+      } catch (error) {
+        showError(error.message || 'Failed to delete seller', 5000)
       }
     }
   }
 
   const handleFormSubmit = async (formData) => {
-    if (selectedSeller) {
-      // Update existing seller
-      const result = await updateSeller(selectedSeller.id, formData)
-      if (result.data) {
-        setSellerModalOpen(false)
-        setSelectedSeller(null)
-        fetchSellers()
+    try {
+      if (selectedSeller) {
+        // Update existing seller
+        const result = await updateSeller(selectedSeller.id, formData)
+        if (result.data) {
+          setSellerModalOpen(false)
+          setSelectedSeller(null)
+          fetchSellers()
+          success('Seller updated successfully!', 3000)
+        } else if (result.error) {
+          const errorMessage = result.error.message || 'Failed to update seller'
+          if (errorMessage.includes('validation') || errorMessage.includes('required') || errorMessage.includes('duplicate')) {
+            showWarning(errorMessage, 5000)
+          } else {
+            showError(errorMessage, 5000)
+          }
+        }
+      } else {
+        // Create new seller
+        const result = await createSeller(formData)
+        if (result.data) {
+          setSellerModalOpen(false)
+          fetchSellers()
+          success('Seller created successfully!', 3000)
+        } else if (result.error) {
+          const errorMessage = result.error.message || 'Failed to create seller'
+          if (errorMessage.includes('validation') || errorMessage.includes('required') || errorMessage.includes('duplicate')) {
+            showWarning(errorMessage, 5000)
+          } else {
+            showError(errorMessage, 5000)
+          }
+        }
       }
-    } else {
-      // Create new seller
-      const result = await createSeller(formData)
-      if (result.data) {
-        setSellerModalOpen(false)
-        fetchSellers()
-      }
+    } catch (error) {
+      showError(error.message || 'Failed to save seller', 5000)
     }
   }
 
   const handleApproveWithdrawal = async (requestId) => {
-    const result = await approveSellerWithdrawal(requestId)
-    if (result.data) {
-      setWithdrawalModalOpen(false)
-      setSelectedWithdrawalRequest(null)
-      fetchWithdrawalRequests()
+    try {
+      const result = await approveSellerWithdrawal(requestId)
+      if (result.data) {
+        setWithdrawalModalOpen(false)
+        setSelectedWithdrawalRequest(null)
+        fetchWithdrawalRequests()
+        success('Withdrawal request approved successfully!', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to approve withdrawal'
+        if (errorMessage.includes('insufficient') || errorMessage.includes('balance')) {
+          showWarning(errorMessage, 6000)
+        } else {
+          showError(errorMessage, 5000)
+        }
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to approve withdrawal', 5000)
     }
   }
 
   const handleRejectWithdrawal = async (requestId, rejectionData) => {
-    const result = await rejectSellerWithdrawal(requestId, rejectionData)
-    if (result.data) {
-      setWithdrawalModalOpen(false)
-      setSelectedWithdrawalRequest(null)
-      fetchWithdrawalRequests()
+    try {
+      const result = await rejectSellerWithdrawal(requestId, rejectionData)
+      if (result.data) {
+        setWithdrawalModalOpen(false)
+        setSelectedWithdrawalRequest(null)
+        fetchWithdrawalRequests()
+        success('Withdrawal request rejected.', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to reject withdrawal'
+        showError(errorMessage, 5000)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to reject withdrawal', 5000)
     }
   }
 

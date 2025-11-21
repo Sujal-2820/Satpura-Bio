@@ -154,8 +154,15 @@ router.post('/vendors/:vendorId/reject', authorizeAdmin, adminController.rejectV
 router.put('/vendors/:vendorId/credit-policy', authorizeAdmin, adminController.updateVendorCreditPolicy);
 
 /**
+ * @route   GET /api/admin/vendors/purchases
+ * @desc    Get all vendor purchase requests (global, with optional filters)
+ * @access  Private (Admin)
+ */
+router.get('/vendors/purchases', authorizeAdmin, adminController.getAllVendorPurchases);
+
+/**
  * @route   GET /api/admin/vendors/:vendorId/purchases
- * @desc    Get vendor purchase requests
+ * @desc    Get vendor purchase requests (vendor-specific)
  * @access  Private (Admin)
  */
 router.get('/vendors/:vendorId/purchases', authorizeAdmin, adminController.getVendorPurchases);
@@ -175,11 +182,32 @@ router.post('/vendors/purchases/:requestId/approve', authorizeAdmin, adminContro
 router.post('/vendors/purchases/:requestId/reject', authorizeAdmin, adminController.rejectVendorPurchase);
 
 /**
+ * @route   PUT /api/admin/vendors/:vendorId/ban
+ * @desc    Ban vendor (temporary or permanent) - requires >3 escalations
+ * @access  Private (Admin)
+ */
+router.put('/vendors/:vendorId/ban', authorizeAdmin, adminController.banVendor);
+
+/**
+ * @route   PUT /api/admin/vendors/:vendorId/unban
+ * @desc    Revoke temporary ban
+ * @access  Private (Admin)
+ */
+router.put('/vendors/:vendorId/unban', authorizeAdmin, adminController.unbanVendor);
+
+/**
  * @route   GET /api/admin/vendors/:vendorId
  * @desc    Get vendor details
  * @access  Private (Admin)
  */
 router.get('/vendors/:vendorId', authorizeAdmin, adminController.getVendorDetails);
+
+/**
+ * @route   DELETE /api/admin/vendors/:vendorId
+ * @desc    Permanently delete vendor (soft delete - activities persist) - requires >3 escalations
+ * @access  Private (Admin)
+ */
+router.delete('/vendors/:vendorId', authorizeAdmin, adminController.deleteVendor);
 
 // ============================================================================
 // SELLER (IRA PARTNER) MANAGEMENT ROUTES
@@ -204,8 +232,15 @@ router.get('/sellers', authorizeAdmin, adminController.getSellers);
 router.put('/sellers/:sellerId/target', authorizeAdmin, adminController.setSellerTarget);
 
 /**
+ * @route   GET /api/admin/sellers/withdrawals
+ * @desc    Get all seller withdrawal requests (global, with optional filters)
+ * @access  Private (Admin)
+ */
+router.get('/sellers/withdrawals', authorizeAdmin, adminController.getAllSellerWithdrawals);
+
+/**
  * @route   GET /api/admin/sellers/:sellerId/withdrawals
- * @desc    Get seller withdrawal requests
+ * @desc    Get seller withdrawal requests (seller-specific)
  * @access  Private (Admin)
  */
 router.get('/sellers/:sellerId/withdrawals', authorizeAdmin, adminController.getSellerWithdrawals);
@@ -286,6 +321,13 @@ router.get('/users/:userId', authorizeAdmin, adminController.getUserDetails);
 router.get('/orders', authorizeAdmin, adminController.getOrders);
 
 /**
+ * @route   GET /api/admin/orders/escalated
+ * @desc    Get escalated orders (assigned to admin)
+ * @access  Private (Admin)
+ */
+router.get('/orders/escalated', authorizeAdmin, adminController.getEscalatedOrders);
+
+/**
  * IMPORTANT: Specific routes with sub-paths must come BEFORE generic :orderId routes
  */
 
@@ -297,11 +339,25 @@ router.get('/orders', authorizeAdmin, adminController.getOrders);
 router.put('/orders/:orderId/reassign', authorizeAdmin, adminController.reassignOrder);
 
 /**
+ * @route   POST /api/admin/orders/:orderId/fulfill
+ * @desc    Fulfill escalated order from warehouse
+ * @access  Private (Admin)
+ */
+router.post('/orders/:orderId/fulfill', authorizeAdmin, adminController.fulfillOrderFromWarehouse);
+
+/**
  * @route   GET /api/admin/orders/:orderId
  * @desc    Get order details
  * @access  Private (Admin)
  */
 router.get('/orders/:orderId', authorizeAdmin, adminController.getOrderDetails);
+
+/**
+ * @route   GET /api/admin/orders/:orderId/invoice
+ * @desc    Generate and download invoice PDF for order
+ * @access  Private (Admin)
+ */
+router.get('/orders/:orderId/invoice', authorizeAdmin, adminController.generateInvoice);
 
 /**
  * @route   GET /api/admin/payments
@@ -322,11 +378,78 @@ router.get('/payments', authorizeAdmin, adminController.getPayments);
 router.get('/finance/credits', authorizeAdmin, adminController.getCredits);
 
 /**
+ * @route   GET /api/admin/finance/vendors/:vendorId/history
+ * @desc    Get vendor credit history (purchases and repayments)
+ * @access  Private (Admin)
+ */
+router.get('/finance/vendors/:vendorId/history', authorizeAdmin, adminController.getVendorCreditHistory);
+
+/**
+ * @route   GET /api/admin/finance/parameters
+ * @desc    Get financial parameters (advance payment %, min order, min vendor purchase)
+ * @access  Private (Admin)
+ */
+router.get('/finance/parameters', authorizeAdmin, adminController.getFinancialParameters);
+
+/**
+ * @route   PUT /api/admin/finance/parameters
+ * @desc    Update financial parameters (currently read-only, returns 501)
+ * @access  Private (Admin)
+ */
+router.put('/finance/parameters', authorizeAdmin, adminController.updateFinancialParameters);
+
+/**
  * @route   GET /api/admin/finance/recovery
  * @desc    Get credit recovery status
  * @access  Private (Admin)
  */
 router.get('/finance/recovery', authorizeAdmin, adminController.getRecoveryStatus);
+
+// ============================================================================
+// OPERATIONS & LOGISTICS ROUTES
+// ============================================================================
+
+/**
+ * @route   GET /api/admin/operations/logistics-settings
+ * @desc    Get logistics settings
+ * @access  Private (Admin)
+ */
+router.get('/operations/logistics-settings', authorizeAdmin, adminController.getLogisticsSettings);
+
+/**
+ * @route   PUT /api/admin/operations/logistics-settings
+ * @desc    Update logistics settings
+ * @access  Private (Admin)
+ */
+router.put('/operations/logistics-settings', authorizeAdmin, adminController.updateLogisticsSettings);
+
+/**
+ * @route   GET /api/admin/operations/notifications
+ * @desc    Get all platform notifications
+ * @access  Private (Admin)
+ */
+router.get('/operations/notifications', authorizeAdmin, adminController.getNotifications);
+
+/**
+ * @route   POST /api/admin/operations/notifications
+ * @desc    Create new platform notification
+ * @access  Private (Admin)
+ */
+router.post('/operations/notifications', authorizeAdmin, adminController.createNotification);
+
+/**
+ * @route   PUT /api/admin/operations/notifications/:notificationId
+ * @desc    Update platform notification
+ * @access  Private (Admin)
+ */
+router.put('/operations/notifications/:notificationId', authorizeAdmin, adminController.updateNotification);
+
+/**
+ * @route   DELETE /api/admin/operations/notifications/:notificationId
+ * @desc    Delete platform notification
+ * @access  Private (Admin)
+ */
+router.delete('/operations/notifications/:notificationId', authorizeAdmin, adminController.deleteNotification);
 
 // ============================================================================
 // ANALYTICS & REPORTING ROUTES

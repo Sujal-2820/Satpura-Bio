@@ -17,7 +17,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 async function handleResponse(response) {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'An error occurred' }))
-    throw new Error(error.message || `HTTP error! status: ${response.status}`)
+    // Ensure error response always has a 'success: false' and 'error' object
+    throw { success: false, error: { message: error.message || `HTTP error! status: ${response.status}` } }
   }
   return response.json()
 }
@@ -53,23 +54,10 @@ async function apiRequest(endpoint, options = {}) {
  * @returns {Promise<Object>} - { message: 'OTP sent successfully', expiresIn: 300 }
  */
 export async function requestOTP(data) {
-  // Mock implementation for testing - accepts any data
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          message: 'OTP sent successfully',
-          expiresIn: 300,
-        },
-      })
-    }, 1000)
+  return apiRequest('/users/auth/request-otp', {
+    method: 'POST',
+    body: JSON.stringify(data),
   })
-  // Uncomment when backend is ready:
-  // return apiRequest('/users/auth/request-otp', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  // })
 }
 
 /**
@@ -80,28 +68,10 @@ export async function requestOTP(data) {
  * @returns {Promise<Object>} - { token, user: { id, name, phone, sellerId } }
  */
 export async function register(data) {
-  // Mock implementation for testing - accepts any data
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          token: 'mock_token_' + Date.now(),
-          user: {
-            id: 'user_' + Date.now(),
-            name: data.fullName,
-            phone: data.phone,
-            sellerId: data.sellerId || null,
-          },
-        },
-      })
-    }, 1000)
+  return apiRequest('/users/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(data),
   })
-  // Uncomment when backend is ready:
-  // return apiRequest('/users/auth/register', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  // })
 }
 
 /**
@@ -112,28 +82,10 @@ export async function register(data) {
  * @returns {Promise<Object>} - { token, user: { id, name, phone, sellerId, location } }
  */
 export async function loginWithOtp(data) {
-  // Mock implementation for testing - accepts any data
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          token: 'mock_token_' + Date.now(),
-          user: {
-            id: 'user_' + Date.now(),
-            name: 'User',
-            phone: data.phone,
-            sellerId: null,
-          },
-        },
-      })
-    }, 1000)
+  return apiRequest('/users/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(data),
   })
-  // Uncomment when backend is ready:
-  // return apiRequest('/users/auth/login', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  // })
 }
 
 /**
@@ -144,21 +96,21 @@ export async function loginWithOtp(data) {
  * @returns {Promise<Object>} - { token, user: { id, name, phone, email, sellerId, location } }
  */
 export async function verifyOTP(data) {
-  return loginWithOtp(data)
+  return apiRequest('/users/auth/verify-otp', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }
 
 /**
- * Update Seller ID
- * PUT /users/profile/seller-id
+ * Get Seller ID (Read-only - Seller ID is locked for lifetime after first registration)
+ * GET /users/profile/seller-id
  * 
- * @param {Object} data - { sellerId }
- * @returns {Promise<Object>} - Updated user profile
+ * @returns {Promise<Object>} - Seller ID information
+ * @note Seller ID can only be set during first-time registration and cannot be changed afterwards
  */
-export async function updateSellerID(data) {
-  return apiRequest('/users/profile/seller-id', {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  })
+export async function getSellerID() {
+  return apiRequest('/users/profile/seller-id')
 }
 
 /**

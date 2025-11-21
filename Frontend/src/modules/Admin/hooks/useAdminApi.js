@@ -207,6 +207,42 @@ export function useAdminApi() {
 
   const getVendorPurchaseRequests = useCallback((params) => callApi(adminApi.getVendorPurchaseRequests, params), [callApi])
 
+  const banVendor = useCallback(
+    (vendorId, banData) => {
+      return callApi(adminApi.banVendor, vendorId, banData).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_VENDORS_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const unbanVendor = useCallback(
+    (vendorId, unbanData) => {
+      return callApi(adminApi.unbanVendor, vendorId, unbanData).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_VENDORS_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const deleteVendor = useCallback(
+    (vendorId, deleteData) => {
+      return callApi(adminApi.deleteVendor, vendorId, deleteData).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_VENDORS_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
   // Seller Management APIs
   const getSellers = useCallback(
     (params) => {
@@ -543,6 +579,9 @@ export function useAdminApi() {
     approveVendorPurchase,
     rejectVendorPurchase,
     getVendorPurchaseRequests,
+    banVendor,
+    unbanVendor,
+    deleteVendor,
     // Sellers
     getSellers,
     getSellerDetails,

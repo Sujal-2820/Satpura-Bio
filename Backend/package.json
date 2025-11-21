@@ -12,6 +12,13 @@
     "seed-test-data": "node scripts/seedTestData.js",
     "seed-orders": "node scripts/seedOrdersAndPayments.js",
     "seed-all": "node scripts/seedAll.js",
+    "ensure-admin-data": "node scripts/ensureAdminData.js",
+    "ensure-seller-data": "node scripts/ensureSellerData.js",
+    "verify-admin-data": "node scripts/verifyAdminData.js",
+    "verify-seller-data": "node scripts/verifySellerData.js",
+    "ensure-vendor-data": "node scripts/ensureVendorData.js",
+    "test-seller-e2e": "node scripts/testSellerDashboardE2E.js",
+    "test-vendor-e2e": "node scripts/testVendorDashboardE2E.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test-endpoints": "node scripts/testAllEndpoints.js"
   },

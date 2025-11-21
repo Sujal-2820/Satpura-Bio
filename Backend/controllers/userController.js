@@ -13,10 +13,11 @@ const Vendor = require('../models/Vendor');
 const Seller = require('../models/Seller');
 const ProductAssignment = require('../models/ProductAssignment');
 const Payment = require('../models/Payment');
+const Commission = require('../models/Commission');
 
 const { generateOTP, sendOTP } = require('../config/sms');
 const { generateToken } = require('../middleware/auth');
-const { OTP_EXPIRY_MINUTES, MIN_ORDER_VALUE, ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE, DELIVERY_CHARGE, VENDOR_COVERAGE_RADIUS_KM, ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS } = require('../utils/constants');
+const { OTP_EXPIRY_MINUTES, MIN_ORDER_VALUE, ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE, DELIVERY_CHARGE, VENDOR_COVERAGE_RADIUS_KM, ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS, IRA_PARTNER_COMMISSION_THRESHOLD, IRA_PARTNER_COMMISSION_RATE_LOW, IRA_PARTNER_COMMISSION_RATE_HIGH } = require('../utils/constants');
 
 /**
  * @desc    Request OTP for user
@@ -1663,6 +1664,24 @@ exports.cancelOrder = async (req, res, next) => {
       });
     }
 
+    // Restore stock if payment was made (stock was already reduced)
+    const payments = await Payment.find({ orderId: order._id, status: { $in: [PAYMENT_STATUS.PARTIAL_PAID, PAYMENT_STATUS.FULLY_PAID] } });
+    const wasPaid = payments.length > 0;
+    
+    if (wasPaid) {
+      // Restore stock for all items
+      for (const item of order.items) {
+        const product = await Product.findById(item.productId);
+        if (product) {
+          product.stock = (product.stock || 0) + item.quantity;
+          await product.save();
+          console.log(`📦 Stock restored for product ${product.name}: ${item.quantity} units. New stock: ${product.stock}`);
+        }
+      }
+      console.log(`⚠️ Refund required for order ${order.orderNumber}. Payments: ${payments.length}`);
+      // TODO: Implement refund logic when payment gateway is integrated
+    }
+
     // Update order status
     order.status = ORDER_STATUS.CANCELLED;
     order.cancelledAt = new Date();
@@ -1678,16 +1697,6 @@ exports.cancelOrder = async (req, res, next) => {
     });
 
     await order.save();
-
-    // TODO: Process refund if payment was made
-    // Check if any payments were made and need refund
-    const payments = await Payment.find({ orderId: order._id, status: { $in: [PAYMENT_STATUS.PARTIAL_PAID, PAYMENT_STATUS.FULLY_PAID] } });
-    
-    // For now, just log that refund is needed
-    if (payments.length > 0) {
-      console.log(`⚠️ Refund required for order ${order.orderNumber}. Payments: ${payments.length}`);
-      // TODO: Implement refund logic when payment gateway is integrated
-    }
 
     res.status(200).json({
       success: true,
@@ -1831,7 +1840,87 @@ exports.confirmPayment = async (req, res, next) => {
     } else {
       order.paymentStatus = PAYMENT_STATUS.PARTIAL_PAID;
     }
+    
+    // Reduce stock for all items in the order
+    for (const item of order.items) {
+      const product = await Product.findById(item.productId);
+      if (product) {
+        if (product.stock < item.quantity) {
+          // If stock is insufficient, log warning but don't fail (order already created)
+          console.warn(`⚠️ Insufficient stock for product ${product.name}. Required: ${item.quantity}, Available: ${product.stock}`);
+        }
+        product.stock = Math.max(0, product.stock - item.quantity);
+        await product.save();
+        console.log(`📦 Stock reduced for product ${product.name}: ${item.quantity} units. Remaining: ${product.stock}`);
+      }
+    }
+    
     await order.save();
+
+    // Create commission for seller (IRA Partner) if order is fully paid and has seller
+    if (order.paymentStatus === PAYMENT_STATUS.FULLY_PAID && order.seller && order.sellerId) {
+      try {
+        const seller = await Seller.findById(order.seller);
+        if (seller) {
+          const now = new Date();
+          const month = now.getMonth() + 1;
+          const year = now.getFullYear();
+
+          // Calculate user's cumulative purchases for this month (excluding this order)
+          const userOrdersThisMonth = await Order.find({
+            userId: order.userId,
+            sellerId: order.sellerId,
+            paymentStatus: PAYMENT_STATUS.FULLY_PAID,
+            _id: { $ne: order._id },
+            createdAt: {
+              $gte: new Date(year, month - 1, 1),
+              $lt: new Date(year, month, 1),
+            },
+          });
+
+          const cumulativePurchaseAmount = userOrdersThisMonth.reduce((sum, o) => sum + o.totalAmount, 0);
+          const newCumulativePurchaseAmount = cumulativePurchaseAmount + order.totalAmount;
+
+          // Determine commission rate based on monthly purchases
+          const commissionRate = newCumulativePurchaseAmount <= IRA_PARTNER_COMMISSION_THRESHOLD
+            ? IRA_PARTNER_COMMISSION_RATE_LOW
+            : IRA_PARTNER_COMMISSION_RATE_HIGH;
+
+          // Calculate commission amount
+          const commissionAmount = (order.totalAmount * commissionRate) / 100;
+
+          // Create commission record
+          const commission = new Commission({
+            sellerId: seller._id,
+            sellerIdCode: seller.sellerId,
+            userId: order.userId,
+            orderId: order._id,
+            month,
+            year,
+            orderAmount: order.totalAmount,
+            cumulativePurchaseAmount,
+            newCumulativePurchaseAmount,
+            commissionRate,
+            commissionAmount: Math.round(commissionAmount * 100) / 100,
+            status: 'credited',
+            creditedAt: new Date(),
+            notes: `Commission for order ${order.orderNumber}`,
+          });
+
+          await commission.save();
+
+          // Update seller wallet
+          seller.walletBalance = (seller.walletBalance || 0) + commissionAmount;
+          seller.totalEarnings = (seller.totalEarnings || 0) + commissionAmount;
+          await seller.save();
+
+          console.log(`💰 Commission credited: ₹${commissionAmount} to seller ${seller.sellerId} for order ${order.orderNumber}`);
+        }
+      } catch (commissionError) {
+        console.error('Error creating commission:', commissionError);
+        // Don't fail the payment confirmation if commission creation fails
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -1992,6 +2081,71 @@ exports.confirmRemainingPayment = async (req, res, next) => {
     // Update order payment status
     order.paymentStatus = PAYMENT_STATUS.FULLY_PAID;
     await order.save();
+
+    // Create commission for seller (IRA Partner) if order has seller
+    if (order.seller && order.sellerId) {
+      try {
+        const seller = await Seller.findById(order.seller);
+        if (seller) {
+          const now = new Date();
+          const month = now.getMonth() + 1;
+          const year = now.getFullYear();
+
+          // Calculate user's cumulative purchases for this month (excluding this order)
+          const userOrdersThisMonth = await Order.find({
+            userId: order.userId,
+            sellerId: order.sellerId,
+            paymentStatus: PAYMENT_STATUS.FULLY_PAID,
+            _id: { $ne: order._id },
+            createdAt: {
+              $gte: new Date(year, month - 1, 1),
+              $lt: new Date(year, month, 1),
+            },
+          });
+
+          const cumulativePurchaseAmount = userOrdersThisMonth.reduce((sum, o) => sum + o.totalAmount, 0);
+          const newCumulativePurchaseAmount = cumulativePurchaseAmount + order.totalAmount;
+
+          // Determine commission rate based on monthly purchases
+          const commissionRate = newCumulativePurchaseAmount <= IRA_PARTNER_COMMISSION_THRESHOLD
+            ? IRA_PARTNER_COMMISSION_RATE_LOW
+            : IRA_PARTNER_COMMISSION_RATE_HIGH;
+
+          // Calculate commission amount
+          const commissionAmount = (order.totalAmount * commissionRate) / 100;
+
+          // Create commission record
+          const commission = new Commission({
+            sellerId: seller._id,
+            sellerIdCode: seller.sellerId,
+            userId: order.userId,
+            orderId: order._id,
+            month,
+            year,
+            orderAmount: order.totalAmount,
+            cumulativePurchaseAmount,
+            newCumulativePurchaseAmount,
+            commissionRate,
+            commissionAmount: Math.round(commissionAmount * 100) / 100,
+            status: 'credited',
+            creditedAt: new Date(),
+            notes: `Commission for order ${order.orderNumber}`,
+          });
+
+          await commission.save();
+
+          // Update seller wallet
+          seller.walletBalance = (seller.walletBalance || 0) + commissionAmount;
+          seller.totalEarnings = (seller.totalEarnings || 0) + commissionAmount;
+          await seller.save();
+
+          console.log(`💰 Commission credited: ₹${commissionAmount} to seller ${seller.sellerId} for order ${order.orderNumber}`);
+        }
+      } catch (commissionError) {
+        console.error('Error creating commission:', commissionError);
+        // Don't fail the payment confirmation if commission creation fails
+      }
+    }
 
     res.status(200).json({
       success: true,

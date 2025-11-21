@@ -11,6 +11,7 @@ import { RecoveryStatusView } from '../components/RecoveryStatusView'
 import { DataTable } from '../components/DataTable'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
+import { useToast } from '../components/ToastNotification'
 import { finance as mockFinance } from '../services/adminData'
 
 const vendorColumns = [
@@ -35,6 +36,7 @@ export function FinancePage() {
     getVendors,
     loading,
   } = useAdminApi()
+  const { success, error: showError, warning: showWarning } = useToast()
 
   const [vendorCredits, setVendorCredits] = useState([])
   const [financialParameters, setFinancialParameters] = useState(null)
@@ -101,22 +103,46 @@ export function FinancePage() {
   }
 
   const handleSaveParameters = async (params) => {
-    const result = await updateFinancialParameters(params)
-    if (result.data) {
-      setParametersModalOpen(false)
-      fetchData()
+    try {
+      const result = await updateFinancialParameters(params)
+      if (result.data) {
+        setParametersModalOpen(false)
+        fetchData()
+        success('Financial parameters updated successfully!', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to update financial parameters'
+        if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
+          showWarning(errorMessage, 5000)
+        } else {
+          showError(errorMessage, 5000)
+        }
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to update financial parameters', 5000)
     }
   }
 
   const handleApplyPenalty = async (vendorId) => {
     const confirmed = window.confirm('Are you sure you want to apply penalty for this vendor?')
     if (confirmed) {
-      const result = await applyPenalty(vendorId)
-      if (result.data) {
-        fetchData()
-        setCreditBalanceModalOpen(false)
-        setSelectedVendorForCredit(null)
-        setSelectedVendorCreditData(null)
+      try {
+        const result = await applyPenalty(vendorId)
+        if (result.data) {
+          fetchData()
+          setCreditBalanceModalOpen(false)
+          setSelectedVendorForCredit(null)
+          setSelectedVendorCreditData(null)
+          success('Penalty applied successfully!', 3000)
+        } else if (result.error) {
+          const errorMessage = result.error.message || 'Failed to apply penalty'
+          if (errorMessage.includes('not eligible') || errorMessage.includes('cannot')) {
+            showWarning(errorMessage, 6000)
+          } else {
+            showError(errorMessage, 5000)
+          }
+        }
+      } catch (error) {
+        showError(error.message || 'Failed to apply penalty', 5000)
       }
     }
   }

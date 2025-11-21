@@ -7,6 +7,7 @@ import { Modal } from '../components/Modal'
 import { ProductForm } from '../components/ProductForm'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
+import { useToast } from '../components/ToastNotification'
 import { productInventory } from '../services/adminData'
 import { cn } from '../../../lib/cn'
 
@@ -24,6 +25,7 @@ const columns = [
 export function ProductsPage() {
   const { products } = useAdminState()
   const { getProducts, createProduct, updateProduct, deleteProduct, toggleProductVisibility, loading } = useAdminApi()
+  const { success, error: showError, warning: showWarning } = useToast()
   
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -103,39 +105,80 @@ export function ProductsPage() {
 
   const handleDeleteProduct = async (productId) => {
     if (window.confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
-      const result = await deleteProduct(productId)
-      if (result.data) {
-        fetchProducts()
+      try {
+        const result = await deleteProduct(productId)
+        if (result.data) {
+          fetchProducts()
+          success('Product deleted successfully!')
+        } else if (result.error) {
+          const errorMessage = result.error.message || 'Failed to delete product'
+          // Check if it's a warning (product has active assignments)
+          if (errorMessage.includes('active vendor assignment')) {
+            showWarning(errorMessage, 6000)
+          } else {
+            showError(errorMessage, 5000)
+          }
+        }
+      } catch (error) {
+        showError(error.message || 'Failed to delete product', 5000)
       }
     }
   }
 
   const handleToggleVisibility = async (product) => {
-    const currentVisibility = product.visibility === 'Active' || product.visibility === 'active' ? 'active' : 'inactive'
-    const newVisibility = currentVisibility === 'active' ? 'inactive' : 'active'
-    
-    const result = await toggleProductVisibility(product.id, { visibility: newVisibility })
-    if (result.data) {
-      fetchProducts()
+    try {
+      const currentVisibility = product.visibility === 'Active' || product.visibility === 'active' ? 'active' : 'inactive'
+      const newVisibility = currentVisibility === 'active' ? 'inactive' : 'active'
+      
+      const result = await toggleProductVisibility(product.id, { visibility: newVisibility })
+      if (result.data) {
+        fetchProducts()
+        success(`Product visibility set to ${newVisibility === 'active' ? 'Active' : 'Inactive'}!`, 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to update product visibility'
+        showError(errorMessage, 5000)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to update product visibility', 5000)
     }
   }
 
   const handleFormSubmit = async (formData) => {
-    if (selectedProduct) {
-      // Update existing product
-      const result = await updateProduct(selectedProduct.id, formData)
-      if (result.data) {
-        setIsModalOpen(false)
-        setSelectedProduct(null)
-        fetchProducts()
+    try {
+      if (selectedProduct) {
+        // Update existing product
+        const result = await updateProduct(selectedProduct.id, formData)
+        if (result.data) {
+          setIsModalOpen(false)
+          setSelectedProduct(null)
+          fetchProducts()
+          success('Product updated successfully!', 3000)
+        } else if (result.error) {
+          const errorMessage = result.error.message || 'Failed to update product'
+          if (errorMessage.includes('validation') || errorMessage.includes('required')) {
+            showWarning(errorMessage, 5000)
+          } else {
+            showError(errorMessage, 5000)
+          }
+        }
+      } else {
+        // Create new product
+        const result = await createProduct(formData)
+        if (result.data) {
+          setIsModalOpen(false)
+          fetchProducts()
+          success('Product created successfully!', 3000)
+        } else if (result.error) {
+          const errorMessage = result.error.message || 'Failed to create product'
+          if (errorMessage.includes('validation') || errorMessage.includes('required') || errorMessage.includes('duplicate')) {
+            showWarning(errorMessage, 5000)
+          } else {
+            showError(errorMessage, 5000)
+          }
+        }
       }
-    } else {
-      // Create new product
-      const result = await createProduct(formData)
-      if (result.data) {
-        setIsModalOpen(false)
-        fetchProducts()
-      }
+    } catch (error) {
+      showError(error.message || 'Failed to save product', 5000)
     }
   }
 

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { AdminProvider } from '../context/AdminContext'
+import { ToastProvider } from '../components/ToastNotification'
 import { AdminLayout } from '../components/AdminLayout'
 import { Sidebar } from '../components/Sidebar'
 import { DashboardPage } from '../pages/Dashboard'
@@ -34,12 +35,14 @@ export function AdminDashboardRoute({ onExit }) {
 
   return (
     <AdminProvider>
-      <AdminLayout
-        sidebar={(props) => <Sidebar active={activeRoute} onNavigate={setActiveRoute} {...props} />}
-        onExit={onExit}
-      >
-        <ActivePage />
-      </AdminLayout>
+      <ToastProvider>
+        <AdminLayout
+          sidebar={(props) => <Sidebar active={activeRoute} onNavigate={setActiveRoute} {...props} />}
+          onExit={onExit}
+        >
+          <ActivePage />
+        </AdminLayout>
+      </ToastProvider>
     </AdminProvider>
   )
 }

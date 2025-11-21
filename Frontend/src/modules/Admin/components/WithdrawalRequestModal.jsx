@@ -6,14 +6,35 @@ import { cn } from '../../../lib/cn'
 export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, onReject, loading }) {
   if (!request) return null
 
+  // Extract request ID safely - handle both object and string ID
+  const getRequestId = () => {
+    if (typeof request.id === 'string') {
+      return request.id
+    }
+    if (request._id) {
+      return typeof request._id === 'string' ? request._id : String(request._id)
+    }
+    if (request.requestId) {
+      return typeof request.requestId === 'string' ? request.requestId : String(request.requestId)
+    }
+    if (request.id && typeof request.id === 'object' && request.id._id) {
+      return String(request.id._id)
+    }
+    return null
+  }
+
+  const requestId = getRequestId()
+
   const handleApprove = () => {
-    onApprove(request.id)
+    if (requestId) {
+      onApprove(requestId)
+    }
   }
 
   const handleReject = () => {
     const reason = window.prompt('Please provide a reason for rejection:')
-    if (reason) {
-      onReject(request.id, { reason })
+    if (reason && requestId) {
+      onReject(requestId, { reason })
     }
   }
 
@@ -27,6 +48,48 @@ export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, on
     return `₹${value.toLocaleString('en-IN')}`
   }
 
+  // Extract seller ID safely - handle both populated object and string ID
+  const getSellerId = () => {
+    if (typeof request.sellerId === 'string') {
+      return request.sellerId
+    }
+    if (request.sellerId && typeof request.sellerId === 'object') {
+      return request.sellerId.sellerId || request.sellerId._id || request.sellerId.id
+    }
+    if (request.seller && typeof request.seller === 'object') {
+      return request.seller.sellerId || request.seller._id || request.seller.id
+    }
+    return null
+  }
+
+  // Extract seller name safely - handle both populated object and direct name
+  const getSellerName = () => {
+    if (request.sellerName) {
+      return request.sellerName
+    }
+    if (request.sellerId && typeof request.sellerId === 'object') {
+      return request.sellerId.name
+    }
+    if (request.seller && typeof request.seller === 'object') {
+      return request.seller.name
+    }
+    return 'Unknown IRA Partner'
+  }
+
+  // Extract seller wallet safely
+  const getSellerWallet = () => {
+    if (request.sellerId && typeof request.sellerId === 'object' && request.sellerId.wallet) {
+      return request.sellerId.wallet
+    }
+    if (request.seller && typeof request.seller === 'object' && request.seller.wallet) {
+      return request.seller.wallet
+    }
+    return null
+  }
+
+  const sellerId = getSellerId()
+  const sellerName = getSellerName()
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="IRA Partner Withdrawal Request Review" size="md">
       <div className="space-y-6">
@@ -38,18 +101,24 @@ export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, on
                 <Wallet className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Request #{request.id || request.requestId}</h3>
+                <h3 className="text-lg font-bold text-gray-900">Request #{requestId || 'N/A'}</h3>
                 <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
                   <User className="h-4 w-4" />
-                  <span>{request.sellerName || request.seller?.name || 'Unknown IRA Partner'}</span>
+                  <span>{sellerName}</span>
                 </div>
-                {request.sellerId && (
-                  <p className="mt-1 text-xs text-gray-500">IRA Partner ID: {request.sellerId || request.seller?.sellerId}</p>
+                {sellerId && (
+                  <p className="mt-1 text-xs text-gray-500">IRA Partner ID: {sellerId}</p>
                 )}
-                {request.date && (
+                {(request.date || request.createdAt) && (
                   <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
                     <Calendar className="h-3.5 w-3.5" />
-                    <span>{request.date}</span>
+                    <span>
+                      {request.date 
+                        ? (typeof request.date === 'string' ? request.date : new Date(request.date).toLocaleDateString('en-IN'))
+                        : request.createdAt 
+                        ? (typeof request.createdAt === 'string' ? request.createdAt : new Date(request.createdAt).toLocaleDateString('en-IN'))
+                        : ''}
+                    </span>
                   </div>
                 )}
               </div>

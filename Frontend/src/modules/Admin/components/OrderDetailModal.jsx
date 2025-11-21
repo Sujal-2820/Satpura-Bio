@@ -17,6 +17,81 @@ export function OrderDetailModal({ isOpen, onClose, order, onReassign, onGenerat
     return `₹${value.toLocaleString('en-IN')}`
   }
 
+  // Extract vendor name safely - handle both populated object and string
+  const getVendorName = () => {
+    if (typeof order.vendor === 'string') {
+      return order.vendor
+    }
+    if (order.vendorId && typeof order.vendorId === 'object') {
+      return order.vendorId.name || 'Unknown Vendor'
+    }
+    if (order.vendor && typeof order.vendor === 'object') {
+      return order.vendor.name || 'Unknown Vendor'
+    }
+    return 'Unknown Vendor'
+  }
+
+  // Extract vendor ID safely - handle both populated object and string ID
+  const getVendorId = () => {
+    if (typeof order.vendorId === 'string') {
+      return order.vendorId
+    }
+    if (order.vendorId && typeof order.vendorId === 'object') {
+      return order.vendorId._id || order.vendorId.id || null
+    }
+    if (order.vendor && typeof order.vendor === 'object') {
+      return order.vendor._id || order.vendor.id || null
+    }
+    return null
+  }
+
+  // Extract user name safely - handle both populated object and string
+  const getUserName = () => {
+    if (typeof order.user === 'string') {
+      return order.user
+    }
+    if (order.userId && typeof order.userId === 'object') {
+      return order.userId.name || 'Unknown User'
+    }
+    if (order.user && typeof order.user === 'object') {
+      return order.user.name || 'Unknown User'
+    }
+    return null
+  }
+
+  // Extract order ID safely
+  const getOrderId = () => {
+    if (typeof order.id === 'string') {
+      return order.id
+    }
+    if (order._id) {
+      return typeof order._id === 'string' ? order._id : String(order._id)
+    }
+    if (order.orderId) {
+      return typeof order.orderId === 'string' ? order.orderId : String(order.orderId)
+    }
+    if (order.id && typeof order.id === 'object' && order.id._id) {
+      return String(order.id._id)
+    }
+    return 'N/A'
+  }
+
+  // Format date safely
+  const formatDate = (dateValue) => {
+    if (!dateValue) return null
+    if (typeof dateValue === 'string') {
+      return dateValue
+    }
+    if (dateValue instanceof Date) {
+      return dateValue.toLocaleDateString('en-IN')
+    }
+    try {
+      return new Date(dateValue).toLocaleDateString('en-IN')
+    } catch {
+      return String(dateValue)
+    }
+  }
+
   const orderValue = typeof order.value === 'number' 
     ? order.value 
     : parseFloat(order.value?.replace(/[₹,\sL]/g, '') || '0') * 100000
@@ -31,8 +106,13 @@ export function OrderDetailModal({ isOpen, onClose, order, onReassign, onGenerat
 
   const advanceStatus = order.advanceStatus || (order.advance === 'Paid' ? 'paid' : 'pending')
 
+  const vendorName = getVendorName()
+  const vendorId = getVendorId()
+  const userName = getUserName()
+  const orderId = getOrderId()
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Order Details - ${order.id}`} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Order Details - ${orderId}`} size="xl">
       <div className="space-y-6">
         {/* Order Header */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -42,19 +122,24 @@ export function OrderDetailModal({ isOpen, onClose, order, onReassign, onGenerat
                 <Package className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Order #{order.id}</h3>
+                <h3 className="text-lg font-bold text-gray-900">Order #{orderId}</h3>
                 <p className="text-sm text-gray-600">Type: {order.type || 'Unknown'}</p>
                 <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
-                  {order.date && (
+                  {(order.date || order.createdAt) && (
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3.5 w-3.5" />
-                      <span>{order.date}</span>
+                      <span>{formatDate(order.date || order.createdAt)}</span>
                     </div>
                   )}
                   {order.region && (
                     <span>{order.region}</span>
                   )}
                 </div>
+                {userName && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    User: {userName}
+                  </div>
+                )}
               </div>
             </div>
             <StatusBadge tone={order.status === 'Processing' || order.status === 'processing' ? 'warning' : order.status === 'Completed' || order.status === 'completed' ? 'success' : 'neutral'}>
@@ -64,12 +149,12 @@ export function OrderDetailModal({ isOpen, onClose, order, onReassign, onGenerat
         </div>
 
         {/* Vendor Information */}
-        {order.vendor && (
+        {(vendorName || vendorId) && (
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
             <p className="text-xs text-gray-500 mb-1">Vendor</p>
-            <p className="text-sm font-bold text-gray-900">{order.vendor}</p>
-            {order.vendorId && (
-              <p className="text-xs text-gray-600 mt-1">Vendor ID: {order.vendorId}</p>
+            <p className="text-sm font-bold text-gray-900">{vendorName}</p>
+            {vendorId && (
+              <p className="text-xs text-gray-600 mt-1">Vendor ID: {vendorId}</p>
             )}
           </div>
         )}
@@ -110,15 +195,44 @@ export function OrderDetailModal({ isOpen, onClose, order, onReassign, onGenerat
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <h4 className="mb-4 text-sm font-bold text-gray-900">Order Items</h4>
             <div className="space-y-3">
-              {order.items.map((item, index) => (
-                <div key={item.id || index} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{item.name || item.product}</p>
-                    <p className="text-xs text-gray-600">Quantity: {item.quantity || 1} {item.unit || 'units'}</p>
+              {order.items.map((item, index) => {
+                // Extract product name safely - handle both populated object and string
+                const getProductName = () => {
+                  if (item.name) {
+                    return typeof item.name === 'string' ? item.name : String(item.name)
+                  }
+                  if (item.productId && typeof item.productId === 'object') {
+                    return item.productId.name || 'Unknown Product'
+                  }
+                  if (item.product) {
+                    return typeof item.product === 'string' ? item.product : String(item.product)
+                  }
+                  return 'Unknown Product'
+                }
+
+                // Extract product price safely
+                const getProductPrice = () => {
+                  if (item.price) return item.price
+                  if (item.amount) return item.amount
+                  if (item.productId && typeof item.productId === 'object' && item.productId.priceToUser) {
+                    return item.productId.priceToUser
+                  }
+                  return 0
+                }
+
+                const productName = getProductName()
+                const productPrice = getProductPrice()
+
+                return (
+                  <div key={item.id || item._id || index} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">{productName}</p>
+                      <p className="text-xs text-gray-600">Quantity: {item.quantity || 1} {item.unit || 'units'}</p>
+                    </div>
+                    <p className="text-sm font-bold text-gray-900">{formatCurrency(productPrice)}</p>
                   </div>
-                  <p className="text-sm font-bold text-gray-900">{formatCurrency(item.price || item.amount || 0)}</p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -203,7 +317,7 @@ export function OrderDetailModal({ isOpen, onClose, order, onReassign, onGenerat
             {onProcessRefund && order.refunds && order.refunds.some(r => r.status !== 'processed') && (
               <button
                 type="button"
-                onClick={() => onProcessRefund(order.id)}
+                onClick={() => onProcessRefund(orderId)}
                 disabled={loading}
                 className="flex items-center gap-2 rounded-xl border border-orange-300 bg-white px-6 py-3 text-sm font-bold text-orange-600 transition-all hover:bg-orange-50 disabled:opacity-50"
               >
@@ -214,7 +328,7 @@ export function OrderDetailModal({ isOpen, onClose, order, onReassign, onGenerat
             {onGenerateInvoice && (
               <button
                 type="button"
-                onClick={() => onGenerateInvoice(order.id)}
+                onClick={() => onGenerateInvoice(orderId)}
                 disabled={loading}
                 className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
               >

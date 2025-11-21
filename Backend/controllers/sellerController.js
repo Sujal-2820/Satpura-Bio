@@ -294,6 +294,92 @@ exports.getProfile = async (req, res, next) => {
 };
 
 /**
+ * @desc    Update seller profile
+ * @route   PUT /api/sellers/profile
+ * @access  Private (Seller)
+ */
+exports.updateProfile = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const { name, phone, email, area, location } = req.body;
+
+    // Update allowed fields
+    if (name !== undefined) seller.name = name;
+    if (phone !== undefined) {
+      // Check if phone is already taken by another seller
+      const existingSeller = await Seller.findOne({ phone, _id: { $ne: seller._id } });
+      if (existingSeller) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number already in use by another seller',
+        });
+      }
+      seller.phone = phone;
+    }
+    if (email !== undefined) seller.email = email;
+    if (area !== undefined) seller.area = area;
+    if (location !== undefined) seller.location = location;
+
+    await seller.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        seller: {
+          id: seller._id,
+          sellerId: seller.sellerId,
+          name: seller.name,
+          phone: seller.phone,
+          email: seller.email,
+          area: seller.area,
+          location: seller.location,
+        },
+        message: 'Profile updated successfully',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Change seller password
+ * @route   PUT /api/sellers/password
+ * @access  Private (Seller)
+ */
+exports.changePassword = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required',
+      });
+    }
+
+    // Sellers use OTP-based auth, so password might not exist
+    // If password doesn't exist, we can't verify current password
+    if (!seller.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password not set. Please use OTP-based authentication.',
+      });
+    }
+
+    // For now, since sellers use OTP, we'll just return a message
+    // If password functionality is needed, implement bcrypt comparison here
+    res.status(501).json({
+      success: false,
+      message: 'Password change not supported. Sellers use OTP-based authentication.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Get dashboard overview
  * @route   GET /api/sellers/dashboard
  * @access  Private (Seller)
@@ -1344,6 +1430,509 @@ exports.getPerformanceAnalytics = async (req, res, next) => {
           },
         },
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// DASHBOARD HELPER ENDPOINTS
+// ============================================================================
+
+/**
+ * @desc    Get dashboard highlights/metrics
+ * @route   GET /api/sellers/dashboard/highlights
+ * @access  Private (Seller)
+ */
+exports.getDashboardHighlights = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const totalReferrals = await User.countDocuments({ sellerId: seller.sellerId });
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const currentMonthSales = await Order.aggregate([
+      {
+        $match: {
+          sellerId: seller.sellerId,
+          status: 'delivered',
+          paymentStatus: 'fully_paid',
+          createdAt: { $gte: currentMonthStart },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalSales: { $sum: '$totalAmount' },
+          orderCount: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const totalSales = currentMonthSales[0]?.totalSales || 0;
+    const orderCount = currentMonthSales[0]?.orderCount || 0;
+    const targetProgress = seller.monthlyTarget > 0
+      ? (totalSales / seller.monthlyTarget) * 100
+      : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        highlights: [
+          {
+            id: 'referrals',
+            label: 'Total Referrals',
+            value: totalReferrals,
+            trend: 'up',
+          },
+          {
+            id: 'sales',
+            label: 'Monthly Sales',
+            value: `₹${totalSales.toLocaleString('en-IN')}`,
+            trend: totalSales > 0 ? 'up' : 'neutral',
+          },
+          {
+            id: 'orders',
+            label: 'Orders This Month',
+            value: orderCount,
+            trend: orderCount > 0 ? 'up' : 'neutral',
+          },
+          {
+            id: 'target',
+            label: 'Target Progress',
+            value: `${Math.round(targetProgress)}%`,
+            trend: targetProgress >= 100 ? 'up' : targetProgress >= 50 ? 'neutral' : 'down',
+          },
+        ],
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get recent activity feed
+ * @route   GET /api/sellers/dashboard/activity
+ * @access  Private (Seller)
+ */
+exports.getRecentActivity = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const { limit = 10 } = req.query;
+    const limitNum = parseInt(limit);
+
+    const recentCommissions = await Commission.find({ sellerId: seller._id })
+      .sort({ createdAt: -1 })
+      .limit(limitNum * 2)
+      .populate('userId', 'name phone')
+      .populate('orderId', 'orderNumber totalAmount')
+      .lean();
+
+    const recentOrders = await Order.find({ sellerId: seller.sellerId })
+      .sort({ createdAt: -1 })
+      .limit(limitNum * 2)
+      .populate('userId', 'name phone')
+      .select('orderNumber totalAmount status createdAt')
+      .lean();
+
+    const activities = [
+      ...recentCommissions.map(commission => ({
+        id: commission._id,
+        type: 'commission',
+        title: 'Commission Earned',
+        message: `You earned ₹${commission.commissionAmount} for order #${commission.orderId?.orderNumber || 'N/A'}`,
+        amount: commission.commissionAmount,
+        timestamp: commission.createdAt,
+      })),
+      ...recentOrders.map(order => ({
+        id: order._id,
+        type: 'order',
+        title: 'Order Placed',
+        message: `Order #${order.orderNumber} placed by referral`,
+        amount: order.totalAmount,
+        status: order.status,
+        timestamp: order.createdAt,
+      })),
+    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, limitNum);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        activities,
+        total: activities.length,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// WALLET ENDPOINTS
+// ============================================================================
+
+/**
+ * @desc    Get withdrawal request details
+ * @route   GET /api/sellers/wallet/withdrawals/:requestId
+ * @access  Private (Seller)
+ */
+exports.getWithdrawalDetails = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const { requestId } = req.params;
+
+    const withdrawal = await WithdrawalRequest.findOne({
+      _id: requestId,
+      sellerId: seller._id,
+    })
+      .populate('reviewedBy', 'name email')
+      .lean();
+
+    if (!withdrawal) {
+      return res.status(404).json({
+        success: false,
+        message: 'Withdrawal request not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        withdrawal,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// TARGET & PERFORMANCE ENDPOINTS
+// ============================================================================
+
+/**
+ * @desc    Get target history
+ * @route   GET /api/sellers/targets/history
+ * @access  Private (Seller)
+ */
+exports.getTargetHistory = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const { year, limit = 12 } = req.query;
+    const limitNum = parseInt(limit);
+    const now = new Date();
+    const targetYear = year ? parseInt(year) : now.getFullYear();
+
+    const targetsHistory = [];
+    for (let i = 0; i < limitNum; i++) {
+      const date = new Date(targetYear, now.getMonth() - i, 1);
+      const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      const salesData = await Order.aggregate([
+        {
+          $match: {
+            sellerId: seller.sellerId,
+            status: 'delivered',
+            paymentStatus: 'fully_paid',
+            createdAt: { $gte: monthStart, $lte: monthEnd },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            achieved: { $sum: '$totalAmount' },
+            orderCount: { $sum: 1 },
+          },
+        },
+      ]);
+
+      const achieved = salesData[0]?.achieved || 0;
+      const orderCount = salesData[0]?.orderCount || 0;
+      const progress = seller.monthlyTarget > 0
+        ? (achieved / seller.monthlyTarget) * 100
+        : 0;
+
+      targetsHistory.push({
+        year: date.getFullYear(),
+        month: date.getMonth() + 1,
+        monthName: date.toLocaleString('default', { month: 'long' }),
+        target: seller.monthlyTarget,
+        achieved,
+        orderCount,
+        progress: Math.round(progress * 100) / 100,
+        status: achieved >= seller.monthlyTarget ? 'achieved' : 'pending',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        targets: targetsHistory,
+        total: targetsHistory.length,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get target achievement incentives
+ * @route   GET /api/sellers/targets/incentives
+ * @access  Private (Seller)
+ */
+exports.getTargetIncentives = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const currentMonthSales = await Order.aggregate([
+      {
+        $match: {
+          sellerId: seller.sellerId,
+          status: 'delivered',
+          paymentStatus: 'fully_paid',
+          createdAt: { $gte: currentMonthStart },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalSales: { $sum: '$totalAmount' },
+        },
+      },
+    ]);
+
+    const achieved = currentMonthSales[0]?.totalSales || 0;
+    const targetAchieved = achieved >= seller.monthlyTarget;
+
+    const incentives = [];
+    for (let i = 0; i < 12; i++) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      const monthSales = await Order.aggregate([
+        {
+          $match: {
+            sellerId: seller.sellerId,
+            status: 'delivered',
+            paymentStatus: 'fully_paid',
+            createdAt: { $gte: monthStart, $lte: monthEnd },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalSales: { $sum: '$totalAmount' },
+          },
+        },
+      ]);
+
+      const monthAchieved = monthSales[0]?.totalSales || 0;
+      if (monthAchieved >= seller.monthlyTarget) {
+        incentives.push({
+          month: monthStart.toLocaleString('default', { month: 'long', year: 'numeric' }),
+          achieved: monthAchieved,
+          target: seller.monthlyTarget,
+          status: 'achieved',
+          reward: 'Target achievement bonus',
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        incentives,
+        currentMonth: {
+          achieved,
+          target: seller.monthlyTarget,
+          status: targetAchieved ? 'achieved' : 'pending',
+        },
+        totalEarned: incentives.length,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// ANNOUNCEMENTS & NOTIFICATIONS ENDPOINTS (Placeholders - TODO: Implement models)
+// ============================================================================
+
+exports.getAnnouncements = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: { announcements: [], total: 0 },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.markAnnouncementRead = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      message: 'Announcement marked as read',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.markAllAnnouncementsRead = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      message: 'All announcements marked as read',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getNotifications = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: { notifications: [], unreadCount: 0 },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.markNotificationRead = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      message: 'Notification marked as read',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.markAllNotificationsRead = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      message: 'All notifications marked as read',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getNotificationPreferences = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: {
+        preferences: {
+          sms: true,
+          email: true,
+          push: true,
+          announcements: true,
+          commission: true,
+          target: true,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateNotificationPreferences = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: { preferences: req.body, message: 'Preferences updated successfully' },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// SHARING ENDPOINTS
+// ============================================================================
+
+exports.getShareLink = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/register?sellerId=${seller.sellerId}`;
+    const shareText = `Join IRA SATHI using my Seller ID: ${seller.sellerId}. Register at: ${shareUrl}`;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        sellerId: seller.sellerId,
+        shareText,
+        shareUrl,
+        qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.trackShareAction = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const { platform, recipient } = req.body;
+    console.log(`Seller ${seller.sellerId} shared via ${platform} to ${recipient}`);
+    res.status(200).json({
+      success: true,
+      message: 'Share tracked successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// SUPPORT ENDPOINTS (Placeholders - TODO: Implement SupportTicket model)
+// ============================================================================
+
+exports.reportIssue = async (req, res, next) => {
+  try {
+    const ticketId = `TICKET-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    res.status(200).json({
+      success: true,
+      data: { ticketId, message: 'Issue reported successfully' },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getSupportTickets = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: { tickets: [], total: 0 },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getSupportTicketDetails = async (req, res, next) => {
+  try {
+    res.status(404).json({
+      success: false,
+      message: 'Support ticket not found',
     });
   } catch (error) {
     next(error);

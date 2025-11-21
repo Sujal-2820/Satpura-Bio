@@ -13,19 +13,25 @@ export function useUserApi() {
   const [error, setError] = useState(null)
 
   const handleApiCall = useCallback(
-    async (apiFunction, successAction, errorMessage) => {
+    async (apiFunction, successAction, errorMessage, ...args) => {
       setLoading(true)
       setError(null)
       try {
-        const data = await apiFunction()
-        if (successAction) {
-          dispatch(successAction(data))
+        const result = await apiFunction(...args)
+        if (result.success) {
+          if (successAction) {
+            // Extract the actual data object from result.data before dispatching
+            dispatch(successAction(result.data))
+          }
+          return { data: result.data, error: null }
+        } else {
+          setError(result.error?.message || errorMessage || 'An error occurred')
+          return { data: null, error: result.error }
         }
-        return { data, error: null }
       } catch (err) {
-        const errorMsg = errorMessage || err.message || 'An error occurred'
+        const errorMsg = err.error?.message || err.message || errorMessage || 'An unexpected error occurred'
         setError(errorMsg)
-        return { data: null, error: err }
+        return { data: null, error: { message: errorMsg } }
       } finally {
         setLoading(false)
       }
@@ -53,7 +59,7 @@ export function useUserApi() {
           type: 'AUTH_LOGIN',
           payload: {
             ...data.user,
-            sellerId: data.user.sellerId || sellerId,
+            sellerId: data.user?.sellerId || sellerId,
           },
         }),
         'Failed to verify OTP',
@@ -62,15 +68,15 @@ export function useUserApi() {
     [handleApiCall],
   )
 
-  const updateSellerID = useCallback(
-    async (sellerId) => {
+  const getSellerID = useCallback(
+    async () => {
       return handleApiCall(
-        () => userApi.updateSellerID({ sellerId }),
+        () => userApi.getSellerID(),
         (data) => ({
           type: 'UPDATE_SELLER_ID',
-          payload: sellerId,
+          payload: data.sellerId,
         }),
-        'Failed to update Seller ID',
+        'Failed to get Seller ID',
       )
     },
     [handleApiCall],
@@ -112,7 +118,7 @@ export function useUserApi() {
     async (productId, quantity) => {
       return handleApiCall(
         () => userApi.addToCart({ productId, quantity }),
-        (data) => ({
+        () => ({
           type: 'ADD_TO_CART',
           payload: { productId, quantity },
         }),
@@ -126,7 +132,7 @@ export function useUserApi() {
     async (itemId, quantity) => {
       return handleApiCall(
         () => userApi.updateCartItem(itemId, { quantity }),
-        (data) => ({
+        () => ({
           type: 'UPDATE_CART_ITEM',
           payload: { productId: itemId, quantity },
         }),
@@ -140,7 +146,7 @@ export function useUserApi() {
     async (itemId) => {
       return handleApiCall(
         () => userApi.removeFromCart(itemId),
-        (data) => ({
+        () => ({
           type: 'REMOVE_FROM_CART',
           payload: { productId: itemId },
         }),
@@ -191,7 +197,7 @@ export function useUserApi() {
         () => userApi.createOrder(orderData),
         (data) => ({
           type: 'ADD_ORDER',
-          payload: data.order,
+          payload: data.order || data,
         }),
         'Failed to create order',
       )
@@ -279,7 +285,7 @@ export function useUserApi() {
         () => userApi.addAddress(addressData),
         (data) => ({
           type: 'ADD_ADDRESS',
-          payload: data,
+          payload: data.address || data,
         }),
         'Failed to add address',
       )
@@ -320,7 +326,7 @@ export function useUserApi() {
     async (productId) => {
       return handleApiCall(
         () => userApi.addToFavourites({ productId }),
-        (data) => ({
+        () => ({
           type: 'ADD_TO_FAVOURITES',
           payload: { productId },
         }),
@@ -334,7 +340,7 @@ export function useUserApi() {
     async (productId) => {
       return handleApiCall(
         () => userApi.removeFromFavourites(productId),
-        (data) => ({
+        () => ({
           type: 'REMOVE_FROM_FAVOURITES',
           payload: { productId },
         }),
@@ -372,7 +378,7 @@ export function useUserApi() {
     error,
     requestOTP,
     verifyOTP,
-    updateSellerID,
+    getSellerID,
     fetchProducts,
     fetchProductDetails,
     fetchCategories,

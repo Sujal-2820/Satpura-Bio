@@ -7,6 +7,7 @@ import { UserDetailModal } from '../components/UserDetailModal'
 import { SupportTicketModal } from '../components/SupportTicketModal'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
+import { useToast } from '../components/ToastNotification'
 import { users as mockUsers } from '../services/adminData'
 
 const columns = [
@@ -31,6 +32,7 @@ export function UsersPage() {
     activateUser,
     loading,
   } = useAdminApi()
+  const { success, error: showError, warning: showWarning } = useToast()
 
   const [usersList, setUsersList] = useState([])
   
@@ -119,11 +121,19 @@ export function UsersPage() {
   const handleBlockUser = async (userId) => {
     const reason = window.prompt('Please provide a reason for blocking this user:')
     if (reason) {
-      const result = await blockUser(userId, { reason })
-      if (result.data) {
-        fetchUsers()
-        setDetailModalOpen(false)
-        setSelectedUserForDetail(null)
+      try {
+        const result = await blockUser(userId, { reason })
+        if (result.data) {
+          fetchUsers()
+          setDetailModalOpen(false)
+          setSelectedUserForDetail(null)
+          success('User blocked successfully!', 3000)
+        } else if (result.error) {
+          const errorMessage = result.error.message || 'Failed to block user'
+          showError(errorMessage, 5000)
+        }
+      } catch (error) {
+        showError(error.message || 'Failed to block user', 5000)
       }
     }
   }
@@ -131,21 +141,37 @@ export function UsersPage() {
   const handleDeactivateUser = async (userId) => {
     const reason = window.prompt('Please provide a reason for deactivating this user:')
     if (reason) {
-      const result = await deactivateUser(userId, { reason })
-      if (result.data) {
-        fetchUsers()
-        setDetailModalOpen(false)
-        setSelectedUserForDetail(null)
+      try {
+        const result = await deactivateUser(userId, { reason })
+        if (result.data) {
+          fetchUsers()
+          setDetailModalOpen(false)
+          setSelectedUserForDetail(null)
+          success('User deactivated successfully!', 3000)
+        } else if (result.error) {
+          const errorMessage = result.error.message || 'Failed to deactivate user'
+          showError(errorMessage, 5000)
+        }
+      } catch (error) {
+        showError(error.message || 'Failed to deactivate user', 5000)
       }
     }
   }
 
   const handleActivateUser = async (userId) => {
-    const result = await activateUser(userId)
-    if (result.data) {
-      fetchUsers()
-      setDetailModalOpen(false)
-      setSelectedUserForDetail(null)
+    try {
+      const result = await activateUser(userId)
+      if (result.data) {
+        fetchUsers()
+        setDetailModalOpen(false)
+        setSelectedUserForDetail(null)
+        success('User activated successfully!', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to activate user'
+        showError(errorMessage, 5000)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to activate user', 5000)
     }
   }
 

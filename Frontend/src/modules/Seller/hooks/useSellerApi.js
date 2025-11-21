@@ -17,15 +17,22 @@ export function useSellerApi() {
       setLoading(true)
       setError(null)
       try {
-        const data = await apiFunction()
-        if (successAction) {
-          dispatch(successAction(data))
+        const result = await apiFunction()
+        // Extract data from response: { success: true, data: {...} } -> {...}
+        const responseData = result.success ? result.data : null
+        
+        if (result.success && successAction && responseData) {
+          dispatch(successAction(responseData))
+        } else if (!result.success) {
+          const errorMsg = result.error?.message || errorMessage || 'An error occurred'
+          setError(errorMsg)
         }
-        return { data, error: null }
+        
+        return { data: responseData, error: result.error || null }
       } catch (err) {
         const errorMsg = errorMessage || err.message || 'An error occurred'
         setError(errorMsg)
-        return { data: null, error: err }
+        return { data: null, error: { message: errorMsg } }
       } finally {
         setLoading(false)
       }
@@ -69,7 +76,7 @@ export function useSellerApi() {
   const fetchTargetIncentives = useCallback(async () => {
     return handleApiCall(
       sellerApi.getTargetIncentives,
-      (data) => ({ type: 'SET_TARGET_INCENTIVES', payload: data.incentives || [] }),
+      (data) => ({ type: 'SET_TARGET_INCENTIVES', payload: data?.incentives || data || [] }),
       'Failed to load target incentives',
     )
   }, [handleApiCall])
@@ -112,13 +119,24 @@ export function useSellerApi() {
   // Notification APIs
   const markNotificationRead = useCallback(
     async (notificationId) => {
+      setLoading(true)
+      setError(null)
       try {
-        await sellerApi.markNotificationRead(notificationId)
-        dispatch({ type: 'MARK_NOTIFICATION_READ', payload: { id: notificationId } })
-        return { data: null, error: null }
+        const result = await sellerApi.markNotificationRead(notificationId)
+        if (result.success) {
+          dispatch({ type: 'MARK_NOTIFICATION_READ', payload: { id: notificationId } })
+          return { data: null, error: null }
+        } else {
+          const errorMsg = result.error?.message || 'Failed to mark notification as read'
+          setError(errorMsg)
+          return { data: null, error: result.error }
+        }
       } catch (err) {
-        setError(err.message)
-        return { data: null, error: err }
+        const errorMsg = err.message || 'Failed to mark notification as read'
+        setError(errorMsg)
+        return { data: null, error: { message: errorMsg } }
+      } finally {
+        setLoading(false)
       }
     },
     [dispatch],

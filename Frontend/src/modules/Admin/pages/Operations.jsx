@@ -8,6 +8,7 @@ import { OrderEscalationModal } from '../components/OrderEscalationModal'
 import { NotificationForm } from '../components/NotificationForm'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
+import { useToast } from '../components/ToastNotification'
 import { cn } from '../../../lib/cn'
 
 const notificationColumns = [
@@ -41,6 +42,7 @@ export function OperationsPage() {
     deleteNotification,
     loading,
   } = useAdminApi()
+  const { success, error: showError, warning: showWarning } = useToast()
 
   const [logisticsSettings, setLogisticsSettings] = useState(null)
   const [notifications, setNotifications] = useState([])
@@ -79,40 +81,86 @@ export function OperationsPage() {
   }, [fetchData])
 
   const handleSaveLogisticsSettings = async (settings) => {
-    const result = await updateLogisticsSettings(settings)
-    if (result.data) {
-      setLogisticsModalOpen(false)
-      fetchData()
+    try {
+      const result = await updateLogisticsSettings(settings)
+      if (result.data) {
+        setLogisticsModalOpen(false)
+        fetchData()
+        success('Logistics settings updated successfully!', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to update logistics settings'
+        if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
+          showWarning(errorMessage, 5000)
+        } else {
+          showError(errorMessage, 5000)
+        }
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to update logistics settings', 5000)
     }
   }
 
   const handleSaveNotification = async (notificationData) => {
-    let result
-    if (selectedNotification) {
-      result = await updateNotification(selectedNotification.id, notificationData)
-    } else {
-      result = await createNotification(notificationData)
-    }
-    if (result.data) {
-      setNotificationFormOpen(false)
-      setSelectedNotification(null)
-      fetchData()
+    try {
+      let result
+      if (selectedNotification) {
+        result = await updateNotification(selectedNotification.id, notificationData)
+      } else {
+        result = await createNotification(notificationData)
+      }
+      if (result.data) {
+        setNotificationFormOpen(false)
+        setSelectedNotification(null)
+        fetchData()
+        success(selectedNotification ? 'Notification updated successfully!' : 'Notification created successfully!', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to save notification'
+        if (errorMessage.includes('validation') || errorMessage.includes('required')) {
+          showWarning(errorMessage, 5000)
+        } else {
+          showError(errorMessage, 5000)
+        }
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to save notification', 5000)
     }
   }
 
   const handleDeleteNotification = async (notificationId) => {
-    const result = await deleteNotification(notificationId)
-    if (result.data) {
-      fetchData()
+    if (window.confirm('Are you sure you want to delete this notification?')) {
+      try {
+        const result = await deleteNotification(notificationId)
+        if (result.data) {
+          fetchData()
+          success('Notification deleted successfully!', 3000)
+        } else if (result.error) {
+          const errorMessage = result.error.message || 'Failed to delete notification'
+          showError(errorMessage, 5000)
+        }
+      } catch (error) {
+        showError(error.message || 'Failed to delete notification', 5000)
+      }
     }
   }
 
   const handleFulfillFromWarehouse = async (orderId, fulfillmentData) => {
-    const result = await fulfillOrderFromWarehouse(orderId, fulfillmentData)
-    if (result.data) {
-      setEscalationModalOpen(false)
-      setSelectedOrderForEscalation(null)
-      fetchData()
+    try {
+      const result = await fulfillOrderFromWarehouse(orderId, fulfillmentData)
+      if (result.data) {
+        setEscalationModalOpen(false)
+        setSelectedOrderForEscalation(null)
+        fetchData()
+        success('Order fulfilled from warehouse successfully!', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to fulfill order'
+        if (errorMessage.includes('stock') || errorMessage.includes('unavailable') || errorMessage.includes('cannot')) {
+          showWarning(errorMessage, 6000)
+        } else {
+          showError(errorMessage, 5000)
+        }
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to fulfill order', 5000)
     }
   }
 

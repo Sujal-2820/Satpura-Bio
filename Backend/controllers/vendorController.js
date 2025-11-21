@@ -731,6 +731,17 @@ exports.rejectOrder = async (req, res, next) => {
     // Reject order - escalate to admin
     order.vendorId = null; // Remove vendor assignment
     order.assignedTo = 'admin'; // Escalate to admin
+    
+    // Track escalation
+    if (vendor) {
+      vendor.escalationCount = (vendor.escalationCount || 0) + 1;
+      vendor.escalationHistory.push({
+        orderId: order._id,
+        escalatedAt: new Date(),
+        reason: 'Order rejected by vendor',
+      });
+      await vendor.save();
+    }
     order.status = 'rejected'; // Mark as rejected by vendor
 
     // Add rejection details

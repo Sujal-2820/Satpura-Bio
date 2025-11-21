@@ -11,6 +11,7 @@ import { PurchaseRequestModal } from '../components/PurchaseRequestModal'
 import { VendorDetailModal } from '../components/VendorDetailModal'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
+import { useToast } from '../components/ToastNotification'
 import { vendors as mockVendors } from '../services/adminData'
 import { cn } from '../../../lib/cn'
 
@@ -91,6 +92,7 @@ export function VendorsPage() {
     rejectVendorPurchase,
     loading,
   } = useAdminApi()
+  const { success, error: showError, warning: showWarning } = useToast()
 
   const [vendorsList, setVendorsList] = useState([])
   const [rawVendors, setRawVendors] = useState([])
@@ -192,54 +194,109 @@ export function VendorsPage() {
   }
 
   const handleApproveVendor = async (vendorId) => {
-    const originalVendor =
-      getRawVendorById(vendorId) || selectedVendorForApproval
-    const result = await approveVendor(vendorId, {
-      creditLimit: originalVendor.creditLimit || 1000000,
-      repaymentDays: originalVendor.repaymentDays || 21,
-      penaltyRate: originalVendor.penaltyRate || 1.5,
-    })
-    if (result.data) {
-      setApprovalModalOpen(false)
-      setSelectedVendorForApproval(null)
-      fetchVendors()
+    try {
+      const originalVendor =
+        getRawVendorById(vendorId) || selectedVendorForApproval
+      const result = await approveVendor(vendorId, {
+        creditLimit: originalVendor.creditLimit || 1000000,
+        repaymentDays: originalVendor.repaymentDays || 21,
+        penaltyRate: originalVendor.penaltyRate || 1.5,
+      })
+      if (result.data) {
+        setApprovalModalOpen(false)
+        setSelectedVendorForApproval(null)
+        fetchVendors()
+        success('Vendor approved successfully!', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to approve vendor'
+        if (errorMessage.includes('location') || errorMessage.includes('coverage') || errorMessage.includes('conflict')) {
+          showWarning(errorMessage, 6000)
+        } else {
+          showError(errorMessage, 5000)
+        }
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to approve vendor', 5000)
     }
   }
 
   const handleRejectVendor = async (vendorId, rejectionData) => {
-    const result = await rejectVendor(vendorId, rejectionData)
-    if (result.data) {
-      setApprovalModalOpen(false)
-      setSelectedVendorForApproval(null)
-      fetchVendors()
+    try {
+      const result = await rejectVendor(vendorId, rejectionData)
+      if (result.data) {
+        setApprovalModalOpen(false)
+        setSelectedVendorForApproval(null)
+        fetchVendors()
+        success('Vendor rejected.', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to reject vendor'
+        showError(errorMessage, 5000)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to reject vendor', 5000)
     }
   }
 
   const handleUpdateCreditPolicy = async (policyData) => {
-    const result = await updateVendorCreditPolicy(selectedVendorForPolicy.id, policyData)
-    if (result.data) {
-      setCreditPolicyModalOpen(false)
-      setSelectedVendorForPolicy(null)
-      fetchVendors()
+    try {
+      const result = await updateVendorCreditPolicy(selectedVendorForPolicy.id, policyData)
+      if (result.data) {
+        setCreditPolicyModalOpen(false)
+        setSelectedVendorForPolicy(null)
+        fetchVendors()
+        success('Credit policy updated successfully!', 4000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to update credit policy'
+        // Check if it's a warning about vendor not being approved
+        if (errorMessage.includes('approved') || errorMessage.includes('status')) {
+          showWarning(errorMessage, 6000)
+        } else {
+          showError(errorMessage, 5000)
+        }
+      }
+    } catch (error) {
+      const errorMessage = error.message || 'Failed to update credit policy'
+      showError(errorMessage, 5000)
     }
   }
 
   const handleApprovePurchase = async (requestId) => {
-    const result = await approveVendorPurchase(requestId)
-    if (result.data) {
-      setPurchaseRequestModalOpen(false)
-      setSelectedPurchaseRequest(null)
-      fetchPurchaseRequests()
-      fetchVendors()
+    try {
+      const result = await approveVendorPurchase(requestId)
+      if (result.data) {
+        setPurchaseRequestModalOpen(false)
+        setSelectedPurchaseRequest(null)
+        fetchPurchaseRequests()
+        fetchVendors()
+        success('Vendor purchase request approved successfully!', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to approve purchase request'
+        if (errorMessage.includes('credit') || errorMessage.includes('limit') || errorMessage.includes('insufficient')) {
+          showWarning(errorMessage, 6000)
+        } else {
+          showError(errorMessage, 5000)
+        }
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to approve purchase request', 5000)
     }
   }
 
   const handleRejectPurchase = async (requestId, rejectionData) => {
-    const result = await rejectVendorPurchase(requestId, rejectionData)
-    if (result.data) {
-      setPurchaseRequestModalOpen(false)
-      setSelectedPurchaseRequest(null)
-      fetchPurchaseRequests()
+    try {
+      const result = await rejectVendorPurchase(requestId, rejectionData)
+      if (result.data) {
+        setPurchaseRequestModalOpen(false)
+        setSelectedPurchaseRequest(null)
+        fetchPurchaseRequests()
+        fetchVendors()
+        success('Vendor purchase request rejected.', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to reject purchase request'
+        showError(errorMessage, 5000)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to reject purchase request', 5000)
     }
   }
 

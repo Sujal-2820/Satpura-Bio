@@ -23,18 +23,38 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
   useEffect(() => {
     if (product) {
       // Parse existing product data
-      const stockMatch = product.stock?.match(/^([\d,]+)\s*(kg|L|bags|units)?$/i)
-      const stockValue = stockMatch ? stockMatch[1].replace(/,/g, '') : ''
-      const stockUnit = stockMatch?.[2]?.toLowerCase() || 'kg'
+      // Handle stock: can be a number or a string like "1000 kg"
+      let stockValue = ''
+      let stockUnit = 'kg'
       
-      const vendorPriceValue = product.vendorPrice?.replace(/[₹,]/g, '') || ''
-      const userPriceValue = product.userPrice?.replace(/[₹,]/g, '') || ''
+      if (product.stock != null) {
+        if (typeof product.stock === 'number') {
+          // If stock is a number, use it directly
+          stockValue = String(product.stock)
+          stockUnit = product.stockUnit || 'kg'
+        } else {
+          // If stock is a string, parse it with regex
+          const stockString = String(product.stock)
+          const stockMatch = stockString.match(/^([\d,]+)\s*(kg|L|bags|units)?$/i)
+          if (stockMatch) {
+            stockValue = stockMatch[1].replace(/,/g, '')
+            stockUnit = stockMatch[2]?.toLowerCase() || product.stockUnit || 'kg'
+          }
+        }
+      }
+      
+      // Convert prices to string if they're numbers
+      const vendorPriceString = product.vendorPrice != null ? String(product.vendorPrice) : ''
+      const userPriceString = product.userPrice != null ? String(product.userPrice) : ''
+      const vendorPriceValue = vendorPriceString.replace(/[₹,]/g, '') || ''
+      const userPriceValue = userPriceString.replace(/[₹,]/g, '') || ''
       
       // Parse expiry date (assuming format like "Aug 2026" or ISO date)
       let expiryDate = ''
       if (product.expiry) {
-        if (product.expiry.includes('-')) {
-          expiryDate = product.expiry.split('T')[0] // ISO date
+        const expiryString = String(product.expiry)
+        if (expiryString.includes('-')) {
+          expiryDate = expiryString.split('T')[0] // ISO date
         } else {
           // Try to parse "Aug 2026" format
           const months = {
@@ -42,7 +62,7 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
             'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
             'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
           }
-          const parts = product.expiry.split(' ')
+          const parts = expiryString.split(' ')
           if (parts.length === 2) {
             const month = months[parts[0]]
             const year = parts[1]

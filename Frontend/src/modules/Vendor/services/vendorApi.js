@@ -15,11 +15,23 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
  * API Response Handler
  */
 async function handleResponse(response) {
+  const data = await response.json().catch(() => ({ 
+    success: false,
+    error: { message: 'An error occurred' }
+  }))
+  
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'An error occurred' }))
-    throw new Error(error.message || `HTTP error! status: ${response.status}`)
+    // Return error in same format as success response for consistent error handling
+    return {
+      success: false,
+      error: {
+        message: data.message || data.error?.message || `HTTP error! status: ${response.status}`,
+        status: response.status,
+      },
+    }
   }
-  return response.json()
+  
+  return data
 }
 
 /**
@@ -53,87 +65,45 @@ async function apiRequest(endpoint, options = {}) {
  * @returns {Promise<Object>} - { message: 'OTP sent successfully', expiresIn: 300 }
  */
 export async function requestVendorOTP(data) {
-  // Mock implementation for testing - accepts any data
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          message: 'OTP sent successfully',
-          expiresIn: 300,
-        },
-      })
-    }, 1000)
+  return apiRequest('/vendors/auth/request-otp', {
+    method: 'POST',
+    body: JSON.stringify(data),
   })
-  // Uncomment when backend is ready:
-  // return apiRequest('/vendors/auth/request-otp', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  // })
 }
 
 /**
  * Register Vendor with OTP
  * POST /vendors/auth/register
  * 
- * @param {Object} data - { fullName, phone, otp }
- * @returns {Promise<Object>} - { token, vendor: { id, name, phone } }
+ * @param {Object} data - { fullName, phone, location }
+ * @returns {Promise<Object>} - { message, vendorId, requiresApproval, expiresIn }
  */
 export async function registerVendor(data) {
-  // Mock implementation for testing - accepts any data
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          token: 'mock_vendor_token_' + Date.now(),
-          vendor: {
-            id: 'vendor_' + Date.now(),
-            name: data.fullName,
-            phone: data.phone,
-          },
-        },
-      })
-    }, 1000)
+  return apiRequest('/vendors/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: data.fullName || data.name,
+      phone: data.phone,
+      location: data.location || {
+        address: data.address || '',
+        coordinates: data.coordinates || { lat: data.lat, lng: data.lng },
+      },
+    }),
   })
-  // Uncomment when backend is ready:
-  // return apiRequest('/vendors/auth/register', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  // })
 }
 
 /**
  * Login Vendor with OTP
- * POST /vendors/auth/login
+ * POST /vendors/auth/verify-otp
  * 
  * @param {Object} data - { phone, otp }
  * @returns {Promise<Object>} - { token, vendor: { id, name, phone, location, coverageRadius } }
  */
 export async function loginVendorWithOtp(data) {
-  // Mock implementation for testing - accepts any data
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          token: 'mock_vendor_token_' + Date.now(),
-          vendor: {
-            id: 'vendor_' + Date.now(),
-            name: 'Vendor',
-            phone: data.phone,
-            location: { lat: 19.2183, lng: 73.0822, address: 'Kolhapur, Maharashtra' },
-            coverageRadius: 20,
-          },
-        },
-      })
-    }, 1000)
+  return apiRequest('/vendors/auth/verify-otp', {
+    method: 'POST',
+    body: JSON.stringify(data),
   })
-  // Uncomment when backend is ready:
-  // return apiRequest('/vendors/auth/login', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  // })
 }
 
 /**
@@ -171,24 +141,24 @@ export async function loginVendor(credentials) {
 
 /**
  * Vendor Logout
- * POST /vendors/logout
+ * POST /vendors/auth/logout
  * 
  * @returns {Promise<Object>} - { message: 'Logged out successfully' }
  */
 export async function logoutVendor() {
-  return apiRequest('/vendors/logout', {
+  return apiRequest('/vendors/auth/logout', {
     method: 'POST',
   })
 }
 
 /**
  * Get Vendor Profile
- * GET /vendors/profile
+ * GET /vendors/auth/profile
  * 
  * @returns {Promise<Object>} - Vendor profile data
  */
 export async function getVendorProfile() {
-  return apiRequest('/vendors/profile')
+  return apiRequest('/vendors/auth/profile')
 }
 
 // ============================================================================
@@ -197,7 +167,7 @@ export async function getVendorProfile() {
 
 /**
  * Get Vendor Dashboard Overview
- * GET /vendors/dashboard/overview
+ * GET /vendors/dashboard
  * 
  * @returns {Promise<Object>} - {
  *   ordersToday: number,
@@ -209,30 +179,7 @@ export async function getVendorProfile() {
  * }
  */
 export async function fetchDashboardData() {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          ordersToday: 12,
-          urgentStock: 4,
-          creditBalance: 1240000,
-          creditDue: '08 Dec 2025',
-          recentActivity: [
-            { name: 'Farm Fresh Traders', action: 'Order accepted', amount: '+₹86,200', status: 'Completed', avatar: 'FF' },
-            { name: 'Green Valley Hub', action: 'Loan repayment', amount: '-₹40,000', status: 'Pending', avatar: 'GV' },
-            { name: 'HarvestLink Pvt Ltd', action: 'Delivery scheduled', amount: '+₹21,500', status: 'Scheduled', avatar: 'HL' },
-          ],
-          highlights: [
-            { id: 'orders', label: 'Orders Today', value: 12, trend: '+3 vs yesterday' },
-            { id: 'inventory', label: 'Urgent Stock', value: 4, trend: 'Items to restock' },
-            { id: 'credit', label: 'Loan Balance', value: '₹12.4L', trend: 'Due in 8 days' },
-          ],
-        },
-      })
-    }, 800)
-  })
+  return apiRequest('/vendors/dashboard')
 }
 
 // ============================================================================
@@ -283,17 +230,8 @@ export async function getOrderDetails(orderId) {
  * @returns {Promise<Object>} - { message: 'Order accepted', order: Object }
  */
 export async function acceptOrder(orderId) {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          message: 'Order accepted successfully',
-          order: { id: orderId, status: 'processing' },
-        },
-      })
-    }, 1000)
+  return apiRequest(`/vendors/orders/${orderId}/accept`, {
+    method: 'POST',
   })
 }
 
@@ -304,14 +242,6 @@ export async function acceptOrder(orderId) {
  * IMPORTANT: This API handles partial order fulfillment where:
  * - Items that vendor has in stock → Vendor fulfills those items
  * - Items that vendor doesn't have (or insufficient quantity) → Escalated to Admin
- * 
- * The backend should:
- * 1. Split the order into two parts:
- *    - Vendor fulfillment: Items accepted by vendor
- *    - Admin fulfillment: Items rejected/escalated to admin
- * 2. Create separate order tracking for each part
- * 3. Notify user about partial fulfillment
- * 4. Update vendor inventory for accepted items
  * 
  * @param {string} orderId - Order ID
  * @param {Object} partialData - {
@@ -327,35 +257,9 @@ export async function acceptOrder(orderId) {
  * }
  */
 export async function acceptOrderPartially(orderId, partialData) {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          message: 'Order partially accepted. Some items will be fulfilled by Admin.',
-          vendorOrder: {
-            id: `${orderId}-vendor`,
-            parentOrderId: orderId,
-            items: partialData.acceptedItems,
-            status: 'processing',
-            fulfillmentBy: 'vendor',
-          },
-          adminOrder: {
-            id: `${orderId}-admin`,
-            parentOrderId: orderId,
-            items: partialData.rejectedItems,
-            status: 'pending',
-            fulfillmentBy: 'admin',
-          },
-          order: {
-            id: orderId,
-            status: 'partially_accepted',
-            split: true,
-          },
-        },
-      })
-    }, 1000)
+  return apiRequest(`/vendors/orders/${orderId}/accept-partial`, {
+    method: 'POST',
+    body: JSON.stringify(partialData),
   })
 }
 
@@ -368,17 +272,9 @@ export async function acceptOrderPartially(orderId, partialData) {
  * @returns {Promise<Object>} - { message: 'Order rejected', order: Object }
  */
 export async function rejectOrder(orderId, reasonData) {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          message: 'Order rejected and forwarded to Admin',
-          order: { id: orderId, status: 'rejected', reason: reasonData.reason },
-        },
-      })
-    }, 1000)
+  return apiRequest(`/vendors/orders/${orderId}/reject`, {
+    method: 'POST',
+    body: JSON.stringify(reasonData),
   })
 }
 
@@ -387,43 +283,15 @@ export async function rejectOrder(orderId, reasonData) {
  * PUT /vendors/orders/:orderId/status
  * 
  * IMPORTANT: This status update must be persisted and immediately reflected in the User Dashboard.
- * The backend should:
- * 1. Update the order status in the database
- * 2. Add an entry to the order's statusTimeline array with timestamp
- * 3. Notify the user via real-time notification (WebSocket/SSE) about the status change
- * 4. Make the updated status available via GET /users/orders/:orderId
  * 
  * @param {string} orderId - Order ID
  * @param {Object} statusData - { status: 'awaiting' | 'dispatched' | 'delivered', notes?: string }
  * @returns {Promise<Object>} - { message: 'Status updated', order: Object with statusTimeline }
  */
 export async function updateOrderStatus(orderId, statusData) {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const now = new Date().toISOString()
-      resolve({
-        success: true,
-        data: {
-          message: 'Order status updated successfully',
-          order: {
-            id: orderId,
-            status: statusData.status,
-            notes: statusData.notes || '',
-            updatedAt: now,
-            statusTimeline: [
-              { status: 'awaiting', timestamp: now },
-              ...(statusData.status === 'dispatched' || statusData.status === 'delivered'
-                ? [{ status: 'dispatched', timestamp: now }]
-                : []),
-              ...(statusData.status === 'delivered'
-                ? [{ status: 'delivered', timestamp: now }]
-                : []),
-            ],
-          },
-        },
-      })
-    }, 1000)
+  return apiRequest(`/vendors/orders/${orderId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify(statusData),
   })
 }
 
@@ -451,52 +319,8 @@ export async function getOrderStats(params = {}) {
  * @returns {Promise<Object>} - { items: Array, total: number, stats: Object }
  */
 export async function getInventory(params = {}) {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          items: [
-            {
-              id: 'inv-1',
-              name: 'NPK 24:24:0',
-              stock: 1240,
-              stockUnit: 'kg',
-              purchasePrice: 1050,
-              sellingPrice: 1380,
-              status: 'Healthy',
-            },
-            {
-              id: 'inv-2',
-              name: 'Urea Blend',
-              stock: 640,
-              stockUnit: 'kg',
-              purchasePrice: 640,
-              sellingPrice: 910,
-              status: 'Low',
-            },
-            {
-              id: 'inv-3',
-              name: 'Micro Nutrients',
-              stock: 210,
-              stockUnit: 'kg',
-              purchasePrice: 720,
-              sellingPrice: 980,
-              status: 'Critical',
-            },
-          ],
-          total: 3,
-          stats: {
-            total: 3,
-            healthy: 1,
-            low: 1,
-            critical: 1,
-          },
-        },
-      })
-    }, 600)
-  })
+  const queryParams = new URLSearchParams(params).toString()
+  return apiRequest(`/vendors/inventory?${queryParams}`)
 }
 
 /**
@@ -519,17 +343,9 @@ export async function getInventoryItemDetails(itemId) {
  * @returns {Promise<Object>} - { message: 'Stock updated', item: Object }
  */
 export async function updateInventoryStock(itemId, stockData) {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          message: 'Stock updated successfully',
-          item: { id: itemId, stock: stockData.quantity },
-        },
-      })
-    }, 1000)
+  return apiRequest(`/vendors/inventory/${itemId}/stock`, {
+    method: 'PUT',
+    body: JSON.stringify(stockData),
   })
 }
 
@@ -562,23 +378,7 @@ export async function getInventoryStats() {
  * }
  */
 export async function getCreditInfo() {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          limit: 3500000,
-          used: 2260000,
-          remaining: 1240000,
-          penalty: 0,
-          dueDate: '2025-12-08',
-          repaymentDays: 30,
-          penaltyRate: 0.5,
-        },
-      })
-    }, 600)
-  })
+  return apiRequest('/vendors/credit')
 }
 
 /**
@@ -593,25 +393,9 @@ export async function getCreditInfo() {
  * @returns {Promise<Object>} - { requestId, message, status }
  */
 export async function requestCreditPurchase(purchaseData) {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (purchaseData.totalAmount < 50000) {
-        resolve({
-          success: false,
-          error: { message: 'Minimum purchase value is ₹50,000' },
-        })
-      } else {
-        resolve({
-          success: true,
-          data: {
-            requestId: `CR-${Date.now()}`,
-            message: 'Purchase request submitted successfully. Waiting for Admin approval.',
-            status: 'pending',
-          },
-        })
-      }
-    }, 1500)
+  return apiRequest('/vendors/credit/purchase', {
+    method: 'POST',
+    body: JSON.stringify(purchaseData),
   })
 }
 
@@ -662,52 +446,35 @@ export async function getCreditHistory(params = {}) {
  * @returns {Promise<Object>} - Reports data based on type
  */
 export async function getReports(params = {}) {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          totalEarnings: 2860000,
-          growth: 15.2,
-          ordersThisWeek: 84,
-          metrics: [
-            { label: 'Orders this week', value: '84', meta: '+12% growth' },
-            { label: 'Earnings this month', value: '₹18.6L', meta: 'Processing ₹4.2L' },
-            { label: 'Loan purchases', value: '₹9.4L', meta: 'Across 3 requests' },
-            { label: 'Customer satisfaction', value: '4.7/5', meta: 'Based on 156 reviews' },
-          ],
-          revenueData: {
-            labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-            revenue: [28.5, 32.8, 29.2, 35.6, 38.4, 34.1, 31.2],
-            orders: [42, 48, 45, 52, 58, 50, 46],
-          },
-        },
-      })
-    }, 800)
-  })
+  const queryParams = new URLSearchParams(params).toString()
+  return apiRequest(`/vendors/reports?${queryParams}`)
 }
 
 /**
  * Get Performance Analytics
- * GET /vendors/reports/performance
+ * GET /vendors/reports/analytics
  * 
  * @param {Object} params - { period: 'week' | 'month' | 'year' }
  * @returns {Promise<Object>} - Performance metrics and charts data
  */
 export async function getPerformanceAnalytics(params = {}) {
   const queryParams = new URLSearchParams(params).toString()
-  return apiRequest(`/vendors/reports/performance?${queryParams}`)
+  return apiRequest(`/vendors/reports/analytics?${queryParams}`)
 }
 
 /**
  * Get Region Analytics (20km coverage)
+ * Note: This endpoint may not exist in backend. Check getPerformanceAnalytics or getReports instead.
  * GET /vendors/reports/region
  * 
  * @returns {Promise<Object>} - Region-wise order and revenue analytics
  */
 export async function getRegionAnalytics() {
-  return apiRequest('/vendors/reports/region')
+  // Try reports endpoint which might include region data
+  return apiRequest('/vendors/reports?type=region').catch(() => {
+    // Fallback to performance analytics if region endpoint doesn't exist
+    return apiRequest('/vendors/reports/analytics?period=month')
+  })
 }
 
 // ============================================================================
