@@ -208,5 +208,15 @@ Expected response:
 
 - Frontend API definitions: `Frontend/src/modules/*/services/*Api.js`
 - System requirements: `PROJECT_OVERVIEW.md`
-- MongoDB credentials: See PROJECT_OVERVIEW.md (lines 521-523)
 
+
+
+
+Cloudinary for Product Images:
+password: YashP#001
+cloud name: dzr6joukq
+API KEY: 455119592853485
+API Secret: -5D4C5afkdVNFcqRgSLpFxqSjwA
+API Environment Variable: CLOUDINARY_URL=cloudinary://455119592853485:-5D4C5afkdVNFcqRgSLpFxqSjwA@dzr6joukq
+
+MongoDB password: eZs25fdXKLkVA5
