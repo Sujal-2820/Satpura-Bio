@@ -1,30 +1,108 @@
 import { useRef, useState, useEffect } from 'react'
-import { userSnapshot } from '../../services/userData'
 import { ProductCard } from '../../components/ProductCard'
 import { CategoryCard } from '../../components/CategoryCard'
 import { ChevronRightIcon, MapPinIcon, TruckIcon, SearchIcon, FilterIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
+import { useUserApi } from '../../hooks/useUserApi'
+import * as userApi from '../../services/userApi'
 
 export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearchClick, onFilterClick, onToggleFavourite, favourites = [] }) {
   const [bannerIndex, setBannerIndex] = useState(0)
   const categoriesRef = useRef(null)
   const bannerRef = useRef(null)
-  const [selectedCategory, setSelectedCategory] = useState(userSnapshot.categories[0]?.id || null)
+  const [selectedCategory, setSelectedCategory] = useState(null)
   const [isUserInteracting, setIsUserInteracting] = useState(false)
   const autoSlideTimeoutRef = useRef(null)
   const touchStartXRef = useRef(null)
   const touchEndXRef = useRef(null)
+  
+  // Real data from API
+  const [categories, setCategories] = useState([])
+  const [products, setProducts] = useState([])
+  const [popularProducts, setPopularProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const { fetchCategories, fetchProducts } = useUserApi()
 
-  const popularProducts = userSnapshot.popularProducts
-    .map((id) => userSnapshot.products.find((p) => p.id === id))
-    .filter(Boolean)
+  // Fetch categories and products on mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true)
+      try {
+        // Fetch categories
+        const categoriesResult = await fetchCategories()
+        if (categoriesResult.data?.categories) {
+          const cats = categoriesResult.data.categories
+          setCategories(cats)
+          if (cats.length > 0) {
+            setSelectedCategory(cats[0].id)
+          }
+        }
+
+        // Fetch popular products - limit to 4 for home screen
+        const popularResult = await userApi.getPopularProducts({ limit: 4 })
+        if (popularResult.success && popularResult.data?.products) {
+          setPopularProducts(popularResult.data.products)
+        }
+
+        // Fetch all products (or products by selected category)
+        const productsResult = await fetchProducts({ limit: 20 })
+        if (productsResult.data?.products) {
+          setProducts(productsResult.data.products)
+        }
+      } catch (error) {
+        console.error('Error loading data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
+
+  // Fetch products when category changes
+  useEffect(() => {
+    if (selectedCategory) {
+      const loadProducts = async () => {
+        try {
+          const result = await fetchProducts({ category: selectedCategory, limit: 20 })
+          if (result.data?.products) {
+            setProducts(result.data.products)
+          }
+        } catch (error) {
+          console.error('Error loading products:', error)
+        }
+      }
+      loadProducts()
+    }
+  }, [selectedCategory, fetchProducts])
+
+  // Temporary banners (will be replaced with API call later)
+  const banners = [
+    {
+      id: 'banner-1',
+      title: 'Seasonal Sale',
+      subtitle: 'Up to 30% off on all fertilizers',
+      image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=800',
+    },
+    {
+      id: 'banner-2',
+      title: 'New Arrivals',
+      subtitle: 'Premium organic fertilizers now available',
+      image: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=800',
+    },
+    {
+      id: 'banner-3',
+      title: 'Free Delivery',
+      subtitle: 'On orders above ₹5,000',
+      image: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=800',
+    },
+  ]
 
   const goToNextSlide = () => {
-    setBannerIndex((prev) => (prev + 1) % userSnapshot.banners.length)
+    setBannerIndex((prev) => (prev + 1) % banners.length)
   }
 
   const goToPreviousSlide = () => {
-    setBannerIndex((prev) => (prev - 1 + userSnapshot.banners.length) % userSnapshot.banners.length)
+    setBannerIndex((prev) => (prev - 1 + banners.length) % banners.length)
   }
 
   const goToSlide = (index) => {
@@ -47,7 +125,7 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
     if (isUserInteracting) return
 
     const interval = setInterval(() => {
-      setBannerIndex((prev) => (prev + 1) % userSnapshot.banners.length)
+      setBannerIndex((prev) => (prev + 1) % banners.length)
     }, 3000)
     
     return () => clearInterval(interval)
@@ -188,7 +266,7 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
         >
-          {userSnapshot.banners.map((banner, index) => (
+          {banners.map((banner, index) => (
             <div
               key={banner.id}
               className={cn(
@@ -206,7 +284,7 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
           ))}
         </div>
         <div className="home-hero-banner__indicators">
-          {userSnapshot.banners.map((_, index) => (
+          {banners.map((_, index) => (
             <button
               key={index}
               type="button"
@@ -236,15 +314,31 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
           </button>
         </div>
         <div ref={categoriesRef} className="home-categories-rail">
-          {userSnapshot.categories.map((category) => (
-            <CategoryCard
-              key={category.id}
-              category={category}
-              onClick={handleCategoryClick}
-              isSelected={selectedCategory === category.id}
-              className="home-category-card"
-            />
-          ))}
+          {loading ? (
+            <div className="flex items-center justify-center p-8">
+              <p className="text-sm text-gray-500">Loading categories...</p>
+            </div>
+          ) : categories.length === 0 ? (
+            <div className="flex items-center justify-center p-8">
+              <p className="text-sm text-gray-500">No categories available</p>
+            </div>
+          ) : (
+            categories.map((category) => (
+              <CategoryCard
+                key={category.id}
+                category={{
+                  id: category.id,
+                  name: category.name,
+                  emoji: category.icon,
+                  count: category.count,
+                  description: category.description,
+                }}
+                onClick={handleCategoryClick}
+                isSelected={selectedCategory === category.id}
+                className="home-category-card"
+              />
+            ))
+          )}
         </div>
       </section>
 
@@ -265,16 +359,35 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
           </button>
         </div>
         <div className="home-products-grid">
-          {popularProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={{ ...product, isWishlisted: favourites.includes(product.id) }}
-              onNavigate={onProductClick}
-              onAddToCart={onAddToCart}
-              onWishlist={onToggleFavourite}
-              className="home-product-card"
-            />
-          ))}
+          {loading ? (
+            <div className="flex items-center justify-center p-8 col-span-full">
+              <p className="text-sm text-gray-500">Loading products...</p>
+            </div>
+          ) : popularProducts.length === 0 ? (
+            <div className="flex items-center justify-center p-8 col-span-full">
+              <p className="text-sm text-gray-500">No popular products available</p>
+            </div>
+          ) : (
+            popularProducts.map((product) => (
+              <ProductCard
+                key={product._id || product.id}
+                product={{
+                  id: product._id || product.id,
+                  name: product.name,
+                  price: product.priceToUser || product.price || 0,
+                  image: product.images?.[0]?.url || product.primaryImage || 'https://via.placeholder.com/300',
+                  category: product.category,
+                  stock: product.stock,
+                  description: product.description,
+                  isWishlisted: favourites.includes(product._id || product.id),
+                }}
+                onNavigate={onProductClick}
+                onAddToCart={onAddToCart}
+                onWishlist={onToggleFavourite}
+                className="home-product-card"
+              />
+            ))
+          )}
         </div>
       </section>
 
@@ -287,28 +400,37 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
           </div>
         </div>
         <div className="home-deals-grid">
-          {userSnapshot.deals.map((deal) => (
-            <div
-              key={deal.id}
-              className="home-deal-card"
-            >
-              <div className="home-deal-card__badge">Special Offer</div>
-              <div className="home-deal-card__content">
-                <h4 className="home-deal-card__title">{deal.title}</h4>
-                <p className="home-deal-card__subtitle">{deal.subtitle}</p>
+          {/* Special offers - static banners (will be replaced with offers API later) */}
+          <div className="home-deal-card">
+            <div className="home-deal-card__badge">Special Offer</div>
+            <div className="home-deal-card__content">
+              <h4 className="home-deal-card__title">Seasonal Discount</h4>
+              <p className="home-deal-card__description">Get up to 30% off on all fertilizers this season</p>
+              <div className="home-deal-card__price">
+                <span className="home-deal-card__price-current">30% OFF</span>
               </div>
-              {deal.category && (
-                <button
-                  type="button"
-                  className="home-deal-card__cta"
-                  onClick={() => onCategoryClick(deal.category)}
-                >
-                  Shop Now
-                  <ChevronRightIcon className="home-deal-card__cta-icon" />
-                </button>
-              )}
             </div>
-          ))}
+          </div>
+          <div className="home-deal-card">
+            <div className="home-deal-card__badge">New Arrival</div>
+            <div className="home-deal-card__content">
+              <h4 className="home-deal-card__title">Premium Organic</h4>
+              <p className="home-deal-card__description">Premium organic fertilizers now available</p>
+              <div className="home-deal-card__price">
+                <span className="home-deal-card__price-current">NEW</span>
+              </div>
+            </div>
+          </div>
+          <div className="home-deal-card">
+            <div className="home-deal-card__badge">Free Delivery</div>
+            <div className="home-deal-card__content">
+              <h4 className="home-deal-card__title">Free Delivery</h4>
+              <p className="home-deal-card__description">On orders above ₹5,000</p>
+              <div className="home-deal-card__price">
+                <span className="home-deal-card__price-current">FREE</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

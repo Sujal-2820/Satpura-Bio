@@ -356,14 +356,28 @@ export async function getProductDetails(productId) {
  * Transform frontend product data to backend format
  */
 function transformProductForBackend(frontendData) {
+  // Handle both naming conventions: vendorPrice/userPrice or priceToVendor/priceToUser
+  const vendorPrice = frontendData.priceToVendor ?? frontendData.vendorPrice
+  const userPrice = frontendData.priceToUser ?? frontendData.userPrice
+  
+  // Parse prices - ensure they are valid numbers
+  const parsedVendorPrice = vendorPrice != null && vendorPrice !== '' ? parseFloat(vendorPrice) : null
+  const parsedUserPrice = userPrice != null && userPrice !== '' ? parseFloat(userPrice) : null
+  
   const backendData = {
     name: frontendData.name,
     description: frontendData.description || frontendData.name, // Use name as description if not provided
     category: frontendData.category || 'fertilizer', // Default category
-    priceToVendor: parseFloat(frontendData.vendorPrice) || 0,
-    priceToUser: parseFloat(frontendData.userPrice) || 0,
     stock: parseFloat(frontendData.stock) || 0,
     isActive: frontendData.visibility === 'active' || frontendData.visibility === 'Active',
+  }
+  
+  // Only add prices if they are valid positive numbers
+  if (parsedVendorPrice != null && !isNaN(parsedVendorPrice) && parsedVendorPrice > 0) {
+    backendData.priceToVendor = parsedVendorPrice
+  }
+  if (parsedUserPrice != null && !isNaN(parsedUserPrice) && parsedUserPrice > 0) {
+    backendData.priceToUser = parsedUserPrice
   }
 
   // Add weight if stockUnit provided

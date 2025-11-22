@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, Link, useNavigate } from 'react-router-dom'
 import { AdminDashboardRoute as AdminDashboardModuleRoute, AdminLogin } from './modules/Admin'
-import { UserDashboardPage, UserLogin } from './modules/User'
+import { UserDashboardPage, UserLogin, UserRegister } from './modules/User'
 import {
   VendorRouteContainer,
   VendorLoginPage,
@@ -15,6 +15,7 @@ function Home() {
     { label: 'Admin Login', to: '/admin/login' },
     { label: 'Admin Dashboard', to: '/admin/dashboard' },
     { label: 'User Login', to: '/user/login' },
+    { label: 'User Register', to: '/user/register' },
     { label: 'User Dashboard', to: '/user/dashboard' },
     { label: 'Vendor Language Select', to: '/vendor/language' },
     { label: 'Vendor/Seller Role Select', to: '/vendor/role' },
@@ -63,7 +64,12 @@ function AdminDashboardRoute() {
 
 function UserLoginRoute() {
   const navigate = useNavigate()
-  return <UserLogin onSubmit={() => navigate('/user/dashboard')} />
+  return <UserLogin onSubmit={() => navigate('/user/dashboard')} onSwitchToRegister={() => navigate('/user/register')} />
+}
+
+function UserRegisterRoute() {
+  const navigate = useNavigate()
+  return <UserRegister onSubmit={() => navigate('/user/dashboard')} onSwitchToLogin={() => navigate('/user/login')} />
 }
 
 function SellerLoginRoute() {
@@ -81,6 +87,7 @@ function App() {
         <Route path="/admin/dashboard" element={<AdminDashboardRoute />} />
 
         <Route path="/user/login" element={<UserLoginRoute />} />
+        <Route path="/user/register" element={<UserRegisterRoute />} />
         <Route path="/user/dashboard" element={<UserDashboardPage />} />
 
         <Route path="/vendor" element={<VendorRouteContainer />}>

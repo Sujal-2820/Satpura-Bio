@@ -156,6 +156,14 @@ export function useUserApi() {
     [handleApiCall],
   )
 
+  const fetchCart = useCallback(async () => {
+    return handleApiCall(
+      userApi.getCart,
+      null, // Don't auto-dispatch, handle manually
+      'Failed to load cart',
+    )
+  }, [handleApiCall])
+
   const validateCart = useCallback(async () => {
     return handleApiCall(
       userApi.validateCart,
@@ -382,6 +390,7 @@ export function useUserApi() {
     fetchProducts,
     fetchProductDetails,
     fetchCategories,
+    fetchCart,
     addToCart,
     updateCartItem,
     removeFromCart,

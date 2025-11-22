@@ -1,30 +1,73 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useUserState } from '../../context/UserContext'
-import { userSnapshot, MIN_ORDER_VALUE } from '../../services/userData'
+import { MIN_ORDER_VALUE } from '../../services/userData'
 import { PlusIcon, MinusIcon, TrashIcon, TruckIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
+import * as userApi from '../../services/userApi'
 
 export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }) {
   const { cart } = useUserState()
+  const [suggestedProducts, setSuggestedProducts] = useState([])
+  const [cartProducts, setCartProducts] = useState({})
 
-  // Get suggested products (exclude items already in cart)
-  const suggestedProducts = useMemo(() => {
-    const cartProductIds = cart.map((item) => item.productId)
-    const available = userSnapshot.products.filter((p) => !cartProductIds.includes(p.id))
-    // Shuffle and take 8
-    const shuffled = [...available].sort(() => Math.random() - 0.5)
-    return shuffled.slice(0, 8)
+  // Fetch suggested products (exclude items already in cart)
+  useEffect(() => {
+    const loadSuggested = async () => {
+      try {
+        const cartProductIds = cart.map((item) => item.productId)
+        const result = await userApi.getProducts({ limit: 20 })
+        if (result.success && result.data?.products) {
+          const available = result.data.products.filter(
+            (p) => !cartProductIds.includes(p._id || p.id)
+          )
+          // Shuffle and take 8
+          const shuffled = [...available].sort(() => Math.random() - 0.5)
+          setSuggestedProducts(shuffled.slice(0, 8))
+        }
+      } catch (error) {
+        console.error('Error loading suggested products:', error)
+      }
+    }
+    
+    if (cart.length > 0) {
+      loadSuggested()
+    }
+  }, [cart])
+
+  // Fetch product details for cart items
+  useEffect(() => {
+    const loadCartProducts = async () => {
+      const productMap = {}
+      for (const item of cart) {
+        try {
+          const result = await userApi.getProductDetails(item.productId)
+          if (result.success && result.data?.product) {
+            productMap[item.productId] = result.data.product
+          }
+        } catch (error) {
+          console.error(`Error loading product ${item.productId}:`, error)
+        }
+      }
+      setCartProducts(productMap)
+    }
+    
+    if (cart.length > 0) {
+      loadCartProducts()
+    }
   }, [cart])
 
   const cartItems = useMemo(() => {
     return cart.map((item) => {
-      const product = userSnapshot.products.find((p) => p.id === item.productId)
+      const product = cartProducts[item.productId]
+      // Use price from item if available, otherwise from product, otherwise default to 0
+      const price = item.price || (product ? (product.priceToUser || product.price || 0) : 0)
       return {
         ...item,
         product,
+        price, // Ensure price is always defined
       }
     })
-  }, [cart])
+  }, [cart, cartProducts])
 
   const totals = useMemo(() => {
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -146,17 +189,17 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
           <h3 className="text-base font-bold text-[#172022] mb-3">You might also like</h3>
           <div className="user-cart-suggested__rail">
             {suggestedProducts.map((product) => (
-              <div key={product.id} className="user-cart-suggested__card">
+              <div key={product._id || product.id} className="user-cart-suggested__card">
                 <div className="user-cart-suggested__image-wrapper">
-                  <img src={product.image} alt={product.name} className="user-cart-suggested__image" />
+                  <img src={product.images?.[0]?.url || product.primaryImage || product.image || 'https://via.placeholder.com/300'} alt={product.name} className="user-cart-suggested__image" />
                 </div>
                 <div className="user-cart-suggested__content">
                   <h4 className="user-cart-suggested__title">{product.name}</h4>
-                  <div className="user-cart-suggested__price">₹{product.price.toLocaleString('en-IN')}</div>
+                  <div className="user-cart-suggested__price">₹{(product.priceToUser || product.price || 0).toLocaleString('en-IN')}</div>
                   <button
                     type="button"
                     className="user-cart-suggested__add-btn"
-                    onClick={() => onAddToCart?.(product.id, 1)}
+                    onClick={() => onAddToCart?.(product._id || product.id, 1)}
                   >
                     <PlusIcon className="h-4 w-4" />
                     <span>Add</span>

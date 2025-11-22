@@ -690,11 +690,21 @@ exports.createProduct = async (req, res, next) => {
       });
     }
 
+    // Validate category against fertilizer categories
+    const { isValidCategory } = require('../utils/fertilizerCategories');
+    const categoryLower = category.toLowerCase();
+    if (!isValidCategory(categoryLower)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid category. Must be one of: ${require('../utils/fertilizerCategories').FERTILIZER_CATEGORIES.map(c => c.id).join(', ')}`,
+      });
+    }
+
     // Create product
     const productData = {
       name,
       description,
-      category: category.toLowerCase(),
+      category: categoryLower,
       priceToVendor,
       priceToUser,
       stock: stock || 0,
@@ -753,9 +763,17 @@ exports.updateProduct = async (req, res, next) => {
       });
     }
 
-    // Normalize category if provided
+    // Normalize and validate category if provided
     if (updateData.category) {
-      updateData.category = updateData.category.toLowerCase();
+      const { isValidCategory } = require('../utils/fertilizerCategories');
+      const categoryLower = updateData.category.toLowerCase();
+      if (!isValidCategory(categoryLower)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid category. Must be one of: ${require('../utils/fertilizerCategories').FERTILIZER_CATEGORIES.map(c => c.id).join(', ')}`,
+        });
+      }
+      updateData.category = categoryLower;
     }
 
     // Normalize SKU if provided

@@ -5,9 +5,27 @@ import { cn } from '../../../lib/cn'
 const REGIONS = ['West', 'North', 'South', 'Central', 'North East', 'East']
 const STOCK_UNITS = ['kg', 'L', 'bags', 'units']
 
+// Fertilizer Categories (This platform is for fertilizers only)
+const FERTILIZER_CATEGORIES = [
+  { value: 'npk', label: 'NPK Fertilizers', description: 'Balanced NPK fertilizers' },
+  { value: 'nitrogen', label: 'Nitrogen Fertilizers', description: 'High nitrogen content' },
+  { value: 'phosphorus', label: 'Phosphorus Fertilizers', description: 'Phosphorus-rich fertilizers' },
+  { value: 'potassium', label: 'Potassium Fertilizers', description: 'Potassium fertilizers' },
+  { value: 'organic', label: 'Organic Fertilizers', description: 'Natural and organic fertilizers' },
+  { value: 'biofertilizer', label: 'Biofertilizers', description: 'Microbial fertilizers' },
+  { value: 'micronutrient', label: 'Micronutrient Fertilizers', description: 'Essential trace elements' },
+  { value: 'liquid', label: 'Liquid Fertilizers', description: 'Water-soluble fertilizers' },
+  { value: 'granular', label: 'Granular Fertilizers', description: 'Solid granular fertilizers' },
+  { value: 'foliar', label: 'Foliar Fertilizers', description: 'Applied to plant leaves' },
+  { value: 'soil-conditioner', label: 'Soil Conditioners', description: 'Improve soil structure' },
+  { value: 'specialty', label: 'Specialty Fertilizers', description: 'Specialized fertilizers' },
+]
+
 export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
   const [formData, setFormData] = useState({
     name: '',
+    category: 'npk', // Default to NPK
+    description: '',
     stock: '',
     stockUnit: 'kg',
     vendorPrice: '',
@@ -75,6 +93,8 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
 
       setFormData({
         name: product.name || '',
+        category: product.category || 'npk',
+        description: product.description || '',
         stock: stockValue,
         stockUnit: stockUnit,
         vendorPrice: vendorPriceValue,
@@ -101,6 +121,14 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
 
     if (!formData.name.trim()) {
       newErrors.name = 'Product name is required'
+    }
+
+    if (!formData.category) {
+      newErrors.category = 'Category is required'
+    }
+
+    if (!formData.description.trim()) {
+      newErrors.description = 'Product description is required'
     }
 
     if (!formData.stock || parseFloat(formData.stock) <= 0) {
@@ -135,15 +163,21 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     e.preventDefault()
     if (!validate()) return
 
+    // Ensure prices are valid numbers (validation already checked they're > 0)
+    const vendorPrice = parseFloat(formData.vendorPrice)
+    const userPrice = parseFloat(formData.userPrice)
+    
     const submitData = {
       name: formData.name.trim(),
+      category: formData.category,
+      description: formData.description.trim(),
       stock: parseFloat(formData.stock),
       stockUnit: formData.stockUnit,
-      vendorPrice: parseFloat(formData.vendorPrice),
-      userPrice: parseFloat(formData.userPrice),
+      priceToVendor: !isNaN(vendorPrice) && vendorPrice > 0 ? vendorPrice : undefined,
+      priceToUser: !isNaN(userPrice) && userPrice > 0 ? userPrice : undefined,
       expiry: formData.expiry,
       region: formData.region,
-      visibility: formData.visibility,
+      isActive: formData.visibility === 'active',
       ...(formData.batchNumber && { batchNumber: formData.batchNumber.trim() }),
     }
 
@@ -172,6 +206,54 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
           )}
         />
         {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
+      </div>
+
+      {/* Category Selection */}
+      <div>
+        <label htmlFor="category" className="mb-2 block text-sm font-bold text-gray-900">
+          Fertilizer Category <span className="text-red-500">*</span>
+        </label>
+        <select
+          id="category"
+          name="category"
+          value={formData.category}
+          onChange={handleChange}
+          className={cn(
+            'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2',
+            errors.category
+              ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
+              : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
+          )}
+        >
+          {FERTILIZER_CATEGORIES.map((cat) => (
+            <option key={cat.value} value={cat.value}>
+              {cat.label} - {cat.description}
+            </option>
+          ))}
+        </select>
+        {errors.category && <p className="mt-1 text-xs text-red-600">{errors.category}</p>}
+      </div>
+
+      {/* Product Description */}
+      <div>
+        <label htmlFor="description" className="mb-2 block text-sm font-bold text-gray-900">
+          Product Description <span className="text-red-500">*</span>
+        </label>
+        <textarea
+          id="description"
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          placeholder="Describe the fertilizer, its composition, benefits, and usage instructions..."
+          rows={3}
+          className={cn(
+            'w-full rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2 resize-none',
+            errors.description
+              ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
+              : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
+          )}
+        />
+        {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description}</p>}
       </div>
 
       {/* Stock Quantity & Unit */}

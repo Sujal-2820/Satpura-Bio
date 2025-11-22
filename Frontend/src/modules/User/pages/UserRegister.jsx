@@ -1,13 +1,23 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { OtpVerification } from '../../../components/auth/OtpVerification'
+import { useUserDispatch } from '../context/UserContext'
 import * as userApi from '../services/userApi'
 
 export function UserRegister({ onSuccess, onSwitchToLogin }) {
+  const navigate = useNavigate()
+  const dispatch = useUserDispatch()
   const [step, setStep] = useState('register') // 'register' | 'otp'
   const [form, setForm] = useState({
     fullName: '',
     contact: '',
     sellerId: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+    latitude: '',
+    longitude: '',
   })
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
@@ -42,8 +52,40 @@ export function UserRegister({ onSuccess, onSwitchToLogin }) {
         setLoading(false)
         return
       }
+      if (!form.address.trim()) {
+        setError('Address is required')
+        setLoading(false)
+        return
+      }
+      if (!form.city.trim()) {
+        setError('City is required')
+        setLoading(false)
+        return
+      }
+      if (!form.state.trim()) {
+        setError('State is required')
+        setLoading(false)
+        return
+      }
+      if (!form.pincode.trim()) {
+        setError('Pincode is required')
+        setLoading(false)
+        return
+      }
+      if (!form.latitude.trim() || !form.longitude.trim()) {
+        setError('Location coordinates (Latitude and Longitude) are required')
+        setLoading(false)
+        return
+      }
+      const lat = parseFloat(form.latitude)
+      const lng = parseFloat(form.longitude)
+      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        setError('Please enter valid latitude (-90 to 90) and longitude (-180 to 180)')
+        setLoading(false)
+        return
+      }
 
-      // Request OTP (mock for now - accepts any data)
+      // Request OTP
       const result = await userApi.requestOTP({ phone: form.contact })
       
       if (result.success || result.data) {
@@ -63,12 +105,25 @@ export function UserRegister({ onSuccess, onSwitchToLogin }) {
     setLoading(true)
 
     try {
-      // Register user with OTP (mock for now - accepts any data)
+      // Prepare location object
+      const location = {
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        pincode: form.pincode,
+        coordinates: {
+          lat: parseFloat(form.latitude),
+          lng: parseFloat(form.longitude),
+        },
+      }
+
+      // Register user with OTP
       const result = await userApi.register({
         fullName: form.fullName,
         phone: form.contact,
         otp: otpCode,
         sellerId: form.sellerId || undefined,
+        location: location,
       })
 
       if (result.success || result.data) {
@@ -76,7 +131,21 @@ export function UserRegister({ onSuccess, onSwitchToLogin }) {
         if (result.data?.token) {
           localStorage.setItem('user_token', result.data.token)
         }
-        onSuccess?.(result.data?.user || { name: form.fullName, phone: form.contact })
+        
+        // Update context with user data
+        const userData = result.data?.user || { name: form.fullName, phone: form.contact }
+        dispatch({
+          type: 'AUTH_LOGIN',
+          payload: {
+            name: userData.name || form.fullName,
+            phone: userData.phone || form.contact,
+            sellerId: userData.sellerId || null,
+            location: userData.location || location,
+          },
+        })
+        
+        onSuccess?.(userData)
+        navigate('/user/dashboard')
       } else {
         setError(result.error?.message || 'Invalid OTP. Please try again.')
       }
@@ -201,6 +270,123 @@ export function UserRegister({ onSuccess, onSwitchToLogin }) {
                   Link your purchases to an IRA Partner for cashback benefits
                 </p>
               )}
+            </div>
+
+            <div className="border-t border-gray-200 pt-5 mt-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">Address & Location</h3>
+              
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="register-address" className="text-xs font-semibold text-gray-700">
+                    Address <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    id="register-address"
+                    name="address"
+                    required
+                    value={form.address}
+                    onChange={handleChange}
+                    placeholder="Enter your complete address"
+                    rows={2}
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label htmlFor="register-city" className="text-xs font-semibold text-gray-700">
+                      City <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="register-city"
+                      name="city"
+                      type="text"
+                      required
+                      value={form.city}
+                      onChange={handleChange}
+                      placeholder="City"
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label htmlFor="register-state" className="text-xs font-semibold text-gray-700">
+                      State <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="register-state"
+                      name="state"
+                      type="text"
+                      required
+                      value={form.state}
+                      onChange={handleChange}
+                      placeholder="State"
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="register-pincode" className="text-xs font-semibold text-gray-700">
+                    Pincode <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="register-pincode"
+                    name="pincode"
+                    type="text"
+                    required
+                    value={form.pincode}
+                    onChange={handleChange}
+                    placeholder="Pincode"
+                    maxLength={6}
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                  />
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
+                  <p className="text-xs font-semibold text-yellow-800 mb-2">⚠️ Temporary Location Entry</p>
+                  <p className="text-xs text-yellow-700 mb-3">
+                    For now, please manually enter your location coordinates. This will be replaced with Google Maps API in the future.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label htmlFor="register-latitude" className="text-xs font-semibold text-gray-700">
+                        Latitude <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="register-latitude"
+                        name="latitude"
+                        type="number"
+                        step="any"
+                        required
+                        value={form.latitude}
+                        onChange={handleChange}
+                        placeholder="e.g., 19.0760"
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label htmlFor="register-longitude" className="text-xs font-semibold text-gray-700">
+                        Longitude <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="register-longitude"
+                        name="longitude"
+                        type="number"
+                        step="any"
+                        required
+                        value={form.longitude}
+                        onChange={handleChange}
+                        placeholder="e.g., 72.8777"
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-yellow-600 mt-2">
+                    💡 Tip: You can find your coordinates using Google Maps or any GPS app
+                  </p>
+                </div>
+              </div>
             </div>
 
             <button

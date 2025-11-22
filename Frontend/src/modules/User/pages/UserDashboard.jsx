@@ -4,9 +4,11 @@ import { MobileShell } from '../components/MobileShell'
 import { BottomNavItem } from '../components/BottomNavItem'
 import { MenuList } from '../components/MenuList'
 import { HomeIcon, SearchIcon, CartIcon, UserIcon, MenuIcon, HeartIcon, PackageIcon } from '../components/icons'
-import { userSnapshot, MIN_ORDER_VALUE } from '../services/userData'
+import { MIN_ORDER_VALUE } from '../services/userData'
+import * as userApi from '../services/userApi'
 import { cn } from '../../../lib/cn'
 import { useToast, ToastProvider } from '../components/ToastNotification'
+import { useUserApi } from '../hooks/useUserApi'
 import { HomeView } from './views/HomeView'
 import { SearchView } from './views/SearchView'
 import { ProductDetailView } from './views/ProductDetailView'
@@ -66,20 +68,42 @@ function UserDashboardContent({ onLogout }) {
   const [searchQuery, setSearchQuery] = useState('')
   const searchInputRef = useRef(null)
 
-  // Initialize user data if not present
+  // Fetch user profile from API on mount
   useEffect(() => {
-    if (!profile.name || profile.name === 'Guest User') {
-      dispatch({
-        type: 'AUTH_LOGIN',
-        payload: userSnapshot.profile,
-      })
-      if (userSnapshot.addresses.length > 0) {
-        userSnapshot.addresses.forEach((addr) => {
-          dispatch({ type: 'ADD_ADDRESS', payload: addr })
-        })
+    const token = localStorage.getItem('user_token')
+    if (token) {
+      // Fetch user profile from backend
+      const fetchProfile = async () => {
+        try {
+          const result = await userApi.getUserProfile()
+          if (result.success && result.data?.user) {
+            const userData = result.data.user
+            dispatch({
+              type: 'AUTH_LOGIN',
+              payload: {
+                name: userData.name || 'User',
+                phone: userData.phone || '',
+                email: userData.email || '',
+                sellerId: userData.sellerId || null,
+                location: userData.location || null,
+              },
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching user profile:', error)
+          // If token is invalid, redirect to login
+          if (error.error?.message?.includes('unauthorized') || error.error?.message?.includes('token')) {
+            localStorage.removeItem('user_token')
+            window.location.href = '/user/login'
+          }
+        }
       }
+      fetchProfile()
+    } else {
+      // No token - redirect to login
+      window.location.href = '/user/login'
     }
-  }, [dispatch, profile])
+  }, [dispatch])
 
   // Initialize sample notifications
   useEffect(() => {
@@ -94,80 +118,58 @@ function UserDashboardContent({ onLogout }) {
     }
   }, [dispatch, notifications.length])
 
-  // Initialize sample delivered orders
+  // Fetch orders and cart from API
+  const { fetchOrders, fetchCart } = useUserApi()
   useEffect(() => {
-    if (orders.length === 0) {
-      const sampleOrders = [
-        {
-          id: `ORD-${Date.now()}-1`,
-          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
-          status: 'delivered',
-          paymentStatus: 'fully_paid',
-          total: 3250,
-          items: [
-            {
-              name: 'NPK 19:19:19 Fertilizer',
-              price: 1250,
-              quantity: 2,
-              image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=400',
-            },
-            {
-              name: 'Organic Compost',
-              price: 750,
-              quantity: 1,
-              image: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=400',
-            },
-          ],
-        },
-        {
-          id: `ORD-${Date.now() - 1000}-2`,
-          date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days ago
-          status: 'delivered',
-          paymentStatus: 'fully_paid',
-          total: 4500,
-          items: [
-            {
-              name: 'Wheat Seeds Premium',
-              price: 1500,
-              quantity: 2,
-              image: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=400',
-            },
-            {
-              name: 'Urea Fertilizer',
-              price: 1500,
-              quantity: 1,
-              image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=400',
-            },
-          ],
-        },
-        {
-          id: `ORD-${Date.now() - 2000}-3`,
-          date: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(), // 21 days ago
-          status: 'delivered',
-          paymentStatus: 'fully_paid',
-          total: 2800,
-          items: [
-            {
-              name: 'Neem Oil Insecticide',
-              price: 850,
-              quantity: 2,
-              image: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=400',
-            },
-            {
-              name: 'Potash Fertilizer',
-              price: 1100,
-              quantity: 1,
-              image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=400',
-            },
-          ],
-        },
-      ]
+    const token = localStorage.getItem('user_token')
+    if (token) {
+      const loadData = async () => {
+        try {
+          // Fetch orders
+          const ordersResult = await fetchOrders()
+          if (ordersResult.data?.orders) {
+            ordersResult.data.orders.forEach((order) => {
+              dispatch({
+                type: 'ADD_ORDER',
+                payload: {
+                  id: order.id || order._id,
+                  orderNumber: order.orderNumber,
+                  status: order.status,
+                  totalAmount: order.totalAmount,
+                  paymentStatus: order.paymentStatus,
+                  items: order.items,
+                  createdAt: order.createdAt,
+                },
+              })
+            })
+          }
 
-      sampleOrders.forEach((order) => {
-        dispatch({ type: 'ADD_ORDER', payload: order })
-      })
+          // Fetch cart
+          const cartResult = await fetchCart()
+          if (cartResult.data?.cart?.items && cartResult.data.cart.items.length > 0) {
+            // Clear existing cart first
+            dispatch({ type: 'CLEAR_CART' })
+            // Add items from API
+            cartResult.data.cart.items.forEach((item) => {
+              const productId = item.product?.id || item.product?._id || item.productId
+              if (productId) {
+                dispatch({
+                  type: 'ADD_TO_CART',
+                  payload: {
+                    productId: productId,
+                    quantity: item.quantity || 1,
+                  },
+                })
+              }
+            })
+          }
+        } catch (error) {
+          console.error('Error loading data:', error)
+        }
+      }
+      loadData()
     }
-  }, [dispatch, orders.length])
+  }, [fetchOrders, fetchCart, dispatch])
 
   const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart])
   const favouritesCount = useMemo(() => favourites.length, [favourites])
@@ -300,29 +302,46 @@ function UserDashboardContent({ onLogout }) {
     return () => clearTimeout(timer)
   }, [pendingScroll, activeTab])
 
-  const handleAddToCart = (productId, quantity = 1) => {
-    const product = userSnapshot.products.find((p) => p.id === productId)
-    if (!product) {
-      error('Product not found')
-      return
+  const handleAddToCart = async (productId, quantity = 1) => {
+    try {
+      // Fetch product details from API
+      const result = await userApi.getProductDetails(productId)
+      if (!result.success || !result.data?.product) {
+        error('Product not found')
+        return
+      }
+      
+      const product = result.data.product
+      if (product.stock === 0) {
+        error('Product is out of stock')
+        return
+      }
+      
+      // Add to cart via API
+      const cartResult = await userApi.addToCart({ productId, quantity })
+      if (cartResult.error) {
+        error(cartResult.error.message || 'Failed to add to cart')
+        return
+      }
+      
+      // Update local state
+      dispatch({
+        type: 'ADD_TO_CART',
+        payload: {
+          productId: product._id || product.id,
+          name: product.name,
+          price: product.priceToUser || product.price,
+          image: product.images?.[0]?.url || product.primaryImage || product.image,
+          quantity,
+          vendor: product.vendor,
+          deliveryTime: product.deliveryTime,
+        },
+      })
+      success(`${product.name} added to cart`)
+    } catch (err) {
+      error('Failed to add product to cart')
+      console.error('Error adding to cart:', err)
     }
-    if (product.stock === 0) {
-      error('Product is out of stock')
-      return
-    }
-    dispatch({
-      type: 'ADD_TO_CART',
-      payload: {
-        productId: product.id,
-        name: product.name,
-        price: product.price,
-        image: product.image,
-        quantity,
-        vendor: product.vendor,
-        deliveryTime: product.deliveryTime,
-      },
-    })
-    success(`${product.name} added to cart`)
   }
 
   const handleRemoveFromCart = (productId) => {
@@ -446,8 +465,14 @@ function UserDashboardContent({ onLogout }) {
           {activeTab === 'home' && (
             <HomeView
               onProductClick={(productId) => {
-                setSelectedProduct(productId)
-                setActiveTab('product-detail')
+                if (productId === 'all') {
+                  // "View All" clicked - switch to search view instead of product detail
+                  setActiveTab('search')
+                  setSearchQuery('')
+                } else {
+                  setSelectedProduct(productId)
+                  setActiveTab('product-detail')
+                }
               }}
               onCategoryClick={(categoryId) => {
                 setSelectedCategory(categoryId)

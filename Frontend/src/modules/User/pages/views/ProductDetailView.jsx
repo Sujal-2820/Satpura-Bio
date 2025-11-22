@@ -1,32 +1,71 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { userSnapshot } from '../../services/userData'
 import { StarIcon, HeartIcon, TruckIcon, MapPinIcon, ChevronRightIcon, PlusIcon, MinusIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
+import * as userApi from '../../services/userApi'
 
 export function ProductDetailView({ productId, onAddToCart, onBack, onProductClick }) {
-  const product = userSnapshot.products.find((p) => p.id === productId)
+  const [product, setProduct] = useState(null)
+  const [similarProducts, setSimilarProducts] = useState([])
+  const [suggestedProducts, setSuggestedProducts] = useState([])
+  const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
   const [selectedImage, setSelectedImage] = useState(0)
-  const [isWishlisted, setIsWishlisted] = useState(product?.isWishlisted || false)
+  const [isWishlisted, setIsWishlisted] = useState(false)
   const containerRef = useRef(null)
 
-  // Get similar products (same category, excluding current product)
-  const similarProducts = useMemo(() => {
-    if (!product) return []
-    return userSnapshot.products
-      .filter((p) => p.category === product.category && p.id !== product.id)
-      .slice(0, 10)
-  }, [product])
-
-  // Get suggested products (random products, excluding current product and similar products)
-  const suggestedProducts = useMemo(() => {
-    if (!product) return []
-    const excludeIds = [product.id, ...similarProducts.map((p) => p.id)]
-    const available = userSnapshot.products.filter((p) => !excludeIds.includes(p.id))
-    // Shuffle and take 10
-    const shuffled = [...available].sort(() => Math.random() - 0.5)
-    return shuffled.slice(0, 10)
-  }, [product, similarProducts])
+  // Fetch product details and related products
+  useEffect(() => {
+    const loadProduct = async () => {
+      // Don't fetch if productId is 'all' or invalid
+      if (!productId || productId === 'all') {
+        setLoading(false)
+        return
+      }
+      
+      setLoading(true)
+      try {
+        // Fetch product details
+        const result = await userApi.getProductDetails(productId)
+        if (result.success && result.data?.product) {
+          const productData = result.data.product
+          setProduct(productData)
+          setIsWishlisted(productData.isWishlisted || false)
+          
+          // Fetch similar products (same category)
+          if (productData.category) {
+            const similarResult = await userApi.getProducts({ 
+              category: productData.category, 
+              limit: 10 
+            })
+            if (similarResult.success && similarResult.data?.products) {
+              const similar = similarResult.data.products
+                .filter((p) => (p._id || p.id) !== productId)
+                .slice(0, 10)
+              setSimilarProducts(similar)
+              
+              // Fetch suggested products (different category)
+              const suggestedResult = await userApi.getProducts({ limit: 20 })
+              if (suggestedResult.success && suggestedResult.data?.products) {
+                const excludeIds = [productId, ...similar.map((p) => p._id || p.id)]
+                const suggested = suggestedResult.data.products
+                  .filter((p) => !excludeIds.includes(p._id || p.id))
+                  .slice(0, 10)
+                setSuggestedProducts(suggested)
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading product:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    if (productId) {
+      loadProduct()
+    }
+  }, [productId])
 
   // Reset quantity and image when product changes
   useEffect(() => {
@@ -40,6 +79,16 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
       }
     }
   }, [productId, product])
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center py-12">
+          <p className="text-base font-semibold text-[rgba(26,42,34,0.75)] mb-4">Loading product...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!product) {
     return (
@@ -67,7 +116,13 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
     }
   }
 
-  const images = [product.image, product.image, product.image] // In real app, use product.images
+  const images = product.images?.length > 0 
+    ? product.images.map(img => img.url || img) 
+    : product.primaryImage 
+    ? [product.primaryImage] 
+    : product.image 
+    ? [product.image] 
+    : ['https://via.placeholder.com/400']
 
   const handleProductClick = (clickedProductId) => {
     if (onProductClick) {
@@ -151,11 +206,13 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
 
         {/* Price */}
         <div className="flex items-baseline gap-2 mb-4">
-          <span className="text-2xl font-bold text-[#1b8f5b]">₹{product.price.toLocaleString('en-IN')}</span>
-          {product.originalPrice && product.originalPrice > product.price && (
+          <span className="text-2xl font-bold text-[#1b8f5b]">₹{(product.priceToUser || product.price || 0).toLocaleString('en-IN')}</span>
+          {product.originalPrice && product.originalPrice > (product.priceToUser || product.price) && (
             <>
               <span className="text-lg text-[rgba(26,42,34,0.5)] line-through">₹{product.originalPrice.toLocaleString('en-IN')}</span>
-              <span className="px-2 py-0.5 rounded text-xs font-semibold text-white bg-red-500">-{product.discount}%</span>
+              {product.discount && (
+                <span className="px-2 py-0.5 rounded text-xs font-semibold text-white bg-red-500">-{product.discount}%</span>
+              )}
             </>
           )}
         </div>
@@ -247,7 +304,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
             onClick={handleAddToCart}
             disabled={!inStock}
           >
-            {inStock ? `Add to Cart • ₹${(product.price * quantity).toLocaleString('en-IN')}` : 'Out of Stock'}
+            {inStock ? `Add to Cart • ₹${((product.priceToUser || product.price || 0) * quantity).toLocaleString('en-IN')}` : 'Out of Stock'}
           </button>
         </div>
       </div>
@@ -264,18 +321,18 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
               <div key={similarProduct.id} className="user-product-detail-view__similar-card-wrapper">
                 <div
                   className="user-product-detail-view__similar-card"
-                  onClick={() => handleProductClick(similarProduct.id)}
+                  onClick={() => handleProductClick(similarProduct._id || similarProduct.id)}
                 >
                   <div className="user-product-detail-view__similar-card-image">
-                    <img src={similarProduct.image} alt={similarProduct.name} />
+                    <img src={similarProduct.images?.[0]?.url || similarProduct.primaryImage || similarProduct.image || 'https://via.placeholder.com/300'} alt={similarProduct.name} />
                   </div>
                   <div className="user-product-detail-view__similar-card-content">
                     <h4 className="user-product-detail-view__similar-card-title">{similarProduct.name}</h4>
                     <div className="user-product-detail-view__similar-card-price">
                       <span className="user-product-detail-view__similar-card-price-main">
-                        ₹{similarProduct.price.toLocaleString('en-IN')}
+                        ₹{(similarProduct.priceToUser || similarProduct.price || 0).toLocaleString('en-IN')}
                       </span>
-                      {similarProduct.originalPrice && similarProduct.originalPrice > similarProduct.price && (
+                      {similarProduct.originalPrice && similarProduct.originalPrice > (similarProduct.priceToUser || similarProduct.price) && (
                         <span className="user-product-detail-view__similar-card-price-original">
                           ₹{similarProduct.originalPrice.toLocaleString('en-IN')}
                         </span>
@@ -286,7 +343,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
                       className="user-product-detail-view__similar-card-button"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleProductClick(similarProduct.id)
+                        handleProductClick(similarProduct._id || similarProduct.id)
                       }}
                     >
                       View Details
@@ -311,18 +368,18 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
               <div key={suggestedProduct.id} className="user-product-detail-view__suggested-card-wrapper">
                 <div
                   className="user-product-detail-view__suggested-card"
-                  onClick={() => handleProductClick(suggestedProduct.id)}
+                  onClick={() => handleProductClick(suggestedProduct._id || suggestedProduct.id)}
                 >
                   <div className="user-product-detail-view__suggested-card-image">
-                    <img src={suggestedProduct.image} alt={suggestedProduct.name} />
+                    <img src={suggestedProduct.images?.[0]?.url || suggestedProduct.primaryImage || suggestedProduct.image || 'https://via.placeholder.com/300'} alt={suggestedProduct.name} />
                   </div>
                   <div className="user-product-detail-view__suggested-card-content">
                     <h4 className="user-product-detail-view__suggested-card-title">{suggestedProduct.name}</h4>
                     <div className="user-product-detail-view__suggested-card-price">
                       <span className="user-product-detail-view__suggested-card-price-main">
-                        ₹{suggestedProduct.price.toLocaleString('en-IN')}
+                        ₹{(suggestedProduct.priceToUser || suggestedProduct.price || 0).toLocaleString('en-IN')}
                       </span>
-                      {suggestedProduct.originalPrice && suggestedProduct.originalPrice > suggestedProduct.price && (
+                      {suggestedProduct.originalPrice && suggestedProduct.originalPrice > (suggestedProduct.priceToUser || suggestedProduct.price) && (
                         <span className="user-product-detail-view__suggested-card-price-original">
                           ₹{suggestedProduct.originalPrice.toLocaleString('en-IN')}
                         </span>
@@ -333,7 +390,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
                       className="user-product-detail-view__suggested-card-button"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleProductClick(suggestedProduct.id)
+                        handleProductClick(suggestedProduct._id || suggestedProduct.id)
                       }}
                     >
                       View Details

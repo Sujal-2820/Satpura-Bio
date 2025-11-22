@@ -51,8 +51,8 @@ export function ProductCard({ product, onAddToCart, onWishlist, onNavigate, clas
             </span>
           </div>
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[0.95rem] font-bold text-[#1b8f5b]">₹{product.price.toLocaleString('en-IN')}</span>
-            {product.originalPrice && product.originalPrice > product.price && (
+            <span className="text-[0.95rem] font-bold text-[#1b8f5b]">₹{(product.priceToUser || product.price || 0).toLocaleString('en-IN')}</span>
+            {product.originalPrice && product.originalPrice > (product.priceToUser || product.price || 0) && (
               <span className="text-[0.8rem] text-[rgba(26,42,34,0.5)] line-through">₹{product.originalPrice.toLocaleString('en-IN')}</span>
             )}
           </div>

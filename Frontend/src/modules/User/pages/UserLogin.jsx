@@ -1,8 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { OtpVerification } from '../../../components/auth/OtpVerification'
+import { useUserDispatch } from '../context/UserContext'
 import * as userApi from '../services/userApi'
 
 export function UserLogin({ onSuccess, onSwitchToRegister }) {
+  const navigate = useNavigate()
+  const dispatch = useUserDispatch()
   const [step, setStep] = useState('phone') // 'phone' | 'otp'
   const [form, setForm] = useState({ phone: '' })
   const [loading, setLoading] = useState(false)
@@ -59,12 +63,42 @@ export function UserLogin({ onSuccess, onSwitchToRegister }) {
         if (result.data?.token) {
           localStorage.setItem('user_token', result.data.token)
         }
-        onSuccess?.(result.data?.user || { phone: form.phone })
+        
+        // Update context with user data
+        const userData = result.data?.user || { name: 'User', phone: form.phone }
+        dispatch({
+          type: 'AUTH_LOGIN',
+          payload: {
+            name: userData.name || 'User',
+            phone: userData.phone || form.phone,
+            sellerId: userData.sellerId || null,
+            location: userData.location || null,
+          },
+        })
+        
+        onSuccess?.(userData)
+        navigate('/user/dashboard')
       } else {
-        setError(result.error?.message || 'Invalid OTP. Please try again.')
+        // Check if user needs to register
+        if (result.error?.message?.includes('not found') || result.requiresRegistration) {
+          setError('User not found. Please register first.')
+          setTimeout(() => {
+            navigate('/user/register')
+          }, 2000)
+        } else {
+          setError(result.error?.message || 'Invalid OTP. Please try again.')
+        }
       }
     } catch (err) {
-      setError(err.message || 'Verification failed. Please try again.')
+      // Check if error indicates user doesn't exist
+      if (err.error?.message?.includes('not found') || err.requiresRegistration) {
+        setError('User not found. Redirecting to registration...')
+        setTimeout(() => {
+          navigate('/user/register')
+        }, 2000)
+      } else {
+        setError(err.error?.message || err.message || 'Verification failed. Please try again.')
+      }
     } finally {
       setLoading(false)
     }

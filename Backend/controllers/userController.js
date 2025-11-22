@@ -38,16 +38,52 @@ exports.requestOTP = async (req, res, next) => {
     let user = await User.findOne({ phone });
 
     // If user doesn't exist, create pending registration
+    // ⚠️ NOTE: Name is not required at OTP request stage - will be set during registration
     if (!user) {
       user = new User({
         phone,
         language: language || 'en',
+        name: 'Pending Registration', // Temporary name, will be updated during registration
+        isActive: false, // Will be activated after registration
       });
     }
 
     // Generate and send OTP
     const otpCode = user.generateOTP();
-    await user.save();
+    
+    // Save user to database
+    try {
+      await user.save();
+      console.log(`✅ User ${user.phone} saved to database (OTP requested)`);
+    } catch (saveError) {
+      console.error('❌ Error saving user during OTP request:', saveError);
+      // If it's a validation error, provide more details
+      if (saveError.name === 'ValidationError') {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error: ' + Object.values(saveError.errors).map(e => e.message).join(', '),
+          errors: saveError.errors,
+        });
+      }
+      // If it's a duplicate key error (phone already exists)
+      if (saveError.code === 11000) {
+        // Try to find the existing user
+        user = await User.findOne({ phone });
+        if (user) {
+          // Regenerate OTP for existing user
+          const otpCode = user.generateOTP();
+          await user.save();
+          console.log(`✅ OTP regenerated for existing user ${user.phone}`);
+        } else {
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to create user. Please try again.',
+          });
+        }
+      } else {
+        throw saveError;
+      }
+    }
 
     // Log OTP to console for testing
     console.log('\n========================================');
@@ -83,7 +119,7 @@ exports.requestOTP = async (req, res, next) => {
  */
 exports.register = async (req, res, next) => {
   try {
-    const { fullName, phone, otp, sellerId, language } = req.body;
+    const { fullName, phone, otp, sellerId, language, location } = req.body;
 
     if (!fullName || !phone || !otp) {
       return res.status(400).json({
@@ -92,22 +128,56 @@ exports.register = async (req, res, next) => {
       });
     }
 
+    // Validate location if provided
+    if (location && (!location.coordinates || !location.coordinates.lat || !location.coordinates.lng)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Location with valid coordinates (lat, lng) is required',
+      });
+    }
+
     let user = await User.findOne({ phone });
     const isNewUser = !user;
 
+    // If user doesn't exist, they must have requested OTP first
+    // In requestOTP, a user is created with OTP, so user should exist here
     if (!user) {
-      // First-time registration - sellerId can be set here
-      user = new User({
-        name: fullName,
-        phone,
-        language: language || 'en',
-        sellerId: null, // Will be set after validation
+      return res.status(400).json({
+        success: false,
+        message: 'Please request OTP first before registering. User not found.',
       });
+    }
+
+    // Verify OTP first before proceeding
+    // User should have OTP from requestOTP call
+    const isOtpValid = user.verifyOTP(otp);
+
+    if (!isOtpValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired OTP',
+      });
+    }
+
+    // Now update user data after OTP verification
+    if (isNewUser || user.name === 'Pending Registration') {
+      // First-time registration - update all fields
+      user.name = fullName;
+      user.language = language || 'en';
+      if (location) {
+        user.location = location;
+      }
     } else {
       // Existing user - only update name and language, NOT sellerId
       // sellerId is locked for lifetime once set
       user.name = fullName;
       if (language) user.language = language;
+      if (location) {
+        user.location = {
+          ...user.location,
+          ...location,
+        };
+      }
       
       // If sellerId is already set and user tries to provide a different one, reject
       if (sellerId && user.sellerId && user.sellerId !== sellerId.toUpperCase()) {
@@ -116,16 +186,6 @@ exports.register = async (req, res, next) => {
           message: 'Seller ID can only be set during first-time registration. Your seller ID is already linked for lifetime and cannot be changed.',
         });
       }
-    }
-
-    // Verify OTP
-    const isOtpValid = user.verifyOTP(otp);
-
-    if (!isOtpValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid or expired OTP',
-      });
     }
 
     // Validate and set sellerId
@@ -158,7 +218,76 @@ exports.register = async (req, res, next) => {
 
     // Clear OTP after successful verification
     user.clearOTP();
-    await user.save();
+    
+    // Save user to database (first save - before vendor assignment)
+    try {
+      await user.save();
+      console.log(`✅ User registered/updated successfully: ${user.phone} (${user.name})`);
+      console.log(`📝 User ID: ${user._id}`);
+      console.log(`📍 Location: ${JSON.stringify(user.location)}`);
+      console.log(`🔗 Seller ID: ${user.sellerId || 'None'}`);
+    } catch (saveError) {
+      console.error('❌ Error saving user during registration:', saveError);
+      // If it's a validation error, provide more details
+      if (saveError.name === 'ValidationError') {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error: ' + Object.values(saveError.errors).map(e => e.message).join(', '),
+          errors: saveError.errors,
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to save user data. Please try again.',
+        error: process.env.NODE_ENV === 'development' ? saveError.message : undefined,
+      });
+    }
+
+    // Assign vendor based on location (20km radius)
+    // ⚠️ TEMPORARY: Manual location entry - will be replaced with Google Maps API
+    let assignedVendor = null;
+    if (user.location && user.location.coordinates && user.location.coordinates.lat && user.location.coordinates.lng) {
+      try {
+        const { lat, lng } = user.location.coordinates;
+        
+        // Find vendor within 20km radius
+        const allVendors = await Vendor.find({
+          status: 'approved',
+          isActive: true,
+          'location.coordinates.lat': { $exists: true },
+          'location.coordinates.lng': { $exists: true },
+        });
+
+        // Filter vendors by distance (20km radius)
+        let nearestVendor = null;
+        let minDistance = VENDOR_COVERAGE_RADIUS_KM; // km
+
+        for (const v of allVendors) {
+          const distance = calculateDistance(
+            lat,
+            lng,
+            v.location.coordinates.lat,
+            v.location.coordinates.lng
+          );
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearestVendor = v;
+          }
+        }
+
+        if (nearestVendor) {
+          assignedVendor = nearestVendor._id;
+          user.assignedVendor = nearestVendor._id;
+          await user.save();
+          console.log(`📍 Vendor assigned to user ${user.phone}: ${nearestVendor.name} (${minDistance.toFixed(2)} km away)`);
+        } else {
+          console.log(`⚠️ No vendor found within 20km radius for user ${user.phone}. Orders will be handled by admin.`);
+        }
+      } catch (geoError) {
+        console.warn('Vendor assignment failed during registration:', geoError);
+        // Don't fail registration if vendor assignment fails
+      }
+    }
 
     // Generate JWT token
     const token = generateToken({
@@ -178,6 +307,7 @@ exports.register = async (req, res, next) => {
           sellerId: user.sellerId,
           email: user.email,
           location: user.location,
+          assignedVendor: assignedVendor ? assignedVendor.toString() : null,
         },
       },
     });
@@ -208,6 +338,15 @@ exports.loginWithOtp = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: 'User not found. Please register first.',
+        requiresRegistration: true, // Flag for frontend to redirect
+      });
+    }
+
+    // Check if user is blocked
+    if (user.isBlocked || !user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been blocked or deactivated. Please contact support.',
       });
     }
 
@@ -435,13 +574,36 @@ exports.getSellerID = async (req, res, next) => {
  */
 exports.getCategories = async (req, res, next) => {
   try {
-    // Get distinct categories from active products
-    const categories = await Product.distinct('category', { isActive: true });
+    const { getCategoryNames, getAllCategories } = require('../utils/fertilizerCategories');
+    
+    // Get all fertilizer categories
+    const allCategories = getAllCategories();
+    
+    // Get product counts for each category
+    const categoryCounts = await Product.aggregate([
+      { $match: { isActive: true } },
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+    ]);
+    
+    // Create a map of category counts
+    const countMap = {};
+    categoryCounts.forEach(item => {
+      countMap[item._id] = item.count;
+    });
+    
+    // Merge category info with counts
+    const categoriesWithCounts = allCategories.map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      description: cat.description,
+      icon: cat.icon,
+      count: countMap[cat.id] || 0,
+    }));
     
     res.status(200).json({
       success: true,
       data: {
-        categories: categories.sort(),
+        categories: categoriesWithCounts,
       },
     });
   } catch (error) {
@@ -471,7 +633,13 @@ exports.getProducts = async (req, res, next) => {
 
     // Filter by category
     if (category) {
-      query.category = category.toLowerCase();
+      // Normalize category to lowercase for matching
+      // Categories are stored as lowercase in database (e.g., 'npk', 'organic', 'nitrogen')
+      const categoryLower = category.toLowerCase().trim();
+      query.category = categoryLower;
+      
+      // Log for debugging (remove in production)
+      console.log(`[getProducts] Filtering by category: "${categoryLower}"`);
     }
 
     // Text search
@@ -509,6 +677,16 @@ exports.getProducts = async (req, res, next) => {
         .lean(),
       Product.countDocuments(query),
     ]);
+
+    // Log for debugging category filtering (remove in production)
+    if (category) {
+      console.log(`[getProducts] Found ${products.length} products for category "${category.toLowerCase()}" (total: ${total})`);
+      if (products.length === 0 && total === 0) {
+        // Check if any products exist with similar category names
+        const allCategories = await Product.distinct('category', { isActive: true });
+        console.log(`[getProducts] Available categories in database:`, allCategories);
+      }
+    }
 
     res.status(200).json({
       success: true,

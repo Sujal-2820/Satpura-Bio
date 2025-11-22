@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useUserState, useUserDispatch } from '../../context/UserContext'
 import { useUserApi } from '../../hooks/useUserApi'
-import { userSnapshot, ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE } from '../../services/userData'
+import { ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE } from '../../services/userData'
 import { MapPinIcon, CreditCardIcon, TruckIcon, ChevronRightIcon, ChevronDownIcon, CheckIcon, PackageIcon, EditIcon, TrashIcon, XIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import { useToast } from '../../components/ToastNotification'
+import * as userApi from '../../services/userApi'
 
 const STEPS = [
   { id: 1, label: 'Summary', icon: PackageIcon },
@@ -38,6 +39,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false)
   const [pendingOrder, setPendingOrder] = useState(null)
   const [paymentPreference, setPaymentPreference] = useState('partial') // 'partial' | 'full'
+  const [cartProducts, setCartProducts] = useState({})
 
   // Remove duplicates from addresses
   const uniqueAddresses = useMemo(() => {
@@ -60,6 +62,28 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       setSelectedAddress(null)
     }
   }, [uniqueAddresses, selectedAddress])
+
+  // Fetch product details for cart items
+  useEffect(() => {
+    const loadCartProducts = async () => {
+      const productMap = {}
+      for (const item of cart) {
+        try {
+          const result = await userApi.getProductDetails(item.productId)
+          if (result.success && result.data?.product) {
+            productMap[item.productId] = result.data.product
+          }
+        } catch (error) {
+          console.error(`Error loading product ${item.productId}:`, error)
+        }
+      }
+      setCartProducts(productMap)
+    }
+    
+    if (cart.length > 0) {
+      loadCartProducts()
+    }
+  }, [cart])
 
   const handleOpenAddressPanel = (address = null) => {
     if (address) {
@@ -139,13 +163,20 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
 
   const cartItems = useMemo(() => {
     return cart.map((item) => {
-      const product = userSnapshot.products.find((p) => p.id === item.productId)
+      const product = cartProducts[item.productId]
+      // Ensure price is always a valid number - prioritize item.price, then product.priceToUser, then product.price
+      const price = item.price || (product ? (product.priceToUser || product.price || 0) : 0)
       return {
         ...item,
         product,
+        price: typeof price === 'number' && !isNaN(price) ? price : 0,
+        // Ensure image is available
+        image: item.image || (product?.images?.[0]?.url || product?.primaryImage || 'https://via.placeholder.com/300'),
+        // Ensure name is available
+        name: item.name || product?.name || 'Unknown Product',
       }
     })
-  }, [cart])
+  }, [cart, cartProducts])
 
   const isFullPayment = paymentPreference === 'full'
 
@@ -173,7 +204,13 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
   const selectedShipping = shippingOptions.find((s) => s.id === shippingMethod) || shippingOptions[0]
 
   const totals = useMemo(() => {
-    const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    // Calculate subtotal with proper price handling
+    const subtotal = cartItems.reduce((sum, item) => {
+      const itemPrice = typeof item.price === 'number' && !isNaN(item.price) ? item.price : 0
+      const itemQuantity = typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
+      return sum + (itemPrice * itemQuantity)
+    }, 0)
+    
     const deliveryBeforeBenefit = subtotal >= (selectedShipping.minOrder || Infinity) ? 0 : selectedShipping.cost
     const delivery = paymentPreference === 'full' ? 0 : deliveryBeforeBenefit
     const discount = 0 // Promo code discount would be calculated here
@@ -185,13 +222,13 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
     const remaining = total - advance
 
     return {
-      subtotal,
-      delivery,
-      deliveryBeforeBenefit,
-      discount,
-      total,
-      advance,
-      remaining,
+      subtotal: isNaN(subtotal) ? 0 : subtotal,
+      delivery: isNaN(delivery) ? 0 : delivery,
+      deliveryBeforeBenefit: isNaN(deliveryBeforeBenefit) ? 0 : deliveryBeforeBenefit,
+      discount: isNaN(discount) ? 0 : discount,
+      total: isNaN(total) ? 0 : total,
+      advance: isNaN(advance) ? 0 : advance,
+      remaining: isNaN(remaining) ? 0 : remaining,
     }
   }, [cartItems, selectedShipping, paymentPreference])
 

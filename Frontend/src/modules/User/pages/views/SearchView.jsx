@@ -1,8 +1,8 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { userSnapshot } from '../../services/userData'
 import { ProductCard } from '../../components/ProductCard'
 import { FilterIcon, ChevronDownIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
+import * as userApi from '../../services/userApi'
 
 export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFavourite, categoryId, favourites = [] }) {
   const [showFilters, setShowFilters] = useState(false)
@@ -10,49 +10,72 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
   const [sortBy, setSortBy] = useState('popular')
   const [showSortDropdown, setShowSortDropdown] = useState(false)
   const [maxPrice, setMaxPrice] = useState(10000)
+  const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState([])
+  const [loading, setLoading] = useState(true)
   const sortDropdownRef = useRef(null)
 
-  const filteredProducts = useMemo(() => {
-    let products = [...userSnapshot.products]
-
-    // Filter by search query
-    if (query.trim()) {
-      const searchLower = query.toLowerCase()
-      products = products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(searchLower) ||
-          p.description.toLowerCase().includes(searchLower) ||
-          p.category.toLowerCase().includes(searchLower),
-      )
+  // Fetch categories
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const result = await userApi.getCategories()
+        if (result.success && result.data?.categories) {
+          setCategories(result.data.categories)
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error)
+      }
     }
+    loadCategories()
+  }, [])
 
-    // Filter by category
-    if (selectedCategory !== 'all') {
-      products = products.filter((p) => p.category === selectedCategory)
+  // Fetch products based on filters
+  useEffect(() => {
+    const loadProducts = async () => {
+      setLoading(true)
+      try {
+        const params = {
+          limit: 100,
+          maxPrice,
+        }
+        
+        if (query.trim()) {
+          params.search = query.trim()
+        }
+        
+        if (selectedCategory !== 'all') {
+          params.category = selectedCategory
+        }
+        
+        // Map sortBy to API sort parameter
+        if (sortBy === 'price-low') {
+          params.sort = 'price_asc'
+        } else if (sortBy === 'price-high') {
+          params.sort = 'price_desc'
+        } else if (sortBy === 'rating') {
+          params.sort = 'rating_desc'
+        } else {
+          params.sort = 'popular'
+        }
+        
+        const result = await userApi.getProducts(params)
+        if (result.success && result.data?.products) {
+          setProducts(result.data.products)
+        }
+      } catch (error) {
+        console.error('Error loading products:', error)
+      } finally {
+        setLoading(false)
+      }
     }
-
-    // Filter by price
-    products = products.filter((p) => p.price >= 0 && p.price <= maxPrice)
-
-    // Sort
-    switch (sortBy) {
-      case 'price-low':
-        products.sort((a, b) => a.price - b.price)
-        break
-      case 'price-high':
-        products.sort((a, b) => b.price - a.price)
-        break
-      case 'rating':
-        products.sort((a, b) => (b.rating || 0) - (a.rating || 0))
-        break
-      case 'popular':
-      default:
-        products.sort((a, b) => (b.reviews || 0) - (a.reviews || 0))
-        break
-    }
-
-    return products
+    
+    loadProducts()
   }, [query, selectedCategory, sortBy, maxPrice])
+
+  const filteredProducts = useMemo(() => {
+    return products
+  }, [products])
 
   // Close sort dropdown when clicking outside
   useEffect(() => {
@@ -109,17 +132,17 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
               >
                 All
               </button>
-              {userSnapshot.categories.map((cat) => (
+              {categories.map((cat) => (
                 <button
-                  key={cat.id}
+                  key={cat._id || cat.id}
                   type="button"
                   className={cn(
                     'px-3 py-1.5 rounded-full text-xs font-semibold transition-all',
-                    selectedCategory === cat.id
+                    selectedCategory === (cat._id || cat.id)
                       ? 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white shadow-md'
                       : 'bg-[rgba(240,245,242,0.8)] text-[rgba(23,32,34,0.65)] border border-[rgba(34,94,65,0.15)] hover:bg-[rgba(248,252,249,0.95)]'
                   )}
-                  onClick={() => setSelectedCategory(cat.id)}
+                  onClick={() => setSelectedCategory(cat._id || cat.id)}
                 >
                   {cat.name}
                 </button>
@@ -231,12 +254,22 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
       )}
 
       {/* Products Grid */}
-      {filteredProducts.length > 0 ? (
+      {loading ? (
+        <div className="text-center py-12">
+          <p className="text-base font-semibold text-[rgba(26,42,34,0.75)] mb-2">Loading products...</p>
+        </div>
+      ) : filteredProducts.length > 0 ? (
         <div className="grid grid-cols-2 gap-3">
           {filteredProducts.map((product) => (
             <ProductCard
-              key={product.id}
-              product={{ ...product, isWishlisted: favourites.includes(product.id) }}
+              key={product._id || product.id}
+              product={{ 
+                ...product, 
+                id: product._id || product.id,
+                price: product.priceToUser || product.price || 0,
+                image: product.images?.[0]?.url || product.primaryImage || product.image,
+                isWishlisted: favourites.includes(product._id || product.id) 
+              }}
               onNavigate={onProductClick}
               onAddToCart={onAddToCart}
               onWishlist={onToggleFavourite}

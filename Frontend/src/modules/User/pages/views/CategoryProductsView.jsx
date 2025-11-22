@@ -1,12 +1,15 @@
-import { useMemo, useState } from 'react'
-import { userSnapshot } from '../../services/userData'
+import { useMemo, useState, useEffect } from 'react'
 import { ProductCard } from '../../components/ProductCard'
 import { ChevronLeftIcon, FilterIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
+import * as userApi from '../../services/userApi'
 
 export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, onBack, onToggleFavourite, favourites = [] }) {
   const [selectedCategory, setSelectedCategory] = useState(categoryId || 'all')
   const [showFilters, setShowFilters] = useState(false)
+  const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState([])
+  const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
     priceRange: 'all',
     availability: {
@@ -21,27 +24,61 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
     },
   })
 
-  const category = useMemo(() => {
-    if (selectedCategory === 'all') return null
-    return userSnapshot.categories.find((cat) => cat.id === selectedCategory)
+  // Fetch categories
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const result = await userApi.getCategories()
+        if (result.success && result.data?.categories) {
+          setCategories(result.data.categories)
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error)
+      }
+    }
+    loadCategories()
+  }, [])
+
+  // Fetch products for selected category
+  useEffect(() => {
+    const loadProducts = async () => {
+      setLoading(true)
+      try {
+        const params = { limit: 100 }
+        if (selectedCategory !== 'all') {
+          params.category = selectedCategory
+        }
+        const result = await userApi.getProducts(params)
+        if (result.success && result.data?.products) {
+          setProducts(result.data.products)
+        }
+      } catch (error) {
+        console.error('Error loading products:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadProducts()
   }, [selectedCategory])
 
+  const category = useMemo(() => {
+    if (selectedCategory === 'all') return null
+    return categories.find((cat) => (cat._id || cat.id) === selectedCategory)
+  }, [selectedCategory, categories])
+
   const categoryProducts = useMemo(() => {
-    let products = []
-    if (selectedCategory === 'all') {
-      products = userSnapshot.products
-    } else {
-      products = userSnapshot.products.filter((product) => product.category === selectedCategory)
-    }
+    let filtered = [...products]
 
     // Apply price filter
     if (filters.priceRange !== 'all') {
       const [min, max] = filters.priceRange.split('-').map((v) => (v === '+' ? Infinity : parseInt(v.replace(/[₹,]/g, ''))))
-      products = products.filter((product) => {
+      filtered = filtered.filter((product) => {
+        const price = product.priceToUser || product.price || 0
         if (max === Infinity) {
-          return product.price >= min
+          return price >= min
         }
-        return product.price >= min && product.price <= max
+        return price >= min && price <= max
       })
     }
 
@@ -52,7 +89,7 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
     if (filters.availability.outOfStock) availabilityFilters.push('outOfStock')
 
     if (availabilityFilters.length > 0) {
-      products = products.filter((product) => {
+      filtered = filtered.filter((product) => {
         const stockStatus = product.stock > 10 ? 'inStock' : product.stock > 0 ? 'lowStock' : 'outOfStock'
         return availabilityFilters.includes(stockStatus)
       })
@@ -66,15 +103,15 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
 
     if (ratingFilters.length > 0) {
       const minRating = Math.max(...ratingFilters)
-      products = products.filter((product) => (product.rating || 0) >= minRating)
+      filtered = filtered.filter((product) => (product.rating || 0) >= minRating)
     }
 
-    return products
-  }, [selectedCategory, filters])
+    return filtered
+  }, [products, filters])
 
   const allCategories = [
     { id: 'all', name: 'All' },
-    ...userSnapshot.categories,
+    ...categories,
   ]
 
   const handleCategoryClick = (catId) => {
@@ -118,13 +155,13 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
         <div className="user-category-products-view__categories-rail">
           {allCategories.map((cat) => (
             <button
-              key={cat.id}
+              key={cat._id || cat.id}
               type="button"
               className={cn(
                 'user-category-products-view__category-tab',
-                selectedCategory === cat.id && 'user-category-products-view__category-tab--active'
+                selectedCategory === (cat._id || cat.id) && 'user-category-products-view__category-tab--active'
               )}
-              onClick={() => handleCategoryClick(cat.id)}
+              onClick={() => handleCategoryClick(cat._id || cat.id)}
             >
               {cat.name}
             </button>
@@ -329,22 +366,26 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
       )}
 
       {/* Products List */}
-      {categoryProducts.length === 0 ? (
+      {loading ? (
+        <div className="user-category-products-view__empty">
+          <p className="user-category-products-view__empty-text">Loading products...</p>
+        </div>
+      ) : categoryProducts.length === 0 ? (
         <div className="user-category-products-view__empty">
           <p className="user-category-products-view__empty-text">No products found in this category</p>
         </div>
       ) : (
         <div className="user-category-products-view__list">
           {categoryProducts.map((product) => (
-            <div key={product.id} className="user-category-products-view__card-wrapper">
+            <div key={product._id || product.id} className="user-category-products-view__card-wrapper">
               <div
                 className="user-category-products-view__card"
-                onClick={() => onProductClick?.(product.id)}
+                onClick={() => onProductClick?.(product._id || product.id)}
               >
                 <div className="user-category-products-view__card-image-section">
                   <div className="user-category-products-view__card-image-wrapper">
                     <img
-                      src={product.image}
+                      src={product.images?.[0]?.url || product.primaryImage || product.image || 'https://via.placeholder.com/300'}
                       alt={product.name}
                       className="user-category-products-view__card-image"
                     />
@@ -353,11 +394,11 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
                       className="user-category-products-view__card-wishlist"
                       onClick={(e) => {
                         e.stopPropagation()
-                        onToggleFavourite?.(product.id)
+                        onToggleFavourite?.(product._id || product.id)
                       }}
                       aria-label="Add to wishlist"
                     >
-                      <svg className="h-5 w-5" fill={favourites.includes(product.id) ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-5 w-5" fill={favourites.includes(product._id || product.id) ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                       </svg>
                     </button>
@@ -389,8 +430,8 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
                   <div className="user-category-products-view__card-body">
                     <div className="user-category-products-view__card-price-section">
                       <div className="user-category-products-view__card-price-main">
-                        <span className="user-category-products-view__card-price">₹{product.price.toLocaleString('en-IN')}</span>
-                        {product.originalPrice && product.originalPrice > product.price && (
+                        <span className="user-category-products-view__card-price">₹{(product.priceToUser || product.price || 0).toLocaleString('en-IN')}</span>
+                        {product.originalPrice && product.originalPrice > (product.priceToUser || product.price) && (
                           <span className="user-category-products-view__card-price-original">
                             ₹{product.originalPrice.toLocaleString('en-IN')}
                           </span>
@@ -408,7 +449,7 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
                       onClick={(e) => {
                         e.stopPropagation()
                         if (product.stock > 0) {
-                          onAddToCart?.(product.id)
+                          onAddToCart?.(product._id || product.id)
                         }
                       }}
                       disabled={product.stock === 0}
