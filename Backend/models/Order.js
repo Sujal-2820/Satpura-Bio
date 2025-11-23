@@ -214,23 +214,31 @@ orderSchema.index({ assignedTo: 1, status: 1 }); // Admin escalated orders
 orderSchema.pre('save', async function (next) {
   // Generate order number if not provided
   if (!this.orderNumber && this.isNew) {
-    const date = new Date();
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
-    
-    // Find count of orders created today
-    const todayStart = new Date(date);
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(date);
-    todayEnd.setHours(23, 59, 59, 999);
-    
-    // Use Order model (must be defined at this point)
-    const OrderModel = mongoose.models.Order || mongoose.model('Order', orderSchema);
-    const todayCount = await OrderModel.countDocuments({
-      createdAt: { $gte: todayStart, $lte: todayEnd },
-    });
-    
-    const sequence = String(todayCount + 1).padStart(4, '0');
-    this.orderNumber = `ORD-${dateStr}-${sequence}`;
+    try {
+      const date = new Date();
+      const dateStr = date.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+      
+      // Find count of orders created today
+      const todayStart = new Date(date);
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(date);
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      // Use mongoose.model to get the Order model
+      const OrderModel = this.constructor;
+      const todayCount = await OrderModel.countDocuments({
+        createdAt: { $gte: todayStart, $lte: todayEnd },
+      });
+      
+      const sequence = String(todayCount + 1).padStart(4, '0');
+      this.orderNumber = `ORD-${dateStr}-${sequence}`;
+    } catch (error) {
+      // Fallback: generate order number without counting
+      const date = new Date();
+      const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+      const timestamp = Date.now().toString().slice(-6);
+      this.orderNumber = `ORD-${dateStr}-${timestamp}`;
+    }
   }
 
   // Calculate expected delivery date

@@ -248,9 +248,9 @@ export function useUserApi() {
   )
 
   const confirmPayment = useCallback(
-    async (paymentIntentId, paymentMethod, paymentDetails) => {
+    async (paymentData) => {
       return handleApiCall(
-        () => userApi.confirmPayment({ paymentIntentId, paymentMethod, paymentDetails }),
+        () => userApi.confirmPayment(paymentData),
         null,
         'Failed to confirm payment',
       )

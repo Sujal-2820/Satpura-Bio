@@ -147,11 +147,19 @@ cartSchema.methods.clear = function () {
 };
 
 // Instance method: Validate cart before checkout
-cartSchema.methods.validateForCheckout = function () {
+// @param {string} paymentPreference - 'partial' (30% advance) or 'full' (100% payment)
+cartSchema.methods.validateForCheckout = function (paymentPreference = 'full') {
   if (!this.items || this.items.length === 0) {
     return { valid: false, message: 'Cart is empty' };
   }
 
+  // Skip minimum order value check if user chooses partial payment (30% advance)
+  // For partial payment, user can pay 30% now and remaining 70% later, so no minimum required
+  if (paymentPreference === 'partial') {
+    return { valid: true, message: 'Cart is valid for checkout (partial payment)' };
+  }
+
+  // For full payment, enforce minimum order value
   if (!this.meetsMinimumOrder) {
     return {
       valid: false,

@@ -16,7 +16,6 @@ import {
   TruckIcon,
   WalletIcon,
 } from '../../components/icons'
-import { vendorSnapshot } from '../../services/vendorDashboard'
 import { cn } from '../../../../lib/cn'
 import { useButtonAction } from '../../hooks/useButtonAction'
 import { ButtonActionPanel } from '../../components/ButtonActionPanel'
@@ -56,13 +55,75 @@ const NAV_ITEMS = [
 ]
 
 export function VendorDashboard({ onLogout }) {
-  const { profile } = useVendorState()
+  const { profile, dashboard } = useVendorState()
   const dispatch = useVendorDispatch()
-  const { acceptOrder, acceptOrderPartially, rejectOrder, updateInventoryStock, requestCreditPurchase, updateOrderStatus } = useVendorApi()
+  const { acceptOrder, acceptOrderPartially, rejectOrder, updateInventoryStock, requestCreditPurchase, updateOrderStatus, fetchProfile, fetchDashboardData } = useVendorApi()
   const [activeTab, setActiveTab] = useState('overview')
-  const welcomeName = (profile?.name || vendorSnapshot.welcome.name || 'Partner').split(' ')[0]
+  const welcomeName = (profile?.name || 'Partner').split(' ')[0]
   const { isOpen, isMounted, currentAction, openPanel, closePanel } = useButtonAction()
   const { toasts, dismissToast, success, error, info, warning } = useToast()
+  
+  // Fetch vendor profile and dashboard data on mount (only if authenticated or has token)
+  useEffect(() => {
+    const token = localStorage.getItem('vendor_token')
+    if (!token) {
+      // No token, redirect to login
+      if (onLogout) {
+        onLogout()
+      }
+      return
+    }
+    
+    const loadVendorData = async () => {
+      try {
+        // Only fetch profile if not already authenticated
+        if (!profile?.id) {
+          const profileResult = await fetchProfile()
+          if (profileResult.data?.vendor) {
+            dispatch({
+              type: 'AUTH_LOGIN',
+              payload: {
+                id: profileResult.data.vendor.id,
+                name: profileResult.data.vendor.name,
+                phone: profileResult.data.vendor.phone,
+                email: profileResult.data.vendor.email,
+                location: profileResult.data.vendor.location,
+                status: profileResult.data.vendor.status,
+                isActive: profileResult.data.vendor.isActive,
+              },
+            })
+          } else if (profileResult.error?.status === 401) {
+            // Token expired or invalid, redirect to login
+            localStorage.removeItem('vendor_token')
+            if (onLogout) {
+              onLogout()
+            }
+            return
+          }
+        }
+        
+        // Fetch dashboard overview
+        const dashboardResult = await fetchDashboardData()
+        if (dashboardResult.error?.status === 401) {
+          // Token expired or invalid, redirect to login
+          localStorage.removeItem('vendor_token')
+          if (onLogout) {
+            onLogout()
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load vendor data:', err)
+        if (err.error?.status === 401) {
+          localStorage.removeItem('vendor_token')
+          if (onLogout) {
+            onLogout()
+          }
+        }
+      }
+    }
+    
+    loadVendorData()
+  }, []) // Only run once on mount
   const tabLabels = useMemo(() => {
     return NAV_ITEMS.reduce((acc, item) => {
       acc[item.id] = item.label
@@ -183,6 +244,7 @@ export function VendorDashboard({ onLogout }) {
   const searchInputRef = useRef(null)
 
   const handleLogout = () => {
+    localStorage.removeItem('vendor_token')
     dispatch({ type: 'AUTH_LOGOUT' })
     onLogout?.()
   }
@@ -284,7 +346,7 @@ export function VendorDashboard({ onLogout }) {
     <>
       <MobileShell
         title={`Hello ${welcomeName}`}
-        subtitle="Kolhapur, Maharashtra"
+        subtitle={profile?.location?.city ? `${profile.location.city}${profile.location.state ? `, ${profile.location.state}` : ''}` : 'Location not set'}
         onSearchClick={openSearch}
         navigation={NAV_ITEMS.map((item) => (
           <BottomNavItem
@@ -476,7 +538,7 @@ export function VendorDashboard({ onLogout }) {
 }
 
 function OverviewView({ onNavigate, welcomeName, openPanel }) {
-  const { dashboard } = useVendorState()
+  const { profile, dashboard } = useVendorState()
   const { fetchDashboardData } = useVendorApi()
   const [showActivitySheet, setShowActivitySheet] = useState(false)
   const [renderActivitySheet, setRenderActivitySheet] = useState(false)
@@ -504,16 +566,30 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
   ]
 
   // Use data from context or fallback to snapshot
-  const overviewData = dashboard.overview || vendorSnapshot
-  const transactions = overviewData.recentActivity || [
-    { name: 'Farm Fresh Traders', action: 'Order accepted', amount: '+₹86,200', status: 'Completed', avatar: 'FF' },
-    { name: 'Green Valley Hub', action: 'Loan repayment', amount: '-₹40,000', status: 'Pending', avatar: 'GV' },
-    { name: 'HarvestLink Pvt Ltd', action: 'Delivery scheduled', amount: '+₹21,500', status: 'Scheduled', avatar: 'HL' },
-  ]
+  const overviewData = dashboard.overview || {}
+  
+  // Transform recent orders from backend to activity format
+  const recentOrders = overviewData.recentOrders || []
+  const transactions = recentOrders.map((order) => {
+    const customerName = order.userId?.name || 'Unknown Customer'
+    const initials = customerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+    return {
+      name: customerName,
+      action: `Order ${order.status === 'pending' ? 'received' : order.status === 'awaiting' ? 'accepted' : order.status}`,
+      amount: `+₹${(order.totalAmount || 0).toLocaleString('en-IN')}`,
+      status: order.status === 'delivered' ? 'Completed' : order.status === 'pending' ? 'Pending' : 'In Progress',
+      avatar: initials,
+      orderId: order._id || order.id,
+      orderNumber: order.orderNumber,
+    }
+  })
+  
+  // If no recent orders, use empty array (don't show dummy data)
+  const displayTransactions = transactions.length > 0 ? transactions : []
 
-  const walletBalance = dashboard.credit?.remaining
-    ? `₹${(dashboard.credit.remaining / 100000).toFixed(1)}L`
-    : vendorSnapshot.credit.remaining || '₹0'
+  const walletBalance = overviewData.credit?.remaining
+    ? `₹${(overviewData.credit.remaining / 100000).toFixed(1)}L`
+    : '₹0'
 
   const quickActions = [
     {
@@ -568,7 +644,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
         <div className="overview-hero__card">
           <div className="overview-hero__meta">
             <span className="overview-chip overview-chip--success">
-              Active Zone • {dashboard.profile?.coverageRadius || vendorSnapshot.welcome.coverageKm} km
+              Active Zone • {profile?.coverageRadius || dashboard?.overview?.coverageRadius || 20} km
             </span>
             <span className="overview-chip overview-chip--warn">Today {new Date().toLocaleDateString('en-GB')}</span>
           </div>
@@ -590,12 +666,12 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
               Check loan
             </button>
           </div>
-          <div className="overview-hero__stats">
+            <div className="overview-hero__stats">
             {[
-              { label: 'Orders waiting for your reply', value: '02' },
-              { label: 'Loan reminder today', value: '₹1.2L' },
-              { label: 'Average delivery time', value: '21h' },
-              { label: 'Reviews waiting', value: '05' },
+              { label: 'Orders waiting for your reply', value: String(overviewData.orders?.pending || 0) },
+              { label: 'Orders in processing', value: String(overviewData.orders?.processing || 0) },
+              { label: 'Low stock alerts', value: String(overviewData.inventory?.lowStockCount || 0) },
+              { label: 'Credit utilization', value: `${Math.round(overviewData.credit?.utilization || 0)}%` },
             ].map((item) => (
               <div key={item.label} className="overview-stat-card">
                 <p>{item.label}</p>
@@ -661,7 +737,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
           </button>
         </div>
         <div className="overview-activity__list">
-          {transactions.map((item) => (
+          {displayTransactions.length > 0 ? displayTransactions.map((item) => (
             <div key={item.name} className="overview-activity__item">
               <div className="overview-activity__avatar">{item.avatar}</div>
               <div className="overview-activity__details">
@@ -682,7 +758,13 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
                 </div>
               </div>
             </div>
-          ))}
+          )) : (
+            <div className="overview-activity__item">
+              <div className="overview-activity__details">
+                <p className="text-sm text-gray-500">No recent activity</p>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -709,7 +791,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
               </button>
             </div>
             <div className="vendor-activity-sheet__body">
-              {[...transactions, ...transactions].map((item, index) => (
+              {displayTransactions.length > 0 ? displayTransactions.map((item, index) => (
                 <div key={`${item.name}-${index}`} className="overview-activity__item">
                   <div className="overview-activity__avatar">{item.avatar}</div>
                   <div className="overview-activity__details">
@@ -730,7 +812,13 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
                     </div>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="overview-activity__item">
+                  <div className="overview-activity__details">
+                    <p className="text-sm text-gray-500">No recent activity</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -743,7 +831,11 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
           </div>
         </div>
         <div className="overview-metric-grid">
-          {(overviewData.highlights || vendorSnapshot.highlights).map((item) => (
+          {[
+            { id: 'orders', label: 'Total Orders', value: String(overviewData.orders?.total || 0), trend: 'Today' },
+            { id: 'inventory', label: 'Products', value: String(overviewData.inventory?.totalProducts || 0), trend: 'Assigned' },
+            { id: 'credit', label: 'Credit Used', value: overviewData.credit?.used ? `₹${(overviewData.credit.used / 100000).toFixed(1)}L` : '₹0', trend: `${Math.round(overviewData.credit?.utilization || 0)}%` },
+          ].map((item) => (
             <div key={item.id} className="overview-metric-card">
               <div className="overview-metric-card__head">
                 <p>{item.label}</p>
@@ -805,15 +897,59 @@ function InventoryView({ openPanel }) {
   const [inventoryData, setInventoryData] = useState(null)
 
   useEffect(() => {
+    const token = localStorage.getItem('vendor_token')
+    if (!token) return
+    
     getInventory().then((result) => {
       if (result.data) {
         setInventoryData(result.data)
         dispatch({ type: 'SET_INVENTORY_DATA', payload: result.data })
+      } else if (result.error?.status === 401) {
+        // Token expired, will be handled by parent
+        localStorage.removeItem('vendor_token')
+      }
+    }).catch((err) => {
+      console.error('Failed to load inventory:', err)
+      if (err.error?.status === 401) {
+        localStorage.removeItem('vendor_token')
       }
     })
   }, [getInventory, dispatch])
 
-  const inventory = inventoryData?.items || dashboard.inventory?.items || vendorSnapshot.inventory
+  // Transform backend inventory data to frontend format
+  // Backend returns: { inventory: Array<ProductAssignment> }
+  const backendInventory = inventoryData?.inventory || inventoryData?.items || dashboard.inventory?.items || []
+  const inventory = backendInventory.map((assignment) => {
+    const product = assignment.productId || assignment.product || {}
+    // Stock is managed separately - check if there's a stock field in assignment or use product stock
+    // For now, we'll use product stock as default (vendor can update via updateInventoryStock API)
+    const stock = assignment.stock || product.stock || 0
+    const minStock = 10 // Default minimum stock threshold
+    const maxStock = 1000 // Default maximum stock
+    
+    // Determine status based on stock levels
+    let status = 'Healthy'
+    if (stock === 0) status = 'Critical'
+    else if (stock < minStock) status = 'Critical'
+    else if (stock < minStock * 2) status = 'Low'
+    
+    return {
+      id: assignment._id || assignment.id,
+      assignmentId: assignment._id || assignment.id,
+      productId: product._id || product.id,
+      name: product.name || 'Unknown Product',
+      sku: product.sku || 'N/A',
+      category: product.category || 'N/A',
+      stock: stock,
+      minStock: minStock,
+      maxStock: maxStock,
+      status: status,
+      priceToVendor: assignment.priceToVendor || product.priceToVendor || 0,
+      priceToUser: product.priceToUser || 0,
+      image: product.imageUrl || product.images?.[0]?.url || 'https://via.placeholder.com/300',
+    }
+  })
+  
   const totalSkus = inventory.length
   const criticalCount = inventory.filter((item) => item.status === 'Critical').length
   const lowCount = inventory.filter((item) => item.status === 'Low').length
@@ -977,49 +1113,62 @@ function InventoryView({ openPanel }) {
       </section>
 
       <div className="space-y-4">
-        {vendorSnapshot.inventory.map((item) => (
-          <article key={item.id} className="inventory-sku-card">
-            <header className="inventory-sku-card__header">
-              <div className="inventory-sku-card__icon">
-                <BoxIcon className="h-4 w-4" />
-              </div>
-                <div className="inventory-sku-card__title">
-                <h4>{item.name}</h4>
-                <p>Available • {item.stock}</p>
-              </div>
-              <span
-                className={cn(
-                  'inventory-sku-card__status',
-                  item.status === 'Healthy'
-                    ? 'is-healthy'
-                    : item.status === 'Low'
-                    ? 'is-low'
-                    : 'is-critical',
-                )}
-              >
-                {item.status === 'Critical' ? 'Urgent' : item.status}
-              </span>
-            </header>
-            <div className="inventory-sku-card__metrics">
-              <div>
-                <span>Cost price</span>
-                <strong>{item.purchase}</strong>
-              </div>
-              <div>
-                <span>Sale price</span>
-                <strong>{item.selling}</strong>
-              </div>
-            </div>
-            <footer className="inventory-sku-card__footer">
-              <div className="vendor-progress inventory-sku-card__progress">
-                <span style={{ width: `${stockProgress[item.status] ?? 40}%` }} />
-              </div>
-              <button type="button" className="inventory-sku-card__cta" onClick={() => openPanel('update-stock', { itemId: item.id, currentStock: item.stock })}>
-                Update stock
-              </button>
-            </footer>
-          </article>
-        ))}
+        {inventory.length > 0 ? (
+          inventory.map((item) => {
+            const stock = item.stock || 0
+            const minStock = item.minStock || 10
+            const status = stock === 0 ? 'Critical' : stock < minStock ? 'Low' : 'Healthy'
+            const stockProgressValue = stock === 0 ? 0 : stock < minStock ? 30 : 70
+            
+            return (
+              <article key={item.id || item.productId?.id || item.productId?._id} className="inventory-sku-card">
+                <header className="inventory-sku-card__header">
+                  <div className="inventory-sku-card__icon">
+                    <BoxIcon className="h-4 w-4" />
+                  </div>
+                  <div className="inventory-sku-card__title">
+                    <h4>{item.name || item.productId?.name || 'Unknown Product'}</h4>
+                    <p>Available • {stock}</p>
+                  </div>
+                  <span
+                    className={cn(
+                      'inventory-sku-card__status',
+                      status === 'Healthy'
+                        ? 'is-healthy'
+                        : status === 'Low'
+                        ? 'is-low'
+                        : 'is-critical',
+                    )}
+                  >
+                    {status === 'Critical' ? 'Urgent' : status}
+                  </span>
+                </header>
+                <div className="inventory-sku-card__metrics">
+                  <div>
+                    <span>Cost price</span>
+                    <strong>₹{((item.costPrice || item.productId?.priceToVendor || item.productId?.price || 0) / 100).toFixed(2)}</strong>
+                  </div>
+                  <div>
+                    <span>Sale price</span>
+                    <strong>₹{((item.salePrice || item.productId?.priceToUser || item.productId?.price || 0) / 100).toFixed(2)}</strong>
+                  </div>
+                </div>
+                <footer className="inventory-sku-card__footer">
+                  <div className="vendor-progress inventory-sku-card__progress">
+                    <span style={{ width: `${stockProgressValue}%` }} />
+                  </div>
+                  <button type="button" className="inventory-sku-card__cta" onClick={() => openPanel('update-stock', { itemId: item.id || item.productId?.id || item.productId?._id, currentStock: stock })}>
+                    Update stock
+                  </button>
+                </footer>
+              </article>
+            )
+          })
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <p>No inventory items found</p>
+          </div>
+        )}
       </div>
 
       <div id="inventory-restock" className="vendor-card border border-brand/20 bg-white px-5 py-4 shadow-card">
@@ -1065,11 +1214,19 @@ function OrdersView({ openPanel }) {
   const STAGES = ['Awaiting', 'Dispatched', 'Delivered']
 
   const normalizeStatus = (status) => {
-    if (!status) return 'awaiting'
+    if (!status) return 'pending'
     const normalized = status.toLowerCase()
+    // Backend statuses: pending, awaiting, processing, ready_for_delivery, out_for_delivery, delivered
+    if (normalized === 'delivered') return 'delivered'
+    if (normalized === 'out_for_delivery') return 'dispatched'
+    if (normalized === 'ready_for_delivery') return 'dispatched'
+    if (normalized === 'processing') return 'awaiting'
+    if (normalized === 'awaiting') return 'awaiting'
+    if (normalized === 'pending') return 'pending'
+    // Fallback
     if (normalized.includes('deliver')) return 'delivered'
     if (normalized.includes('dispatch')) return 'dispatched'
-    return 'awaiting'
+    return 'pending'
   }
 
   const stageIndex = (status) => {
@@ -1079,12 +1236,31 @@ function OrdersView({ openPanel }) {
     return 0
   }
 
-  const orders = dashboard.orders?.orders || ordersData?.orders || vendorSnapshot.orders
+  // Transform backend orders to frontend format
+  const backendOrders = ordersData?.orders || dashboard.orders?.orders || []
+  const orders = backendOrders.map((order) => ({
+    id: order._id || order.id,
+    orderNumber: order.orderNumber,
+    farmer: order.userId?.name || 'Unknown Customer',
+    value: `₹${(order.totalAmount || 0).toLocaleString('en-IN')}`,
+    payment: order.paymentStatus === 'paid' ? 'Paid' : order.paymentStatus === 'partial' ? 'Partial' : 'Pending',
+    status: order.status || 'pending',
+    items: order.items || [],
+    customerPhone: order.userId?.phone || '',
+    deliveryAddress: order.deliveryAddress || {},
+    createdAt: order.createdAt,
+    next: order.status === 'pending' ? 'Confirm availability within 1 hour' : 
+          order.status === 'awaiting' ? 'Process and dispatch order' :
+          order.status === 'processing' ? 'Prepare for delivery' :
+          order.status === 'ready_for_delivery' ? 'Mark as out for delivery' :
+          order.status === 'out_for_delivery' ? 'Mark as delivered' : null,
+  }))
+  
   const totals = orders.reduce(
     (acc, order) => {
-      const index = stageIndex(order.status)
-      if (index === 2) acc.delivered += 1
-      else if (index === 1) acc.dispatched += 1
+      const normalizedStatus = normalizeStatus(order.status)
+      if (normalizedStatus === 'delivered') acc.delivered += 1
+      else if (normalizedStatus === 'dispatched') acc.dispatched += 1
       else acc.awaiting += 1
       return acc
     },
@@ -1245,9 +1421,10 @@ function OrdersView({ openPanel }) {
           </button>
               </div>
         <div className="orders-list">
-          {orders.map((order) => {
+          {orders.length > 0 ? orders.map((order) => {
             const normalizedStatus = normalizeStatus(order.status)
-            const showAvailabilityActions = normalizedStatus === 'awaiting'
+            // Show accept/reject actions for pending orders
+            const showAvailabilityActions = order.status === 'pending' || normalizedStatus === 'pending'
             const nextMessage =
               order.next ||
               (normalizedStatus === 'awaiting'
@@ -1257,7 +1434,7 @@ function OrdersView({ openPanel }) {
                   : 'Mark payment as collected')
 
             return (
-            <article key={order.id} className="orders-card">
+              <article key={order.id} className="orders-card">
               <header className="orders-card__header">
                 <div className="orders-card__identity">
                   <span className="orders-card__icon">
@@ -1323,7 +1500,14 @@ function OrdersView({ openPanel }) {
                 )}
               </div>
             </article>
-          )})}
+            )
+          }) : (
+            <div className="orders-card">
+              <div className="orders-card__details">
+                <p className="text-sm text-gray-500 text-center py-4">No orders found</p>
+              </div>
+            </div>
+          )}
       </div>
       </section>
 
@@ -1363,23 +1547,24 @@ function CreditView({ openPanel }) {
     })
   }, [getCreditInfo, dispatch])
 
+  // Use real credit data from backend
   const creditData = dashboard.credit || {}
+  const creditLimit = creditData.limit || 0
+  const creditUsed = creditData.used || 0
+  const creditRemaining = creditData.remaining || 0
+  const penalty = creditData.penalty || 0
+  
   const credit = {
-    limit: creditData.limit ? `₹${(creditData.limit / 100000).toFixed(1)}L` : vendorSnapshot.credit.limit || '₹35L',
-    used: creditData.used ? `₹${(creditData.used / 100000).toFixed(1)}L` : vendorSnapshot.credit.used || '₹22.6L',
-    remaining: creditData.remaining ? `₹${(creditData.remaining / 100000).toFixed(1)}L` : vendorSnapshot.credit.remaining || '₹12.4L',
-    penalty: creditData.penalty === 0 ? 'No penalty' : creditData.penalty || vendorSnapshot.credit.penalty || 'No penalty',
-    due: creditData.dueDate || vendorSnapshot.credit.due || '08 Dec 2025',
+    limit: creditLimit > 0 ? `₹${(creditLimit / 100000).toFixed(1)}L` : '₹0',
+    used: creditUsed > 0 ? `₹${(creditUsed / 100000).toFixed(1)}L` : '₹0',
+    remaining: creditRemaining > 0 ? `₹${(creditRemaining / 100000).toFixed(1)}L` : '₹0',
+    penalty: penalty === 0 ? 'No penalty' : `₹${penalty.toLocaleString('en-IN')}`,
+    due: creditData.dueDate ? new Date(creditData.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set',
   }
 
-  const usedPercent = creditData.limit && creditData.used
-    ? Math.min(Math.round((creditData.used / creditData.limit) * 100), 100)
-    : Math.min(
-        Math.round(
-          (parseInt(credit.used.replace(/[^0-9]/g, ''), 10) / parseInt(credit.limit.replace(/[^0-9]/g, ''), 10)) * 100,
-        ),
-        100,
-      )
+  const usedPercent = creditLimit > 0
+    ? Math.min(Math.round((creditUsed / creditLimit) * 100), 100)
+    : 0
 
   const creditMetrics = [
     { label: 'Loan limit', value: credit.limit, icon: CreditIcon, tone: 'success' },
@@ -1582,42 +1767,40 @@ function ReportsView() {
     { id: 'all', label: 'All Time' },
   ]
 
+  // Transform backend reports data to chart format
   const getRevenueData = (period) => {
-    switch (period) {
-      case 'week':
-        return {
-          labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-          revenue: [28.5, 32.8, 29.2, 35.6, 38.4, 34.1, 31.2],
-          orders: [42, 48, 45, 52, 58, 50, 46],
-        }
-      case 'month':
-        return {
-          labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-          revenue: [125.6, 142.3, 138.9, 156.2],
-          orders: [185, 210, 205, 232],
-        }
-      case 'year':
-        return {
-          labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-          revenue: [485.2, 562.8, 598.4, 642.1],
-          orders: [720, 835, 890, 955],
-        }
-      case 'all':
-        return {
-          labels: ['Year 1', 'Year 2', 'Year 3', 'Year 4'],
-          revenue: [1850.5, 2156.8, 2489.2, 2856.4],
-          orders: [2750, 3200, 3690, 4240],
-        }
-      default:
-        return {
-          labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-          revenue: [28.5, 32.8, 29.2, 35.6, 38.4, 34.1, 31.2],
-          orders: [42, 48, 45, 52, 58, 50, 46],
-        }
+    // Use real data from backend if available
+    if (analyticsData?.dailyTrends && Array.isArray(analyticsData.dailyTrends)) {
+      const trends = analyticsData.dailyTrends
+      return {
+        labels: trends.map(t => {
+          // Format date labels based on period
+          const date = new Date(t._id)
+          if (period === 'week') return date.toLocaleDateString('en-US', { weekday: 'short' })
+          if (period === 'month') return `Week ${Math.ceil(date.getDate() / 7)}`
+          if (period === 'year') return `Q${Math.ceil((date.getMonth() + 1) / 3)}`
+          return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+        }),
+        revenue: trends.map(t => (t.sales || 0) / 100000), // Convert to Lakhs
+        orders: trends.map(t => t.count || 0),
+      }
+    }
+    
+    // Fallback to empty data if no backend data
+    return {
+      labels: [],
+      revenue: [],
+      orders: [],
     }
   }
 
   const chartData = getRevenueData(timePeriod)
+  
+  // Get sales data from backend
+  const salesData = analyticsData?.sales || reportsData?.sales || {}
+  const totalSales = salesData.totalSales || 0
+  const orderCount = salesData.orderCount || 0
+  const averageOrderValue = salesData.averageOrderValue || 0
   const maxValue = Math.max(...chartData.revenue, ...chartData.orders)
   const yAxisSteps = 5
   const yAxisLabels = Array.from({ length: yAxisSteps + 1 }, (_, i) => {
@@ -1638,23 +1821,35 @@ function ReportsView() {
               <div className="reports-summary-card__stats">
                 <div className="reports-summary-card__stat">
                   <span className="reports-summary-card__stat-label">Total Earnings</span>
-                  <span className="reports-summary-card__stat-value">₹28.6L</span>
+                  <span className="reports-summary-card__stat-value">
+                    {totalSales > 0 ? `₹${(totalSales / 100000).toFixed(1)}L` : '₹0'}
+                  </span>
             </div>
                 <div className="reports-summary-card__stat">
-                  <span className="reports-summary-card__stat-label">Growth</span>
-                  <span className="reports-summary-card__stat-value is-positive">+15.2%</span>
+                  <span className="reports-summary-card__stat-label">Total Orders</span>
+                  <span className="reports-summary-card__stat-value">{orderCount}</span>
           </div>
               </div>
             </div>
             <div className="reports-summary-card__insights">
-              <div className="reports-summary-card__insight">
-                <span className="reports-summary-card__insight-icon">📈</span>
-                <span className="reports-summary-card__insight-text">Earnings up 15% from last month</span>
-              </div>
-              <div className="reports-summary-card__insight">
-                <span className="reports-summary-card__insight-icon">⚡</span>
-                <span className="reports-summary-card__insight-text">84 orders completed this week</span>
-              </div>
+              {orderCount > 0 && (
+                <div className="reports-summary-card__insight">
+                  <span className="reports-summary-card__insight-icon">⚡</span>
+                  <span className="reports-summary-card__insight-text">{orderCount} orders completed this {timePeriod}</span>
+                </div>
+              )}
+              {averageOrderValue > 0 && (
+                <div className="reports-summary-card__insight">
+                  <span className="reports-summary-card__insight-icon">📈</span>
+                  <span className="reports-summary-card__insight-text">Average order value: ₹{averageOrderValue.toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {orderCount === 0 && (
+                <div className="reports-summary-card__insight">
+                  <span className="reports-summary-card__insight-icon">ℹ️</span>
+                  <span className="reports-summary-card__insight-text">No orders data available for this period</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1667,17 +1862,22 @@ function ReportsView() {
           </div>
           </div>
         <div className="reports-metric-grid">
-          {vendorSnapshot.reports.map((report, index) => {
-            const Icon = reportIcons[index % reportIcons.length]
+          {[
+            { label: 'Total Sales', value: totalSales > 0 ? `₹${(totalSales / 100000).toFixed(1)}L` : '₹0', meta: `${orderCount} orders`, icon: ChartIcon },
+            { label: 'Avg Order Value', value: averageOrderValue > 0 ? `₹${averageOrderValue.toLocaleString('en-IN')}` : '₹0', meta: 'Per order', icon: WalletIcon },
+            { label: 'Orders Completed', value: String(orderCount), meta: 'Delivered orders', icon: CreditIcon },
+            { label: 'Performance', value: orderCount > 0 ? 'Active' : 'No activity', meta: 'This period', icon: HomeIcon },
+          ].map((metric, index) => {
+            const Icon = metric.icon || reportIcons[index % reportIcons.length]
             return (
-              <div key={report.label} className="reports-metric-card">
+              <div key={metric.label} className="reports-metric-card">
                 <span className="reports-metric-icon">
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="reports-metric-body">
-                  <p>{report.label}</p>
-                  <span>{report.value}</span>
-                  <small>{report.meta}</small>
+                  <p>{metric.label}</p>
+                  <span>{metric.value}</span>
+                  <small>{metric.meta}</small>
         </div>
               </div>
             )

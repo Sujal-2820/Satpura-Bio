@@ -107,23 +107,31 @@ paymentSchema.index({ gatewayPaymentId: 1 }); // Gateway payment lookup
 // Pre-save hook: Generate payment ID
 paymentSchema.pre('save', async function (next) {
   if (!this.paymentId && this.isNew) {
-    const date = new Date();
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
-    
-    // Find count of payments created today
-    const todayStart = new Date(date);
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(date);
-    todayEnd.setHours(23, 59, 59, 999);
-    
-    // Use Payment model (must be defined at this point)
-    const PaymentModel = mongoose.models.Payment || mongoose.model('Payment', paymentSchema);
-    const todayCount = await PaymentModel.countDocuments({
-      createdAt: { $gte: todayStart, $lte: todayEnd },
-    });
-    
-    const sequence = String(todayCount + 1).padStart(4, '0');
-    this.paymentId = `PAY-${dateStr}-${sequence}`;
+    try {
+      const date = new Date();
+      const dateStr = date.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+      
+      // Find count of payments created today
+      const todayStart = new Date(date);
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(date);
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      // Use this.constructor to get the Payment model
+      const PaymentModel = this.constructor;
+      const todayCount = await PaymentModel.countDocuments({
+        createdAt: { $gte: todayStart, $lte: todayEnd },
+      });
+      
+      const sequence = String(todayCount + 1).padStart(4, '0');
+      this.paymentId = `PAY-${dateStr}-${sequence}`;
+    } catch (error) {
+      // Fallback: generate payment ID without counting
+      const date = new Date();
+      const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+      const timestamp = Date.now().toString().slice(-6);
+      this.paymentId = `PAY-${dateStr}-${timestamp}`;
+    }
   }
 
   // Update timestamps based on status

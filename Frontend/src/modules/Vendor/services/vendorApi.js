@@ -22,13 +22,20 @@ async function handleResponse(response) {
   
   if (!response.ok) {
     // Return error in same format as success response for consistent error handling
-    return {
+    const errorResponse = {
       success: false,
       error: {
         message: data.message || data.error?.message || `HTTP error! status: ${response.status}`,
         status: response.status,
       },
     }
+    
+    // If 401, also clear token
+    if (response.status === 401) {
+      localStorage.removeItem('vendor_token')
+    }
+    
+    return errorResponse
   }
   
   return data
@@ -86,7 +93,10 @@ export async function registerVendor(data) {
       phone: data.phone,
       location: data.location || {
         address: data.address || '',
-        coordinates: data.coordinates || { lat: data.lat, lng: data.lng },
+        city: data.location?.city || '',
+        state: data.location?.state || '',
+        pincode: data.location?.pincode || '',
+        coordinates: data.location?.coordinates || data.coordinates || { lat: data.lat, lng: data.lng },
       },
     }),
   })

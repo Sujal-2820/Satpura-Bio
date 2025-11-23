@@ -18,6 +18,7 @@ const Commission = require('../models/Commission');
 const { generateOTP, sendOTP } = require('../config/sms');
 const { generateToken } = require('../middleware/auth');
 const { OTP_EXPIRY_MINUTES, MIN_ORDER_VALUE, ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE, DELIVERY_CHARGE, VENDOR_COVERAGE_RADIUS_KM, ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS, IRA_PARTNER_COMMISSION_THRESHOLD, IRA_PARTNER_COMMISSION_RATE_LOW, IRA_PARTNER_COMMISSION_RATE_HIGH } = require('../utils/constants');
+const { checkPhoneExists, checkPhoneInRole } = require('../utils/phoneValidation');
 
 /**
  * @desc    Request OTP for user
@@ -32,6 +33,15 @@ exports.requestOTP = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Phone number is required',
+      });
+    }
+
+    // Check if phone exists in other roles (vendor, seller)
+    const phoneCheck = await checkPhoneExists(phone, 'user');
+    if (phoneCheck.exists) {
+      return res.status(400).json({
+        success: false,
+        message: phoneCheck.message,
       });
     }
 
@@ -53,7 +63,7 @@ exports.requestOTP = async (req, res, next) => {
     
     // Save user to database
     try {
-      await user.save();
+    await user.save();
       console.log(`✅ User ${user.phone} saved to database (OTP requested)`);
     } catch (saveError) {
       console.error('❌ Error saving user during OTP request:', saveError);
@@ -125,6 +135,15 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Name, phone, and OTP are required',
+      });
+    }
+
+    // Check if phone exists in other roles (vendor, seller)
+    const phoneCheck = await checkPhoneExists(phone, 'user');
+    if (phoneCheck.exists) {
+      return res.status(400).json({
+        success: false,
+        message: phoneCheck.message,
       });
     }
 
@@ -221,7 +240,7 @@ exports.register = async (req, res, next) => {
     
     // Save user to database (first save - before vendor assignment)
     try {
-      await user.save();
+    await user.save();
       console.log(`✅ User registered/updated successfully: ${user.phone} (${user.name})`);
       console.log(`📝 User ID: ${user._id}`);
       console.log(`📍 Location: ${JSON.stringify(user.location)}`);
@@ -245,43 +264,20 @@ exports.register = async (req, res, next) => {
 
     // Assign vendor based on location (20km radius)
     // ⚠️ TEMPORARY: Manual location entry - will be replaced with Google Maps API
+    // Assign vendor based on location (coordinates or city)
     let assignedVendor = null;
-    if (user.location && user.location.coordinates && user.location.coordinates.lat && user.location.coordinates.lng) {
+    if (user.location && (user.location.coordinates || user.location.city)) {
       try {
-        const { lat, lng } = user.location.coordinates;
+        const { vendor, distance, method } = await findVendorByLocation(user.location);
         
-        // Find vendor within 20km radius
-        const allVendors = await Vendor.find({
-          status: 'approved',
-          isActive: true,
-          'location.coordinates.lat': { $exists: true },
-          'location.coordinates.lng': { $exists: true },
-        });
-
-        // Filter vendors by distance (20km radius)
-        let nearestVendor = null;
-        let minDistance = VENDOR_COVERAGE_RADIUS_KM; // km
-
-        for (const v of allVendors) {
-          const distance = calculateDistance(
-            lat,
-            lng,
-            v.location.coordinates.lat,
-            v.location.coordinates.lng
-          );
-          if (distance < minDistance) {
-            minDistance = distance;
-            nearestVendor = v;
-          }
-        }
-
-        if (nearestVendor) {
-          assignedVendor = nearestVendor._id;
-          user.assignedVendor = nearestVendor._id;
+        if (vendor) {
+          assignedVendor = vendor._id;
+          user.assignedVendor = vendor._id;
           await user.save();
-          console.log(`📍 Vendor assigned to user ${user.phone}: ${nearestVendor.name} (${minDistance.toFixed(2)} km away)`);
+          const distanceText = distance ? `${distance.toFixed(2)} km away` : `same city (${user.location.city})`;
+          console.log(`📍 Vendor assigned to user ${user.phone}: ${vendor.name} (${distanceText}, method: ${method})`);
         } else {
-          console.log(`⚠️ No vendor found within 20km radius for user ${user.phone}. Orders will be handled by admin.`);
+          console.log(`⚠️ No vendor found for user ${user.phone} (${user.location.city || 'no location'}). Orders will be handled by admin.`);
         }
       } catch (geoError) {
         console.warn('Vendor assignment failed during registration:', geoError);
@@ -332,7 +328,18 @@ exports.loginWithOtp = async (req, res, next) => {
       });
     }
 
-    const user = await User.findOne({ phone });
+    // Check if phone exists in other roles first
+    const phoneCheck = await checkPhoneExists(phone, 'user');
+    if (phoneCheck.exists) {
+      return res.status(400).json({
+        success: false,
+        message: phoneCheck.message,
+      });
+    }
+
+    // Check if phone exists in user role
+    const userCheck = await checkPhoneInRole(phone, 'user');
+    const user = userCheck.data;
 
     if (!user) {
       return res.status(404).json({
@@ -1180,6 +1187,7 @@ exports.clearCart = async (req, res, next) => {
 exports.validateCart = async (req, res, next) => {
   try {
     const userId = req.user.userId;
+    const { paymentPreference = 'full' } = req.body; // Get payment preference from request
 
     const cart = await Cart.findOne({ userId });
     if (!cart || !cart.items || cart.items.length === 0) {
@@ -1192,8 +1200,9 @@ exports.validateCart = async (req, res, next) => {
       });
     }
 
-    // Use cart's validation method
-    const validation = cart.validateForCheckout();
+    // Use cart's validation method with payment preference
+    // If paymentPreference is 'partial', minimum order check is skipped
+    const validation = cart.validateForCheckout(paymentPreference);
 
     if (!validation.valid) {
       return res.status(200).json({
@@ -1237,48 +1246,25 @@ exports.getAssignedVendor = async (req, res, next) => {
     const userId = req.user.userId;
     const { location } = req.body;
 
-    if (!location || !location.coordinates || !location.coordinates.lat || !location.coordinates.lng) {
+    // Validate location - must have at least city or coordinates
+    if (!location || (!location.coordinates && !location.city)) {
       return res.status(400).json({
         success: false,
-        message: 'Location with coordinates (lat, lng) is required',
+        message: 'Location with coordinates (lat, lng) or city is required',
       });
     }
 
-    const { lat, lng } = location.coordinates;
-
-    // Find vendor within 20km radius
-    // Since Vendor model uses lat/lng structure, we'll find vendors and filter by distance
-    const allVendors = await Vendor.find({
-      status: 'approved',
-      isActive: true,
-      'location.coordinates.lat': { $exists: true },
-      'location.coordinates.lng': { $exists: true },
-    });
-
-    // Filter vendors by distance (20km radius)
-    let vendor = null;
-    let minDistance = VENDOR_COVERAGE_RADIUS_KM; // km
-
-    for (const v of allVendors) {
-      const distance = calculateDistance(
-        lat,
-        lng,
-        v.location.coordinates.lat,
-        v.location.coordinates.lng
-      );
-      if (distance < minDistance) {
-        minDistance = distance;
-        vendor = v;
-      }
-    }
+    // Find vendor using helper function (coordinates first, then city fallback)
+    const { vendor, distance, method } = await findVendorByLocation(location);
 
     if (!vendor) {
       return res.status(404).json({
         success: false,
-        message: 'No vendor found within 20km radius. Order will be handled by admin.',
+        message: 'No vendor found for this location. Order will be handled by admin.',
         data: {
           vendor: null,
           assignedTo: 'admin',
+          method: method,
         },
       });
     }
@@ -1294,9 +1280,6 @@ exports.getAssignedVendor = async (req, res, next) => {
       await user.save();
     }
 
-    // Calculate distance (approximate)
-    const distance = calculateDistance(lat, lng, vendor.location.coordinates.lat, vendor.location.coordinates.lng);
-
     res.status(200).json({
       success: true,
       data: {
@@ -1306,8 +1289,9 @@ exports.getAssignedVendor = async (req, res, next) => {
           phone: vendor.phone,
           location: vendor.location,
         },
-        distance: distance.toFixed(2), // in km
+        distance: distance ? distance.toFixed(2) : null, // in km (null if city-based)
         assignedTo: 'vendor',
+        method: method, // 'coordinates' or 'city'
       },
     });
   } catch (error) {
@@ -1390,6 +1374,125 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
   return R * c; // Distance in km
 }
 
+/**
+ * Find vendor by location
+ * Priority: 1) Coordinates within 20km radius, 2) Same city matching
+ * @param {Object} location - { coordinates: { lat, lng }, city, state, pincode }
+ * @returns {Promise<Object>} - { vendor: Vendor|null, distance: number|null, method: string }
+ */
+async function findVendorByLocation(location) {
+  try {
+    // Get all active approved vendors
+    const allVendors = await Vendor.find({
+      status: 'approved',
+      isActive: true,
+    });
+
+    if (allVendors.length === 0) {
+      return { vendor: null, distance: null, method: 'none' };
+    }
+
+    // Method 1: Try coordinates-based matching (20km radius)
+    // IMPORTANT: Only use coordinates if they are valid and within 20km radius
+    if (location?.coordinates?.lat && location?.coordinates?.lng) {
+      const { lat, lng } = location.coordinates;
+      
+      // Validate coordinates are reasonable (not 0,0 or invalid)
+      if (lat !== 0 && lng !== 0 && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+        // Filter vendors with coordinates
+        const vendorsWithCoords = allVendors.filter(
+          v => v.location?.coordinates?.lat && 
+               v.location?.coordinates?.lng &&
+               v.location.coordinates.lat !== 0 && 
+               v.location.coordinates.lng !== 0
+        );
+
+        if (vendorsWithCoords.length > 0) {
+          let nearestVendor = null;
+          let minDistance = VENDOR_COVERAGE_RADIUS_KM; // 20km
+
+          for (const v of vendorsWithCoords) {
+            const distance = calculateDistance(
+              lat,
+              lng,
+              v.location.coordinates.lat,
+              v.location.coordinates.lng
+            );
+            console.log(`   - Vendor "${v.name}" (${v.location?.city || 'N/A'}) distance: ${distance.toFixed(2)} km`);
+            if (distance < minDistance) {
+              minDistance = distance;
+              nearestVendor = v;
+            }
+          }
+
+          if (nearestVendor) {
+            console.log(`✅ Vendor found by coordinates: ${nearestVendor.name} (${minDistance.toFixed(2)} km away, city: ${nearestVendor.location?.city || 'N/A'})`);
+            return { vendor: nearestVendor, distance: minDistance, method: 'coordinates' };
+          } else {
+            console.log(`⚠️ No vendor found within ${VENDOR_COVERAGE_RADIUS_KM}km radius. Falling back to city matching.`);
+          }
+        } else {
+          console.log(`⚠️ No vendors with valid coordinates found. Falling back to city matching.`);
+        }
+      } else {
+        console.log(`⚠️ Invalid coordinates provided (lat: ${lat}, lng: ${lng}). Falling back to city matching.`);
+      }
+    }
+
+    // Method 2: Fallback to city-based matching (temporary until Google Maps API)
+    // CRITICAL: Only match vendors in the EXACT same city
+    if (location?.city) {
+      const cityNormalized = location.city.trim().toLowerCase();
+      
+      console.log(`🔍 Searching for vendors in city: "${location.city}" (normalized: "${cityNormalized}")`);
+      console.log(`   Total active vendors: ${allVendors.length}`);
+      
+      // Log all vendor cities for debugging
+      const vendorCities = allVendors.map(v => ({
+        name: v.name,
+        city: v.location?.city || 'NO CITY',
+        normalized: (v.location?.city || '').trim().toLowerCase()
+      }));
+      console.log(`   Available vendor cities:`, vendorCities);
+      
+      // Find vendors in the same city (EXACT match required)
+      const vendorsInCity = allVendors.filter(v => {
+        const vendorCity = v.location?.city?.trim().toLowerCase();
+        const matches = vendorCity === cityNormalized;
+        if (!matches && vendorCity) {
+          console.log(`   - Vendor "${v.name}" is in "${v.location.city}" (normalized: "${vendorCity}") - NO MATCH`);
+        } else if (matches) {
+          console.log(`   ✅ Vendor "${v.name}" matches city "${location.city}"`);
+        }
+        return matches;
+      });
+
+      console.log(`   Found ${vendorsInCity.length} vendor(s) in same city "${location.city}"`);
+
+      if (vendorsInCity.length > 0) {
+        // If multiple vendors in same city, pick the first one
+        // TODO: In future, can add logic to pick based on other factors (load, rating, etc.)
+        const selectedVendor = vendorsInCity[0];
+        console.log(`✅ Vendor found by city matching: ${selectedVendor.name} (ID: ${selectedVendor._id}, city: ${selectedVendor.location?.city})`);
+        return { vendor: selectedVendor, distance: null, method: 'city' };
+      } else {
+        console.log(`❌ No vendors found in city "${location.city}". Order will be assigned to admin.`);
+        console.log(`   Available vendor cities:`, 
+          allVendors.map(v => `"${v.location?.city || 'NO CITY'}"`).filter(Boolean).join(', ') || 'None');
+      }
+    } else {
+      console.log(`⚠️ No city provided in delivery address. Cannot match vendor by city.`);
+    }
+
+    // No vendor found
+    console.log(`⚠️ No vendor found for location: ${location?.city || 'Unknown'}`);
+    return { vendor: null, distance: null, method: 'none' };
+  } catch (error) {
+    console.error('Error finding vendor by location:', error);
+    return { vendor: null, distance: null, method: 'error' };
+  }
+}
+
 // ============================================================================
 // CHECKOUT & ORDER CONTROLLERS
 // ============================================================================
@@ -1418,7 +1521,8 @@ exports.createOrder = async (req, res, next) => {
     }
 
     // Validate cart minimum order value
-    const validation = cart.validateForCheckout();
+    // Skip minimum order check if paymentPreference is 'partial' (30% advance)
+    const validation = cart.validateForCheckout(paymentPreference);
     if (!validation.valid) {
       return res.status(400).json({
         success: false,
@@ -1474,47 +1578,67 @@ exports.createOrder = async (req, res, next) => {
       }
     }
 
-    // Assign vendor based on location
+    // Assign vendor based on location (coordinates or city)
     let vendorId = null;
     let assignedTo = 'admin';
     
-    if (deliveryAddress.coordinates && deliveryAddress.coordinates.lat && deliveryAddress.coordinates.lng) {
-      const { lat, lng } = deliveryAddress.coordinates;
-      
-        try {
-          // Find vendor within 20km radius
-          const allVendors = await Vendor.find({
-            status: 'approved',
-            isActive: true,
-            'location.coordinates.lat': { $exists: true },
-            'location.coordinates.lng': { $exists: true },
-          });
-
-          // Filter vendors by distance (20km radius)
-          let nearestVendor = null;
-          let minDistance = VENDOR_COVERAGE_RADIUS_KM; // km
-
-          for (const v of allVendors) {
-            const distance = calculateDistance(
-              lat,
-              lng,
-              v.location.coordinates.lat,
-              v.location.coordinates.lng
-            );
-            if (distance < minDistance) {
-              minDistance = distance;
-              nearestVendor = v;
+    console.log(`🔍 Attempting vendor assignment for order. Delivery address:`, {
+      city: deliveryAddress?.city,
+      state: deliveryAddress?.state,
+      hasCoordinates: !!(deliveryAddress?.coordinates?.lat && deliveryAddress?.coordinates?.lng)
+    });
+    
+    if (deliveryAddress && (deliveryAddress.coordinates || deliveryAddress.city)) {
+      try {
+        const { vendor, distance, method } = await findVendorByLocation(deliveryAddress);
+        
+        if (vendor) {
+          vendorId = vendor._id;
+          assignedTo = 'vendor';
+          const distanceText = distance ? `${distance.toFixed(2)} km` : `same city (${deliveryAddress.city})`;
+          console.log(`✅ Order assigned to vendor: ${vendor.name} (ID: ${vendor._id}, ${distanceText}, method: ${method})`);
+          console.log(`📍 Vendor location: ${vendor.location?.city || 'N/A'}, ${vendor.location?.state || 'N/A'}`);
+        } else {
+          console.log(`⚠️ No vendor found for delivery address (${deliveryAddress.city || 'no location'}). Order assigned to admin.`);
+        }
+      } catch (geoError) {
+        console.warn('❌ Vendor assignment failed, assigning to admin:', geoError);
+        // Fallback: assign to admin if vendor assignment fails
+      }
+    } else {
+      console.log(`⚠️ Delivery address missing or incomplete. Order assigned to admin.`);
+    }
+    
+    console.log(`📦 Order will be created with vendorId: ${vendorId || 'null'}, assignedTo: ${assignedTo}`);
+    
+    // CRITICAL SAFEGUARD: Validate vendor assignment
+    // If vendorId is set, verify the vendor exists and is in the same city (or within 20km)
+    if (vendorId) {
+      try {
+        const assignedVendor = await Vendor.findById(vendorId);
+        if (!assignedVendor) {
+          console.error(`❌ ERROR: Assigned vendor ${vendorId} not found! Reverting to admin assignment.`);
+          vendorId = null;
+          assignedTo = 'admin';
+        } else {
+          // Verify city match if using city-based assignment
+          if (deliveryAddress?.city && assignedVendor.location?.city) {
+            const deliveryCity = deliveryAddress.city.trim().toLowerCase();
+            const vendorCity = assignedVendor.location.city.trim().toLowerCase();
+            if (deliveryCity !== vendorCity) {
+              console.error(`❌ ERROR: City mismatch! Delivery: "${deliveryAddress.city}", Vendor: "${assignedVendor.location.city}". Reverting to admin assignment.`);
+              vendorId = null;
+              assignedTo = 'admin';
+            } else {
+              console.log(`✅ Vendor assignment validated: ${assignedVendor.name} in ${assignedVendor.location.city} matches delivery city ${deliveryAddress.city}`);
             }
           }
-
-          if (nearestVendor) {
-            vendorId = nearestVendor._id;
-            assignedTo = 'vendor';
-          }
-        } catch (geoError) {
-          console.warn('Vendor assignment failed, assigning to admin:', geoError);
-          // Fallback: assign to admin if vendor assignment fails
         }
+      } catch (validationError) {
+        console.error(`❌ ERROR validating vendor assignment:`, validationError);
+        vendorId = null;
+        assignedTo = 'admin';
+      }
     }
 
     // Get user info for sellerId
@@ -1539,8 +1663,23 @@ exports.createOrder = async (req, res, next) => {
     const upfrontAmount = paymentPreference === 'full' ? totalAmount : Math.round(totalAmount * (ADVANCE_PAYMENT_PERCENTAGE / 100));
     const remainingAmount = paymentPreference === 'full' ? 0 : totalAmount - upfrontAmount;
 
+    // Generate order number before creating order
+    const date = new Date();
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+    const todayStart = new Date(date);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(date);
+    todayEnd.setHours(23, 59, 59, 999);
+    
+    const todayCount = await Order.countDocuments({
+      createdAt: { $gte: todayStart, $lte: todayEnd },
+    });
+    const sequence = String(todayCount + 1).padStart(4, '0');
+    const orderNumber = `ORD-${dateStr}-${sequence}`;
+
     // Create order
     const order = new Order({
+      orderNumber, // Explicitly set orderNumber
       userId,
       sellerId,
       seller,
@@ -1561,6 +1700,12 @@ exports.createOrder = async (req, res, next) => {
     });
 
     await order.save();
+    
+    // Debug: Log order creation with vendor assignment
+    console.log(`✅ Order created: ${order.orderNumber}`);
+    console.log(`   - vendorId: ${order.vendorId || 'null'}`);
+    console.log(`   - assignedTo: ${order.assignedTo}`);
+    console.log(`   - deliveryAddress.city: ${order.deliveryAddress?.city || 'N/A'}`);
 
     // Clear cart after order creation
     cart.clear();
@@ -1976,10 +2121,10 @@ exports.confirmPayment = async (req, res, next) => {
       paymentMethod = PAYMENT_METHODS.RAZORPAY,
     } = req.body;
 
-    if (!orderId || !gatewayPaymentId) {
+    if (!orderId) {
       return res.status(400).json({
         success: false,
-        message: 'Order ID and gateway payment ID are required',
+        message: 'Order ID is required',
       });
     }
 
@@ -1992,21 +2137,40 @@ exports.confirmPayment = async (req, res, next) => {
       });
     }
 
-    // ⚠️ **DUMMY IMPLEMENTATION**: Payment Gateway Verification Pending
-    // TODO: Verify payment with actual gateway SDK (Razorpay/Paytm/Stripe)
-    // For now, assume payment is successful
+    // ⚠️ **DUMMY IMPLEMENTATION**: Payment Gateway Integration Pending
+    // TODO: Integrate Razorpay SDK and verify payment with actual gateway
+    // For now, we bypass payment gateway verification and generate dummy IDs
+    // FLAG: Replace with actual Razorpay payment verification in future
+    
+    // Generate dummy gateway IDs if not provided (bypassing payment gateway for now)
+    const finalGatewayPaymentId = gatewayPaymentId || `dummy_payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const finalGatewayOrderId = gatewayOrderId || `dummy_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Generate payment ID explicitly (pre-save hook will also generate, but this ensures it's set)
+    const date = new Date();
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+    const todayStart = new Date(date);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(date);
+    todayEnd.setHours(23, 59, 59, 999);
+    const todayCount = await Payment.countDocuments({
+      createdAt: { $gte: todayStart, $lte: todayEnd },
+    });
+    const sequence = String(todayCount + 1).padStart(4, '0');
+    const generatedPaymentId = `PAY-${dateStr}-${sequence}`;
     
     // Create payment record
     const payment = new Payment({
+      paymentId: generatedPaymentId, // Explicitly set paymentId
       orderId: order._id,
       userId,
       paymentType: order.paymentPreference === 'full' ? 'full' : 'advance',
       amount: order.upfrontAmount,
       paymentMethod,
-      status: PAYMENT_STATUS.PARTIAL_PAID, // or FULLY_PAID if full payment
-      gatewayPaymentId,
-      gatewayOrderId,
-      gatewaySignature,
+      status: order.paymentPreference === 'full' ? PAYMENT_STATUS.FULLY_PAID : PAYMENT_STATUS.PARTIAL_PAID,
+      gatewayPaymentId: finalGatewayPaymentId, // Dummy - FLAG: Replace with actual Razorpay payment ID in future
+      gatewayOrderId: finalGatewayOrderId, // Dummy - FLAG: Replace with actual Razorpay order ID in future
+      gatewaySignature: gatewaySignature || null, // Dummy - FLAG: Replace with actual Razorpay signature in future
       paidAt: new Date(),
     });
 
@@ -2214,10 +2378,10 @@ exports.confirmRemainingPayment = async (req, res, next) => {
       paymentMethod = PAYMENT_METHODS.RAZORPAY,
     } = req.body;
 
-    if (!orderId || !gatewayPaymentId) {
+    if (!orderId) {
       return res.status(400).json({
         success: false,
-        message: 'Order ID and gateway payment ID are required',
+        message: 'Order ID is required',
       });
     }
 
@@ -2237,20 +2401,40 @@ exports.confirmRemainingPayment = async (req, res, next) => {
       });
     }
 
-    // ⚠️ **DUMMY IMPLEMENTATION**: Payment Gateway Verification Pending
-    // TODO: Verify payment with actual gateway SDK
+    // ⚠️ **DUMMY IMPLEMENTATION**: Payment Gateway Integration Pending
+    // TODO: Integrate Razorpay SDK and verify payment with actual gateway
+    // For now, we bypass payment gateway verification and generate dummy IDs
+    // FLAG: Replace with actual Razorpay payment verification in future
+    
+    // Generate dummy gateway IDs if not provided (bypassing payment gateway for now)
+    const finalGatewayPaymentId = gatewayPaymentId || `dummy_payment_remaining_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const finalGatewayOrderId = gatewayOrderId || `dummy_order_remaining_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Generate payment ID explicitly (pre-save hook will also generate, but this ensures it's set)
+    const date = new Date();
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+    const todayStart = new Date(date);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(date);
+    todayEnd.setHours(23, 59, 59, 999);
+    const todayCount = await Payment.countDocuments({
+      createdAt: { $gte: todayStart, $lte: todayEnd },
+    });
+    const sequence = String(todayCount + 1).padStart(4, '0');
+    const generatedPaymentId = `PAY-${dateStr}-${sequence}`;
     
     // Create payment record
     const payment = new Payment({
+      paymentId: generatedPaymentId, // Explicitly set paymentId
       orderId: order._id,
       userId,
       paymentType: 'remaining',
       amount: order.remainingAmount,
       paymentMethod,
       status: PAYMENT_STATUS.FULLY_PAID,
-      gatewayPaymentId,
-      gatewayOrderId,
-      gatewaySignature,
+      gatewayPaymentId: finalGatewayPaymentId, // Dummy - FLAG: Replace with actual Razorpay payment ID in future
+      gatewayOrderId: finalGatewayOrderId, // Dummy - FLAG: Replace with actual Razorpay order ID in future
+      gatewaySignature: gatewaySignature || null, // Dummy - FLAG: Replace with actual Razorpay signature in future
       paidAt: new Date(),
     });
 

@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useReducer, useEffect } from 'react'
-import { initializeRealtimeConnection, handleRealtimeNotification } from '../services/vendorApi'
+import { createContext, useContext, useMemo, useReducer, useEffect, useState } from 'react'
+import { initializeRealtimeConnection, handleRealtimeNotification, getVendorProfile } from '../services/vendorApi'
 
 const initialState = {
   language: 'en',
@@ -254,12 +254,51 @@ function reducer(state, action) {
 
 export function VendorProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
+  const [isInitialized, setIsInitialized] = useState(false)
   
   // Get toast functions from context (if available)
   let showToast = (message, type) => {
     // Fallback if toast is not available
     console.log(`[${type.toUpperCase()}] ${message}`)
   }
+  
+  // Initialize vendor profile from token on mount
+  useEffect(() => {
+    const initializeVendor = async () => {
+      const token = localStorage.getItem('vendor_token')
+      if (token && !state.authenticated) {
+        try {
+          const profileResult = await getVendorProfile()
+          
+          if (profileResult.success && profileResult.data?.vendor) {
+            const vendor = profileResult.data.vendor
+            dispatch({
+              type: 'AUTH_LOGIN',
+              payload: {
+                id: vendor.id || vendor._id,
+                name: vendor.name,
+                phone: vendor.phone,
+                email: vendor.email,
+                location: vendor.location,
+                status: vendor.status,
+                isActive: vendor.isActive,
+              },
+            })
+          } else {
+            // Token is invalid, remove it
+            localStorage.removeItem('vendor_token')
+          }
+        } catch (error) {
+          console.error('Failed to initialize vendor:', error)
+          // Token might be invalid, remove it
+          localStorage.removeItem('vendor_token')
+        }
+      }
+      setIsInitialized(true)
+    }
+    
+    initializeVendor()
+  }, [state.authenticated]) // Run when authenticated state changes
   
   // Initialize real-time connection when authenticated
   useEffect(() => {

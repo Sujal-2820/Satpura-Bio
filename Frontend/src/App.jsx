@@ -4,6 +4,7 @@ import { UserDashboardPage, UserLogin, UserRegister } from './modules/User'
 import {
   VendorRouteContainer,
   VendorLoginPage,
+  VendorRegisterPage,
   VendorDashboardPage,
   VendorLanguagePage,
   VendorRolePage,
@@ -94,6 +95,7 @@ function App() {
           <Route path="language" element={<VendorLanguagePage />} />
           <Route path="role" element={<VendorRolePage />} />
           <Route path="login" element={<VendorLoginPage />} />
+          <Route path="register" element={<VendorRegisterPage />} />
           <Route path="dashboard" element={<VendorDashboardPage />} />
         </Route>
 

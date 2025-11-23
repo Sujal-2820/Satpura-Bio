@@ -13,6 +13,7 @@ const WithdrawalRequest = require('../models/WithdrawalRequest');
 const { generateOTP, sendOTP } = require('../config/sms');
 const { generateToken } = require('../middleware/auth');
 const { OTP_EXPIRY_MINUTES, IRA_PARTNER_COMMISSION_THRESHOLD, IRA_PARTNER_COMMISSION_RATE_LOW, IRA_PARTNER_COMMISSION_RATE_HIGH } = require('../utils/constants');
+const { checkPhoneExists, checkPhoneInRole } = require('../utils/phoneValidation');
 
 /**
  * @desc    Seller registration
@@ -27,6 +28,15 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Name and phone are required',
+      });
+    }
+
+    // Check if phone exists in other roles (user, vendor)
+    const phoneCheck = await checkPhoneExists(phone, 'seller');
+    if (phoneCheck.exists) {
+      return res.status(400).json({
+        success: false,
+        message: phoneCheck.message,
       });
     }
 
@@ -104,6 +114,15 @@ exports.requestOTP = async (req, res, next) => {
       });
     }
 
+    // Check if phone exists in other roles (user, vendor)
+    const phoneCheck = await checkPhoneExists(phone, 'seller');
+    if (phoneCheck.exists) {
+      return res.status(400).json({
+        success: false,
+        message: phoneCheck.message,
+      });
+    }
+
     let seller = await Seller.findOne({ phone });
 
     // If seller doesn't exist, create pending registration
@@ -169,12 +188,24 @@ exports.verifyOTP = async (req, res, next) => {
       });
     }
 
-    const seller = await Seller.findOne({ phone });
+    // Check if phone exists in other roles first
+    const phoneCheck = await checkPhoneExists(phone, 'seller');
+    if (phoneCheck.exists) {
+      return res.status(400).json({
+        success: false,
+        message: phoneCheck.message,
+      });
+    }
+
+    // Check if phone exists in seller role
+    const sellerCheck = await checkPhoneInRole(phone, 'seller');
+    const seller = sellerCheck.data;
 
     if (!seller) {
       return res.status(404).json({
         success: false,
-        message: 'Seller not found',
+        message: 'Seller not found. Please register first.',
+        requiresRegistration: true, // Flag for frontend to redirect
       });
     }
 

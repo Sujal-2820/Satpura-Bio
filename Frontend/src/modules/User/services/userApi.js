@@ -446,7 +446,14 @@ export async function createPaymentIntent(data) {
  * Confirm Payment (Advance Payment)
  * POST /users/payments/confirm
  * 
- * @param {Object} data - { paymentIntentId, paymentMethod, paymentDetails }
+ * @param {Object} data - { 
+ *   orderId: string (required),
+ *   paymentIntentId?: string,
+ *   gatewayPaymentId: string (required - dummy for now),
+ *   gatewayOrderId?: string (dummy for now),
+ *   gatewaySignature?: string (dummy for now),
+ *   paymentMethod: string
+ * }
  * @returns {Promise<Object>} - { success: boolean, transactionId, orderId }
  */
 export async function confirmPayment(data) {

@@ -163,6 +163,31 @@ function UserDashboardContent({ onLogout }) {
               }
             })
           }
+
+          // Fetch addresses
+          const addressesResult = await userApi.getAddresses()
+          if (addressesResult.success && addressesResult.data?.addresses) {
+            // Clear existing addresses first
+            dispatch({ type: 'CLEAR_ADDRESSES' })
+            // Add addresses from API
+            addressesResult.data.addresses.forEach((address) => {
+              dispatch({
+                type: 'ADD_ADDRESS',
+                payload: {
+                  id: address.id || address._id,
+                  name: address.name || address.label,
+                  label: address.label || address.name,
+                  address: address.address || address.street,
+                  street: address.street || address.address,
+                  city: address.city,
+                  state: address.state,
+                  pincode: address.pincode,
+                  phone: address.phone,
+                  isDefault: address.isDefault || false,
+                },
+              })
+            })
+          }
         } catch (error) {
           console.error('Error loading data:', error)
         }

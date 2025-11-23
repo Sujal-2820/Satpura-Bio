@@ -1680,14 +1680,6 @@ exports.banVendor = async (req, res, next) => {
       });
     }
 
-    // Check escalation count (requires >3 escalations)
-    if ((vendor.escalationCount || 0) <= 3) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot ban vendor. Requires more than 3 escalations. Current escalation count: ' + (vendor.escalationCount || 0),
-      });
-    }
-
     // Check if vendor is already banned
     if (vendor.banInfo.isBanned) {
       return res.status(400).json({

@@ -9,6 +9,7 @@ export function VendorDashboardPage() {
   return (
     <VendorDashboard
       onLogout={() => {
+        localStorage.removeItem('vendor_token')
         dispatch({ type: 'AUTH_LOGOUT' })
         navigate('/vendor/login')
       }}

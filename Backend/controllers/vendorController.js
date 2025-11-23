@@ -4,6 +4,7 @@
  * Handles all vendor-related operations
  */
 
+const mongoose = require('mongoose');
 const Vendor = require('../models/Vendor');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
@@ -13,6 +14,7 @@ const CreditPurchase = require('../models/CreditPurchase');
 const { generateOTP, sendOTP } = require('../config/sms');
 const { generateToken } = require('../middleware/auth');
 const { OTP_EXPIRY_MINUTES, MIN_VENDOR_PURCHASE, VENDOR_COVERAGE_RADIUS_KM } = require('../utils/constants');
+const { checkPhoneExists, checkPhoneInRole } = require('../utils/phoneValidation');
 
 /**
  * @desc    Vendor registration
@@ -27,6 +29,15 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Name, phone, and location are required',
+      });
+    }
+
+    // Check if phone exists in other roles (user, seller)
+    const phoneCheck = await checkPhoneExists(phone, 'vendor');
+    if (phoneCheck.exists) {
+      return res.status(400).json({
+        success: false,
+        message: phoneCheck.message,
       });
     }
 
@@ -47,11 +58,13 @@ exports.register = async (req, res, next) => {
       
       try {
         await session.withTransaction(async () => {
-          // Check if another approved or pending vendor exists within 20km
+          // Check if another approved vendor exists within 20km
           // Using MongoDB geospatial query with 2dsphere index
           const nearbyVendors = await Vendor.find({
             phone: { $ne: phone }, // Exclude current vendor if exists
-            status: { $in: ['pending', 'approved'] }, // Check both pending and approved
+            status: 'approved', // Only check approved vendors
+            isActive: true, // Only check active vendors
+            'banInfo.isBanned': false, // Exclude banned vendors
             'location.coordinates': {
               $near: {
                 $geometry: {
@@ -74,7 +87,9 @@ exports.register = async (req, res, next) => {
           // Get vendor details for error message (outside transaction)
           const nearbyVendor = await Vendor.findOne({
             phone: { $ne: phone },
-            status: { $in: ['pending', 'approved'] },
+            status: 'approved',
+            isActive: true,
+            'banInfo.isBanned': false,
             'location.coordinates': {
               $near: {
                 $geometry: {
@@ -105,7 +120,7 @@ exports.register = async (req, res, next) => {
       }
     }
 
-    // Create vendor
+    // Create vendor - Auto-approved on registration
     const vendor = new Vendor({
       name,
       phone,
@@ -120,7 +135,9 @@ exports.register = async (req, res, next) => {
         },
         coverageRadius: VENDOR_COVERAGE_RADIUS_KM,
       },
-      status: 'pending', // Requires admin approval
+      status: 'approved', // Auto-approved on registration
+      isActive: true, // Active immediately
+      approvedAt: new Date(), // Set approval timestamp
     });
 
     // Clear any existing OTP before generating new one
@@ -152,9 +169,8 @@ exports.register = async (req, res, next) => {
     res.status(201).json({
       success: true,
       data: {
-        message: 'Registration request submitted. OTP sent to phone.',
+        message: 'Registration successful. OTP sent to phone.',
         vendorId: vendor._id,
-        requiresApproval: true,
         expiresIn: OTP_EXPIRY_MINUTES * 60, // seconds
       },
     });
@@ -179,13 +195,24 @@ exports.requestOTP = async (req, res, next) => {
       });
     }
 
-    let vendor = await Vendor.findOne({ phone });
+    // Check if phone exists in other roles (user, seller)
+    const phoneCheck = await checkPhoneExists(phone, 'vendor');
+    if (phoneCheck.exists) {
+      return res.status(400).json({
+        success: false,
+        message: phoneCheck.message,
+      });
+    }
 
-    // If vendor doesn't exist, create pending registration
+    // Check if vendor exists - requestOTP is only for existing vendors
+    const vendorCheck = await checkPhoneInRole(phone, 'vendor');
+    const vendor = vendorCheck.data;
+
     if (!vendor) {
-      vendor = new Vendor({
-        phone,
-        status: 'pending',
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found. Please register first.',
+        requiresRegistration: true,
       });
     }
 
@@ -243,12 +270,24 @@ exports.verifyOTP = async (req, res, next) => {
       });
     }
 
-    const vendor = await Vendor.findOne({ phone });
+    // Check if phone exists in other roles first
+    const phoneCheck = await checkPhoneExists(phone, 'vendor');
+    if (phoneCheck.exists) {
+      return res.status(400).json({
+        success: false,
+        message: phoneCheck.message,
+      });
+    }
+
+    // Check if phone exists in vendor role
+    const vendorCheck = await checkPhoneInRole(phone, 'vendor');
+    const vendor = vendorCheck.data;
 
     if (!vendor) {
       return res.status(404).json({
         success: false,
-        message: 'Vendor not found',
+        message: 'Vendor not found. Please register first.',
+        requiresRegistration: true, // Flag for frontend to redirect
       });
     }
 
@@ -262,11 +301,22 @@ exports.verifyOTP = async (req, res, next) => {
       });
     }
 
-    // Check if vendor is approved and active
-    if (vendor.status !== 'approved' || !vendor.isActive) {
+    // Check if vendor is banned
+    if (vendor.banInfo?.isBanned) {
+      const banType = vendor.banInfo.banType || 'temporary'
+      const banReason = vendor.banInfo.banReason || 'Account banned by admin'
       return res.status(403).json({
         success: false,
-        message: 'Vendor account is pending approval or inactive. Please contact admin.',
+        message: `Vendor account is ${banType === 'permanent' ? 'permanently' : 'temporarily'} banned. ${banReason}. Please contact admin.`,
+        banInfo: vendor.banInfo,
+      });
+    }
+
+    // Check if vendor is active
+    if (!vendor.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vendor account is inactive. Please contact admin.',
       });
     }
 
@@ -499,7 +549,15 @@ exports.getOrders = async (req, res, next) => {
     } = req.query;
 
     // Build query - only orders assigned to this vendor
-    const query = { vendorId: vendor._id };
+    // Use both vendorId and assignedTo to ensure we get all orders for this vendor
+    const query = { 
+      vendorId: vendor._id,
+      assignedTo: 'vendor'
+    };
+    
+    // Debug logging
+    console.log(`🔍 Vendor ${vendor.name} (${vendor._id}) fetching orders`);
+    console.log(`📍 Vendor location: ${vendor.location?.city || 'No city'}, ${vendor.location?.state || 'No state'}`);
 
     if (status) {
       query.status = status;
@@ -548,6 +606,15 @@ exports.getOrders = async (req, res, next) => {
       .lean();
 
     const total = await Order.countDocuments(query);
+    
+    // Debug logging
+    console.log(`📦 Vendor ${vendor.name} orders query result: ${orders.length} orders found (total: ${total})`);
+    if (orders.length === 0 && total === 0) {
+      console.log(`⚠️ No orders found for vendor. Query:`, JSON.stringify(query, null, 2));
+      // Check if there are any orders with this vendorId at all
+      const allOrdersForVendor = await Order.find({ vendorId: vendor._id }).countDocuments();
+      console.log(`   Total orders with vendorId ${vendor._id}: ${allOrdersForVendor}`);
+    }
 
     res.status(200).json({
       success: true,

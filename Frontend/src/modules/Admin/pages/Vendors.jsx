@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Building2, CreditCard, MapPin, ShieldAlert, Edit2, Eye, CheckCircle, Package } from 'lucide-react'
+import { Building2, CreditCard, MapPin, ShieldAlert, Edit2, Eye, Package, Ban, Unlock } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { Timeline } from '../components/Timeline'
 import { Modal } from '../components/Modal'
 import { VendorMap } from '../components/VendorMap'
-import { VendorApprovalModal } from '../components/VendorApprovalModal'
 import { CreditPolicyForm } from '../components/CreditPolicyForm'
 import { PurchaseRequestModal } from '../components/PurchaseRequestModal'
 import { VendorDetailModal } from '../components/VendorDetailModal'
@@ -84,8 +83,8 @@ export function VendorsPage() {
   const { vendors: vendorsState } = useAdminState()
   const {
     getVendors,
-    approveVendor,
-    rejectVendor,
+    banVendor,
+    unbanVendor,
     updateVendorCreditPolicy,
     getVendorPurchaseRequests,
     approveVendorPurchase,
@@ -97,12 +96,11 @@ export function VendorsPage() {
   const [vendorsList, setVendorsList] = useState([])
   const [rawVendors, setRawVendors] = useState([])
   const [purchaseRequests, setPurchaseRequests] = useState([])
-  const [pendingVendors, setPendingVendors] = useState([])
   const [coverageReport, setCoverageReport] = useState(null)
   
   // Modal states
-  const [approvalModalOpen, setApprovalModalOpen] = useState(false)
-  const [selectedVendorForApproval, setSelectedVendorForApproval] = useState(null)
+  const [banModalOpen, setBanModalOpen] = useState(false)
+  const [selectedVendorForBan, setSelectedVendorForBan] = useState(null)
   const [creditPolicyModalOpen, setCreditPolicyModalOpen] = useState(false)
   const [selectedVendorForPolicy, setSelectedVendorForPolicy] = useState(null)
   const [purchaseRequestModalOpen, setPurchaseRequestModalOpen] = useState(false)
@@ -145,9 +143,6 @@ export function VendorsPage() {
     const flaggedSet = new Set(coverageInfo.flaggedVendors || [])
     const formatted = sourceVendors.map((vendor) => formatVendorForDisplay(vendor, flaggedSet))
     setVendorsList(formatted)
-
-    const pending = sourceVendors.filter((v) => v.status === 'pending' || v.status === 'review')
-    setPendingVendors(pending)
   }, [getVendors])
 
   // Fetch purchase requests
@@ -193,47 +188,35 @@ export function VendorsPage() {
     }
   }
 
-  const handleApproveVendor = async (vendorId) => {
+  const handleBanVendor = async (vendorId, banData) => {
     try {
-      const originalVendor =
-        getRawVendorById(vendorId) || selectedVendorForApproval
-      const result = await approveVendor(vendorId, {
-        creditLimit: originalVendor.creditLimit || 1000000,
-        repaymentDays: originalVendor.repaymentDays || 21,
-        penaltyRate: originalVendor.penaltyRate || 1.5,
-      })
+      const result = await banVendor(vendorId, banData)
       if (result.data) {
-        setApprovalModalOpen(false)
-        setSelectedVendorForApproval(null)
+        setBanModalOpen(false)
+        setSelectedVendorForBan(null)
         fetchVendors()
-        success('Vendor approved successfully!', 3000)
+        success(`Vendor ${banData.banType === 'permanent' ? 'permanently' : 'temporarily'} banned successfully!`, 3000)
       } else if (result.error) {
-        const errorMessage = result.error.message || 'Failed to approve vendor'
-        if (errorMessage.includes('location') || errorMessage.includes('coverage') || errorMessage.includes('conflict')) {
-          showWarning(errorMessage, 6000)
-        } else {
-          showError(errorMessage, 5000)
-        }
-      }
-    } catch (error) {
-      showError(error.message || 'Failed to approve vendor', 5000)
-    }
-  }
-
-  const handleRejectVendor = async (vendorId, rejectionData) => {
-    try {
-      const result = await rejectVendor(vendorId, rejectionData)
-      if (result.data) {
-        setApprovalModalOpen(false)
-        setSelectedVendorForApproval(null)
-        fetchVendors()
-        success('Vendor rejected.', 3000)
-      } else if (result.error) {
-        const errorMessage = result.error.message || 'Failed to reject vendor'
+        const errorMessage = result.error.message || 'Failed to ban vendor'
         showError(errorMessage, 5000)
       }
     } catch (error) {
-      showError(error.message || 'Failed to reject vendor', 5000)
+      showError(error.message || 'Failed to ban vendor', 5000)
+    }
+  }
+
+  const handleUnbanVendor = async (vendorId, unbanData) => {
+    try {
+      const result = await unbanVendor(vendorId, unbanData)
+      if (result.data) {
+        fetchVendors()
+        success('Vendor ban revoked successfully!', 3000)
+      } else if (result.error) {
+        const errorMessage = result.error.message || 'Failed to unban vendor'
+        showError(errorMessage, 5000)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to unban vendor', 5000)
     }
   }
 
@@ -312,23 +295,29 @@ export function VendorsPage() {
     setMapModalOpen(true)
   }
 
-  const handleOpenApprovalModal = () => {
-    if (pendingVendors.length > 0) {
-      setSelectedVendorForApproval(withCoverageMeta(pendingVendors[0]))
-      setApprovalModalOpen(true)
-    } else {
-      alert('No pending vendor applications at the moment.')
-    }
-  }
 
   const tableColumns = columns.map((column) => {
     if (column.accessor === 'status') {
       return {
         ...column,
         Cell: (row) => {
-          const status = row.status || 'Unknown'
-          const tone = status === 'On Track' || status === 'on_track' ? 'success' : status === 'Delayed' || status === 'delayed' ? 'warning' : 'neutral'
-          return <StatusBadge tone={tone}>{status}</StatusBadge>
+          const originalVendor = vendorsState.data?.vendors?.find((v) => v.id === row.id) || row
+          const isBanned = originalVendor.banInfo?.isBanned || originalVendor.status === 'temporarily_banned' || originalVendor.status === 'permanently_banned'
+          const banType = originalVendor.banInfo?.banType || (originalVendor.status === 'permanently_banned' ? 'permanent' : 'temporary')
+          const status = isBanned ? (banType === 'permanent' ? 'Permanently Banned' : 'Temporarily Banned') : (row.status || 'Active')
+          let tone = 'neutral'
+          if (isBanned) {
+            tone = 'error'
+          } else if (status === 'approved' || status === 'active' || status === 'On Track' || status === 'on_track') {
+            tone = 'success'
+          } else if (status === 'Delayed' || status === 'delayed') {
+            tone = 'warning'
+          } else if (status === 'inactive' || status === 'blocked') {
+            tone = 'error'
+          }
+          // Capitalize first letter for display
+          const displayStatus = status.charAt(0).toUpperCase() + status.slice(1)
+          return <StatusBadge tone={tone}>{displayStatus}</StatusBadge>
         },
       }
     }
@@ -361,6 +350,8 @@ export function VendorsPage() {
         ...column,
         Cell: (row) => {
           const originalVendor = vendorsState.data?.vendors?.find((v) => v.id === row.id) || row
+          const isBanned = originalVendor.banInfo?.isBanned || originalVendor.status === 'temporarily_banned' || originalVendor.status === 'permanently_banned'
+          const banType = originalVendor.banInfo?.banType || (originalVendor.status === 'permanently_banned' ? 'permanent' : 'temporary')
           return (
             <div className="flex items-center gap-2">
               <button
@@ -379,17 +370,48 @@ export function VendorsPage() {
               >
                 <Eye className="h-4 w-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedVendorForPolicy(originalVendor)
-                  setCreditPolicyModalOpen(true)
-                }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-green-500 hover:bg-green-50 hover:text-green-700"
-                title="Update credit policy"
-              >
-                <Edit2 className="h-4 w-4" />
-              </button>
+              {!isBanned && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedVendorForPolicy(originalVendor)
+                      setCreditPolicyModalOpen(true)
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-green-500 hover:bg-green-50 hover:text-green-700"
+                    title="Update credit policy"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const banType = window.confirm('Ban permanently? (Cancel for temporary ban)') ? 'permanent' : 'temporary'
+                      const banReason = window.prompt('Enter ban reason:') || 'Banned by admin'
+                      if (banReason) {
+                        handleBanVendor(originalVendor.id, { banType, banReason })
+                      }
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition-all hover:border-red-500 hover:bg-red-100 hover:text-red-800"
+                    title="Ban vendor"
+                  >
+                    <Ban className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+              {isBanned && banType === 'temporary' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const revocationReason = window.prompt('Enter unban reason (optional):') || 'Ban revoked by admin'
+                    handleUnbanVendor(originalVendor.id, { revocationReason })
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-50 text-green-700 transition-all hover:border-green-500 hover:bg-green-100 hover:text-green-800"
+                  title="Unban vendor"
+                >
+                  <Unlock className="h-4 w-4" />
+                </button>
+              )}
             </div>
           )
         },
@@ -421,13 +443,6 @@ export function VendorsPage() {
               Purchase Requests ({purchaseRequests.length})
             </button>
           )}
-          <button
-            onClick={handleOpenApprovalModal}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]"
-          >
-          <Building2 className="h-4 w-4" />
-            Approve Vendors {pendingVendors.length > 0 && `(${pendingVendors.length})`}
-        </button>
         </div>
       </header>
 
@@ -587,18 +602,6 @@ export function VendorsPage() {
         </div>
       </section>
 
-      {/* Vendor Approval Modal */}
-      <VendorApprovalModal
-        isOpen={approvalModalOpen}
-        onClose={() => {
-          setApprovalModalOpen(false)
-          setSelectedVendorForApproval(null)
-        }}
-        vendor={selectedVendorForApproval}
-        onApprove={handleApproveVendor}
-        onReject={handleRejectVendor}
-        loading={loading}
-      />
 
       {/* Credit Policy Modal */}
       <Modal

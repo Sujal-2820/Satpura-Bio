@@ -16,7 +16,7 @@ const STEPS = [
 export function CheckoutView({ onBack, onOrderPlaced }) {
   const { cart, addresses, profile, assignedVendor } = useUserState()
   const dispatch = useUserDispatch()
-  const { assignVendor, createOrder, createPaymentIntent, confirmPayment, loading } = useUserApi()
+  const { createOrder, createPaymentIntent, confirmPayment, addAddress, updateAddress, deleteAddress, loading } = useUserApi()
   const { success, error: showError } = useToast()
   const [currentStep, setCurrentStep] = useState(1)
   const [summaryExpanded, setSummaryExpanded] = useState(true)
@@ -125,38 +125,59 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
     }, 300)
   }
 
-  const handleSaveAddress = () => {
+  const handleSaveAddress = async () => {
     if (!addressForm.name || !addressForm.address || !addressForm.city || !addressForm.state || !addressForm.pincode || !addressForm.phone) {
-      alert('Please fill in all fields')
+      showError('Please fill in all fields')
       return
     }
 
-    if (editingAddress) {
-      dispatch({
-        type: 'UPDATE_ADDRESS',
-        payload: {
-          id: editingAddress,
+    try {
+      if (editingAddress) {
+        // Update existing address via API
+        const result = await updateAddress(editingAddress, addressForm)
+        if (result.data) {
+          success('Address updated successfully')
+        } else {
+          showError(result.error?.message || 'Failed to update address')
+        }
+      } else {
+        // Add new address via API
+        const addressData = {
           ...addressForm,
-        },
-      })
-    } else {
-      const newAddress = {
-        id: `addr-${Date.now()}`,
-        ...addressForm,
-        isDefault: uniqueAddresses.length === 0,
+          isDefault: uniqueAddresses.length === 0,
+        }
+        const result = await addAddress(addressData)
+        if (result.data) {
+          const savedAddress = result.data.address || result.data
+          setSelectedAddress(savedAddress.id || savedAddress._id)
+          success('Address added successfully')
+        } else {
+          showError(result.error?.message || 'Failed to add address')
+        }
       }
-      dispatch({ type: 'ADD_ADDRESS', payload: newAddress })
-      setSelectedAddress(newAddress.id)
+      handleCloseAddressPanel()
+    } catch (error) {
+      console.error('Error saving address:', error)
+      showError(error.message || 'Failed to save address')
     }
-    handleCloseAddressPanel()
   }
 
-  const handleDeleteAddress = (addressId) => {
+  const handleDeleteAddress = async (addressId) => {
     if (window.confirm('Are you sure you want to delete this address?')) {
-      dispatch({ type: 'DELETE_ADDRESS', payload: { id: addressId } })
-      if (selectedAddress === addressId) {
-        const remaining = uniqueAddresses.filter((a) => a.id !== addressId)
-        setSelectedAddress(remaining.length > 0 ? (remaining.find((a) => a.isDefault)?.id || remaining[0]?.id) : null)
+      try {
+        const result = await deleteAddress(addressId)
+        if (result.data) {
+          success('Address deleted successfully')
+          if (selectedAddress === addressId) {
+            const remaining = uniqueAddresses.filter((a) => a.id !== addressId)
+            setSelectedAddress(remaining.length > 0 ? (remaining.find((a) => a.isDefault)?.id || remaining[0]?.id) : null)
+          }
+        } else {
+          showError(result.error?.message || 'Failed to delete address')
+        }
+      } catch (error) {
+        console.error('Error deleting address:', error)
+        showError(error.message || 'Failed to delete address')
       }
     }
   }
@@ -250,27 +271,8 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
   const modalDeliveryWaived =
     pendingOrder?.uiPayment?.deliveryWaived ?? (isFullPayment && totals.deliveryBeforeBenefit > 0)
 
-  // Assign vendor based on selected address location (20km radius)
-  useEffect(() => {
-    if (currentStep >= 2 && selectedAddress && cartItems.length > 0) {
-      const address = uniqueAddresses.find((a) => a.id === selectedAddress)
-      if (address && address.pincode) {
-        // Get coordinates from address or use profile location
-        const location = {
-          address: address.address,
-          city: address.city,
-          state: address.state,
-          pincode: address.pincode,
-          coordinates: profile.location?.coordinates || null,
-        }
-        
-        assignVendor(location).catch((err) => {
-          console.error('Failed to assign vendor:', err)
-          // Vendor assignment will be handled by backend during order creation
-        })
-      }
-    }
-  }, [currentStep, selectedAddress, cartItems.length, uniqueAddresses, profile.location, assignVendor])
+  // Note: Vendor assignment is now handled by the backend during order creation
+  // No need to call assignVendor separately - it's done automatically when creating the order
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -335,7 +337,10 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
   }
 
   const handleConfirmPayment = async () => {
-    if (!pendingOrder) return
+    if (!pendingOrder || !pendingOrder.id) {
+      showError('Order information is missing')
+      return
+    }
 
     try {
       const paymentAmount = pendingOrder.uiPayment?.amountDueNow ?? amountDueNow
@@ -355,22 +360,24 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
 
       const { paymentIntentId, clientSecret, paymentGateway } = paymentIntentResult.data
 
+      // ⚠️ **DUMMY IMPLEMENTATION**: Payment Gateway Integration Pending
       // In a real app, this would integrate with Razorpay/Paytm/Stripe SDK
-      // For now, we'll simulate payment confirmation
-      // TODO: Integrate actual payment gateway SDK here
+      // For now, we'll simulate payment confirmation with dummy gateway IDs
+      // TODO: Replace with actual payment gateway SDK integration
       
-      // Simulate payment confirmation (replace with actual gateway integration)
-      const paymentDetails = {
-        paymentIntentId,
-        clientSecret,
-        // Add actual payment gateway response here
-      }
+      // Generate dummy gateway payment ID (will be replaced with actual gateway response)
+      const dummyGatewayPaymentId = `dummy_payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const dummyGatewayOrderId = `dummy_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-      const confirmResult = await confirmPayment(
-        paymentIntentId,
-        paymentMethod,
-        paymentDetails
-      )
+      // Confirm payment with orderId and dummy gateway IDs
+      const confirmResult = await confirmPayment({
+        orderId: pendingOrder.id,
+        paymentIntentId: paymentIntentId,
+        gatewayPaymentId: dummyGatewayPaymentId, // Dummy - replace with actual gateway response
+        gatewayOrderId: dummyGatewayOrderId, // Dummy - replace with actual gateway response
+        gatewaySignature: null, // Dummy - replace with actual gateway signature
+        paymentMethod: paymentMethod,
+      })
 
       if (confirmResult.error) {
         showError(confirmResult.error.message || 'Payment failed')
@@ -386,7 +393,8 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       setShowPaymentConfirm(false)
       setPendingOrder(null)
     } catch (err) {
-      showError('Payment processing failed. Please try again.')
+      console.error('Payment processing error:', err)
+      showError(err.message || 'Payment processing failed. Please try again.')
     }
   }
 

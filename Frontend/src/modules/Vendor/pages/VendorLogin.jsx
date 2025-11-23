@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { OtpVerification } from '../../../components/auth/OtpVerification'
+import { useVendorDispatch } from '../context/VendorContext'
 import * as vendorApi from '../services/vendorApi'
 
 export function VendorLogin({ onSuccess, onSwitchToRegister }) {
+  const dispatch = useVendorDispatch()
   const [step, setStep] = useState('phone') // 'phone' | 'otp'
   const [form, setForm] = useState({ phone: '' })
   const [loading, setLoading] = useState(false)
@@ -53,12 +55,44 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
       const result = await vendorApi.loginVendorWithOtp({ phone: form.phone, otp: otpCode })
 
       if (result.success || result.data) {
-        if (result.data?.token) {
-          localStorage.setItem('vendor_token', result.data.token)
+        const vendorData = result.data?.vendor || result.data?.data?.vendor
+        if (result.data?.token || result.data?.data?.token) {
+          localStorage.setItem('vendor_token', result.data?.token || result.data?.data?.token)
         }
-        onSuccess?.(result.data?.vendor || { phone: form.phone })
+        
+        // Update vendor context with profile
+        if (vendorData) {
+          dispatch({
+            type: 'AUTH_LOGIN',
+            payload: {
+              id: vendorData.id || vendorData._id,
+              name: vendorData.name,
+              phone: vendorData.phone || form.phone,
+              email: vendorData.email,
+              location: vendorData.location,
+              status: vendorData.status,
+              isActive: vendorData.isActive,
+            },
+          })
+        }
+        
+        onSuccess?.(vendorData || { phone: form.phone })
       } else {
-        setError(result.error?.message || 'Invalid OTP. Please try again.')
+        // Check if vendor needs to register
+        if (result.error?.message?.includes('not found') || result.error?.message?.includes('Vendor not found')) {
+          setError('Vendor not found. Please register first.')
+          setTimeout(() => {
+            if (onSwitchToRegister) {
+              onSwitchToRegister()
+            }
+          }, 2000)
+        } else if (result.error?.message?.includes('banned')) {
+          setError(result.error?.message || 'Your account has been banned. Please contact admin.')
+        } else if (result.error?.message?.includes('inactive')) {
+          setError('Your account is inactive. Please contact admin.')
+        } else {
+          setError(result.error?.message || 'Invalid OTP. Please try again.')
+        }
       }
     } catch (err) {
       setError(err.message || 'Verification failed. Please try again.')
@@ -103,11 +137,11 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
             <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
-          <p className="text-xs uppercase tracking-wide text-green-600 font-semibold">Vendor Access</p>
-          <h1 className="text-3xl font-bold text-gray-900">Sign in to Vendor Dashboard</h1>
+          <p className="text-xs uppercase tracking-wide text-green-600 font-semibold">Welcome Back</p>
+          <h1 className="text-3xl font-bold text-gray-900">Sign in as Vendor</h1>
           <p className="text-sm text-gray-600">Enter your contact number to continue</p>
         </div>
 
@@ -120,11 +154,11 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
             )}
 
             <div className="space-y-1.5">
-              <label htmlFor="vendor-login-phone" className="text-xs font-semibold text-gray-700">
+              <label htmlFor="login-phone" className="text-xs font-semibold text-gray-700">
                 Contact Number <span className="text-red-500">*</span>
               </label>
               <input
-                id="vendor-login-phone"
+                id="login-phone"
                 name="phone"
                 type="tel"
                 required

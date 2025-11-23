@@ -134,6 +134,11 @@ function reducer(state, action) {
         ...state,
         addresses: state.addresses.filter((addr) => addr.id !== action.payload.id),
       }
+    case 'CLEAR_ADDRESSES':
+      return {
+        ...state,
+        addresses: [],
+      }
     case 'ADD_TO_FAVOURITES':
       if (state.favourites.includes(action.payload.productId)) {
         return state
