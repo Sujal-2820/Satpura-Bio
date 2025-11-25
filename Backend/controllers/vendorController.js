@@ -51,7 +51,48 @@ exports.register = async (req, res, next) => {
       });
     }
 
-    // CRITICAL: Verify 20km radius rule - Only 1 vendor allowed per 20km radius
+    // CRITICAL: Verify region uniqueness - Only 1 vendor allowed per region (city + state)
+    // First check: Region-based check (city + state) - STRICT REGION RULE
+    if (location.city && location.state) {
+      const cityNormalized = location.city.trim().toLowerCase();
+      const stateNormalized = location.state.trim().toLowerCase();
+      
+      console.log(`🔍 Checking for existing vendor in region: ${location.city}, ${location.state}`);
+      
+      // Check if another vendor exists in the same region (city + state)
+      const existingVendorInRegion = await Vendor.findOne({
+        phone: { $ne: phone }, // Exclude current vendor if exists
+        status: { $in: ['pending', 'approved'] }, // Check both pending and approved
+        isActive: true,
+        'banInfo.isBanned': false,
+        'location.city': { $regex: new RegExp(`^${cityNormalized}$`, 'i') },
+        'location.state': { $regex: new RegExp(`^${stateNormalized}$`, 'i') },
+      });
+
+      if (existingVendorInRegion) {
+        console.log(`❌ Vendor registration blocked: Another vendor exists in ${location.city}, ${location.state}`);
+        console.log(`   Existing vendor: ${existingVendorInRegion.name} (${existingVendorInRegion.phone})`);
+        return res.status(400).json({
+          success: false,
+          message: `A vendor already exists in ${location.city}, ${location.state}. Only one vendor is allowed per region.`,
+          existingVendor: {
+            id: existingVendorInRegion._id,
+            name: existingVendorInRegion.name,
+            phone: existingVendorInRegion.phone,
+            status: existingVendorInRegion.status,
+            location: {
+              city: existingVendorInRegion.location.city,
+              state: existingVendorInRegion.location.state,
+            },
+          },
+          businessRule: 'Only one vendor is allowed per region (city + state). Please choose a different region.',
+        });
+      }
+      
+      console.log(`✅ No existing vendor found in region: ${location.city}, ${location.state}`);
+    }
+
+    // CRITICAL: Verify 20km radius rule - Only 1 vendor allowed per 20km radius (for coordinates-based check)
     // Use transaction to prevent race conditions during concurrent registrations
     if (location.coordinates && location.coordinates.lat && location.coordinates.lng) {
       const session = await mongoose.startSession();
@@ -120,7 +161,7 @@ exports.register = async (req, res, next) => {
       }
     }
 
-    // Create vendor - Auto-approved on registration
+    // Create vendor - Status set to pending (requires admin approval)
     const vendor = new Vendor({
       name,
       phone,
@@ -135,9 +176,8 @@ exports.register = async (req, res, next) => {
         },
         coverageRadius: VENDOR_COVERAGE_RADIUS_KM,
       },
-      status: 'approved', // Auto-approved on registration
-      isActive: true, // Active immediately
-      approvedAt: new Date(), // Set approval timestamp
+      status: 'pending', // Requires admin approval
+      isActive: false, // Inactive until approved
     });
 
     // Clear any existing OTP before generating new one
@@ -216,6 +256,16 @@ exports.requestOTP = async (req, res, next) => {
       });
     }
 
+    // Check vendor status before sending OTP
+    if (vendor.status === 'rejected') {
+      return res.status(403).json({
+        success: false,
+        status: 'rejected',
+        message: 'Your vendor profile was rejected by the admin. You cannot access the dashboard.',
+      });
+    }
+
+    // Allow OTP for pending and approved vendors (status check will happen in verifyOTP)
     // Clear any existing OTP before generating new one
     vendor.clearOTP();
     
@@ -312,7 +362,56 @@ exports.verifyOTP = async (req, res, next) => {
       });
     }
 
-    // Check if vendor is active
+    // Check vendor status - Handle pending, rejected, and approved statuses
+    if (vendor.status === 'pending') {
+      // Clear OTP after successful verification
+      vendor.clearOTP();
+      await vendor.save();
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          status: 'pending',
+          message: 'Registration successful. Waiting for admin approval.',
+          vendor: {
+            id: vendor._id,
+            name: vendor.name,
+            phone: vendor.phone,
+            status: vendor.status,
+            isActive: vendor.isActive,
+            location: vendor.location,
+          },
+        },
+      });
+    }
+
+    if (vendor.status === 'rejected') {
+      // Clear OTP after verification
+      vendor.clearOTP();
+      await vendor.save();
+      
+      return res.status(403).json({
+        success: false,
+        status: 'rejected',
+        message: 'Your vendor profile was rejected by the admin. You cannot access the dashboard.',
+        vendor: {
+          id: vendor._id,
+          name: vendor.name,
+          phone: vendor.phone,
+          status: vendor.status,
+        },
+      });
+    }
+
+    // Check if vendor is approved and active
+    if (vendor.status !== 'approved') {
+      return res.status(403).json({
+        success: false,
+        message: `Vendor account status is ${vendor.status}. Please contact admin.`,
+        status: vendor.status,
+      });
+    }
+
     if (!vendor.isActive) {
       return res.status(403).json({
         success: false,
@@ -320,8 +419,10 @@ exports.verifyOTP = async (req, res, next) => {
       });
     }
 
+    // Vendor is approved and active - proceed with login
     // Clear OTP after successful verification
     vendor.clearOTP();
+    vendor.lastLogin = new Date();
     await vendor.save();
 
     // Generate JWT token
@@ -347,6 +448,7 @@ exports.verifyOTP = async (req, res, next) => {
       success: true,
       data: {
         token,
+        status: 'approved',
         vendor: {
           id: vendor._id,
           name: vendor.name,
@@ -1198,6 +1300,293 @@ exports.getOrderStats = async (req, res, next) => {
 // ============================================================================
 
 /**
+ * @desc    Get all products available for ordering (not just assigned)
+ * @route   GET /api/vendors/products
+ * @access  Private (Vendor)
+ */
+exports.getProducts = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const {
+      page = 1,
+      limit = 20,
+      category,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = req.query;
+
+    // Build query - only show active products
+    const query = { isActive: true };
+
+    if (category) {
+      query.category = category.toLowerCase();
+    }
+
+    if (search) {
+      query.$text = { $search: search };
+    }
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sort
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Get all active products (vendors can see all products to order)
+    const products = await Product.find(query)
+      .select('name description category priceToVendor displayStock actualStock images sku weight expiry')
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    // Check which products are assigned to this vendor
+    const productIds = products.map(p => p._id);
+    let ordersCountMap = {};
+    let pendingPurchasesMap = {}; // Track pending/approved purchases
+
+    if (productIds.length > 0) {
+      const ordersCounts = await Order.aggregate([
+        {
+          $match: {
+            vendorId: vendor._id,
+            'items.productId': { $in: productIds },
+          },
+        },
+        { $unwind: '$items' },
+        {
+          $match: {
+            'items.productId': { $in: productIds },
+          },
+        },
+        {
+          $group: {
+            _id: '$items.productId',
+            ordersCount: { $sum: 1 },
+          },
+        },
+      ]);
+
+      // Get pending and approved purchases (within last 24 hours) for arriving products
+      const CreditPurchase = require('../models/CreditPurchase');
+      const oneDayAgo = new Date();
+      oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+      
+      // Get pending purchases (created within 24 hours)
+      const pendingPurchases = await CreditPurchase.find({
+        vendorId: vendor._id,
+        status: 'pending',
+        createdAt: { $gte: oneDayAgo },
+      }).lean();
+
+      // Get approved purchases (approved within 24 hours)
+      const approvedPurchases = await CreditPurchase.find({
+        vendorId: vendor._id,
+        status: 'approved',
+        reviewedAt: { $gte: oneDayAgo },
+      }).lean();
+
+      const recentPurchases = [...pendingPurchases, ...approvedPurchases];
+
+      // Aggregate quantities by product for arriving items
+      recentPurchases.forEach(purchase => {
+        purchase.items.forEach(item => {
+          const productIdStr = item.productId.toString();
+          if (productIds.some(id => id.toString() === productIdStr)) {
+            if (!pendingPurchasesMap[productIdStr]) {
+              pendingPurchasesMap[productIdStr] = 0;
+            }
+            pendingPurchasesMap[productIdStr] += item.quantity;
+          }
+        });
+      });
+
+      ordersCountMap = ordersCounts.reduce((acc, item) => {
+        acc[item._id.toString()] = item.ordersCount;
+        return acc;
+      }, {});
+    }
+    const assignments = await ProductAssignment.find({
+      vendorId: vendor._id,
+      productId: { $in: productIds },
+      isActive: true,
+    }).lean();
+
+    const assignedProductIds = new Set(assignments.map(a => a.productId.toString()));
+
+    // Enrich products with assignment status and vendor-specific info
+    const enrichedProducts = products.map(product => {
+      const isAssigned = assignedProductIds.has(product._id.toString());
+      const assignment = assignments.find(a => a.productId.toString() === product._id.toString());
+      const adminStock = product.displayStock ?? product.stock ?? 0;
+      const vendorStock = assignment?.stock ?? 0;
+      const productIdStr = product._id.toString();
+      const arrivingQuantity = pendingPurchasesMap[productIdStr] || 0;
+      
+      return {
+        ...product,
+        id: product._id,
+        isAssigned,
+        assignmentId: assignment?._id || null,
+        adminStock,
+        vendorStock,
+        vendorOrdersCount: ordersCountMap[productIdStr] || 0,
+        arrivingQuantity, // Quantity arriving in 24 hours
+        // Stock available for ordering is admin managed stock
+        stock: adminStock,
+        stockStatus: adminStock > 0 ? 'in_stock' : 'out_of_stock',
+        pricePerUnit: product.priceToVendor,
+        unit: product.weight?.unit || 'kg',
+        primaryImage: product.images?.find(img => img.isPrimary)?.url || product.images?.[0]?.url || null,
+      };
+    });
+
+    const total = await Product.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        products: enrichedProducts,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
+          totalItems: total,
+          itemsPerPage: limitNum,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get single product details for vendor
+ * @route   GET /api/vendors/products/:productId
+ * @access  Private (Vendor)
+ */
+exports.getProductDetails = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { productId } = req.params;
+
+    const product = await Product.findById(productId)
+      .select('name description category priceToVendor displayStock actualStock images sku weight expiry brand specifications tags')
+      .lean();
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    // Check if product is assigned to this vendor
+    const assignment = await ProductAssignment.findOne({
+      vendorId: vendor._id,
+      productId: product._id,
+      isActive: true,
+    }).lean();
+
+    const vendorOrdersCount = await Order.countDocuments({
+      vendorId: vendor._id,
+      'items.productId': product._id,
+    });
+
+    // Calculate how many orders the vendor has fulfilled for this product
+    const ordersAggregation = await Order.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          items: { $elemMatch: { productId: product._id } },
+        },
+      },
+      { $unwind: '$items' },
+      {
+        $match: {
+          'items.productId': product._id,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          totalQuantity: { $sum: '$items.quantity' },
+        },
+      },
+    ]);
+
+    const ordersInfo = ordersAggregation[0] || { totalOrders: 0, totalQuantity: 0 };
+
+    // Get arriving quantity (pending/approved purchases within 24 hours)
+    const CreditPurchase = require('../models/CreditPurchase');
+    const oneDayAgo = new Date();
+    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+    
+    const pendingPurchases = await CreditPurchase.find({
+      vendorId: vendor._id,
+      status: 'pending',
+      createdAt: { $gte: oneDayAgo },
+      'items.productId': product._id,
+    }).lean();
+
+    const approvedPurchases = await CreditPurchase.find({
+      vendorId: vendor._id,
+      status: 'approved',
+      reviewedAt: { $gte: oneDayAgo },
+      'items.productId': product._id,
+    }).lean();
+
+    let arrivingQuantity = 0;
+    [...pendingPurchases, ...approvedPurchases].forEach(purchase => {
+      purchase.items.forEach(item => {
+        if (item.productId.toString() === product._id.toString()) {
+          arrivingQuantity += item.quantity;
+        }
+      });
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        product: {
+          id: product._id,
+          name: product.name,
+          description: product.description,
+          category: product.category,
+          priceToVendor: product.priceToVendor,
+          pricePerUnit: product.priceToVendor,
+          adminStock: product.displayStock ?? product.stock ?? 0,
+          vendorStock: assignment?.stock ?? 0,
+          vendorOrdersCount,
+          arrivingQuantity,
+          stockStatus: (product.displayStock ?? product.stock ?? 0) > 0 ? 'in_stock' : 'out_of_stock',
+          images: product.images,
+          primaryImage: product.images?.find(img => img.isPrimary)?.url || product.images?.[0]?.url || null,
+          sku: product.sku,
+          weight: product.weight,
+          unit: product.weight?.unit || 'kg',
+          expiry: product.expiry,
+          brand: product.brand,
+          specifications: product.specifications,
+          tags: product.tags,
+          isAssigned: !!assignment,
+          assignmentId: assignment?._id || null,
+          ordersFulfilled: ordersInfo.totalOrders,
+          quantitySupplied: ordersInfo.totalQuantity,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Get inventory items (assigned products)
  * @route   GET /api/vendors/inventory
  * @access  Private (Vendor)
@@ -1545,13 +1934,14 @@ exports.requestCreditPurchase = async (req, res, next) => {
     // Calculate total amount
     let totalAmount = 0;
     const purchaseItems = items.map(item => {
-      const itemTotal = (item.quantity || 0) * (item.pricePerUnit || 0);
+      // Support both pricePerUnit (from frontend) and unitPrice (model requirement)
+      const unitPrice = item.unitPrice || item.pricePerUnit || 0;
+      const itemTotal = (item.quantity || 0) * unitPrice;
       totalAmount += itemTotal;
       return {
         productId: item.productId,
-        productName: item.productName || '',
         quantity: item.quantity || 0,
-        pricePerUnit: item.pricePerUnit || 0,
+        unitPrice: unitPrice, // Model requires unitPrice
         totalPrice: itemTotal,
       };
     });

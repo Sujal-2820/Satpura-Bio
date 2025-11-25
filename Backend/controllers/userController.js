@@ -1392,96 +1392,139 @@ async function findVendorByLocation(location) {
       return { vendor: null, distance: null, method: 'none' };
     }
 
-    // Method 1: Try coordinates-based matching (20km radius)
-    // IMPORTANT: Only use coordinates if they are valid and within 20km radius
+    // Method 1: Try coordinates-based matching (20km radius) WITH STRICT REGION CHECK
+    // Even if coordinates are close, vendor must be in the same region (city + state)
     if (location?.coordinates?.lat && location?.coordinates?.lng) {
       const { lat, lng } = location.coordinates;
       
-      // Validate coordinates are reasonable (not 0,0 or invalid)
-      if (lat !== 0 && lng !== 0 && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-        // Filter vendors with coordinates
-        const vendorsWithCoords = allVendors.filter(
-          v => v.location?.coordinates?.lat && 
-               v.location?.coordinates?.lng &&
-               v.location.coordinates.lat !== 0 && 
-               v.location.coordinates.lng !== 0
-        );
+      // Filter vendors with coordinates AND same region (if region info is available)
+      let vendorsWithCoords = allVendors.filter(
+        v => v.location?.coordinates?.lat && v.location?.coordinates?.lng
+      );
+      
+      // STRICT REGION CHECK: If order has city and state, only consider vendors in same region
+      if (location?.city && location?.state) {
+        const cityNormalized = location.city.trim().toLowerCase();
+        const stateNormalized = location.state.trim().toLowerCase();
+        
+        vendorsWithCoords = vendorsWithCoords.filter(v => {
+          const vendorCity = v.location?.city?.trim().toLowerCase();
+          const vendorState = v.location?.state?.trim().toLowerCase();
+          return vendorCity === cityNormalized && vendorState === stateNormalized;
+        });
+        
+        console.log(`🔍 Coordinates-based search with STRICT REGION filter: ${location.city}, ${location.state}`);
+        console.log(`   Vendors in same region with coordinates: ${vendorsWithCoords.length}`);
+      }
 
-        if (vendorsWithCoords.length > 0) {
-          let nearestVendor = null;
-          let minDistance = VENDOR_COVERAGE_RADIUS_KM; // 20km
+      if (vendorsWithCoords.length > 0) {
+        let nearestVendor = null;
+        let minDistance = VENDOR_COVERAGE_RADIUS_KM; // 20km
 
-          for (const v of vendorsWithCoords) {
-            const distance = calculateDistance(
-              lat,
-              lng,
-              v.location.coordinates.lat,
-              v.location.coordinates.lng
-            );
-            console.log(`   - Vendor "${v.name}" (${v.location?.city || 'N/A'}) distance: ${distance.toFixed(2)} km`);
-            if (distance < minDistance) {
-              minDistance = distance;
-              nearestVendor = v;
-            }
+        for (const v of vendorsWithCoords) {
+          const distance = calculateDistance(
+            lat,
+            lng,
+            v.location.coordinates.lat,
+            v.location.coordinates.lng
+          );
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearestVendor = v;
           }
+        }
 
-          if (nearestVendor) {
-            console.log(`✅ Vendor found by coordinates: ${nearestVendor.name} (${minDistance.toFixed(2)} km away, city: ${nearestVendor.location?.city || 'N/A'})`);
-            return { vendor: nearestVendor, distance: minDistance, method: 'coordinates' };
-          } else {
-            console.log(`⚠️ No vendor found within ${VENDOR_COVERAGE_RADIUS_KM}km radius. Falling back to city matching.`);
-          }
+        if (nearestVendor) {
+          console.log(`✅ Vendor found by coordinates (within same region): ${nearestVendor.name} (${minDistance.toFixed(2)} km away)`);
+          console.log(`   Vendor region: ${nearestVendor.location.city}, ${nearestVendor.location.state}`);
+          console.log(`   Order region: ${location.city}, ${location.state}`);
+          return { vendor: nearestVendor, distance: minDistance, method: 'coordinates' };
         } else {
-          console.log(`⚠️ No vendors with valid coordinates found. Falling back to city matching.`);
+          console.log(`⚠️ No vendor found within ${VENDOR_COVERAGE_RADIUS_KM}km in the same region`);
         }
       } else {
-        console.log(`⚠️ Invalid coordinates provided (lat: ${lat}, lng: ${lng}). Falling back to city matching.`);
+        if (location?.city && location?.state) {
+          console.log(`⚠️ No vendors with coordinates found in region: ${location.city}, ${location.state}`);
+        }
       }
     }
 
-    // Method 2: Fallback to city-based matching (temporary until Google Maps API)
-    // CRITICAL: Only match vendors in the EXACT same city
-    if (location?.city) {
+    // Method 2: STRICT REGION-BASED MATCHING (city + state) - Primary method for region assignment
+    // This ensures orders are strictly assigned to vendors in the same region
+    if (location?.city && location?.state) {
+      const cityNormalized = location.city.trim().toLowerCase();
+      const stateNormalized = location.state.trim().toLowerCase();
+      
+      console.log(`🔍 STRICT REGION MATCHING: Searching for vendors in region: "${location.city}, ${location.state}"`);
+      console.log(`   Normalized: city="${cityNormalized}", state="${stateNormalized}"`);
+      console.log(`   Total active vendors in database: ${allVendors.length}`);
+      
+      // Find vendors in the EXACT same region (city + state)
+      const vendorsInRegion = allVendors.filter(v => {
+        const vendorCity = v.location?.city?.trim().toLowerCase();
+        const vendorState = v.location?.state?.trim().toLowerCase();
+        const cityMatch = vendorCity === cityNormalized;
+        const stateMatch = vendorState === stateNormalized;
+        const matches = cityMatch && stateMatch;
+        
+        if (!matches) {
+          if (vendorCity && vendorState) {
+            console.log(`   - Vendor "${v.name}" is in "${v.location.city}, ${v.location.state}" (normalized: "${vendorCity}, ${vendorState}") - NO MATCH`);
+          } else {
+            console.log(`   - Vendor "${v.name}" has incomplete location data - NO MATCH`);
+          }
+        }
+        return matches;
+      });
+
+      console.log(`   Found ${vendorsInRegion.length} vendor(s) in same region (${location.city}, ${location.state})`);
+
+      if (vendorsInRegion.length > 0) {
+        // If multiple vendors in same region, pick the first one
+        // TODO: In future, can add logic to pick based on other factors (load, rating, etc.)
+        const selectedVendor = vendorsInRegion[0];
+        console.log(`✅ Vendor found by STRICT REGION matching: ${selectedVendor.name} (ID: ${selectedVendor._id})`);
+        console.log(`   Vendor region: ${selectedVendor.location.city}, ${selectedVendor.location.state}`);
+        console.log(`   Order region: ${location.city}, ${location.state}`);
+        return { vendor: selectedVendor, distance: null, method: 'region' };
+      } else {
+        const availableRegions = allVendors
+          .map(v => v.location?.city && v.location?.state ? `${v.location.city}, ${v.location.state}` : null)
+          .filter(Boolean)
+          .join(' | ') || 'None';
+        console.log(`⚠️ No vendors found in region "${location.city}, ${location.state}"`);
+        console.log(`   Available vendor regions in database: ${availableRegions}`);
+      }
+    }
+    
+    // Method 3: Fallback to city-only matching (if state is not provided)
+    // This is less strict but needed for backward compatibility
+    if (location?.city && !location?.state) {
       const cityNormalized = location.city.trim().toLowerCase();
       
-      console.log(`🔍 Searching for vendors in city: "${location.city}" (normalized: "${cityNormalized}")`);
+      console.log(`🔍 FALLBACK: Searching for vendors in city only (state not provided): "${location.city}"`);
       console.log(`   Total active vendors: ${allVendors.length}`);
       
-      // Log all vendor cities for debugging
-      const vendorCities = allVendors.map(v => ({
-        name: v.name,
-        city: v.location?.city || 'NO CITY',
-        normalized: (v.location?.city || '').trim().toLowerCase()
-      }));
-      console.log(`   Available vendor cities:`, vendorCities);
-      
-      // Find vendors in the same city (EXACT match required)
+      // Find vendors in the same city
       const vendorsInCity = allVendors.filter(v => {
         const vendorCity = v.location?.city?.trim().toLowerCase();
         const matches = vendorCity === cityNormalized;
         if (!matches && vendorCity) {
           console.log(`   - Vendor "${v.name}" is in "${v.location.city}" (normalized: "${vendorCity}") - NO MATCH`);
-        } else if (matches) {
-          console.log(`   ✅ Vendor "${v.name}" matches city "${location.city}"`);
         }
         return matches;
       });
 
-      console.log(`   Found ${vendorsInCity.length} vendor(s) in same city "${location.city}"`);
+      console.log(`   Found ${vendorsInCity.length} vendor(s) in same city`);
 
       if (vendorsInCity.length > 0) {
-        // If multiple vendors in same city, pick the first one
-        // TODO: In future, can add logic to pick based on other factors (load, rating, etc.)
         const selectedVendor = vendorsInCity[0];
-        console.log(`✅ Vendor found by city matching: ${selectedVendor.name} (ID: ${selectedVendor._id}, city: ${selectedVendor.location?.city})`);
+        console.log(`✅ Vendor found by city matching (fallback): ${selectedVendor.name} (ID: ${selectedVendor._id}, city: ${location.city})`);
         return { vendor: selectedVendor, distance: null, method: 'city' };
       } else {
-        console.log(`❌ No vendors found in city "${location.city}". Order will be assigned to admin.`);
-        console.log(`   Available vendor cities:`, 
-          allVendors.map(v => `"${v.location?.city || 'NO CITY'}"`).filter(Boolean).join(', ') || 'None');
+        console.log(`⚠️ No vendors found in city "${location.city}". Available vendor cities:`, 
+          allVendors.map(v => v.location?.city).filter(Boolean).join(', ') || 'None');
       }
-    } else {
-      console.log(`⚠️ No city provided in delivery address. Cannot match vendor by city.`);
     }
 
     // No vendor found
@@ -1594,52 +1637,22 @@ exports.createOrder = async (req, res, next) => {
         
         if (vendor) {
           vendorId = vendor._id;
-          assignedTo = 'vendor';
+            assignedTo = 'vendor';
           const distanceText = distance ? `${distance.toFixed(2)} km` : `same city (${deliveryAddress.city})`;
           console.log(`✅ Order assigned to vendor: ${vendor.name} (ID: ${vendor._id}, ${distanceText}, method: ${method})`);
           console.log(`📍 Vendor location: ${vendor.location?.city || 'N/A'}, ${vendor.location?.state || 'N/A'}`);
         } else {
           console.log(`⚠️ No vendor found for delivery address (${deliveryAddress.city || 'no location'}). Order assigned to admin.`);
-        }
-      } catch (geoError) {
+          }
+        } catch (geoError) {
         console.warn('❌ Vendor assignment failed, assigning to admin:', geoError);
-        // Fallback: assign to admin if vendor assignment fails
-      }
+          // Fallback: assign to admin if vendor assignment fails
+        }
     } else {
       console.log(`⚠️ Delivery address missing or incomplete. Order assigned to admin.`);
     }
     
     console.log(`📦 Order will be created with vendorId: ${vendorId || 'null'}, assignedTo: ${assignedTo}`);
-    
-    // CRITICAL SAFEGUARD: Validate vendor assignment
-    // If vendorId is set, verify the vendor exists and is in the same city (or within 20km)
-    if (vendorId) {
-      try {
-        const assignedVendor = await Vendor.findById(vendorId);
-        if (!assignedVendor) {
-          console.error(`❌ ERROR: Assigned vendor ${vendorId} not found! Reverting to admin assignment.`);
-          vendorId = null;
-          assignedTo = 'admin';
-        } else {
-          // Verify city match if using city-based assignment
-          if (deliveryAddress?.city && assignedVendor.location?.city) {
-            const deliveryCity = deliveryAddress.city.trim().toLowerCase();
-            const vendorCity = assignedVendor.location.city.trim().toLowerCase();
-            if (deliveryCity !== vendorCity) {
-              console.error(`❌ ERROR: City mismatch! Delivery: "${deliveryAddress.city}", Vendor: "${assignedVendor.location.city}". Reverting to admin assignment.`);
-              vendorId = null;
-              assignedTo = 'admin';
-            } else {
-              console.log(`✅ Vendor assignment validated: ${assignedVendor.name} in ${assignedVendor.location.city} matches delivery city ${deliveryAddress.city}`);
-            }
-          }
-        }
-      } catch (validationError) {
-        console.error(`❌ ERROR validating vendor assignment:`, validationError);
-        vendorId = null;
-        assignedTo = 'admin';
-      }
-    }
 
     // Get user info for sellerId
     const user = await User.findById(userId).populate('seller');

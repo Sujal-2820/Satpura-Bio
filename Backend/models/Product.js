@@ -38,9 +38,23 @@ const productSchema = new mongoose.Schema({
     min: [0, 'Price to user cannot be negative'],
   },
   // Stock tracking (global/admin-managed stock)
+  // Actual stock quantity (internal/admin use only)
+  actualStock: {
+    type: Number,
+    required: [true, 'Actual stock quantity is required'],
+    min: [0, 'Actual stock cannot be negative'],
+    default: 0,
+  },
+  // Display stock quantity (shown to vendors)
+  displayStock: {
+    type: Number,
+    required: [true, 'Display stock quantity is required'],
+    min: [0, 'Display stock cannot be negative'],
+    default: 0,
+  },
+  // Legacy field for backward compatibility (maps to displayStock)
   stock: {
     type: Number,
-    required: [true, 'Stock quantity is required'],
     min: [0, 'Stock cannot be negative'],
     default: 0,
   },
@@ -105,6 +119,11 @@ const productSchema = new mongoose.Schema({
     uppercase: true,
     // Stock Keeping Unit (optional, auto-generated if not provided)
   },
+  batchNumber: {
+    type: String,
+    trim: true,
+    // Batch number for product tracking
+  },
   // Product specifications
   specifications: {
     type: Map,
@@ -135,7 +154,7 @@ productSchema.virtual('primaryImage').get(function () {
 productSchema.set('toJSON', { virtuals: true });
 productSchema.set('toObject', { virtuals: true });
 
-// Pre-save hook: Auto-generate SKU if not provided
+// Pre-save hook: Auto-generate SKU if not provided and sync stock fields
 productSchema.pre('save', async function (next) {
   if (!this.sku && this.isNew) {
     // Generate SKU: Category prefix + timestamp + random 3 digits
@@ -144,12 +163,18 @@ productSchema.pre('save', async function (next) {
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     this.sku = `${categoryPrefix}-${timestamp}-${random}`;
   }
+  
+  // Sync legacy stock field with displayStock for backward compatibility
+  if (this.isModified('displayStock') || this.isNew) {
+    this.stock = this.displayStock;
+  }
+  
   next();
 });
 
-// Instance method: Check if product is in stock
+// Instance method: Check if product is in stock (uses displayStock for vendor visibility)
 productSchema.methods.isInStock = function () {
-  return this.stock > 0;
+  return (this.displayStock || this.stock) > 0;
 };
 
 // Instance method: Check if product is expired

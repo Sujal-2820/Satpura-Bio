@@ -132,20 +132,20 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
     }
 
     try {
-      if (editingAddress) {
+    if (editingAddress) {
         // Update existing address via API
         const result = await updateAddress(editingAddress, addressForm)
         if (result.data) {
           success('Address updated successfully')
-        } else {
+    } else {
           showError(result.error?.message || 'Failed to update address')
         }
       } else {
         // Add new address via API
         const addressData = {
-          ...addressForm,
-          isDefault: uniqueAddresses.length === 0,
-        }
+        ...addressForm,
+        isDefault: uniqueAddresses.length === 0,
+      }
         const result = await addAddress(addressData)
         if (result.data) {
           const savedAddress = result.data.address || result.data
@@ -154,8 +154,8 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
         } else {
           showError(result.error?.message || 'Failed to add address')
         }
-      }
-      handleCloseAddressPanel()
+    }
+    handleCloseAddressPanel()
     } catch (error) {
       console.error('Error saving address:', error)
       showError(error.message || 'Failed to save address')
@@ -168,10 +168,10 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
         const result = await deleteAddress(addressId)
         if (result.data) {
           success('Address deleted successfully')
-          if (selectedAddress === addressId) {
-            const remaining = uniqueAddresses.filter((a) => a.id !== addressId)
-            setSelectedAddress(remaining.length > 0 ? (remaining.find((a) => a.isDefault)?.id || remaining[0]?.id) : null)
-          }
+      if (selectedAddress === addressId) {
+        const remaining = uniqueAddresses.filter((a) => a.id !== addressId)
+        setSelectedAddress(remaining.length > 0 ? (remaining.find((a) => a.isDefault)?.id || remaining[0]?.id) : null)
+      }
         } else {
           showError(result.error?.message || 'Failed to delete address')
         }

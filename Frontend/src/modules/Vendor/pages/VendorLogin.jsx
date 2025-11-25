@@ -1,11 +1,14 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { OtpVerification } from '../../../components/auth/OtpVerification'
 import { useVendorDispatch } from '../context/VendorContext'
+import { VendorStatusMessage } from '../components/VendorStatusMessage'
 import * as vendorApi from '../services/vendorApi'
 
 export function VendorLogin({ onSuccess, onSwitchToRegister }) {
+  const navigate = useNavigate()
   const dispatch = useVendorDispatch()
-  const [step, setStep] = useState('phone') // 'phone' | 'otp'
+  const [step, setStep] = useState('phone') // 'phone' | 'otp' | 'pending' | 'rejected'
   const [form, setForm] = useState({ phone: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -38,7 +41,12 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
       if (result.success || result.data) {
         setStep('otp')
       } else {
+        // Check for rejected status
+        if (result.error?.status === 'rejected' || result.error?.message?.includes('rejected')) {
+          setStep('rejected')
+      } else {
         setError(result.error?.message || 'Failed to send OTP. Please try again.')
+        }
       }
     } catch (err) {
       setError(err.message || 'Failed to send OTP. Please try again.')
@@ -55,9 +63,41 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
       const result = await vendorApi.loginVendorWithOtp({ phone: form.phone, otp: otpCode })
 
       if (result.success || result.data) {
-        const vendorData = result.data?.vendor || result.data?.data?.vendor
-        if (result.data?.token || result.data?.data?.token) {
-          localStorage.setItem('vendor_token', result.data?.token || result.data?.data?.token)
+        const responseData = result.data?.data || result.data
+        const vendorData = responseData?.vendor || result.data?.vendor
+        const status = responseData?.status || vendorData?.status
+
+        // Check status
+        if (status === 'pending') {
+          // Show pending message
+          setStep('pending')
+          // Update vendor context with profile (but no token)
+          if (vendorData) {
+            dispatch({
+              type: 'AUTH_LOGIN',
+              payload: {
+                id: vendorData.id || vendorData._id,
+                name: vendorData.name,
+                phone: vendorData.phone || form.phone,
+                email: vendorData.email,
+                location: vendorData.location,
+                status: vendorData.status,
+                isActive: vendorData.isActive,
+              },
+            })
+          }
+          return
+        }
+
+        if (status === 'rejected') {
+          // Show rejected message
+          setStep('rejected')
+          return
+        }
+
+        // Vendor is approved - proceed to dashboard
+        if (responseData?.token || result.data?.token) {
+          localStorage.setItem('vendor_token', responseData?.token || result.data?.token)
         }
         
         // Update vendor context with profile
@@ -77,6 +117,7 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
         }
         
         onSuccess?.(vendorData || { phone: form.phone })
+        navigate('/vendor/dashboard')
       } else {
         // Check if vendor needs to register
         if (result.error?.message?.includes('not found') || result.error?.message?.includes('Vendor not found')) {
@@ -86,16 +127,23 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
               onSwitchToRegister()
             }
           }, 2000)
+        } else if (result.error?.status === 'rejected' || result.error?.message?.includes('rejected')) {
+          setStep('rejected')
         } else if (result.error?.message?.includes('banned')) {
           setError(result.error?.message || 'Your account has been banned. Please contact admin.')
         } else if (result.error?.message?.includes('inactive')) {
           setError('Your account is inactive. Please contact admin.')
-        } else {
-          setError(result.error?.message || 'Invalid OTP. Please try again.')
+      } else {
+        setError(result.error?.message || 'Invalid OTP. Please try again.')
         }
       }
     } catch (err) {
-      setError(err.message || 'Verification failed. Please try again.')
+      // Check for rejected status in error response
+      if (err.error?.status === 'rejected' || err.message?.includes('rejected')) {
+        setStep('rejected')
+      } else {
+        setError(err.error?.message || err.message || 'Verification failed. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -129,6 +177,10 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
         </div>
       </div>
     )
+  }
+
+  if (step === 'pending' || step === 'rejected') {
+    return <VendorStatusMessage status={step} onBack={() => setStep('phone')} />
   }
 
   return (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Building2, CreditCard, MapPin, ShieldAlert, Edit2, Eye, Package, Ban, Unlock } from 'lucide-react'
+import { Building2, CreditCard, MapPin, ShieldAlert, Edit2, Eye, Package, Ban, Unlock, CheckCircle, XCircle } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { Timeline } from '../components/Timeline'
@@ -83,6 +83,8 @@ export function VendorsPage() {
   const { vendors: vendorsState } = useAdminState()
   const {
     getVendors,
+    approveVendor,
+    rejectVendor,
     banVendor,
     unbanVendor,
     updateVendorCreditPolicy,
@@ -243,6 +245,44 @@ export function VendorsPage() {
     }
   }
 
+  const handleApproveVendor = async (vendorId) => {
+    try {
+      const result = await approveVendor(vendorId)
+      if (result.success || result.data) {
+        success('Vendor approved successfully!', 3000)
+        // Refresh vendors list
+        const vendorsResult = await getVendors({})
+        if (vendorsResult.data) {
+          setRawVendors(vendorsResult.data.vendors || [])
+        }
+      } else {
+        const errorMessage = result.error?.message || 'Failed to approve vendor'
+        showError(errorMessage, 5000)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to approve vendor', 5000)
+    }
+  }
+
+  const handleRejectVendor = async (vendorId, rejectionData) => {
+    try {
+      const result = await rejectVendor(vendorId, rejectionData)
+      if (result.success || result.data) {
+        success('Vendor application rejected.', 3000)
+        // Refresh vendors list
+        const vendorsResult = await getVendors({})
+        if (vendorsResult.data) {
+          setRawVendors(vendorsResult.data.vendors || [])
+        }
+      } else {
+        const errorMessage = result.error?.message || 'Failed to reject vendor'
+        showError(errorMessage, 5000)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to reject vendor', 5000)
+    }
+  }
+
   const handleApprovePurchase = async (requestId) => {
     try {
       const result = await approveVendorPurchase(requestId)
@@ -350,6 +390,9 @@ export function VendorsPage() {
         ...column,
         Cell: (row) => {
           const originalVendor = vendorsState.data?.vendors?.find((v) => v.id === row.id) || row
+          const vendorStatus = originalVendor.status?.toLowerCase() || 'active'
+          const isPending = vendorStatus === 'pending'
+          const isRejected = vendorStatus === 'rejected'
           const isBanned = originalVendor.banInfo?.isBanned || originalVendor.status === 'temporarily_banned' || originalVendor.status === 'permanently_banned'
           const banType = originalVendor.banInfo?.banType || (originalVendor.status === 'permanently_banned' ? 'permanent' : 'temporary')
           return (
@@ -370,7 +413,40 @@ export function VendorsPage() {
               >
                 <Eye className="h-4 w-4" />
               </button>
-              {!isBanned && (
+              
+              {/* Approve/Reject buttons for pending vendors */}
+              {isPending && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Approve vendor "${originalVendor.name}"?`)) {
+                        handleApproveVendor(originalVendor.id)
+                      }
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-50 text-green-700 transition-all hover:border-green-500 hover:bg-green-100 hover:text-green-800"
+                    title="Approve vendor"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const reason = window.prompt('Enter rejection reason (optional):') || 'Application rejected by admin'
+                      if (reason) {
+                        handleRejectVendor(originalVendor.id, { reason })
+                      }
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition-all hover:border-red-500 hover:bg-red-100 hover:text-red-800"
+                    title="Reject vendor"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+
+              {/* Actions for approved vendors (not banned) */}
+              {!isBanned && !isPending && !isRejected && (
                 <>
                   <button
                     type="button"

@@ -260,11 +260,14 @@ function transformProduct(backendProduct) {
     description: backendProduct.description,
     category: backendProduct.category,
     stock: backendProduct.stock || 0,
-    stockUnit: backendProduct.weight?.unit || 'kg',
+    actualStock: backendProduct.actualStock !== undefined ? backendProduct.actualStock : (backendProduct.stock || 0),
+    displayStock: backendProduct.displayStock !== undefined ? backendProduct.displayStock : (backendProduct.stock || 0),
+    stockUnit: backendProduct.weight?.unit || backendProduct.stockUnit || 'kg',
     vendorPrice: backendProduct.priceToVendor || 0,
     userPrice: backendProduct.priceToUser || 0,
     expiry: backendProduct.expiry ? new Date(backendProduct.expiry).toISOString().split('T')[0] : null,
-    visibility: backendProduct.isActive ? 'active' : 'inactive',
+    visibility: backendProduct.isActive !== false ? 'active' : 'inactive', // Default to active
+    batchNumber: backendProduct.batchNumber || '',
     images: backendProduct.images || [],
     sku: backendProduct.sku,
     brand: backendProduct.brand,
@@ -368,8 +371,39 @@ function transformProductForBackend(frontendData) {
     name: frontendData.name,
     description: frontendData.description || frontendData.name, // Use name as description if not provided
     category: frontendData.category || 'fertilizer', // Default category
-    stock: parseFloat(frontendData.stock) || 0,
-    isActive: frontendData.visibility === 'active' || frontendData.visibility === 'Active',
+    // Only set isActive if visibility is explicitly provided, otherwise default to true (active)
+    isActive: frontendData.visibility !== undefined 
+      ? (frontendData.visibility === 'active' || frontendData.visibility === 'Active')
+      : true, // Default to active
+  }
+  
+  // Handle stock fields - prioritize actualStock/displayStock over legacy stock
+  // Always include actualStock and displayStock if they exist (even if 0)
+  if (frontendData.actualStock !== undefined && frontendData.actualStock !== null) {
+    const actualStockValue = frontendData.actualStock === '' ? 0 : parseFloat(frontendData.actualStock)
+    if (!isNaN(actualStockValue)) {
+      backendData.actualStock = actualStockValue
+    }
+  }
+  if (frontendData.displayStock !== undefined && frontendData.displayStock !== null) {
+    const displayStockValue = frontendData.displayStock === '' ? 0 : parseFloat(frontendData.displayStock)
+    if (!isNaN(displayStockValue)) {
+      backendData.displayStock = displayStockValue
+      // Also set legacy stock field for backward compatibility
+      backendData.stock = displayStockValue
+    }
+  } else if (frontendData.stock !== undefined && frontendData.stock !== null) {
+    // Fallback to legacy stock field
+    const stockValue = frontendData.stock === '' ? 0 : parseFloat(frontendData.stock)
+    if (!isNaN(stockValue)) {
+      backendData.stock = stockValue
+      if (backendData.displayStock === undefined) {
+        backendData.displayStock = stockValue
+      }
+      if (backendData.actualStock === undefined) {
+        backendData.actualStock = stockValue
+      }
+    }
   }
   
   // Only add prices if they are valid positive numbers
@@ -382,10 +416,21 @@ function transformProductForBackend(frontendData) {
 
   // Add weight if stockUnit provided
   if (frontendData.stockUnit) {
+    backendData.stockUnit = frontendData.stockUnit
     backendData.weight = {
-      value: parseFloat(frontendData.stock) || 0,
+      value: backendData.actualStock || backendData.displayStock || 0,
       unit: frontendData.stockUnit.toLowerCase(),
     }
+  }
+  
+  // Add expiry date if provided
+  if (frontendData.expiry) {
+    backendData.expiry = frontendData.expiry
+  }
+  
+  // Add batchNumber if provided
+  if (frontendData.batchNumber !== undefined && frontendData.batchNumber !== null && frontendData.batchNumber !== '') {
+    backendData.batchNumber = frontendData.batchNumber.trim()
   }
 
   // Add expiry if provided
@@ -414,7 +459,6 @@ function transformProductForBackend(frontendData) {
  *   stock: number,
  *   stockUnit: string,
  *   expiry: string,
- *   region: string,
  *   visibility: 'active' | 'inactive'
  * }
  * @returns {Promise<Object>} - { product: Object, message: string }

@@ -112,6 +112,11 @@ export function useVendorApi() {
 
   const getOrderStats = useCallback((params) => callApi(vendorApi.getOrderStats, params), [callApi])
 
+  // Product APIs (for viewing and ordering products)
+  const getProducts = useCallback((params) => callApi(vendorApi.getProducts, params), [callApi])
+
+  const getProductDetails = useCallback((productId) => callApi(vendorApi.getProductDetails, productId), [callApi])
+
   // Inventory APIs
   const getInventory = useCallback((params) => callApi(vendorApi.getInventory, params), [callApi])
 
@@ -176,6 +181,9 @@ export function useVendorApi() {
     rejectOrder,
     updateOrderStatus,
     getOrderStats,
+    // Products
+    getProducts,
+    getProductDetails,
     // Inventory
     getInventory,
     getInventoryItemDetails,

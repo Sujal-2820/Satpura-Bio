@@ -318,6 +318,31 @@ export async function getOrderStats(params = {}) {
 }
 
 // ============================================================================
+// PRODUCT APIs (For vendors to view and order products)
+
+/**
+ * Get All Products Available for Ordering
+ * GET /vendors/products
+ * 
+ * @param {Object} params - Query parameters { page, limit, category, search, sortBy, sortOrder }
+ * @returns {Promise<Object>} - { products: Array, pagination: Object }
+ */
+export async function getProducts(params = {}) {
+  const queryParams = new URLSearchParams(params).toString()
+  return apiRequest(`/vendors/products?${queryParams}`)
+}
+
+/**
+ * Get Product Details
+ * GET /vendors/products/:productId
+ * 
+ * @param {string} productId - Product ID
+ * @returns {Promise<Object>} - Detailed product information
+ */
+export async function getProductDetails(productId) {
+  return apiRequest(`/vendors/products/${productId}`)
+}
+
 // INVENTORY APIs
 // ============================================================================
 

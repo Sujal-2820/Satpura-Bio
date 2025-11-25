@@ -43,6 +43,12 @@ const productAssignmentSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  // Vendor stock for this product
+  stock: {
+    type: Number,
+    default: 0,
+    min: [0, 'Stock cannot be negative'],
+  },
 }, {
   timestamps: true,
 });

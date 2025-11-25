@@ -590,19 +590,30 @@ exports.getProducts = async (req, res, next) => {
     const sort = {};
     sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-    // Execute query
+    // Execute query - explicitly select stock fields to ensure they're returned
     const products = await Product.find(query)
       .sort(sort)
       .skip(skip)
       .limit(limitNum)
-      .select('-__v');
+      .select('name description category priceToVendor priceToUser actualStock displayStock stock images sku weight expiry brand specifications tags isActive createdAt updatedAt')
+      .lean(); // Use lean() for better performance and to ensure fresh data
 
     const total = await Product.countDocuments(query);
+
+    // Ensure stock fields are properly formatted
+    const formattedProducts = products.map(product => ({
+      ...product,
+      id: product._id,
+      // Ensure stock values are numbers, not undefined
+      actualStock: product.actualStock ?? product.stock ?? 0,
+      displayStock: product.displayStock ?? product.stock ?? 0,
+      stock: product.displayStock ?? product.stock ?? product.actualStock ?? 0,
+    }));
 
     res.status(200).json({
       success: true,
       data: {
-        products,
+        products: formattedProducts,
         pagination: {
           currentPage: pageNum,
           totalPages: Math.ceil(total / limitNum),
@@ -664,7 +675,10 @@ exports.createProduct = async (req, res, next) => {
       category,
       priceToVendor,
       priceToUser,
-      stock,
+      actualStock,
+      displayStock,
+      stock, // Legacy field support
+      stockUnit,
       images, // Array of image objects {url, publicId, isPrimary, order}
       expiry,
       brand,
@@ -672,13 +686,25 @@ exports.createProduct = async (req, res, next) => {
       tags,
       specifications,
       sku,
+      batchNumber,
     } = req.body;
 
     // Validate required fields
-    if (!name || !description || !category || priceToVendor === undefined || priceToUser === undefined || stock === undefined) {
+    if (!name || !description || !category || priceToVendor === undefined || priceToUser === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: name, description, category, priceToVendor, priceToUser, stock',
+        message: 'Missing required fields: name, description, category, priceToVendor, priceToUser',
+      });
+    }
+
+    // Validate stock fields
+    const actualStockValue = actualStock !== undefined ? actualStock : (stock !== undefined ? stock : 0);
+    const displayStockValue = displayStock !== undefined ? displayStock : (stock !== undefined ? stock : 0);
+
+    if (actualStockValue < 0 || displayStockValue < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Stock quantities cannot be negative',
       });
     }
 
@@ -707,7 +733,9 @@ exports.createProduct = async (req, res, next) => {
       category: categoryLower,
       priceToVendor,
       priceToUser,
-      stock: stock || 0,
+      actualStock: actualStockValue,
+      displayStock: displayStockValue,
+      stock: displayStockValue, // Legacy field for backward compatibility
     };
 
     if (images && Array.isArray(images)) {
@@ -718,9 +746,14 @@ exports.createProduct = async (req, res, next) => {
     if (expiry) productData.expiry = expiry;
     if (brand) productData.brand = brand;
     if (weight) productData.weight = weight;
+    if (stockUnit) {
+      // Store unit in weight.unit for consistency
+      productData.weight = { ...(productData.weight || {}), unit: stockUnit };
+    }
     if (tags && Array.isArray(tags)) productData.tags = tags;
     if (specifications) productData.specifications = specifications;
     if (sku) productData.sku = sku.toUpperCase();
+    if (batchNumber) productData.batchNumber = batchNumber.trim();
 
     const product = await Product.create(productData);
 
@@ -781,9 +814,46 @@ exports.updateProduct = async (req, res, next) => {
       updateData.sku = updateData.sku.toUpperCase();
     }
 
-    // Update product
+    // Handle stock fields
+    if (updateData.actualStock !== undefined) {
+      product.actualStock = updateData.actualStock;
+    }
+    if (updateData.displayStock !== undefined) {
+      product.displayStock = updateData.displayStock;
+      product.stock = updateData.displayStock; // Sync legacy field
+    }
+    // Legacy stock field support
+    if (updateData.stock !== undefined && updateData.displayStock === undefined) {
+      product.displayStock = updateData.stock;
+      product.actualStock = updateData.actualStock !== undefined ? updateData.actualStock : updateData.stock;
+      product.stock = updateData.stock;
+    }
+    
+    // Handle stockUnit
+    if (updateData.stockUnit !== undefined) {
+      product.weight = product.weight || {};
+      product.weight.unit = updateData.stockUnit;
+    }
+    
+    // Handle batchNumber
+    if (updateData.batchNumber !== undefined) {
+      product.batchNumber = updateData.batchNumber.trim();
+    }
+
+    // Handle isActive separately - only update if explicitly provided, otherwise keep current value
+    if (updateData.isActive !== undefined) {
+      product.isActive = updateData.isActive;
+    } else {
+      // If isActive is not provided, default to true (active) unless it was explicitly set to false
+      // This ensures products don't accidentally become inactive
+      if (product.isActive === undefined) {
+        product.isActive = true;
+      }
+    }
+
+    // Update other fields
     Object.keys(updateData).forEach(key => {
-      if (updateData[key] !== undefined) {
+      if (updateData[key] !== undefined && key !== 'actualStock' && key !== 'displayStock' && key !== 'stock' && key !== 'stockUnit' && key !== 'batchNumber' && key !== 'isActive') {
         product[key] = updateData[key];
       }
     });
@@ -1530,8 +1600,8 @@ exports.approveVendorPurchase = async (req, res, next) => {
   try {
     const { requestId } = req.params;
 
-    const purchase = await CreditPurchase.findById(requestId)
-      .populate('items.productId', 'name sku priceToVendor');
+    // Get purchase without populating to work with raw IDs
+    const purchase = await CreditPurchase.findById(requestId);
 
     if (!purchase) {
       return res.status(404).json({
@@ -1580,22 +1650,117 @@ exports.approveVendorPurchase = async (req, res, next) => {
     }
     await vendor.save();
 
-    // TODO: Create Inventory entries for vendor when Inventory model is created
+    // Update product stock and vendor inventory
+    // Note: Product and ProductAssignment are already imported at the top of the file
+    const updatedProducts = [];
+    
+    for (const item of purchase.items) {
+      // Handle both populated and non-populated productId
+      const productId = item.productId?._id || item.productId;
+      
+      if (!productId) {
+        console.warn(`⚠️ Product ID is missing in purchase item, skipping stock update`);
+        continue;
+      }
+
+      // Get fresh product from database (not populated version)
+      const product = await Product.findById(productId);
+      if (!product) {
+        console.warn(`⚠️ Product ${productId} not found, skipping stock update`);
+        continue;
+      }
+
+      // Validate stock availability
+      const currentActualStock = product.actualStock || 0;
+      const currentDisplayStock = product.displayStock || product.stock || 0;
+      
+      if (currentActualStock < item.quantity) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient stock for ${product.name}. Available: ${currentActualStock}, Requested: ${item.quantity}`,
+        });
+      }
+
+      // Reduce product stock (both actualStock and displayStock)
+      const newActualStock = Math.max(0, currentActualStock - item.quantity);
+      const newDisplayStock = Math.max(0, currentDisplayStock - item.quantity);
+      
+      product.actualStock = newActualStock;
+      product.displayStock = newDisplayStock;
+      // Also update legacy stock field for backward compatibility
+      product.stock = newDisplayStock;
+      
+      // Save product with validation
+      try {
+        await product.save();
+        updatedProducts.push({
+          productId: product._id,
+          productName: product.name,
+          oldActualStock: currentActualStock,
+          newActualStock,
+          oldDisplayStock: currentDisplayStock,
+          newDisplayStock,
+          quantity: item.quantity,
+        });
+        console.log(`✅ Updated stock for ${product.name}: actualStock ${currentActualStock} → ${newActualStock}, displayStock ${currentDisplayStock} → ${newDisplayStock}`);
+      } catch (saveError) {
+        console.error(`❌ Failed to save product ${product.name}:`, saveError);
+        return res.status(500).json({
+          success: false,
+          message: `Failed to update stock for ${product.name}: ${saveError.message}`,
+        });
+      }
+
+      // Create or update ProductAssignment (vendor inventory)
+      let assignment = await ProductAssignment.findOne({
+        vendorId: vendor._id,
+        productId: productId,
+      });
+
+      if (assignment) {
+        // Update existing assignment stock
+        assignment.stock = (assignment.stock || 0) + item.quantity;
+        assignment.isActive = true;
+        await assignment.save();
+        console.log(`✅ Updated ProductAssignment stock for ${product.name}: ${assignment.stock - item.quantity} → ${assignment.stock}`);
+      } else {
+        // Create new assignment
+        assignment = await ProductAssignment.create({
+          vendorId: vendor._id,
+          productId: productId,
+          stock: item.quantity,
+          isActive: true,
+          assignedBy: req.admin._id,
+          assignedAt: new Date(),
+        });
+        console.log(`✅ Created ProductAssignment for ${product.name} with stock: ${item.quantity}`);
+      }
+    }
+
+    console.log(`✅ Stock update completed for ${updatedProducts.length} products`);
+
     // TODO: Send notification to vendor
 
     console.log(`✅ Purchase approved: ₹${purchase.totalAmount} for vendor ${vendor.name}`);
 
+    // Reload purchase with populated data for response
+    const populatedPurchase = await CreditPurchase.findById(purchase._id)
+      .populate('items.productId', 'name sku category')
+      .populate('reviewedBy', 'name email')
+      .lean();
+
     res.status(200).json({
       success: true,
       data: {
-        purchase,
+        purchase: populatedPurchase,
         vendor: {
           id: vendor._id,
           name: vendor.name,
           creditUsed: vendor.creditUsed,
           creditLimit: vendor.creditPolicy.limit,
         },
-        message: 'Purchase request approved successfully',
+        updatedProducts, // Include stock update details
+        message: 'Purchase request approved successfully. Product stock has been updated.',
       },
     });
   } catch (error) {

@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { OtpVerification } from '../../../components/auth/OtpVerification'
 import { useVendorDispatch } from '../context/VendorContext'
+import { VendorStatusMessage } from '../components/VendorStatusMessage'
 import * as vendorApi from '../services/vendorApi'
 
 export function VendorRegister({ onSuccess, onSwitchToLogin }) {
   const navigate = useNavigate()
   const dispatch = useVendorDispatch()
-  const [step, setStep] = useState('register') // 'register' | 'otp'
+  const [step, setStep] = useState('register') // 'register' | 'otp' | 'pending' | 'rejected'
   const [form, setForm] = useState({
     fullName: '',
     contact: '',
@@ -122,10 +123,41 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
       const result = await vendorApi.loginVendorWithOtp({ phone: form.contact, otp: otpCode })
 
       if (result.success || result.data) {
-        // Store token if provided
-        const vendorData = result.data?.vendor || result.data?.data?.vendor
-        if (result.data?.token || result.data?.data?.token) {
-          localStorage.setItem('vendor_token', result.data?.token || result.data?.data?.token)
+        const responseData = result.data?.data || result.data
+        const vendorData = responseData?.vendor || result.data?.vendor
+        const status = responseData?.status || vendorData?.status
+
+        // Check status
+        if (status === 'pending') {
+          // Show pending message
+          setStep('pending')
+          // Update vendor context with profile (but no token)
+          if (vendorData) {
+            dispatch({
+              type: 'AUTH_LOGIN',
+              payload: {
+                id: vendorData.id || vendorData._id,
+                name: vendorData.name || form.fullName,
+                phone: vendorData.phone || form.contact,
+                email: vendorData.email,
+                location: vendorData.location,
+                status: vendorData.status,
+                isActive: vendorData.isActive,
+              },
+            })
+          }
+          return
+        }
+
+        if (status === 'rejected') {
+          // Show rejected message
+          setStep('rejected')
+          return
+        }
+
+        // Vendor is approved - proceed to dashboard
+        if (responseData?.token || result.data?.token) {
+          localStorage.setItem('vendor_token', responseData?.token || result.data?.token)
         }
         
         // Update vendor context with profile
@@ -147,10 +179,20 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
         onSuccess?.(vendorData || { name: form.fullName, phone: form.contact })
         navigate('/vendor/dashboard')
       } else {
+        // Check for rejected status in error response
+        if (result.error?.status === 'rejected' || result.error?.message?.includes('rejected')) {
+          setStep('rejected')
+      } else {
         setError(result.error?.message || 'Invalid OTP. Please try again.')
+        }
       }
     } catch (err) {
-      setError(err.error?.message || err.message || 'Verification failed. Please try again.')
+      // Check for rejected status in error response
+      if (err.error?.status === 'rejected' || err.message?.includes('rejected')) {
+        setStep('rejected')
+      } else {
+        setError(err.error?.message || err.message || 'Verification failed. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -184,6 +226,10 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
         </div>
       </div>
     )
+  }
+
+  if (step === 'pending' || step === 'rejected') {
+    return <VendorStatusMessage status={step} onBack={() => setStep('register')} />
   }
 
   return (

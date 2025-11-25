@@ -186,6 +186,7 @@ export function useAdminApi() {
       return callApi(adminApi.approveVendorPurchase, requestId).then((result) => {
         if (result.data) {
           dispatch({ type: 'SET_FINANCE_UPDATED', payload: true })
+          dispatch({ type: 'SET_PRODUCTS_UPDATED', payload: true }) // Refresh products after stock update
         }
         return result
       })

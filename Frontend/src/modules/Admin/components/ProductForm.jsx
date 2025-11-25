@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
-import { MapPin, Calendar, Package, IndianRupee, Eye, EyeOff } from 'lucide-react'
+import { Calendar, Package, IndianRupee, Eye, EyeOff } from 'lucide-react'
 import { cn } from '../../../lib/cn'
 
-const REGIONS = ['West', 'North', 'South', 'Central', 'North East', 'East']
 const STOCK_UNITS = ['kg', 'L', 'bags', 'units']
 
 // Fertilizer Categories (This platform is for fertilizers only)
@@ -26,12 +25,12 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     name: '',
     category: 'npk', // Default to NPK
     description: '',
-    stock: '',
+    actualStock: '',
+    displayStock: '',
     stockUnit: 'kg',
     vendorPrice: '',
     userPrice: '',
     expiry: '',
-    region: 'West',
     visibility: 'active',
     batchNumber: '',
   })
@@ -41,24 +40,52 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
   useEffect(() => {
     if (product) {
       // Parse existing product data
-      // Handle stock: can be a number or a string like "1000 kg"
-      let stockValue = ''
+      // Handle stock: check for actualStock and displayStock first, fallback to legacy stock
+      let actualStockValue = ''
+      let displayStockValue = ''
       let stockUnit = 'kg'
       
-      if (product.stock != null) {
+      // Check for actualStock and displayStock first
+      if (product.actualStock != null && product.actualStock !== undefined) {
+        actualStockValue = String(product.actualStock)
+      }
+      if (product.displayStock != null && product.displayStock !== undefined) {
+        displayStockValue = String(product.displayStock)
+      }
+      
+      // Fallback to legacy stock field if new fields not available
+      if (!actualStockValue && product.stock != null && product.stock !== undefined) {
         if (typeof product.stock === 'number') {
-          // If stock is a number, use it directly
-          stockValue = String(product.stock)
-          stockUnit = product.stockUnit || 'kg'
+          actualStockValue = String(product.stock)
         } else {
-          // If stock is a string, parse it with regex
           const stockString = String(product.stock)
           const stockMatch = stockString.match(/^([\d,]+)\s*(kg|L|bags|units)?$/i)
           if (stockMatch) {
-            stockValue = stockMatch[1].replace(/,/g, '')
+            actualStockValue = stockMatch[1].replace(/,/g, '')
             stockUnit = stockMatch[2]?.toLowerCase() || product.stockUnit || 'kg'
           }
         }
+      }
+      if (!displayStockValue && product.stock != null && product.stock !== undefined) {
+        if (typeof product.stock === 'number') {
+          displayStockValue = String(product.stock)
+        } else {
+          const stockString = String(product.stock)
+          const stockMatch = stockString.match(/^([\d,]+)\s*(kg|L|bags|units)?$/i)
+          if (stockMatch) {
+            displayStockValue = stockMatch[1].replace(/,/g, '')
+            if (!stockUnit) stockUnit = stockMatch[2]?.toLowerCase() || product.stockUnit || 'kg'
+          }
+        }
+      }
+      
+      if (product.stockUnit) {
+        stockUnit = product.stockUnit
+      }
+      
+      // Also check weight.unit as fallback
+      if (product.weight?.unit) {
+        stockUnit = product.weight.unit
       }
       
       // Convert prices to string if they're numbers
@@ -95,13 +122,13 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
         name: product.name || '',
         category: product.category || 'npk',
         description: product.description || '',
-        stock: stockValue,
+        actualStock: actualStockValue,
+        displayStock: displayStockValue,
         stockUnit: stockUnit,
         vendorPrice: vendorPriceValue,
         userPrice: userPriceValue,
         expiry: expiryDate,
-        region: product.region || 'West',
-        visibility: product.visibility?.toLowerCase() === 'active' ? 'active' : 'inactive',
+        visibility: product.isActive !== false ? 'active' : 'inactive',
         batchNumber: product.batchNumber || '',
       })
     }
@@ -115,6 +142,12 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       setErrors((prev) => ({ ...prev, [name]: '' }))
     }
   }
+
+  // Sync displayStock unit when stockUnit changes
+  useEffect(() => {
+    // When stockUnit changes, we don't need to do anything special
+    // The disabled select will show the same unit automatically
+  }, [formData.stockUnit])
 
   const validate = () => {
     const newErrors = {}
@@ -131,8 +164,14 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       newErrors.description = 'Product description is required'
     }
 
-    if (!formData.stock || parseFloat(formData.stock) <= 0) {
-      newErrors.stock = 'Stock quantity must be greater than 0'
+    if (!formData.actualStock || parseFloat(formData.actualStock) < 0) {
+      newErrors.actualStock = 'Actual quantity is required and cannot be negative'
+    }
+    if (!formData.displayStock || parseFloat(formData.displayStock) < 0) {
+      newErrors.displayStock = 'Display quantity is required and cannot be negative'
+    }
+    if (parseFloat(formData.displayStock) > parseFloat(formData.actualStock)) {
+      newErrors.displayStock = 'Display quantity cannot exceed actual quantity'
     }
 
     if (!formData.vendorPrice || parseFloat(formData.vendorPrice) <= 0) {
@@ -151,10 +190,6 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       newErrors.expiry = 'Expiry date is required'
     }
 
-    if (!formData.region) {
-      newErrors.region = 'Region is required'
-    }
-
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -166,17 +201,17 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     // Ensure prices are valid numbers (validation already checked they're > 0)
     const vendorPrice = parseFloat(formData.vendorPrice)
     const userPrice = parseFloat(formData.userPrice)
-    
+
     const submitData = {
       name: formData.name.trim(),
       category: formData.category,
       description: formData.description.trim(),
-      stock: parseFloat(formData.stock),
+      actualStock: parseFloat(formData.actualStock) || 0,
+      displayStock: parseFloat(formData.displayStock) || 0,
       stockUnit: formData.stockUnit,
       priceToVendor: !isNaN(vendorPrice) && vendorPrice > 0 ? vendorPrice : undefined,
       priceToUser: !isNaN(userPrice) && userPrice > 0 ? userPrice : undefined,
       expiry: formData.expiry,
-      region: formData.region,
       isActive: formData.visibility === 'active',
       ...(formData.batchNumber && { batchNumber: formData.batchNumber.trim() }),
     }
@@ -259,22 +294,23 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       {/* Stock Quantity & Unit */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="stock" className="mb-2 block text-sm font-bold text-gray-900">
-            Stock Quantity <span className="text-red-500">*</span>
+          <label htmlFor="actualStock" className="mb-2 block text-sm font-bold text-gray-900">
+            Actual Quantity <span className="text-red-500">*</span>
+            <span className="text-xs font-normal text-gray-500 ml-2">(Internal/Admin use)</span>
           </label>
           <div className="flex gap-2">
             <input
               type="number"
-              id="stock"
-              name="stock"
-              value={formData.stock}
+              id="actualStock"
+              name="actualStock"
+              value={formData.actualStock}
               onChange={handleChange}
               placeholder="0"
               min="0"
               step="0.01"
               className={cn(
                 'flex-1 rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2',
-                errors.stock
+                errors.actualStock
                   ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
                   : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
               )}
@@ -292,9 +328,51 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
               ))}
             </select>
           </div>
-          {errors.stock && <p className="mt-1 text-xs text-red-600">{errors.stock}</p>}
+          {errors.actualStock && <p className="mt-1 text-xs text-red-600">{errors.actualStock}</p>}
         </div>
 
+        <div>
+          <label htmlFor="displayStock" className="mb-2 block text-sm font-bold text-gray-900">
+            Quantity to Show to Vendors <span className="text-red-500">*</span>
+            <span className="text-xs font-normal text-gray-500 ml-2">(Visible to vendors)</span>
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              id="displayStock"
+              name="displayStock"
+              value={formData.displayStock}
+              onChange={handleChange}
+              placeholder="0"
+              min="0"
+              step="0.01"
+              className={cn(
+                'flex-1 rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2',
+                errors.displayStock
+                  ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
+                  : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
+              )}
+            />
+            <select
+              value={formData.stockUnit}
+              disabled
+              className="rounded-xl border border-gray-300 bg-gray-100 px-3 py-3 text-sm font-semibold text-gray-500 cursor-not-allowed"
+            >
+              {STOCK_UNITS.map((unit) => (
+                <option key={unit} value={unit}>
+                  {unit}
+                </option>
+              ))}
+            </select>
+          </div>
+          {errors.displayStock && <p className="mt-1 text-xs text-red-600">{errors.displayStock}</p>}
+          {formData.displayStock && parseFloat(formData.displayStock) > parseFloat(formData.actualStock || 0) && (
+            <p className="mt-1 text-xs text-yellow-600">⚠️ Display quantity exceeds actual quantity</p>
+          )}
+        </div>
+      </div>
+
+      {/* Expiry Date */}
         <div>
           <label htmlFor="expiry" className="mb-2 block text-sm font-bold text-gray-900">
             Expiry Date / Batch <span className="text-red-500">*</span>
@@ -316,7 +394,6 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
             />
           </div>
           {errors.expiry && <p className="mt-1 text-xs text-red-600">{errors.expiry}</p>}
-        </div>
       </div>
 
       {/* Batch Number (Optional) */}
@@ -384,33 +461,6 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
           />
           {errors.userPrice && <p className="mt-1 text-xs text-red-600">{errors.userPrice}</p>}
         </div>
-      </div>
-
-      {/* Region Assignment */}
-      <div>
-        <label htmlFor="region" className="mb-2 block text-sm font-bold text-gray-900">
-          <MapPin className="mr-1 inline h-4 w-4" />
-          Assign to Region <span className="text-red-500">*</span>
-        </label>
-        <select
-          id="region"
-          name="region"
-          value={formData.region}
-          onChange={handleChange}
-          className={cn(
-            'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2',
-            errors.region
-              ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-              : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
-          )}
-        >
-          {REGIONS.map((region) => (
-            <option key={region} value={region}>
-              {region}
-            </option>
-          ))}
-        </select>
-        {errors.region && <p className="mt-1 text-xs text-red-600">{errors.region}</p>}
       </div>
 
       {/* Visibility Toggle */}

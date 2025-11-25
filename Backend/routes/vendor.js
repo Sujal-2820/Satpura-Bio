@@ -114,6 +114,24 @@ router.get('/orders', authorizeVendor, vendorController.getOrders);
 router.get('/orders/:orderId', authorizeVendor, vendorController.getOrderDetails);
 
 // ============================================================================
+// PRODUCT MANAGEMENT ROUTES (For vendors to view and order products)
+// ============================================================================
+
+/**
+ * @route   GET /api/vendors/products
+ * @desc    Get all products available for ordering
+ * @access  Private (Vendor)
+ */
+router.get('/products', authorizeVendor, vendorController.getProducts);
+
+/**
+ * @route   GET /api/vendors/products/:productId
+ * @desc    Get product details for vendor
+ * @access  Private (Vendor)
+ */
+router.get('/products/:productId', authorizeVendor, vendorController.getProductDetails);
+
+// ============================================================================
 // INVENTORY MANAGEMENT ROUTES
 // ============================================================================
 

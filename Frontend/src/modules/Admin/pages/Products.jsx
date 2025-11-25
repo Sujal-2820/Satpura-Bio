@@ -13,7 +13,8 @@ import { cn } from '../../../lib/cn'
 
 const columns = [
   { Header: 'Product', accessor: 'name' },
-  { Header: 'Stock', accessor: 'stock' },
+  { Header: 'Actual Stock', accessor: 'actualStock' },
+  { Header: 'Vendor Stock', accessor: 'vendorStock' },
   { Header: 'Vendor Price', accessor: 'vendorPrice' },
   { Header: 'User Price', accessor: 'userPrice' },
   { Header: 'Expiry / Batch', accessor: 'expiry' },
@@ -42,12 +43,22 @@ export function ProductsPage() {
 
   // Format product data for display
   const formatProductForDisplay = (product) => {
-    const stockValue = typeof product.stock === 'number' ? product.stock : parseFloat(product.stock?.replace(/[^\d.]/g, '') || '0')
-    const stockUnit = product.stockUnit || 'kg'
-    const stockFormatted = `${stockValue.toLocaleString('en-IN')} ${stockUnit}`
+    // Get actual stock
+    const actualStockValue = typeof product.actualStock === 'number' 
+      ? product.actualStock 
+      : parseFloat(product.actualStock?.replace(/[^\d.]/g, '') || '0')
     
-    const vendorPrice = typeof product.vendorPrice === 'number' ? product.vendorPrice : parseFloat(product.vendorPrice?.replace(/[₹,]/g, '') || '0')
-    const userPrice = typeof product.userPrice === 'number' ? product.userPrice : parseFloat(product.userPrice?.replace(/[₹,]/g, '') || '0')
+    // Get display stock (vendor stock)
+    const displayStockValue = typeof product.displayStock === 'number'
+      ? product.displayStock
+      : parseFloat(product.displayStock?.replace(/[^\d.]/g, '') || product.stock?.replace(/[^\d.]/g, '') || '0')
+    
+    const stockUnit = product.weight?.unit || product.stockUnit || 'kg'
+    const actualStockFormatted = `${actualStockValue.toLocaleString('en-IN')} ${stockUnit}`
+    const vendorStockFormatted = `${displayStockValue.toLocaleString('en-IN')} ${stockUnit}`
+    
+    const vendorPrice = typeof product.vendorPrice === 'number' ? product.vendorPrice : parseFloat(product.vendorPrice?.replace(/[₹,]/g, '') || product.priceToVendor || '0')
+    const userPrice = typeof product.userPrice === 'number' ? product.userPrice : parseFloat(product.userPrice?.replace(/[₹,]/g, '') || product.priceToUser || '0')
     
     // Format expiry date
     let expiryFormatted = product.expiry || ''
@@ -55,12 +66,18 @@ export function ProductsPage() {
       const date = new Date(product.expiry)
       expiryFormatted = date.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
     }
+    
+    // Include batch number if available
+    if (product.batchNumber) {
+      expiryFormatted = expiryFormatted ? `${expiryFormatted} (${product.batchNumber})` : product.batchNumber
+    }
 
-    const visibility = product.visibility === 'active' || product.visibility === 'Active' ? 'Active' : 'Inactive'
+    const visibility = product.isActive !== false ? 'Active' : 'Inactive'
 
     return {
       ...product,
-      stock: stockFormatted,
+      actualStock: actualStockFormatted,
+      vendorStock: vendorStockFormatted,
       vendorPrice: `₹${vendorPrice.toLocaleString('en-IN')}`,
       userPrice: `₹${userPrice.toLocaleString('en-IN')}`,
       expiry: expiryFormatted,

@@ -136,7 +136,7 @@ const vendorSchema = new mongoose.Schema({
   },
   isActive: {
     type: Boolean,
-    default: true, // Active by default on registration
+    default: false, // Inactive until approved by admin // Active by default on registration
   },
   approvedAt: Date,
   approvedBy: {
