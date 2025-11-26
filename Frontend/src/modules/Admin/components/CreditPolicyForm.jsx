@@ -4,7 +4,6 @@ import { cn } from '../../../lib/cn'
 
 export function CreditPolicyForm({ vendor, onSubmit, onCancel, loading = false }) {
   const [formData, setFormData] = useState({
-    creditLimit: '',
     repaymentDays: '',
     penaltyRate: '',
   })
@@ -13,23 +12,17 @@ export function CreditPolicyForm({ vendor, onSubmit, onCancel, loading = false }
 
   useEffect(() => {
     if (vendor) {
-      // Parse existing credit policy data
-      const creditLimit = typeof vendor.creditLimit === 'number' 
-        ? vendor.creditLimit 
-        : parseFloat(vendor.creditLimit?.replace(/[₹,\sL]/g, '') || '0') * 100000 // Convert L to actual number
-      
       const repaymentDays = typeof vendor.repaymentDays === 'number'
         ? vendor.repaymentDays
-        : parseInt(vendor.repayment?.replace(/\D/g, '') || '0')
+        : vendor.creditPolicy?.repaymentDays || 30
 
       const penaltyRate = typeof vendor.penaltyRate === 'number'
         ? vendor.penaltyRate
-        : parseFloat(vendor.penalty?.replace(/[%\s]/g, '') || '0')
+        : vendor.creditPolicy?.penaltyRate || 2
 
       setFormData({
-        creditLimit: creditLimit || '',
-        repaymentDays: repaymentDays || '',
-        penaltyRate: penaltyRate || '',
+        repaymentDays: repaymentDays || 30,
+        penaltyRate: penaltyRate || 2,
       })
     }
   }, [vendor])
@@ -45,10 +38,6 @@ export function CreditPolicyForm({ vendor, onSubmit, onCancel, loading = false }
 
   const validate = () => {
     const newErrors = {}
-
-    if (!formData.creditLimit || parseFloat(formData.creditLimit) <= 0) {
-      newErrors.creditLimit = 'Credit limit must be greater than 0'
-    }
 
     if (!formData.repaymentDays || parseInt(formData.repaymentDays) <= 0) {
       newErrors.repaymentDays = 'Repayment days must be greater than 0'
@@ -71,7 +60,6 @@ export function CreditPolicyForm({ vendor, onSubmit, onCancel, loading = false }
     if (!validate()) return
 
     const submitData = {
-      creditLimit: parseFloat(formData.creditLimit),
       repaymentDays: parseInt(formData.repaymentDays),
       penaltyRate: parseFloat(formData.penaltyRate),
     }
@@ -90,36 +78,6 @@ export function CreditPolicyForm({ vendor, onSubmit, onCancel, loading = false }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Credit Limit */}
-      <div>
-        <label htmlFor="creditLimit" className="mb-2 block text-sm font-bold text-gray-900">
-          <IndianRupee className="mr-1 inline h-4 w-4" />
-          Credit Limit <span className="text-red-500">*</span>
-        </label>
-        <div className="relative">
-          <input
-            type="number"
-            id="creditLimit"
-            name="creditLimit"
-            value={formData.creditLimit}
-            onChange={handleChange}
-            placeholder="0"
-            min="0"
-            step="1000"
-            className={cn(
-              'w-full rounded-xl border px-4 py-3 pr-24 text-sm transition-all focus:outline-none focus:ring-2',
-              errors.creditLimit
-                ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                : 'border-gray-300 bg-white focus:border-green-500 focus:ring-green-500/50',
-            )}
-          />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">
-            {formData.creditLimit ? formatCurrency(formData.creditLimit) : '₹0'}
-          </div>
-        </div>
-        {errors.creditLimit && <p className="mt-1 text-xs text-red-600">{errors.creditLimit}</p>}
-      </div>
-
       {/* Repayment Days */}
       <div>
         <label htmlFor="repaymentDays" className="mb-2 block text-sm font-bold text-gray-900">
@@ -183,9 +141,9 @@ export function CreditPolicyForm({ vendor, onSubmit, onCancel, loading = false }
           <div className="text-xs text-blue-900">
             <p className="font-bold">Credit Policy Guidelines</p>
             <ul className="mt-2 space-y-1 list-disc list-inside">
-              <li>Credit limit should be based on vendor's historical performance</li>
-              <li>Standard repayment period is 21-28 days</li>
-              <li>Penalty rate typically ranges from 1% to 2.5%</li>
+              <li>No credit limit - vendors can order within ₹50,000 - ₹100,000 range</li>
+              <li>Standard repayment period is 30 days</li>
+              <li>Default penalty rate is 2% per day after due date</li>
             </ul>
           </div>
         </div>

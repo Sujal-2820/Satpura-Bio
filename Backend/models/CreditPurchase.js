@@ -19,6 +19,10 @@ const creditPurchaseSchema = new mongoose.Schema({
       ref: 'Product',
       required: true,
     },
+    productName: {
+      type: String,
+      trim: true,
+    },
     quantity: {
       type: Number,
       required: true,
@@ -34,11 +38,16 @@ const creditPurchaseSchema = new mongoose.Schema({
       required: true,
       min: [0, 'Total price cannot be negative'],
     },
+    unit: {
+      type: String,
+      trim: true,
+    },
   }],
   totalAmount: {
     type: Number,
     required: [true, 'Total amount is required'],
     min: [50000, 'Minimum purchase amount is ₹50,000'], // MIN_VENDOR_PURCHASE
+    max: [100000, 'Maximum purchase amount is ₹100,000'], // MAX_VENDOR_PURCHASE
   },
   status: {
     type: String,
@@ -57,6 +66,48 @@ const creditPurchaseSchema = new mongoose.Schema({
   },
   // Notes
   notes: {
+    type: String,
+    trim: true,
+  },
+  reason: {
+    type: String,
+    trim: true,
+  },
+  bankDetails: {
+    accountName: {
+      type: String,
+      trim: true,
+    },
+    accountNumber: {
+      type: String,
+      trim: true,
+    },
+    bankName: {
+      type: String,
+      trim: true,
+    },
+    ifsc: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+    branch: {
+      type: String,
+      trim: true,
+    },
+  },
+  confirmationText: {
+    type: String,
+    trim: true,
+  },
+  deliveryStatus: {
+    type: String,
+    enum: ['pending', 'scheduled', 'in_transit', 'delivered'],
+    default: 'pending',
+  },
+  expectedDeliveryAt: Date,
+  deliveredAt: Date,
+  deliveryNotes: {
     type: String,
     trim: true,
   },

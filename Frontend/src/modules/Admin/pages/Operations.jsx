@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Settings, Truck, Package, Bell, Plus, Edit2, Trash2, AlertCircle } from 'lucide-react'
+import { Settings, Truck, Package, Bell, Plus, Edit2, Trash2, AlertCircle, Recycle } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { Modal } from '../components/Modal'
@@ -36,6 +36,7 @@ export function OperationsPage() {
     updateLogisticsSettings,
     getEscalatedOrders,
     fulfillOrderFromWarehouse,
+    revertEscalation,
     getNotifications,
     createNotification,
     updateNotification,
@@ -54,6 +55,9 @@ export function OperationsPage() {
   const [selectedNotification, setSelectedNotification] = useState(null)
   const [escalationModalOpen, setEscalationModalOpen] = useState(false)
   const [selectedOrderForEscalation, setSelectedOrderForEscalation] = useState(null)
+  const [revertModalOpen, setRevertModalOpen] = useState(false)
+  const [selectedOrderForRevert, setSelectedOrderForRevert] = useState(null)
+  const [revertReason, setRevertReason] = useState('')
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -161,6 +165,28 @@ export function OperationsPage() {
       }
     } catch (error) {
       showError(error.message || 'Failed to fulfill order', 5000)
+    }
+  }
+
+  const handleRevertEscalation = async () => {
+    if (!revertReason.trim()) {
+      showError('Please provide a reason for reverting the escalation')
+      return
+    }
+
+    try {
+      const result = await revertEscalation(selectedOrderForRevert.id, { reason: revertReason.trim() })
+      if (result.data) {
+        setRevertModalOpen(false)
+        setSelectedOrderForRevert(null)
+        setRevertReason('')
+        fetchData()
+        success('Escalation reverted successfully. Order assigned back to vendor.', 3000)
+      } else if (result.error) {
+        showError(result.error.message || 'Failed to revert escalation', 5000)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to revert escalation', 5000)
     }
   }
 
@@ -424,6 +450,81 @@ export function OperationsPage() {
         onFulfillFromWarehouse={handleFulfillFromWarehouse}
         loading={loading}
       />
+
+      {/* Revert Escalation Modal */}
+      {revertModalOpen && selectedOrderForRevert && (
+        <Modal
+          isOpen={revertModalOpen}
+          onClose={() => {
+            setRevertModalOpen(false)
+            setSelectedOrderForRevert(null)
+            setRevertReason('')
+          }}
+          title="Revert Escalation"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+              <p className="text-sm font-semibold text-orange-900">Order #{selectedOrderForRevert.orderNumber}</p>
+              <p className="text-xs text-orange-700 mt-1">
+                Vendor: {selectedOrderForRevert.vendor || 'N/A'} | Value: {formatCurrency(selectedOrderForRevert.value || 0)}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Reason for Reverting <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={revertReason}
+                onChange={(e) => setRevertReason(e.target.value)}
+                placeholder="Why are you reverting this escalation back to the vendor?"
+                rows={4}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              />
+            </div>
+
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-900">
+                  This order will be assigned back to the original vendor. The vendor will receive a notification and can proceed with fulfillment.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setRevertModalOpen(false)
+                  setSelectedOrderForRevert(null)
+                  setRevertReason('')
+                }}
+                disabled={loading}
+                className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRevertEscalation}
+                disabled={loading || !revertReason.trim()}
+                className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  'Reverting...'
+                ) : (
+                  <>
+                    <Recycle className="h-4 w-4" />
+                    Revert to Vendor
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

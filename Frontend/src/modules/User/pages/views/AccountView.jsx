@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useUserState, useUserDispatch } from '../../context/UserContext'
+import { useUserApi } from '../../hooks/useUserApi'
+import { useToast } from '../../components/ToastNotification'
 import {
   UserIcon,
   MapPinIcon,
@@ -20,6 +22,8 @@ import { cn } from '../../../../lib/cn'
 export function AccountView({ onNavigate }) {
   const { profile, addresses, orders } = useUserState()
   const dispatch = useUserDispatch()
+  const { updateUserProfile, loading } = useUserApi()
+  const { success, error: showError } = useToast()
   const [activeSection, setActiveSection] = useState('profile')
   const [editingName, setEditingName] = useState(false)
   const [editedName, setEditedName] = useState(profile.name)
@@ -27,6 +31,13 @@ export function AccountView({ onNavigate }) {
   const [editingAddress, setEditingAddress] = useState(null)
   const [showPasswordPanel, setShowPasswordPanel] = useState(false)
   const [showDefaultAddressPanel, setShowDefaultAddressPanel] = useState(false)
+  const [showChangeDeliveryAddressPanel, setShowChangeDeliveryAddressPanel] = useState(false)
+  const [deliveryAddressForm, setDeliveryAddressForm] = useState({
+    address: profile.location?.address || '',
+    city: profile.location?.city || '',
+    state: profile.location?.state || '',
+    pincode: profile.location?.pincode || '',
+  })
   const [showAccountRecoveryPanel, setShowAccountRecoveryPanel] = useState(false)
   const [showPrivacyPanel, setShowPrivacyPanel] = useState(false)
   const [showSupportPanel, setShowSupportPanel] = useState(false)
@@ -79,6 +90,12 @@ export function AccountView({ onNavigate }) {
       state: profile.location?.state || '',
       pincode: profile.location?.pincode || '',
       phone: profile.phone || '',
+    })
+    setDeliveryAddressForm({
+      address: profile.location?.address || '',
+      city: profile.location?.city || '',
+      state: profile.location?.state || '',
+      pincode: profile.location?.pincode || '',
     })
   }, [profile.location, profile.phone])
 
@@ -299,11 +316,13 @@ export function AccountView({ onNavigate }) {
       icon: TruckIcon,
       items: [
         {
-          id: 'default-delivery',
-          label: 'Default Delivery Address',
-          value: addresses.find((a) => a.isDefault)?.label || addresses.find((a) => a.isDefault)?.name || 'Not set',
+          id: 'change-delivery-address',
+          label: 'Change Delivery Address',
+          value: profile.location?.city && profile.location?.state && profile.location?.pincode
+            ? `${profile.location.address || ''}, ${profile.location.city}, ${profile.location.state} - ${profile.location.pincode}`.replace(/^,\s*|,\s*$/g, '').trim() || 'Not set'
+            : 'Not set',
           editable: true,
-          action: () => setShowDefaultAddressPanel(true),
+          action: () => setShowChangeDeliveryAddressPanel(true),
         },
         {
           id: 'track-deliveries',
@@ -1069,6 +1088,105 @@ export function AccountView({ onNavigate }) {
                   className="w-full py-2.5 px-4 rounded-xl bg-[#1b8f5b] text-white text-sm font-semibold hover:bg-[#2a9d61] transition-colors"
                 >
                   Submit Report
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Delivery Address Panel */}
+      {showChangeDeliveryAddressPanel && (
+        <div
+          className="user-account-view__panel"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowChangeDeliveryAddressPanel(false)
+            }
+          }}
+        >
+          <div className="user-account-view__panel-content">
+            <div className="user-account-view__panel-header">
+              <h3 className="user-account-view__panel-title">Change Delivery Address</h3>
+              <button
+                type="button"
+                onClick={() => setShowChangeDeliveryAddressPanel(false)}
+                className="user-account-view__panel-close"
+              >
+                <XIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="user-account-view__panel-body">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[#172022] mb-1.5">
+                    Street Address
+                  </label>
+                  <textarea
+                    value={deliveryAddressForm.address}
+                    onChange={(e) => setDeliveryAddressForm({ ...deliveryAddressForm, address: e.target.value })}
+                    placeholder="Enter your street address"
+                    rows={3}
+                    className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b] resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-[#172022] mb-1.5">
+                      City <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={deliveryAddressForm.city}
+                      onChange={(e) => setDeliveryAddressForm({ ...deliveryAddressForm, city: e.target.value })}
+                      placeholder="City"
+                      className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-[#172022] mb-1.5">
+                      State <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={deliveryAddressForm.state}
+                      onChange={(e) => setDeliveryAddressForm({ ...deliveryAddressForm, state: e.target.value })}
+                      placeholder="State"
+                      className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#172022] mb-1.5">
+                    Pincode <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={deliveryAddressForm.pincode}
+                    onChange={(e) => setDeliveryAddressForm({ ...deliveryAddressForm, pincode: e.target.value })}
+                    placeholder="Pincode"
+                    maxLength={6}
+                    className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
+                  />
+                </div>
+              </div>
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowChangeDeliveryAddressPanel(false)}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(240,245,242,0.5)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveDeliveryAddress}
+                  disabled={loading}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-[#1b8f5b] text-white text-sm font-semibold hover:bg-[#2a9d61] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Saving...' : 'Save Address'}
                 </button>
               </div>
             </div>

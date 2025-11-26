@@ -13,8 +13,62 @@ const CreditPurchase = require('../models/CreditPurchase');
 
 const { generateOTP, sendOTP } = require('../config/sms');
 const { generateToken } = require('../middleware/auth');
-const { OTP_EXPIRY_MINUTES, MIN_VENDOR_PURCHASE, VENDOR_COVERAGE_RADIUS_KM } = require('../utils/constants');
+const { OTP_EXPIRY_MINUTES, MIN_VENDOR_PURCHASE, MAX_VENDOR_PURCHASE, VENDOR_COVERAGE_RADIUS_KM, DELIVERY_TIMELINE_HOURS } = require('../utils/constants');
 const { checkPhoneExists, checkPhoneInRole } = require('../utils/phoneValidation');
+
+const DELIVERY_WINDOW_HOURS = DELIVERY_TIMELINE_HOURS || 24;
+const DELIVERY_WINDOW_MS = DELIVERY_WINDOW_HOURS * 60 * 60 * 1000;
+
+async function processPendingDeliveries(vendorId) {
+  try {
+    const now = new Date();
+    const pendingPurchases = await CreditPurchase.find({
+      vendorId,
+      status: 'approved',
+      deliveryStatus: { $in: ['scheduled', 'in_transit'] },
+      expectedDeliveryAt: { $lte: now },
+    });
+
+    if (!pendingPurchases.length) {
+      return;
+    }
+
+    for (const purchase of pendingPurchases) {
+      for (const item of purchase.items) {
+        let assignment = await ProductAssignment.findOne({
+          vendorId,
+          productId: item.productId,
+        });
+
+        if (!assignment) {
+          if (!purchase.reviewedBy) {
+            console.warn(`⚠️ Unable to auto-create assignment for vendor ${vendorId}. Missing reviewer on purchase ${purchase._id}.`);
+            continue;
+          }
+          assignment = await ProductAssignment.create({
+            vendorId,
+            productId: item.productId,
+            assignedBy: purchase.reviewedBy,
+            assignedAt: new Date(),
+            stock: 0,
+            isActive: true,
+            notes: 'Auto-created during approved stock transfer',
+          });
+        }
+
+        assignment.stock += item.quantity;
+        await assignment.save();
+      }
+
+      purchase.deliveryStatus = 'delivered';
+      purchase.deliveredAt = now;
+      purchase.deliveryNotes = 'Stock delivered and added to your inventory.';
+      await purchase.save();
+    }
+  } catch (error) {
+    console.error(`Failed to process pending deliveries for vendor ${vendorId}:`, error);
+  }
+}
 
 /**
  * @desc    Vendor registration
@@ -650,19 +704,41 @@ exports.getOrders = async (req, res, next) => {
       sortOrder = 'desc',
     } = req.query;
 
-    // Build query - only orders assigned to this vendor
-    // Use both vendorId and assignedTo to ensure we get all orders for this vendor
+    // Build query - orders assigned to this vendor
+    // Primary condition: vendorId must match
+    // Secondary condition: assignedTo should be 'vendor' (but also include orders where it's not set for compatibility)
+    const vendorIdForQuery = vendor._id;
+    
+    // Build the query - start simple and add conditions
     const query = { 
-      vendorId: vendor._id,
-      assignedTo: 'vendor'
+      vendorId: vendorIdForQuery,
+      $or: [
+        { assignedTo: 'vendor' },
+        { assignedTo: { $exists: false } },
+        { assignedTo: null }
+      ]
     };
     
     // Debug logging
-    console.log(`🔍 Vendor ${vendor.name} (${vendor._id}) fetching orders`);
+    console.log(`🔍 Vendor ${vendor.name} fetching orders`);
+    console.log(`   Vendor ID: ${vendorIdForQuery}`);
+    console.log(`   Vendor ID (string): ${vendorIdForQuery.toString()}`);
     console.log(`📍 Vendor location: ${vendor.location?.city || 'No city'}, ${vendor.location?.state || 'No state'}`);
+    console.log(`📋 Base Query structure:`, {
+      vendorId: vendorIdForQuery.toString(),
+      $or: query.$or
+    });
 
-    if (status) {
+    // Apply status filter if provided (but ignore if it's the string "undefined")
+    if (status && status !== 'undefined' && status !== 'null') {
       query.status = status;
+      console.log(`📋 Query with status filter '${status}':`, {
+        vendorId: query.vendorId.toString(),
+        $or: query.$or,
+        status: query.status
+      });
+    } else if (status === 'undefined' || status === 'null') {
+      console.log(`⚠️ Ignoring invalid status filter: '${status}'`);
     }
 
     if (paymentStatus) {
@@ -709,13 +785,50 @@ exports.getOrders = async (req, res, next) => {
 
     const total = await Order.countDocuments(query);
     
-    // Debug logging
-    console.log(`📦 Vendor ${vendor.name} orders query result: ${orders.length} orders found (total: ${total})`);
-    if (orders.length === 0 && total === 0) {
-      console.log(`⚠️ No orders found for vendor. Query:`, JSON.stringify(query, null, 2));
-      // Check if there are any orders with this vendorId at all
-      const allOrdersForVendor = await Order.find({ vendorId: vendor._id }).countDocuments();
-      console.log(`   Total orders with vendorId ${vendor._id}: ${allOrdersForVendor}`);
+    // Debug logging - Always log for troubleshooting
+    console.log(`📦 Vendor ${vendor.name} (${vendor._id}) orders query result: ${orders.length} orders found (total: ${total})`);
+    console.log(`📋 Final Query:`, JSON.stringify(query, null, 2));
+    
+    // Check if there are any orders with this vendorId at all (regardless of assignedTo)
+    const allOrdersForVendor = await Order.find({ vendorId: vendor._id }).countDocuments();
+    console.log(`   Total orders with vendorId ${vendor._id.toString()}: ${allOrdersForVendor}`);
+    
+    if (allOrdersForVendor > 0 && orders.length === 0) {
+      // There are orders for this vendor but they don't match the query
+      // Get sample orders to see what's in the database
+      const sampleOrders = await Order.find({ vendorId: vendor._id })
+        .limit(5)
+        .select('orderNumber vendorId assignedTo status createdAt')
+        .lean();
+      console.log(`   ⚠️ Found ${allOrdersForVendor} orders with vendorId, but none match query. Sample orders:`);
+      sampleOrders.forEach((o, idx) => {
+        console.log(`      [${idx + 1}] Order ${o.orderNumber}:`);
+        console.log(`          - vendorId: ${o.vendorId?.toString() || 'null'} (type: ${o.vendorId?.constructor?.name || 'unknown'})`);
+        console.log(`          - assignedTo: ${o.assignedTo || 'NOT SET'} (type: ${typeof o.assignedTo})`);
+        console.log(`          - status: ${o.status || 'NOT SET'}`);
+        console.log(`          - createdAt: ${o.createdAt || 'NOT SET'}`);
+        console.log(`          - vendorId match: ${o.vendorId?.toString() === vendor._id.toString() ? 'YES' : 'NO'}`);
+      });
+      
+      // Check if any orders have assignedTo set to something other than 'vendor'
+      const ordersWithDifferentAssignedTo = await Order.find({ 
+        vendorId: vendor._id,
+        assignedTo: { $ne: 'vendor', $exists: true }
+      }).countDocuments();
+      console.log(`   Orders with vendorId but assignedTo != 'vendor': ${ordersWithDifferentAssignedTo}`);
+      
+      const ordersWithoutAssignedTo = await Order.find({ 
+        vendorId: vendor._id,
+        assignedTo: { $exists: false }
+      }).countDocuments();
+      console.log(`   Orders with vendorId but assignedTo not set: ${ordersWithoutAssignedTo}`);
+      
+      // Try a simpler query to see if we can find the orders
+      const simpleQueryOrders = await Order.find({ vendorId: vendor._id })
+        .limit(3)
+        .select('orderNumber vendorId assignedTo status')
+        .lean();
+      console.log(`   Simple query (vendorId only) found ${simpleQueryOrders.length} orders`);
     }
 
     res.status(200).json({
@@ -761,6 +874,44 @@ exports.getOrderDetails = async (req, res, next) => {
       });
     }
 
+    // Enrich order items with vendor stock info
+    const orderObject = order.toObject({ virtuals: true });
+    const productIds = orderObject.items
+      .map((item) => {
+        if (!item.productId) return null;
+        return item.productId._id ? item.productId._id.toString() : item.productId.toString();
+      })
+      .filter(Boolean);
+
+    let assignmentMap = {};
+    if (productIds.length > 0) {
+      const assignments = await ProductAssignment.find({
+        vendorId: vendor._id,
+        productId: { $in: productIds },
+      })
+        .select('productId stock updatedAt lastRestockedAt')
+        .lean();
+
+      assignmentMap = assignments.reduce((acc, assignment) => {
+        acc[assignment.productId.toString()] = assignment;
+        return acc;
+      }, {});
+    }
+
+    orderObject.items = orderObject.items.map((item) => {
+      const productId = item.productId?._id
+        ? item.productId._id.toString()
+        : item.productId?.toString();
+      const assignment = productId ? assignmentMap[productId] : null;
+      const vendorStock = assignment?.stock ?? assignment?.vendorStock ?? 0;
+
+      return {
+        ...item,
+        vendorStock,
+        vendorStockUpdatedAt: assignment?.updatedAt || assignment?.lastRestockedAt || null,
+      };
+    });
+
     // Get order payments
     const Payment = require('../models/Payment');
     const payments = await Payment.find({ orderId })
@@ -780,7 +931,7 @@ exports.getOrderDetails = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: {
-        order,
+        order: orderObject,
         payments,
         paymentSummary: {
           totalAmount: order.totalAmount,
@@ -898,30 +1049,40 @@ exports.rejectOrder = async (req, res, next) => {
     }
 
     // Reject order - escalate to admin
-    order.vendorId = null; // Remove vendor assignment
     order.assignedTo = 'admin'; // Escalate to admin
-    
-    // Track escalation
-    if (vendor) {
-      vendor.escalationCount = (vendor.escalationCount || 0) + 1;
-      vendor.escalationHistory.push({
-        orderId: order._id,
-        escalatedAt: new Date(),
-        reason: 'Order rejected by vendor',
-      });
-      await vendor.save();
-    }
     order.status = 'rejected'; // Mark as rejected by vendor
+    
+    // Track escalation details
+    order.escalation = {
+      isEscalated: true,
+      escalatedAt: new Date(),
+      escalatedBy: 'vendor',
+      escalationReason: reason,
+      escalationType: 'full',
+      escalatedItems: order.items.map(item => ({
+        itemId: item._id,
+        productId: item.productId,
+        productName: item.productName,
+        requestedQuantity: item.quantity,
+        availableQuantity: 0, // Will be calculated if needed
+        escalatedQuantity: item.quantity,
+        reason: reason,
+      })),
+      originalVendorId: order.vendorId, // Keep reference to original vendor
+    };
+    
+    // Keep vendorId for reference but mark as escalated
+    // Don't remove vendorId so we can track which vendor escalated
 
     // Add rejection details
-    order.notes = `${order.notes || ''}\n[Vendor Rejection] Reason: ${reason}${notes ? ` | Notes: ${notes}` : ''}`.trim();
+    order.notes = `${order.notes || ''}\n[Vendor Escalation] Reason: ${reason}${notes ? ` | Notes: ${notes}` : ''}`.trim();
 
     // Update status timeline
     order.statusTimeline.push({
       status: 'rejected',
       timestamp: new Date(),
       updatedBy: 'vendor',
-      note: `Order rejected by vendor. Reason: ${reason}`,
+      note: `Order escalated to admin by vendor. Reason: ${reason}`,
     });
 
     await order.save();
@@ -1057,27 +1218,68 @@ exports.acceptOrderPartially = async (req, res, next) => {
         };
       });
 
+    // Get escalation details
+    const escalatedItemsDetails = originalOrder.items
+      .filter(item => rejectedItems.some(ri => ri.itemId && ri.itemId.toString() === item._id.toString()))
+      .map(item => {
+        const rejectedItem = rejectedItems.find(ri => ri.itemId && ri.itemId.toString() === item._id.toString());
+        return {
+          itemId: item._id,
+          productId: item.productId,
+          productName: item.productName,
+          requestedQuantity: item.quantity,
+          availableQuantity: 0,
+          escalatedQuantity: rejectedItem.quantity || item.quantity,
+          reason: rejectedItem.reason || notes || 'Item not available',
+        };
+      });
+
     // Generate new order number for admin order
-    const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const date = new Date();
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+    const todayStart = new Date(date);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(date);
+    todayEnd.setHours(23, 59, 59, 999);
+    const todayCount = await Order.countDocuments({
+      createdAt: { $gte: todayStart, $lte: todayEnd },
+    });
+    const sequence = String(todayCount + 1).padStart(4, '0');
+    const orderNumber = `ORD-${dateStr}-${sequence}`;
 
     const adminOrder = await Order.create({
       orderNumber,
       userId: order.userId,
       sellerId: order.sellerId,
+      seller: order.seller,
       vendorId: null, // Not assigned to any vendor
       assignedTo: 'admin',
       items: adminOrderItems,
+      subtotal: rejectedTotal,
+      deliveryCharge: 0,
       totalAmount: rejectedTotal,
-      status: 'rejected', // Escalated to admin
+      paymentPreference: order.paymentPreference,
+      upfrontAmount: order.paymentPreference === 'full' ? rejectedTotal : Math.round(rejectedTotal * 0.3),
+      remainingAmount: order.paymentPreference === 'full' ? 0 : rejectedTotal - Math.round(rejectedTotal * 0.3),
       paymentStatus: order.paymentStatus,
       paymentMethod: order.paymentMethod,
       parentOrderId: order._id, // Link to original order
       deliveryAddress: order.deliveryAddress,
+      status: 'rejected', // Escalated to admin
+      escalation: {
+        isEscalated: true,
+        escalatedAt: new Date(),
+        escalatedBy: 'vendor',
+        escalationReason: notes || 'Items not available',
+        escalationType: 'partial',
+        escalatedItems: escalatedItemsDetails,
+        originalVendorId: vendor._id,
+      },
       notes: `[Escalated from Order ${order.orderNumber}] Items rejected by vendor.${notes ? ` ${notes}` : ''}`,
       statusTimeline: [{
         status: 'rejected',
         timestamp: new Date(),
-        updatedBy: 'system',
+        updatedBy: 'vendor',
         note: 'Order escalated to admin due to partial rejection by vendor',
       }],
     });
@@ -1097,6 +1299,194 @@ exports.acceptOrderPartially = async (req, res, next) => {
         vendorOrder: order,
         adminOrder,
         message: 'Order partially accepted. Rejected items escalated to admin.',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Escalate order with partial quantities (Scenario 3)
+ * @route   POST /api/vendors/orders/:orderId/escalate-partial
+ * @access  Private (Vendor)
+ */
+exports.escalateOrderPartial = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { orderId } = req.params;
+    const { escalatedItems, reason, notes } = req.body;
+
+    if (!escalatedItems || !Array.isArray(escalatedItems) || escalatedItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Escalated items are required',
+      });
+    }
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Escalation reason is required',
+      });
+    }
+
+    const order = await Order.findOne({
+      _id: orderId,
+      vendorId: vendor._id,
+    }).populate('items.productId');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found or not assigned to you',
+      });
+    }
+
+    if (order.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `Order cannot be escalated. Current status: ${order.status}`,
+      });
+    }
+
+    const ProductAssignment = require('../models/ProductAssignment');
+    const escalatedItemsDetails = [];
+    const acceptedItems = [];
+    let escalatedTotal = 0;
+    let acceptedTotal = 0;
+
+    // Process each item in the order
+    for (const orderItem of order.items) {
+      const escalatedItem = escalatedItems.find(
+        ei => ei.itemId && ei.itemId.toString() === orderItem._id.toString()
+      );
+
+      if (escalatedItem) {
+        // This item (or part of it) is being escalated
+        const assignment = await ProductAssignment.findOne({
+          productId: orderItem.productId,
+          vendorId: vendor._id,
+        });
+        const availableStock = assignment?.vendorStock || 0;
+        const requestedQty = orderItem.quantity;
+        const escalatedQty = escalatedItem.escalatedQuantity || requestedQty;
+        const acceptedQty = requestedQty - escalatedQty;
+
+        if (escalatedQty > 0) {
+          escalatedItemsDetails.push({
+            itemId: orderItem._id,
+            productId: orderItem.productId,
+            productName: orderItem.productName,
+            requestedQuantity: requestedQty,
+            availableQuantity: availableStock,
+            escalatedQuantity: escalatedQty,
+            reason: escalatedItem.reason || reason,
+          });
+          escalatedTotal += orderItem.unitPrice * escalatedQty;
+        }
+
+        if (acceptedQty > 0) {
+          acceptedItems.push({
+            ...orderItem.toObject(),
+            quantity: acceptedQty,
+            totalPrice: orderItem.unitPrice * acceptedQty,
+          });
+          acceptedTotal += orderItem.unitPrice * acceptedQty;
+        }
+      } else {
+        // Item is fully accepted
+        acceptedItems.push(orderItem.toObject());
+        acceptedTotal += orderItem.totalPrice;
+      }
+    }
+
+    // Update order with accepted items
+    order.items = acceptedItems;
+    order.subtotal = acceptedTotal;
+    order.totalAmount = acceptedTotal + (order.deliveryCharge || 0);
+    order.status = 'partially_accepted';
+    order.assignedTo = 'vendor';
+
+    // Create escalated order for admin
+    const escalatedOrderItems = escalatedItemsDetails.map(ei => ({
+      productId: ei.productId,
+      productName: ei.productName,
+      quantity: ei.escalatedQuantity,
+      unitPrice: order.items.find(item => item.productId.toString() === ei.productId.toString())?.unitPrice || 0,
+      totalPrice: (order.items.find(item => item.productId.toString() === ei.productId.toString())?.unitPrice || 0) * ei.escalatedQuantity,
+      status: 'pending',
+    }));
+
+    const date = new Date();
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+    const todayStart = new Date(date);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(date);
+    todayEnd.setHours(23, 59, 59, 999);
+    const todayCount = await Order.countDocuments({
+      createdAt: { $gte: todayStart, $lte: todayEnd },
+    });
+    const sequence = String(todayCount + 1).padStart(4, '0');
+    const escalatedOrderNumber = `ORD-${dateStr}-${sequence}`;
+
+    const escalatedOrder = await Order.create({
+      orderNumber: escalatedOrderNumber,
+      userId: order.userId,
+      sellerId: order.sellerId,
+      seller: order.seller,
+      vendorId: null,
+      assignedTo: 'admin',
+      items: escalatedOrderItems,
+      subtotal: escalatedTotal,
+      deliveryCharge: 0, // Admin handles delivery
+      totalAmount: escalatedTotal,
+      paymentPreference: order.paymentPreference,
+      upfrontAmount: order.paymentPreference === 'full' ? escalatedTotal : Math.round(escalatedTotal * 0.3),
+      remainingAmount: order.paymentPreference === 'full' ? 0 : escalatedTotal - Math.round(escalatedTotal * 0.3),
+      paymentStatus: order.paymentStatus,
+      deliveryAddress: order.deliveryAddress,
+      status: 'rejected',
+      parentOrderId: order._id,
+      escalation: {
+        isEscalated: true,
+        escalatedAt: new Date(),
+        escalatedBy: 'vendor',
+        escalationReason: reason,
+        escalationType: 'quantity',
+        escalatedItems: escalatedItemsDetails,
+        originalVendorId: vendor._id,
+      },
+      notes: `[Escalated from Order ${order.orderNumber}] Partial quantity escalated by vendor. Reason: ${reason}${notes ? ` | Notes: ${notes}` : ''}`,
+      statusTimeline: [{
+        status: 'rejected',
+        timestamp: new Date(),
+        updatedBy: 'vendor',
+        note: `Partial quantity escalated to admin. Reason: ${reason}`,
+      }],
+    });
+
+    // Link orders
+    order.childOrderIds = order.childOrderIds || [];
+    order.childOrderIds.push(escalatedOrder._id);
+    order.notes = `${order.notes || ''}\n[Partial Escalation] Some quantities escalated to admin. Reason: ${reason}`.trim();
+    order.statusTimeline.push({
+      status: 'partially_accepted',
+      timestamp: new Date(),
+      updatedBy: 'vendor',
+      note: `Order partially accepted. Some quantities escalated to admin.`,
+    });
+
+    await order.save();
+
+    console.log(`⚠️ Order ${order.orderNumber} partially escalated by vendor ${vendor.name}. Escalated order: ${escalatedOrder.orderNumber}`);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        vendorOrder: order,
+        escalatedOrder,
+        message: 'Order partially accepted. Escalated quantities sent to admin.',
       },
     });
   } catch (error) {
@@ -1307,6 +1697,7 @@ exports.getOrderStats = async (req, res, next) => {
 exports.getProducts = async (req, res, next) => {
   try {
     const vendor = req.vendor;
+    await processPendingDeliveries(vendor._id);
     const {
       page = 1,
       limit = 20,
@@ -1383,12 +1774,46 @@ exports.getProducts = async (req, res, next) => {
 
     const assignedProductIds = new Set(assignments.map(a => a.productId.toString()));
 
+    // Check for incoming deliveries (approved purchases within 24 hours)
+    // Only show if delivery hasn't been completed yet
+    const now = new Date();
+    const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const incomingPurchases = await CreditPurchase.find({
+      vendorId: vendor._id,
+      status: 'approved',
+      deliveryStatus: { $in: ['scheduled', 'in_transit'] },
+      expectedDeliveryAt: {
+        $gte: now, // Only future deliveries
+        $lte: twentyFourHoursFromNow, // Within 24 hours
+      },
+    })
+      .select('items expectedDeliveryAt deliveryStatus')
+      .lean();
+
+    // Create a map of productId -> incoming delivery info
+    const incomingDeliveryMap = {};
+    incomingPurchases.forEach((purchase) => {
+      purchase.items.forEach((item) => {
+        const productIdStr = item.productId?.toString();
+        if (productIdStr) {
+          if (!incomingDeliveryMap[productIdStr]) {
+            incomingDeliveryMap[productIdStr] = {
+              isArrivingWithin24Hours: true,
+              expectedDeliveryAt: purchase.expectedDeliveryAt,
+              deliveryStatus: purchase.deliveryStatus,
+            };
+          }
+        }
+      });
+    });
+
     // Enrich products with assignment status and vendor-specific info
     const enrichedProducts = products.map(product => {
       const isAssigned = assignedProductIds.has(product._id.toString());
       const assignment = assignments.find(a => a.productId.toString() === product._id.toString());
       const adminStock = product.displayStock ?? product.stock ?? 0;
       const vendorStock = assignment?.stock ?? 0;
+      const incomingDelivery = incomingDeliveryMap[product._id.toString()];
       
       return {
         ...product,
@@ -1404,6 +1829,9 @@ exports.getProducts = async (req, res, next) => {
         pricePerUnit: product.priceToVendor,
         unit: product.weight?.unit || 'kg',
         primaryImage: product.images?.find(img => img.isPrimary)?.url || product.images?.[0]?.url || null,
+        // Incoming delivery info
+        isArrivingWithin24Hours: incomingDelivery?.isArrivingWithin24Hours || false,
+        expectedDeliveryAt: incomingDelivery?.expectedDeliveryAt || null,
       };
     });
 
@@ -1527,6 +1955,7 @@ exports.getProductDetails = async (req, res, next) => {
 exports.getInventory = async (req, res, next) => {
   try {
     const vendor = req.vendor;
+    await processPendingDeliveries(vendor._id);
     const {
       page = 1,
       limit = 20,
@@ -1795,15 +2224,28 @@ exports.getCreditInfo = async (req, res, next) => {
   try {
     const vendor = req.vendor;
 
-    const creditLimit = vendor.creditPolicy.limit;
-    const creditUsed = vendor.creditUsed;
-    const creditRemaining = creditLimit - creditUsed;
-    const creditUtilization = creditLimit > 0
-      ? (creditUsed / creditLimit) * 100
-      : 0;
+    const creditUsed = vendor.creditUsed || 0;
+
+    // Check for unpaid credits
+    const now = new Date();
+    const repaymentDays = vendor.creditPolicy.repaymentDays || 30;
+    const unpaidPurchases = await CreditPurchase.find({
+      vendorId: vendor._id,
+      status: 'approved',
+      $or: [
+        { deliveryStatus: { $in: ['pending', 'scheduled', 'in_transit'] } },
+        {
+          deliveryStatus: 'delivered',
+          deliveredAt: {
+            $gte: new Date(now.getTime() - repaymentDays * 24 * 60 * 60 * 1000),
+          },
+        },
+      ],
+    }).select('totalAmount deliveredAt deliveryStatus createdAt');
+
+    const totalUnpaidAmount = unpaidPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
 
     // Check if credit is overdue
-    const now = new Date();
     const isOverdue = vendor.creditPolicy.dueDate && now > vendor.creditPolicy.dueDate;
     const daysOverdue = isOverdue && vendor.creditPolicy.dueDate
       ? Math.floor((now - vendor.creditPolicy.dueDate) / (1000 * 60 * 60 * 24))
@@ -1811,8 +2253,9 @@ exports.getCreditInfo = async (req, res, next) => {
 
     // Calculate penalty if overdue
     let penalty = 0;
-    if (isOverdue && vendor.creditPolicy.penaltyRate > 0) {
-      const dailyPenaltyRate = vendor.creditPolicy.penaltyRate / 100;
+    const penaltyRate = vendor.creditPolicy.penaltyRate || 2;
+    if (isOverdue && penaltyRate > 0) {
+      const dailyPenaltyRate = penaltyRate / 100;
       penalty = creditUsed * dailyPenaltyRate * daysOverdue;
     }
 
@@ -1825,13 +2268,12 @@ exports.getCreditInfo = async (req, res, next) => {
       success: true,
       data: {
         credit: {
-          limit: creditLimit,
           used: creditUsed,
-          remaining: creditRemaining,
-          utilization: Math.round(creditUtilization * 100) / 100,
+          totalUnpaid: totalUnpaidAmount,
+          unpaidCount: unpaidPurchases.length,
           dueDate: vendor.creditPolicy.dueDate,
-          repaymentDays: vendor.creditPolicy.repaymentDays,
-          penaltyRate: vendor.creditPolicy.penaltyRate,
+          repaymentDays: vendor.creditPolicy.repaymentDays || 30,
+          penaltyRate: penaltyRate,
         },
         status: {
           isOverdue,
@@ -1839,6 +2281,7 @@ exports.getCreditInfo = async (req, res, next) => {
           daysUntilDue,
           penalty: Math.round(penalty * 100) / 100,
           status: isOverdue ? 'overdue' : daysUntilDue !== null && daysUntilDue <= 7 ? 'dueSoon' : 'active',
+          hasUnpaidCredits: unpaidPurchases.length > 0,
         },
       },
     });
@@ -1855,56 +2298,172 @@ exports.getCreditInfo = async (req, res, next) => {
 exports.requestCreditPurchase = async (req, res, next) => {
   try {
     const vendor = req.vendor;
-    const { items, notes } = req.body;
+    const {
+      items,
+      notes,
+      reason,
+      bankDetails = {},
+      confirmationText,
+    } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Items array is required',
+        message: 'At least one product must be included in the request.',
       });
     }
 
-    // Calculate total amount
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Provide a brief reason (minimum 10 characters) for the stock request.',
+      });
+    }
+
+    if (!confirmationText || confirmationText.trim().toLowerCase() !== 'confirm') {
+      return res.status(400).json({
+        success: false,
+        message: 'Type "confirm" to acknowledge the credit policy and submit the request.',
+      });
+    }
+
+    const requiredBankFields = ['accountName', 'accountNumber', 'bankName', 'ifsc'];
+    const missingField = requiredBankFields.find((field) => !bankDetails[field] || !bankDetails[field].trim());
+    if (missingField) {
+      return res.status(400).json({
+        success: false,
+        message: 'Complete bank details are required (account holder, number, bank name, IFSC).',
+      });
+    }
+
+    const sanitizedBankDetails = {
+      accountName: bankDetails.accountName.trim(),
+      accountNumber: bankDetails.accountNumber.toString().trim(),
+      bankName: bankDetails.bankName.trim(),
+      ifsc: bankDetails.ifsc.trim().toUpperCase(),
+      branch: bankDetails.bankBranch?.trim() || bankDetails.branch?.trim() || '',
+    };
+
+    if (sanitizedBankDetails.accountNumber.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Account number looks incomplete.',
+      });
+    }
+
+    if (sanitizedBankDetails.ifsc.length < 4) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid IFSC code.',
+      });
+    }
+
+    const productIds = [...new Set(items.map((item) => item.productId))];
+    const products = await Product.find({
+      _id: { $in: productIds },
+      isActive: true,
+    })
+      .select('name priceToVendor displayStock stock weight')
+      .lean();
+
+    const productMap = products.reduce((acc, product) => {
+      acc[product._id.toString()] = product;
+      return acc;
+    }, {});
+
     let totalAmount = 0;
-    const purchaseItems = items.map(item => {
-      const itemTotal = (item.quantity || 0) * (item.pricePerUnit || 0);
-      totalAmount += itemTotal;
+    const purchaseItems = items.map((item) => {
+      const productId = item.productId?.toString();
+      const product = productMap[productId];
+      if (!product) {
+        throw new Error('One of the selected products is no longer available.');
+      }
+
+      const quantity = Number(item.quantity) || 0;
+      if (quantity <= 0) {
+        throw new Error('Each item must include a valid quantity.');
+      }
+
+      const adminStock = product.displayStock ?? product.stock ?? 0;
+      if (quantity > adminStock) {
+        throw new Error(`Requested quantity for ${product.name} exceeds admin stock.`);
+      }
+
+      const unitPrice = Number(product.priceToVendor) || 0;
+      const totalPrice = quantity * unitPrice;
+      totalAmount += totalPrice;
+
       return {
-        productId: item.productId,
-        productName: item.productName || '',
-        quantity: item.quantity || 0,
-        pricePerUnit: item.pricePerUnit || 0,
-        totalPrice: itemTotal,
+        productId: productId,
+        productName: product.name,
+        quantity,
+        unitPrice,
+        totalPrice,
+        unit: product.weight?.unit || 'kg',
       };
     });
 
-    // Validate minimum purchase value
     if (totalAmount < MIN_VENDOR_PURCHASE) {
       return res.status(400).json({
         success: false,
-        message: `Minimum purchase value is ₹${MIN_VENDOR_PURCHASE.toLocaleString('en-IN')}. Your total: ₹${totalAmount.toLocaleString('en-IN')}`,
+        message: `Minimum order value is ₹${MIN_VENDOR_PURCHASE.toLocaleString('en-IN')}.`,
       });
     }
 
-    // Check credit limit
-    const creditLimit = vendor.creditPolicy.limit;
-    const creditUsed = vendor.creditUsed;
-    const availableCredit = creditLimit - creditUsed;
-
-    if (totalAmount > availableCredit) {
+    if (totalAmount > MAX_VENDOR_PURCHASE) {
       return res.status(400).json({
         success: false,
-        message: `Insufficient credit limit. Available: ₹${availableCredit.toLocaleString('en-IN')}, Requested: ₹${totalAmount.toLocaleString('en-IN')}`,
+        message: `Maximum order value is ₹${MAX_VENDOR_PURCHASE.toLocaleString('en-IN')}. Your request: ₹${totalAmount.toLocaleString('en-IN')}.`,
       });
     }
 
-    // Create credit purchase request
+    // Check for unpaid credits
+    const now = new Date();
+    const repaymentDays = vendor.creditPolicy.repaymentDays || 30;
+    const unpaidPurchases = await CreditPurchase.find({
+      vendorId: vendor._id,
+      status: 'approved',
+      $or: [
+        { deliveryStatus: { $in: ['pending', 'scheduled', 'in_transit'] } },
+        {
+          deliveryStatus: 'delivered',
+          deliveredAt: {
+            $gte: new Date(now.getTime() - repaymentDays * 24 * 60 * 60 * 1000),
+          },
+        },
+      ],
+    }).select('totalAmount deliveredAt deliveryStatus createdAt');
+
+    const hasUnpaidCredits = unpaidPurchases.length > 0;
+    const totalUnpaidAmount = unpaidPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+
+    if (hasUnpaidCredits) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have unpaid credits from previous purchase requests. Please clear your outstanding payments before making a new request. Failure to repay may result in account suspension or permanent ban.',
+        unpaidCredits: {
+          count: unpaidPurchases.length,
+          totalAmount: totalUnpaidAmount,
+          purchases: unpaidPurchases.map((p) => ({
+            amount: p.totalAmount,
+            deliveredAt: p.deliveredAt,
+            deliveryStatus: p.deliveryStatus,
+            createdAt: p.createdAt,
+          })),
+        },
+      });
+    }
+
     const purchase = await CreditPurchase.create({
       vendorId: vendor._id,
       items: purchaseItems,
       totalAmount,
       status: 'pending',
-      notes,
+      notes: notes?.trim() || undefined,
+      reason: reason.trim(),
+      bankDetails: sanitizedBankDetails,
+      confirmationText: confirmationText.trim(),
+      deliveryStatus: 'pending',
     });
 
     console.log(`✅ Credit purchase requested: ₹${totalAmount} by vendor ${vendor.name} - ${vendor._id}`);
@@ -1917,6 +2476,12 @@ exports.requestCreditPurchase = async (req, res, next) => {
       },
     });
   } catch (error) {
+    if (error.message && error.message.includes('exceeds admin stock')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
     next(error);
   }
 };

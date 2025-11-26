@@ -16,6 +16,7 @@ const WithdrawalRequest = require('../models/WithdrawalRequest');
 const User = require('../models/User');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
+const Commission = require('../models/Commission');
 const Settings = require('../models/Settings');
 const Notification = require('../models/Notification');
 const { VENDOR_COVERAGE_RADIUS_KM, MIN_VENDOR_PURCHASE, DELIVERY_TIMELINE_HOURS } = require('../utils/constants');
@@ -1281,11 +1282,28 @@ exports.approveVendor = async (req, res, next) => {
       });
     }
 
-    // Approve vendor
+    // Approve vendor and set default credit policy
     vendor.status = 'approved';
     vendor.isActive = true;
     vendor.approvedAt = new Date();
     vendor.approvedBy = req.admin._id;
+    
+    // Set default credit policy (no limit, 30 days repayment, 2% penalty)
+    if (!vendor.creditPolicy) {
+      vendor.creditPolicy = {
+        repaymentDays: 30,
+        penaltyRate: 2,
+      };
+    } else {
+      // Ensure defaults if missing
+      if (!vendor.creditPolicy.repaymentDays) {
+        vendor.creditPolicy.repaymentDays = 30;
+      }
+      if (vendor.creditPolicy.penaltyRate === undefined || vendor.creditPolicy.penaltyRate === null) {
+        vendor.creditPolicy.penaltyRate = 2;
+      }
+    }
+    
     await vendor.save();
 
     // TODO: Send notification to vendor (SMS/Email)
@@ -1357,7 +1375,7 @@ exports.rejectVendor = async (req, res, next) => {
 exports.updateVendorCreditPolicy = async (req, res, next) => {
   try {
     const { vendorId } = req.params;
-    const { limit, repaymentDays, penaltyRate } = req.body;
+    const { repaymentDays, penaltyRate } = req.body;
 
     // Validate vendor ID
     if (!vendorId || !require('mongoose').Types.ObjectId.isValid(vendorId)) {
@@ -1384,13 +1402,6 @@ exports.updateVendorCreditPolicy = async (req, res, next) => {
     }
 
     // Validate input values
-    if (limit !== undefined && (isNaN(limit) || limit < 0)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Credit limit must be a valid number greater than or equal to 0',
-      });
-    }
-
     if (repaymentDays !== undefined && (isNaN(repaymentDays) || repaymentDays <= 0)) {
       return res.status(400).json({
         success: false,
@@ -1408,17 +1419,12 @@ exports.updateVendorCreditPolicy = async (req, res, next) => {
     // Ensure creditPolicy object exists
     if (!vendor.creditPolicy) {
       vendor.creditPolicy = {
-        limit: 0,
         repaymentDays: 30,
-        penaltyRate: 0,
+        penaltyRate: 2,
       };
     }
 
-    // Update credit policy
-    if (limit !== undefined) {
-      vendor.creditPolicy.limit = limit;
-      vendor.creditLimit = limit; // Also update creditLimit field
-    }
+    // Update credit policy (no credit limit)
     if (repaymentDays !== undefined) {
       vendor.creditPolicy.repaymentDays = repaymentDays;
     }
@@ -1615,19 +1621,55 @@ exports.approveVendorPurchase = async (req, res, next) => {
       });
     }
 
-    // Check if vendor has sufficient credit limit
-    const newCreditUsed = vendor.creditUsed + purchase.totalAmount;
-    if (newCreditUsed > vendor.creditPolicy.limit) {
-      return res.status(400).json({
-        success: false,
-        message: `Insufficient credit limit. Current: ₹${vendor.creditUsed}/${vendor.creditPolicy.limit}, Required: ₹${purchase.totalAmount}`,
-      });
+    // Update vendor credit used (no limit check)
+    const newCreditUsed = (vendor.creditUsed || 0) + purchase.totalAmount;
+
+    // Validate and reserve admin stock
+    for (const item of purchase.items) {
+      const product = await Product.findById(item.productId);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'One of the requested products no longer exists.',
+        });
+      }
+
+      const adminStock = product.displayStock ?? product.stock ?? 0;
+      if (item.quantity > adminStock) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient admin stock for ${product.name}. Available: ${adminStock}, Requested: ${item.quantity}`,
+        });
+      }
+
+      product.displayStock = Math.max(0, adminStock - item.quantity);
+      product.actualStock = Math.max(0, (product.actualStock ?? adminStock) - item.quantity);
+      await product.save();
+
+      await ProductAssignment.findOneAndUpdate(
+        { productId: item.productId, vendorId: vendor._id },
+        {
+          $setOnInsert: {
+            assignedBy: req.admin._id,
+            assignedAt: new Date(),
+            stock: 0,
+            isActive: true,
+            notes: 'Auto-assigned during purchase approval',
+          },
+        },
+        { upsert: true, new: true }
+      );
     }
+
+    const expectedDeliveryAt = new Date(Date.now() + (DELIVERY_TIMELINE_HOURS || 24) * 60 * 60 * 1000);
 
     // Approve purchase
     purchase.status = 'approved';
     purchase.reviewedBy = req.admin._id;
     purchase.reviewedAt = new Date();
+    purchase.deliveryStatus = 'scheduled';
+    purchase.expectedDeliveryAt = expectedDeliveryAt;
+    purchase.deliveryNotes = `Stock scheduled for delivery within ${DELIVERY_TIMELINE_HOURS || 24} hours.`;
     await purchase.save();
 
     // Update vendor credit
@@ -1652,7 +1694,6 @@ exports.approveVendorPurchase = async (req, res, next) => {
           id: vendor._id,
           name: vendor.name,
           creditUsed: vendor.creditUsed,
-          creditLimit: vendor.creditPolicy.limit,
         },
         message: 'Purchase request approved successfully',
       },
@@ -2961,9 +3002,9 @@ exports.getOrders = async (req, res, next) => {
       .sort(sort)
       .skip(skip)
       .limit(limitNum)
-      .populate('userId', 'name phone email')
-      .populate('vendorId', 'name phone')
-      .populate('seller', 'sellerId name')
+      .populate('userId', 'name phone email location')
+      .populate('vendorId', 'name phone location')
+      .populate('seller', 'sellerId name phone')
       .select('-__v')
       .lean();
 
@@ -3035,6 +3076,115 @@ exports.getOrderDetails = async (req, res, next) => {
           totalPaid,
           totalPending,
           remaining: order.totalAmount - totalPaid,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get all commissions with order and user details
+ * @route   GET /api/admin/commissions
+ * @access  Private (Admin)
+ */
+exports.getCommissions = async (req, res, next) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      sellerId,
+      userId,
+      orderId,
+      month,
+      year,
+      status,
+      dateFrom,
+      dateTo,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = req.query;
+
+    // Build query
+    const query = {};
+
+    if (sellerId) {
+      query.sellerId = sellerId;
+    }
+
+    if (userId) {
+      query.userId = userId;
+    }
+
+    if (orderId) {
+      query.orderId = orderId;
+    }
+
+    if (month) {
+      query.month = parseInt(month);
+    }
+
+    if (year) {
+      query.year = parseInt(year);
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) {
+        query.createdAt.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = toDate;
+      }
+    }
+
+    // Search by seller ID code or order number
+    if (search) {
+      query.$or = [
+        { sellerIdCode: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sort
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Execute query with population
+    const commissions = await Commission.find(query)
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .populate('sellerId', 'sellerId name phone email')
+      .populate('userId', 'name phone email location')
+      .populate('orderId', 'orderNumber totalAmount status paymentStatus createdAt deliveryAddress vendorId assignedTo')
+      .select('-__v')
+      .lean();
+
+    const total = await Commission.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        commissions,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
+          totalItems: total,
+          itemsPerPage: limitNum,
         },
       },
     });
@@ -3434,10 +3584,11 @@ exports.getEscalatedOrders = async (req, res, next) => {
 
     // Transform orders for frontend
     const transformedOrders = orders.map(order => {
-      const vendor = order.vendorId;
+      const vendor = order.vendorId || order.escalation?.originalVendorId;
       const user = order.userId;
       
-      // Find escalation timestamp from status timeline
+      // Get escalation details
+      const escalation = order.escalation || {};
       const escalationEntry = order.statusTimeline?.find(
         entry => entry.status === 'rejected' && entry.updatedBy === 'vendor'
       );
@@ -3447,9 +3598,18 @@ exports.getEscalatedOrders = async (req, res, next) => {
         orderNumber: order.orderNumber,
         vendor: vendor?.name || 'N/A',
         vendorId: vendor?._id?.toString() || null,
+        vendorPhone: vendor?.phone || null,
+        vendorLocation: vendor?.location ? `${vendor.location.city || ''}, ${vendor.location.state || ''}`.trim() : null,
         value: order.totalAmount || 0,
         orderValue: order.totalAmount || 0,
-        escalatedAt: escalationEntry?.timestamp || order.createdAt,
+        escalatedAt: escalation.escalatedAt || escalationEntry?.timestamp || order.createdAt,
+        escalatedBy: escalation.escalatedBy || 'vendor',
+        escalationReason: escalation.escalationReason || 'Not provided',
+        escalationType: escalation.escalationType || 'full',
+        escalatedItems: escalation.escalatedItems || [],
+        isReverted: !!escalation.revertedAt,
+        revertedAt: escalation.revertedAt || null,
+        revertReason: escalation.revertReason || null,
         status: order.status || 'rejected',
         items: order.items?.map(item => ({
           id: item.productId?._id?.toString() || item._id?.toString(),
@@ -3460,6 +3620,8 @@ exports.getEscalatedOrders = async (req, res, next) => {
         })) || [],
         userId: user?._id?.toString(),
         userName: user?.name,
+        userPhone: user?.phone || null,
+        userLocation: user?.location ? `${user.location.city || ''}, ${user.location.state || ''}`.trim() : null,
         deliveryAddress: order.deliveryAddress,
         notes: order.notes,
       };
@@ -3570,6 +3732,110 @@ exports.fulfillOrderFromWarehouse = async (req, res, next) => {
           trackingNumber: order.trackingNumber,
         },
         message: 'Order fulfilled from warehouse successfully',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Revert escalation back to vendor
+ * @route   POST /api/admin/orders/:orderId/revert-escalation
+ * @access  Private (Admin)
+ */
+exports.revertEscalation = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Revert reason is required',
+      });
+    }
+
+    const order = await Order.findById(orderId)
+      .populate('userId', 'name phone email location')
+      .populate('escalation.originalVendorId', 'name phone location');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    // Check if order is escalated
+    if (!order.escalation?.isEscalated || order.assignedTo !== 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Order is not escalated to admin',
+      });
+    }
+
+    // Check if order can be reverted (not delivered or cancelled)
+    if (order.status === 'delivered' || order.status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot revert order with status: ${order.status}`,
+      });
+    }
+
+    // Get original vendor
+    const originalVendor = order.escalation.originalVendorId;
+    if (!originalVendor) {
+      return res.status(400).json({
+        success: false,
+        message: 'Original vendor not found. Cannot revert escalation.',
+      });
+    }
+
+    // Revert escalation - assign back to vendor
+    order.vendorId = originalVendor._id;
+    order.assignedTo = 'vendor';
+    order.status = 'pending'; // Reset to pending for vendor to handle
+
+    // Update escalation tracking
+    order.escalation.revertedAt = new Date();
+    order.escalation.revertedBy = req.admin._id;
+    order.escalation.revertReason = reason;
+
+    // Add notes
+    order.notes = `${order.notes || ''}\n[Admin Revert] Order reverted back to vendor ${originalVendor.name}. Reason: ${reason}`.trim();
+
+    // Update status timeline
+    order.statusTimeline.push({
+      status: 'pending',
+      timestamp: new Date(),
+      updatedBy: 'admin',
+      note: `Escalation reverted back to vendor ${originalVendor.name}. Reason: ${reason}`,
+    });
+
+    await order.save();
+
+    // TODO: Send notification to vendor
+
+    console.log(`✅ Escalation reverted for order ${order.orderNumber} back to vendor ${originalVendor.name}`);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        order: {
+          id: order._id,
+          orderNumber: order.orderNumber,
+          status: order.status,
+          assignedTo: order.assignedTo,
+          vendorId: order.vendorId,
+          vendor: {
+            id: originalVendor._id,
+            name: originalVendor.name,
+            phone: originalVendor.phone,
+            location: originalVendor.location,
+          },
+        },
+        message: 'Escalation reverted successfully. Order assigned back to vendor.',
       },
     });
   } catch (error) {

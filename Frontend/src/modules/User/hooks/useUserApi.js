@@ -358,6 +358,21 @@ export function useUserApi() {
     [handleApiCall],
   )
 
+  // Profile APIs
+  const updateUserProfile = useCallback(
+    async (profileData) => {
+      return handleApiCall(
+        () => userApi.updateUserProfile(profileData),
+        (data) => ({
+          type: 'AUTH_LOGIN',
+          payload: data.user || data,
+        }),
+        'Failed to update profile',
+      )
+    },
+    [handleApiCall],
+  )
+
   // Support APIs
   const createSupportTicket = useCallback(
     async (ticketData) => {
@@ -409,6 +424,7 @@ export function useUserApi() {
     deleteAddress,
     addToFavourites,
     removeFromFavourites,
+    updateUserProfile,
     createSupportTicket,
     initiateSupportCall,
   }

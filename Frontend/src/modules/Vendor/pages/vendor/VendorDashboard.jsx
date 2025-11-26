@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVendorDispatch, useVendorState } from '../../context/VendorContext'
 import { useVendorApi } from '../../hooks/useVendorApi'
 import { MobileShell } from '../../components/MobileShell'
@@ -15,11 +15,14 @@ import {
   SparkIcon,
   TruckIcon,
   WalletIcon,
+  CloseIcon,
 } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import { useButtonAction } from '../../hooks/useButtonAction'
 import { ButtonActionPanel } from '../../components/ButtonActionPanel'
 import { useToast, ToastContainer } from '../../components/ToastNotification'
+import { OrderEscalationModal } from '../../components/OrderEscalationModal'
+import { OrderPartialEscalationModal } from '../../components/OrderPartialEscalationModal'
 
 const NAV_ITEMS = [
   {
@@ -57,11 +60,17 @@ const NAV_ITEMS = [
 export function VendorDashboard({ onLogout }) {
   const { profile, dashboard } = useVendorState()
   const dispatch = useVendorDispatch()
-  const { acceptOrder, acceptOrderPartially, rejectOrder, updateInventoryStock, requestCreditPurchase, updateOrderStatus, fetchProfile, fetchDashboardData } = useVendorApi()
+  const { acceptOrder, acceptOrderPartially, rejectOrder, updateInventoryStock, requestCreditPurchase, updateOrderStatus, fetchProfile, fetchDashboardData, getOrders } = useVendorApi()
   const [activeTab, setActiveTab] = useState('overview')
   const welcomeName = (profile?.name || 'Partner').split(' ')[0]
   const { isOpen, isMounted, currentAction, openPanel, closePanel } = useButtonAction()
   const { toasts, dismissToast, success, error, info, warning } = useToast()
+  
+  // Escalation modal states
+  const [escalationModalOpen, setEscalationModalOpen] = useState(false)
+  const [partialEscalationModalOpen, setPartialEscalationModalOpen] = useState(false)
+  const [selectedOrderForEscalation, setSelectedOrderForEscalation] = useState(null)
+  const [escalationType, setEscalationType] = useState('items') // 'items' or 'quantities'
   
   // Fetch vendor profile and dashboard data on mount (only if authenticated or has token)
   useEffect(() => {
@@ -362,7 +371,20 @@ export function VendorDashboard({ onLogout }) {
         <section className="space-y-6">
           {activeTab === 'overview' && <OverviewView onNavigate={navigateTo} welcomeName={welcomeName} openPanel={openPanel} />}
           {activeTab === 'inventory' && <InventoryView onNavigate={navigateTo} openPanel={openPanel} />}
-          {activeTab === 'orders' && <OrdersView openPanel={openPanel} />}
+          {activeTab === 'orders' && (
+            <OrdersView 
+              openPanel={openPanel}
+              onOpenEscalationModal={(order) => {
+                setSelectedOrderForEscalation(order)
+                setEscalationModalOpen(true)
+              }}
+              onOpenPartialEscalationModal={(order, type) => {
+                setSelectedOrderForEscalation(order)
+                setEscalationType(type)
+                setPartialEscalationModalOpen(true)
+              }}
+            />
+          )}
           {activeTab === 'credit' && <CreditView openPanel={openPanel} />}
           {activeTab === 'reports' && <ReportsView />}
         </section>
@@ -532,6 +554,46 @@ export function VendorDashboard({ onLogout }) {
         />
       )}
 
+      {/* Escalation Modals */}
+      <OrderEscalationModal
+        isOpen={escalationModalOpen}
+        onClose={() => {
+          setEscalationModalOpen(false)
+          setSelectedOrderForEscalation(null)
+        }}
+        order={selectedOrderForEscalation}
+        onSuccess={() => {
+          // Refresh orders
+          if (activeTab === 'orders') {
+            getOrders({ status: selectedFilter === 'all' ? undefined : selectedFilter }).then((result) => {
+              if (result.data) {
+                dispatch({ type: 'SET_ORDERS_DATA', payload: result.data })
+              }
+            })
+          }
+        }}
+      />
+      
+      <OrderPartialEscalationModal
+        isOpen={partialEscalationModalOpen}
+        onClose={() => {
+          setPartialEscalationModalOpen(false)
+          setSelectedOrderForEscalation(null)
+        }}
+        order={selectedOrderForEscalation}
+        escalationType={escalationType}
+        onSuccess={() => {
+          // Refresh orders
+          if (activeTab === 'orders') {
+            getOrders({ status: selectedFilter === 'all' ? undefined : selectedFilter }).then((result) => {
+              if (result.data) {
+                dispatch({ type: 'SET_ORDERS_DATA', payload: result.data })
+              }
+            })
+          }
+        }}
+      />
+      
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </>
   )
@@ -894,8 +956,9 @@ function InventoryView({ openPanel }) {
   const { dashboard, profile } = useVendorState()
   const dispatch = useVendorDispatch()
   const { success, error: showError } = useToast()
-  const { getProducts, getProductDetails, requestCreditPurchase } = useVendorApi()
+  const { getProducts, getProductDetails, requestCreditPurchase, getCreditPurchases } = useVendorApi()
   const MIN_PURCHASE_VALUE = 50000
+  const MAX_PURCHASE_VALUE = 100000
   const [productsData, setProductsData] = useState(null)
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [orderQuantity, setOrderQuantity] = useState('')
@@ -903,6 +966,24 @@ function InventoryView({ openPanel }) {
   const [orderNotes, setOrderNotes] = useState('')
   const [orderError, setOrderError] = useState('')
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false)
+  const [showOrderRequestScreen, setShowOrderRequestScreen] = useState(false)
+  const [selectedProducts, setSelectedProducts] = useState([]) // Array of {productId, quantity}
+  const [orderRequestForm, setOrderRequestForm] = useState({
+    reason: '',
+    notes: '',
+    bankAccountName: '',
+    bankAccountNumber: '',
+    bankName: '',
+    bankIfsc: '',
+    bankBranch: '',
+    confirmationText: '',
+    creditPolicyAccepted: false,
+  })
+  const [orderRequestError, setOrderRequestError] = useState('')
+  const [isOrderRequestSubmitting, setIsOrderRequestSubmitting] = useState(false)
+  const [purchaseRequests, setPurchaseRequests] = useState([])
+  const [isPurchaseHistoryLoading, setIsPurchaseHistoryLoading] = useState(false)
+  const [showCreditPolicyModal, setShowCreditPolicyModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const orderFormRef = useRef(null)
 
@@ -934,7 +1015,80 @@ function InventoryView({ openPanel }) {
     setOrderError('')
   }, [selectedProduct?.id])
 
+  const resetOrderRequestForm = () => {
+    setSelectedProducts([])
+    setOrderRequestForm({
+      reason: '',
+      notes: '',
+      bankAccountName: '',
+      bankAccountNumber: '',
+      bankName: '',
+      bankIfsc: '',
+      bankBranch: '',
+      confirmationText: '',
+      creditPolicyAccepted: false,
+    })
+    setOrderRequestError('')
+    setIsOrderRequestSubmitting(false)
+  }
+
+  const openOrderRequestScreen = () => {
+    setSelectedProduct(null)
+    resetOrderRequestForm()
+    setShowOrderRequestScreen(true)
+  }
+
+  const closeOrderRequestScreen = () => {
+    setShowOrderRequestScreen(false)
+    setOrderRequestError('')
+  }
+
+  const handleOrderRequestChange = (field, value) => {
+    setOrderRequestForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  const handleAddProduct = (productId) => {
+    const exists = selectedProducts.find((p) => p.productId === productId)
+    if (!exists) {
+      setSelectedProducts((prev) => [...prev, { productId, quantity: '' }])
+    }
+  }
+
+  const handleRemoveProduct = (productId) => {
+    setSelectedProducts((prev) => prev.filter((p) => p.productId !== productId))
+  }
+
+  const handleQuantityChange = (productId, quantity) => {
+    setSelectedProducts((prev) =>
+      prev.map((p) => (p.productId === productId ? { ...p, quantity } : p))
+    )
+  }
+
+  const loadPurchaseRequests = useCallback(async () => {
+    setIsPurchaseHistoryLoading(true)
+    try {
+      const result = await getCreditPurchases({ limit: 5 })
+      if (result.data?.purchases) {
+        setPurchaseRequests(result.data.purchases)
+      }
+    } catch (err) {
+      console.error('Failed to load purchase requests:', err)
+    } finally {
+      setIsPurchaseHistoryLoading(false)
+    }
+  }, [getCreditPurchases])
+
+  useEffect(() => {
+    if (showOrderRequestScreen) {
+      loadPurchaseRequests()
+    }
+  }, [showOrderRequestScreen, loadPurchaseRequests])
+
   const handleProductClick = async (product) => {
+    setShowOrderRequestScreen(false)
     setLoading(true)
     try {
       const result = await getProductDetails(product.id || product._id)
@@ -1014,6 +1168,132 @@ function InventoryView({ openPanel }) {
       showError(message)
     } finally {
       setIsSubmittingOrder(false)
+    }
+  }
+
+  const handleOrderRequestSubmit = async () => {
+    setOrderRequestError('')
+
+    if (selectedProducts.length === 0) {
+      setOrderRequestError('Add at least one product to continue.')
+      return
+    }
+
+    const creditInfo = dashboard.credit || {}
+    const hasUnpaidCredits = creditInfo.status?.hasUnpaidCredits || false
+
+    const purchaseItems = []
+    let totalAmount = 0
+
+    for (const selected of selectedProducts) {
+      const product = products.find(
+        (p) => (p.id || p._id)?.toString() === selected.productId
+      )
+      if (!product) {
+        setOrderRequestError(`Product not found: ${selected.productId}`)
+        return
+      }
+
+      const quantityNumber = parseFloat(selected.quantity)
+      if (!quantityNumber || quantityNumber <= 0) {
+        setOrderRequestError(`Enter a valid quantity for ${product.name}.`)
+        return
+      }
+
+      const adminStock = product.adminStock ?? product.displayStock ?? product.stock ?? 0
+      if (quantityNumber > adminStock) {
+        setOrderRequestError(`Requested quantity for ${product.name} exceeds admin stock (${adminStock}).`)
+        return
+      }
+
+      const pricePerUnit = product.pricePerUnit || product.priceToVendor || 0
+      const itemTotal = quantityNumber * pricePerUnit
+      totalAmount += itemTotal
+
+      purchaseItems.push({
+        productId: product.id || product._id,
+        productName: product.name,
+        quantity: quantityNumber,
+        pricePerUnit,
+      })
+    }
+
+    if (totalAmount < MIN_PURCHASE_VALUE) {
+      setOrderRequestError(`Minimum order value is ₹${MIN_PURCHASE_VALUE.toLocaleString('en-IN')}.`)
+      return
+    }
+    if (totalAmount > MAX_PURCHASE_VALUE) {
+      setOrderRequestError(`Maximum order value is ₹${MAX_PURCHASE_VALUE.toLocaleString('en-IN')}. Your request: ₹${totalAmount.toLocaleString('en-IN')}.`)
+      return
+    }
+    if (hasUnpaidCredits) {
+      setOrderRequestError('You have unpaid credits from previous purchase requests. Please clear your outstanding payments before making a new request. Failure to repay may result in account suspension or permanent ban.')
+      return
+    }
+    if (!orderRequestForm.reason || orderRequestForm.reason.trim().length < 10) {
+      setOrderRequestError('Please provide a reason (at least 10 characters).')
+      return
+    }
+    if (!orderRequestForm.creditPolicyAccepted) {
+      setOrderRequestError('Please acknowledge the credit policy to proceed.')
+      return
+    }
+    if (!orderRequestForm.confirmationText || orderRequestForm.confirmationText.trim().toLowerCase() !== 'confirm') {
+      setOrderRequestError('Type "confirm" to proceed with the request.')
+      return
+    }
+
+    const trimmedAccountName = orderRequestForm.bankAccountName?.trim()
+    const trimmedAccountNumber = orderRequestForm.bankAccountNumber?.toString().trim()
+    const trimmedBankName = orderRequestForm.bankName?.trim()
+    const trimmedIfsc = orderRequestForm.bankIfsc?.trim().toUpperCase()
+
+    if (!trimmedAccountName || !trimmedAccountNumber || !trimmedBankName || !trimmedIfsc) {
+      setOrderRequestError('Complete bank details are required.')
+      return
+    }
+    if (trimmedAccountNumber.length < 6) {
+      setOrderRequestError('Account number looks incomplete.')
+      return
+    }
+    if (trimmedIfsc.length < 4) {
+      setOrderRequestError('Please provide a valid IFSC code.')
+      return
+    }
+
+    setIsOrderRequestSubmitting(true)
+    try {
+      const payload = {
+        items: purchaseItems,
+        reason: orderRequestForm.reason.trim(),
+        notes: orderRequestForm.notes?.trim() || undefined,
+        bankDetails: {
+          accountName: trimmedAccountName,
+          accountNumber: trimmedAccountNumber,
+          bankName: trimmedBankName,
+          ifsc: trimmedIfsc,
+          bankBranch: orderRequestForm.bankBranch?.trim() || undefined,
+        },
+        confirmationText: orderRequestForm.confirmationText.trim(),
+      }
+
+      const result = await requestCreditPurchase(payload)
+      if (result.data) {
+        success('Stock request submitted. Admin will review shortly.')
+        resetOrderRequestForm()
+        setShowOrderRequestScreen(false)
+        loadPurchaseRequests()
+      } else if (result.error) {
+        const message = result.error.message || 'Failed to submit stock request.'
+        setOrderRequestError(message)
+        showError(message)
+      }
+    } catch (err) {
+      const message = err?.error?.message || err.message || 'Failed to submit stock request.'
+      setOrderRequestError(message)
+      showError(message)
+    } finally {
+      setIsOrderRequestSubmitting(false)
     }
   }
 
@@ -1317,6 +1597,495 @@ function InventoryView({ openPanel }) {
     )
   }
 
+  if (showOrderRequestScreen) {
+    const creditInfo = dashboard.credit || {}
+    const hasUnpaidCredits = creditInfo.status?.hasUnpaidCredits || false
+    const totalUnpaid = creditInfo.credit?.totalUnpaid || 0
+
+    // Calculate billing for selected products
+    let billingTotal = 0
+    const billingItems = selectedProducts.map((selected) => {
+      const product = products.find(
+        (p) => (p.id || p._id)?.toString() === selected.productId
+      )
+      if (!product) return null
+      const quantity = parseFloat(selected.quantity) || 0
+      const pricePerUnit = product.pricePerUnit || product.priceToVendor || 0
+      const itemTotal = quantity * pricePerUnit
+      billingTotal += itemTotal
+      return {
+        product,
+        quantity,
+        pricePerUnit,
+        itemTotal,
+      }
+    }).filter(Boolean)
+
+    const confirmMatches = orderRequestForm.confirmationText.trim().toLowerCase() === 'confirm'
+    const trimmedAccountName = orderRequestForm.bankAccountName?.trim() || ''
+    const trimmedAccountNumber = orderRequestForm.bankAccountNumber?.toString().trim() || ''
+    const trimmedBankName = orderRequestForm.bankName?.trim() || ''
+    const trimmedIfsc = orderRequestForm.bankIfsc?.trim() || ''
+    const bankDetailsComplete =
+      trimmedAccountName && trimmedAccountNumber && trimmedBankName && trimmedIfsc
+    const reasonValid = orderRequestForm.reason?.trim().length >= 10
+    const meetsMinValue = billingTotal >= MIN_PURCHASE_VALUE
+    const withinMaxValue = billingTotal <= MAX_PURCHASE_VALUE
+    const allQuantitiesValid = selectedProducts.every((selected) => {
+      const product = products.find((p) => (p.id || p._id)?.toString() === selected.productId)
+      if (!product) return false
+      const quantity = parseFloat(selected.quantity) || 0
+      const adminStock = product.adminStock ?? product.displayStock ?? product.stock ?? 0
+      return quantity > 0 && quantity <= adminStock
+    })
+    const canSubmitOrderRequest =
+      selectedProducts.length > 0 &&
+      allQuantitiesValid &&
+      meetsMinValue &&
+      withinMaxValue &&
+      !hasUnpaidCredits &&
+      orderRequestForm.creditPolicyAccepted &&
+      confirmMatches &&
+      bankDetailsComplete &&
+      reasonValid &&
+      !isOrderRequestSubmitting
+
+    const pendingDeliveryRequests = purchaseRequests.filter(
+      (request) =>
+        request.status === 'approved' &&
+        ['pending', 'scheduled', 'in_transit'].includes(request.deliveryStatus)
+    )
+
+    const formatEta = (request) => {
+      if (!request.expectedDeliveryAt) {
+        return 'Awaiting schedule'
+      }
+      const eta = new Date(request.expectedDeliveryAt)
+      const diffMs = eta.getTime() - Date.now()
+      if (diffMs <= 0) {
+        return 'Delivery in progress'
+      }
+      const hours = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60)))
+      return `Arriving in ~${hours}h`
+    }
+
+    return (
+      <div className="inventory-request-screen space-y-6">
+        <div className="inventory-request-screen__header">
+          <div>
+            <button
+              type="button"
+              onClick={closeOrderRequestScreen}
+              className="text-sm font-semibold text-purple-600 hover:text-purple-800"
+            >
+              ← Back to inventory
+            </button>
+            <h2 className="mt-2 text-2xl font-bold text-gray-900">Request stock from Admin</h2>
+            <p className="text-sm text-gray-500">
+              Select products, enter quantities, and submit for approval. Stock arrives within 24 hours after approval.
+            </p>
+          </div>
+        </div>
+
+        <div className="inventory-request-layout">
+          <div className="inventory-request-card space-y-6">
+            {/* Unpaid Credits Warning */}
+            {hasUnpaidCredits && (
+              <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-red-900 mb-1">Unpaid Credits Warning</h4>
+                    <p className="text-sm text-red-800 mb-2">
+                      You have unpaid credits from previous purchase requests (Total: ₹{totalUnpaid.toLocaleString('en-IN')}).
+                    </p>
+                    <p className="text-xs text-red-700 font-semibold">
+                      ⚠️ Making further purchase requests without clearing outstanding payments could lead to suspension or permanent ban of your account.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Product Cards Section */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Available Products</h3>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {products.map((product) => {
+                  const isSelected = selectedProducts.some((p) => p.productId === (product.id || product._id)?.toString())
+                  const adminStock = product.adminStock ?? product.displayStock ?? product.stock ?? 0
+                  const pricePerUnit = product.pricePerUnit || product.priceToVendor || 0
+                  
+                  return (
+                    <div
+                      key={product.id || product._id}
+                      className={cn(
+                        'inventory-product-card rounded-xl border-2 p-4 transition-all',
+                        isSelected
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200 bg-white hover:border-purple-300'
+                      )}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h4 className="text-sm font-bold text-gray-900 mb-1">{product.name}</h4>
+                          <p className="text-xs text-gray-500">SKU: {product.sku || 'N/A'}</p>
+                        </div>
+                        {product.primaryImage || product.images?.[0]?.url ? (
+                          <img
+                            src={product.primaryImage || product.images[0].url}
+                            alt={product.name}
+                            className="w-12 h-12 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
+                            <BoxIcon className="h-6 w-6 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2 mb-3">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600">Admin stock:</span>
+                          <span className="font-semibold text-gray-900">{adminStock} {product.unit || 'kg'}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600">Price:</span>
+                          <span className="font-semibold text-purple-600">₹{pricePerUnit.toLocaleString('en-IN')}/{product.unit || 'kg'}</span>
+                        </div>
+                        {product.category && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600">Category:</span>
+                            <span className="font-semibold text-gray-700 capitalize">{product.category}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {!isSelected ? (
+                        <button
+                          type="button"
+                          onClick={() => handleAddProduct((product.id || product._id).toString())}
+                          disabled={adminStock === 0}
+                          className={cn(
+                            'w-full rounded-lg px-4 py-2 text-xs font-semibold transition-all',
+                            adminStock === 0
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'bg-purple-600 text-white hover:bg-purple-700'
+                          )}
+                        >
+                          {adminStock === 0 ? 'Out of Stock' : 'Add to Order'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProduct((product.id || product._id).toString())}
+                          className="w-full rounded-lg px-4 py-2 text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-all"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Quantity Inputs Section */}
+            {selectedProducts.length > 0 && (
+              <div className="space-y-4 rounded-xl border-2 border-purple-200 bg-purple-50/30 p-5">
+                <h3 className="text-lg font-semibold text-gray-900">Enter Quantities</h3>
+                <div className="space-y-3">
+                  {selectedProducts.map((selected) => {
+                    const product = products.find(
+                      (p) => (p.id || p._id)?.toString() === selected.productId
+                    )
+                    if (!product) return null
+                    const adminStock = product.adminStock ?? product.displayStock ?? product.stock ?? 0
+                    const quantity = parseFloat(selected.quantity) || 0
+                    
+                    return (
+                      <div
+                        key={selected.productId}
+                        className="flex items-center gap-4 rounded-lg border border-purple-200 bg-white p-4"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-900">{product.name}</p>
+                          <p className="text-xs text-gray-500">
+                            Available: {adminStock} {product.unit || 'kg'} • ₹{product.pricePerUnit || product.priceToVendor || 0}/{product.unit || 'kg'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            max={adminStock}
+                            value={selected.quantity}
+                            onChange={(e) => handleQuantityChange(selected.productId, e.target.value)}
+                            placeholder="Qty"
+                            className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                          />
+                          <span className="text-xs text-gray-600">{product.unit || 'kg'}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveProduct(selected.productId)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <CloseIcon className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Billing Summary */}
+            {billingItems.length > 0 && (
+              <div className="rounded-xl border-2 border-gray-200 bg-white p-5">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Billing Summary</h3>
+                <div className="space-y-3 mb-4">
+                  {billingItems.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between border-b border-gray-100 pb-2">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{item.product.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {item.quantity} {item.product.unit || 'kg'} × ₹{item.pricePerUnit.toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                      <p className="text-sm font-bold text-gray-900">
+                        ₹{item.itemTotal.toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between pt-3 border-t-2 border-gray-200">
+                  <p className="text-base font-semibold text-gray-900">Total Amount</p>
+                  <p
+                    className={cn(
+                      'text-xl font-bold',
+                      meetsMinValue && withinMaxValue ? 'text-gray-900' : 'text-red-600'
+                    )}
+                  >
+                    ₹{billingTotal.toLocaleString('en-IN')}
+                  </p>
+                </div>
+                {!meetsMinValue && (
+                  <p className="text-xs text-red-600 mt-2">
+                    Minimum order value is ₹{MIN_PURCHASE_VALUE.toLocaleString('en-IN')}
+                  </p>
+                )}
+                {!withinMaxValue && (
+                  <p className="text-xs text-red-600 mt-2">
+                    Maximum order value is ₹{MAX_PURCHASE_VALUE.toLocaleString('en-IN')}
+                  </p>
+                )}
+                {hasUnpaidCredits && (
+                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
+                    <p className="text-xs font-semibold text-red-800">
+                      ⚠️ You have unpaid credits. Clear outstanding payments before making a new request.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Reason and Notes */}
+            {selectedProducts.length > 0 && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-gray-700">Reason for request *</label>
+                  <textarea
+                    rows={3}
+                    value={orderRequestForm.reason}
+                    onChange={(e) => handleOrderRequestChange('reason', e.target.value)}
+                    placeholder="Explain why you need this stock (min 10 characters)"
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-gray-700">Additional notes (optional)</label>
+                  <textarea
+                    rows={3}
+                    value={orderRequestForm.notes}
+                    onChange={(e) => handleOrderRequestChange('notes', e.target.value)}
+                    placeholder="Mention urgency, delivery instructions, etc."
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Bank Details */}
+            {selectedProducts.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-900">Bank details for billing *</h3>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <input
+                    type="text"
+                    value={orderRequestForm.bankAccountName}
+                    onChange={(e) => handleOrderRequestChange('bankAccountName', e.target.value)}
+                    placeholder="Account holder name"
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                  />
+                  <input
+                    type="text"
+                    value={orderRequestForm.bankAccountNumber}
+                    onChange={(e) => handleOrderRequestChange('bankAccountNumber', e.target.value)}
+                    placeholder="Account number"
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                  />
+                  <input
+                    type="text"
+                    value={orderRequestForm.bankName}
+                    onChange={(e) => handleOrderRequestChange('bankName', e.target.value)}
+                    placeholder="Bank name"
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                  />
+                  <input
+                    type="text"
+                    value={orderRequestForm.bankIfsc}
+                    onChange={(e) => handleOrderRequestChange('bankIfsc', e.target.value)}
+                    placeholder="IFSC code"
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm uppercase focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                  />
+                  <input
+                    type="text"
+                    value={orderRequestForm.bankBranch}
+                    onChange={(e) => handleOrderRequestChange('bankBranch', e.target.value)}
+                    placeholder="Branch (optional)"
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 md:col-span-2"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Policy Confirmation */}
+            {selectedProducts.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-900">Confirm policy</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreditPolicyModal(true)}
+                    className="text-xs font-semibold text-purple-600 hover:text-purple-800"
+                  >
+                    View Credit Policy
+                  </button>
+                </div>
+                <label className="flex items-start gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={orderRequestForm.creditPolicyAccepted}
+                    onChange={(e) => handleOrderRequestChange('creditPolicyAccepted', e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <span>
+                    I have reviewed the credit policy, repayment timeline, and authorize IRA Sathi to adjust my credit balance once the stock is dispatched.
+                  </span>
+                </label>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-gray-700">Type "confirm" to proceed *</label>
+                  <input
+                    type="text"
+                    value={orderRequestForm.confirmationText}
+                    onChange={(e) => handleOrderRequestChange('confirmationText', e.target.value)}
+                    placeholder="confirm"
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                  />
+                </div>
+              </div>
+            )}
+
+            {orderRequestError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                <p className="text-sm text-red-600">{orderRequestError}</p>
+              </div>
+            )}
+
+            {selectedProducts.length > 0 && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeOrderRequestScreen}
+                  className="rounded-full border border-purple-100 bg-white px-4 py-2 text-xs font-semibold text-purple-700 transition-all hover:border-purple-400 hover:text-purple-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOrderRequestSubmit}
+                  disabled={!canSubmitOrderRequest}
+                  className={cn(
+                    'rounded-full px-6 py-2 text-sm font-semibold text-white transition-all',
+                    canSubmitOrderRequest
+                      ? 'bg-purple-600 hover:bg-purple-700'
+                      : 'bg-purple-300 cursor-not-allowed'
+                  )}
+                >
+                  {isOrderRequestSubmitting ? 'Submitting...' : 'Submit for Admin Approval'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Credit Policy Modal */}
+        {showCreditPolicyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Credit Policy</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowCreditPolicyModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <CloseIcon className="h-6 w-6" />
+                </button>
+              </div>
+              <div className="space-y-4 text-sm text-gray-700">
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Minimum Order Value</h4>
+                  <p>All purchase requests must meet a minimum value of ₹{MIN_PURCHASE_VALUE.toLocaleString('en-IN')}.</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Stock Delivery</h4>
+                  <p>Approved stock requests are scheduled for delivery within 24 hours. Admin stock is adjusted immediately upon approval, and your vendor stock is updated automatically after the delivery window.</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Credit Adjustment</h4>
+                  <p>Your credit balance is adjusted once the stock is dispatched. Ensure your bank details are accurate for smooth billing and credit management.</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Repayment Timeline</h4>
+                  <p>Credit repayment is due within {creditInfo.repaymentDays || 30} days. Keep your credit usage under control to avoid penalties and maintain a healthy credit standing.</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Penalties</h4>
+                  <p>Late payments may incur penalties based on your credit policy. Contact your Admin SPOC for assistance with credit management.</p>
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowCreditPolicyModal(false)}
+                  className="rounded-full bg-purple-600 px-6 py-2 text-sm font-semibold text-white hover:bg-purple-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <section id="inventory-hero" className="inventory-hero">
@@ -1327,6 +2096,17 @@ function InventoryView({ openPanel }) {
             <p className="inventory-hero__meta">
               {inStockCount} in stock • {outOfStockCount} out of stock
             </p>
+            <div className="inventory-order-cta">
+              <div>
+                <p className="inventory-order-cta__title">Need to top-up stock?</p>
+                <p className="inventory-order-cta__meta">
+                  Review credit policy, enter bank details, and raise a request for Admin approval.
+                </p>
+              </div>
+              <button type="button" onClick={openOrderRequestScreen} className="inventory-order-cta__button">
+                Order stock from Admin
+              </button>
+            </div>
             <div className="inventory-hero__actions">
               {[
                 { label: 'Add product', icon: SparkIcon, action: 'add-sku' },
@@ -1451,6 +2231,7 @@ function InventoryView({ openPanel }) {
               const vendorStock = product.vendorStock ?? 0
               const vendorStockStatus = getVendorStockStatus(vendorStock)
               const adminStockStatus = product.stockStatus || (adminStock > 0 ? 'in_stock' : 'out_of_stock')
+              const isArriving = product.isArrivingWithin24Hours || false
               
               return (
                 <div
@@ -1476,6 +2257,18 @@ function InventoryView({ openPanel }) {
                   <div className="space-y-2">
                     <h4 className="font-bold text-gray-900 line-clamp-1">{product.name}</h4>
                     <p className="text-xs text-gray-600 line-clamp-2">{shortDescription}...</p>
+                    
+                    {/* Arriving Notification */}
+                    {isArriving && (
+                      <div className="rounded-lg border border-orange-200 bg-orange-50 p-2">
+                        <div className="flex items-center gap-2">
+                          <TruckIcon className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                          <p className="text-xs font-semibold text-orange-800">
+                            Product is arriving within 24 hours
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     
                     {/* Stock Status */}
                     <div className="flex items-center gap-2">
@@ -1551,19 +2344,31 @@ function InventoryView({ openPanel }) {
   )
 }
 
-function OrdersView({ openPanel }) {
+function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationModal }) {
   const { dashboard } = useVendorState()
   const dispatch = useVendorDispatch()
-  const { getOrders } = useVendorApi()
+  const { getOrders, getOrderDetails } = useVendorApi()
   const [selectedFilter, setSelectedFilter] = useState('all')
   const [ordersData, setOrdersData] = useState(null)
 
   useEffect(() => {
-    getOrders({ status: selectedFilter === 'all' ? undefined : selectedFilter }).then((result) => {
+    // Build params object, only include status if it's not 'all'
+    const params = {};
+    if (selectedFilter !== 'all') {
+      params.status = selectedFilter;
+    }
+    getOrders(params).then((result) => {
+      console.log('📦 OrdersView: getOrders result:', result)
       if (result.data) {
+        console.log('📦 OrdersView: Orders data:', result.data)
+        console.log('📦 OrdersView: Orders count:', result.data.orders?.length || 0)
         setOrdersData(result.data)
         dispatch({ type: 'SET_ORDERS_DATA', payload: result.data })
+      } else if (result.error) {
+        console.error('❌ OrdersView: Error fetching orders:', result.error)
       }
+    }).catch((error) => {
+      console.error('❌ OrdersView: Exception fetching orders:', error)
     })
   }, [getOrders, selectedFilter, dispatch])
 
@@ -1595,6 +2400,10 @@ function OrdersView({ openPanel }) {
 
   // Transform backend orders to frontend format
   const backendOrders = ordersData?.orders || dashboard.orders?.orders || []
+  console.log('📦 OrdersView: backendOrders count:', backendOrders.length)
+  console.log('📦 OrdersView: ordersData:', ordersData)
+  console.log('📦 OrdersView: dashboard.orders:', dashboard.orders)
+  
   const orders = backendOrders.map((order) => ({
     id: order._id || order.id,
     orderNumber: order.orderNumber,
@@ -1841,17 +2650,46 @@ function OrdersView({ openPanel }) {
                   <>
                     <button
                       type="button"
-                      className="orders-card__action is-secondary"
+                      className="orders-card__action is-primary"
                       onClick={() => openPanel('order-available', { orderId: order.id })}
                     >
-                      Available
+                      Accept Order
                     </button>
                     <button
                       type="button"
                       className="orders-card__action is-secondary"
-                      onClick={() => openPanel('order-not-available', { orderId: order.id })}
+                      onClick={async () => {
+                        const details = await getOrderDetails(order.id)
+                        if (details.data?.order) {
+                          onOpenEscalationModal?.(details.data.order)
+                        }
+                      }}
                     >
-                      Not available
+                      Escalate All
+                    </button>
+                    <button
+                      type="button"
+                      className="orders-card__action is-secondary"
+                      onClick={async () => {
+                        const details = await getOrderDetails(order.id)
+                        if (details.data?.order) {
+                          onOpenPartialEscalationModal?.(details.data.order, 'items')
+                        }
+                      }}
+                    >
+                      Partial Items
+                    </button>
+                    <button
+                      type="button"
+                      className="orders-card__action is-secondary"
+                      onClick={async () => {
+                        const details = await getOrderDetails(order.id)
+                        if (details.data?.order) {
+                          onOpenPartialEscalationModal?.(details.data.order, 'quantities')
+                        }
+                      }}
+                    >
+                      Partial Qty
                     </button>
                   </>
                 )}

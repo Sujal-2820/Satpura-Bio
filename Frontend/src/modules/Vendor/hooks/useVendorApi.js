@@ -98,6 +98,18 @@ export function useVendorApi() {
     [callApi, dispatch],
   )
 
+  const escalateOrderPartial = useCallback(
+    (orderId, escalationData) => {
+      return callApi(vendorApi.escalateOrderPartial, orderId, escalationData).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'UPDATE_ORDER_STATUS', payload: { orderId, status: 'partially_accepted' } })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
   const updateOrderStatus = useCallback(
     (orderId, statusData) => {
       return callApi(vendorApi.updateOrderStatus, orderId, statusData).then((result) => {
@@ -179,6 +191,7 @@ export function useVendorApi() {
     acceptOrder,
     acceptOrderPartially,
     rejectOrder,
+    escalateOrderPartial,
     updateOrderStatus,
     getOrderStats,
     // Products

@@ -346,6 +346,13 @@ router.get('/orders/escalated', authorizeAdmin, adminController.getEscalatedOrde
  */
 
 /**
+ * @route   POST /api/admin/orders/:orderId/revert-escalation
+ * @desc    Revert escalation back to vendor
+ * @access  Private (Admin)
+ */
+router.post('/orders/:orderId/revert-escalation', authorizeAdmin, adminController.revertEscalation);
+
+/**
  * @route   PUT /api/admin/orders/:orderId/reassign
  * @desc    Reassign order to different vendor
  * @access  Private (Admin)
@@ -372,6 +379,13 @@ router.get('/orders/:orderId', authorizeAdmin, adminController.getOrderDetails);
  * @access  Private (Admin)
  */
 router.get('/orders/:orderId/invoice', authorizeAdmin, adminController.generateInvoice);
+
+/**
+ * @route   GET /api/admin/commissions
+ * @desc    Get all commissions with order and user details
+ * @access  Private (Admin)
+ */
+router.get('/commissions', authorizeAdmin, adminController.getCommissions);
 
 /**
  * @route   GET /api/admin/payments

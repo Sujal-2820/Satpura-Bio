@@ -1648,12 +1648,26 @@ function transformOrder(backendOrder) {
                  backendOrder.userId?.location?.state || 
                  'Unknown'
 
+  // User location details
+  const userLocation = backendOrder.userId?.location || {}
+  const userLocationDisplay = userLocation.city && userLocation.state
+    ? `${userLocation.city}, ${userLocation.state}`
+    : userLocation.city || userLocation.state || 'Not provided'
+
+  // Vendor location details
+  const vendorLocation = backendOrder.vendorId?.location || {}
+  const vendorLocationDisplay = vendorLocation.city && vendorLocation.state
+    ? `${vendorLocation.city}, ${vendorLocation.state}`
+    : vendorLocation.city || vendorLocation.state || 'N/A'
+
   return {
     id: backendOrder._id?.toString() || backendOrder.id,
     orderNumber: backendOrder.orderNumber || backendOrder.id,
     type: backendOrder.assignedTo || 'vendor',
     vendorId: backendOrder.vendorId?._id?.toString() || backendOrder.vendorId?.toString() || null,
     vendor: backendOrder.vendorId?.name || 'Admin',
+    vendorLocation: vendorLocationDisplay,
+    vendorPhone: backendOrder.vendorId?.phone || 'N/A',
     region,
     value: backendOrder.totalAmount || 0,
     advance: backendOrder.upfrontAmount || 0,
@@ -1663,7 +1677,10 @@ function transformOrder(backendOrder) {
     status: backendOrder.status || 'pending',
     paymentStatus: backendOrder.paymentStatus || 'pending',
     userId: backendOrder.userId?._id?.toString() || backendOrder.userId?.toString(),
-    userName: backendOrder.userId?.name,
+    userName: backendOrder.userId?.name || 'Unknown',
+    userPhone: backendOrder.userId?.phone || 'N/A',
+    userLocation: userLocationDisplay,
+    userLocationDetails: userLocation,
     assignedTo: backendOrder.assignedTo || 'vendor',
     escalated: isEscalated,
     createdAt: backendOrder.createdAt,
@@ -2447,6 +2464,40 @@ export async function fulfillOrderFromWarehouse(orderId, fulfillmentData = {}) {
         data: {
           order: response.data.order ? transformOrder(response.data.order) : undefined,
           message: response.data.message || 'Order fulfilled from warehouse successfully',
+        },
+      }
+    }
+
+    return response
+  } catch (error) {
+    throw error
+  }
+}
+
+/**
+ * Revert Escalation
+ * POST /admin/orders/:orderId/revert-escalation
+ * 
+ * @param {string} orderId - Order ID
+ * @param {Object} revertData - { reason: string }
+ * @returns {Promise<Object>} - { order: Object, message: string }
+ */
+export async function revertEscalation(orderId, revertData = {}) {
+  try {
+    const response = await apiRequest(`/admin/orders/${orderId}/revert-escalation`, {
+      method: 'POST',
+      body: JSON.stringify({
+        reason: revertData.reason,
+      }),
+    })
+
+    // Transform backend response to frontend format
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: {
+          order: response.data.order ? transformOrder(response.data.order) : undefined,
+          message: response.data.message || 'Escalation reverted successfully',
         },
       }
     }

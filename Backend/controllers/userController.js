@@ -368,17 +368,29 @@ exports.loginWithOtp = async (req, res, next) => {
     }
 
     // Update sellerId if provided
+    // Rule: sellerId can only be set if not already set (lifetime lock)
     if (sellerId) {
-      const seller = await Seller.findOne({ sellerId: sellerId.toUpperCase(), status: 'approved', isActive: true });
-      if (!seller) {
+      // Check if sellerId is already set and different
+      if (user.sellerId && user.sellerId !== sellerId.toUpperCase()) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid seller ID. Seller not found or inactive.',
+          message: 'Seller ID cannot be changed. Your seller ID is already linked for lifetime and cannot be changed.',
         });
       }
-      user.sellerId = sellerId.toUpperCase();
-      user.seller = seller._id;
-      await user.save();
+      
+      // Only set if not already set
+      if (!user.sellerId) {
+        const seller = await Seller.findOne({ sellerId: sellerId.toUpperCase(), status: 'approved', isActive: true });
+        if (!seller) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid seller ID. Seller not found or inactive.',
+          });
+        }
+        user.sellerId = sellerId.toUpperCase();
+        user.seller = seller._id;
+        await user.save();
+      }
     }
 
     // Clear OTP after successful verification
@@ -1549,7 +1561,6 @@ exports.createOrder = async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const {
-      addressId,
       paymentPreference = 'partial', // 'partial' or 'full'
       notes,
     } = req.body;
@@ -1577,49 +1588,31 @@ exports.createOrder = async (req, res, next) => {
       });
     }
 
-    // Get or validate address
-    let deliveryAddress;
-    if (addressId) {
-      const address = await Address.findOne({ _id: addressId, userId });
-      if (!address) {
-        return res.status(404).json({
-          success: false,
-          message: 'Address not found',
-        });
-      }
-      deliveryAddress = {
-        name: address.name,
-        address: address.address,
-        city: address.city,
-        state: address.state,
-        pincode: address.pincode,
-        phone: address.phone,
-        coordinates: address.coordinates,
-      };
-    } else {
-      // Use user's default address or location
-      const defaultAddress = await Address.findOne({ userId, isDefault: true });
-      if (defaultAddress) {
-        deliveryAddress = {
-          name: defaultAddress.name,
-          address: defaultAddress.address,
-          city: defaultAddress.city,
-          state: defaultAddress.state,
-          pincode: defaultAddress.pincode,
-          phone: defaultAddress.phone,
-          coordinates: defaultAddress.coordinates,
-        };
-      } else {
-        const user = await User.findById(userId);
-        if (!user || !user.location) {
-          return res.status(400).json({
-            success: false,
-            message: 'Please provide a delivery address',
-          });
-        }
-        deliveryAddress = user.location;
-      }
+    // Get delivery address from user's location
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
     }
+
+    if (!user.location || !user.location.city || !user.location.state || !user.location.pincode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Delivery address is required. Please update your delivery address in settings.',
+      });
+    }
+
+    const deliveryAddress = {
+      name: user.name || 'Home',
+      address: user.location.address || '',
+      city: user.location.city,
+      state: user.location.state,
+      pincode: user.location.pincode,
+      phone: user.phone || '',
+      coordinates: user.location.coordinates,
+    };
 
     // Assign vendor based on location (coordinates or city)
     let vendorId = null;
@@ -1654,10 +1647,33 @@ exports.createOrder = async (req, res, next) => {
     
     console.log(`📦 Order will be created with vendorId: ${vendorId || 'null'}, assignedTo: ${assignedTo}`);
 
-    // Get user info for sellerId
-    const user = await User.findById(userId).populate('seller');
-    const sellerId = user?.sellerId || null;
-    const seller = user?.seller?._id || null;
+    // Get user info for sellerId (user already fetched above)
+    const userWithSeller = await User.findById(userId).populate('seller');
+    const sellerId = userWithSeller?.sellerId || null;
+    const seller = userWithSeller?.seller?._id || null;
+
+    // Validate products exist and are active (but don't block on stock availability)
+    // Orders are always created and assigned to vendor, vendor can then escalate if needed
+    for (const item of cart.items) {
+      const product = await Product.findById(item.productId._id);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: `Product ${item.productId.name} not found`,
+        });
+      }
+      
+      // Check if product is active
+      if (!product.isActive) {
+        return res.status(400).json({
+          success: false,
+          message: `Product ${item.productId.name} is no longer available`,
+        });
+      }
+      
+      // Note: Stock validation is removed - orders are always created
+      // Vendor will receive the order and can escalate if stock is insufficient
+    }
 
     // Prepare order items
     const orderItems = cart.items.map(item => ({

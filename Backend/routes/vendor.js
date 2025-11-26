@@ -93,6 +93,13 @@ router.post('/orders/:orderId/reject', authorizeVendor, vendorController.rejectO
 router.post('/orders/:orderId/accept-partial', authorizeVendor, vendorController.acceptOrderPartially);
 
 /**
+ * @route   POST /api/vendors/orders/:orderId/escalate-partial
+ * @desc    Escalate order with partial quantities (Scenario 3)
+ * @access  Private (Vendor)
+ */
+router.post('/orders/:orderId/escalate-partial', authorizeVendor, vendorController.escalateOrderPartial);
+
+/**
  * @route   PUT /api/vendors/orders/:orderId/status
  * @desc    Update order status (Awaiting → Dispatched → Delivered)
  * @access  Private (Vendor)

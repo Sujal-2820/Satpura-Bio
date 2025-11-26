@@ -425,6 +425,13 @@ export function useAdminApi() {
 
   const generateInvoice = useCallback((orderId) => callApi(adminApi.generateInvoice, orderId), [callApi])
 
+  const getCommissions = useCallback(
+    (params) => {
+      return callApi(adminApi.getCommissions, params)
+    },
+    [callApi],
+  )
+
   // Finance & Credit Management APIs
   const getFinanceData = useCallback(
     () => {
@@ -516,6 +523,18 @@ export function useAdminApi() {
   const fulfillOrderFromWarehouse = useCallback(
     (orderId, fulfillmentData) => {
       return callApi(adminApi.fulfillOrderFromWarehouse, orderId, fulfillmentData).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_ORDERS_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const revertEscalation = useCallback(
+    (orderId, revertData) => {
+      return callApi(adminApi.revertEscalation, orderId, revertData).then((result) => {
         if (result.data) {
           dispatch({ type: 'SET_ORDERS_UPDATED', payload: true })
         }
@@ -629,6 +648,7 @@ export function useAdminApi() {
     getOrderDetails,
     reassignOrder,
     generateInvoice,
+    getCommissions,
     // Finance
     getFinanceData,
     getFinancialParameters,
@@ -645,6 +665,7 @@ export function useAdminApi() {
     updateLogisticsSettings,
     getEscalatedOrders,
     fulfillOrderFromWarehouse,
+    revertEscalation,
     getNotifications,
     createNotification,
     updateNotification,

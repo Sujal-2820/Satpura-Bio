@@ -7,6 +7,7 @@
 // Financial Thresholds
 const MIN_ORDER_VALUE = parseInt(process.env.MIN_ORDER_VALUE) || 2000;
 const MIN_VENDOR_PURCHASE = parseInt(process.env.MIN_VENDOR_PURCHASE) || 50000;
+const MAX_VENDOR_PURCHASE = parseInt(process.env.MAX_VENDOR_PURCHASE) || 100000;
 const DELIVERY_CHARGE = parseInt(process.env.DELIVERY_CHARGE) || 50;
 
 // Geographic Rules
@@ -60,6 +61,7 @@ module.exports = {
   // Financial
   MIN_ORDER_VALUE,
   MIN_VENDOR_PURCHASE,
+  MAX_VENDOR_PURCHASE,
   DELIVERY_CHARGE,
   
   // Geographic

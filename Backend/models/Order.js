@@ -197,6 +197,46 @@ const orderSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  // Escalation tracking
+  escalation: {
+    isEscalated: {
+      type: Boolean,
+      default: false,
+    },
+    escalatedAt: Date,
+    escalatedBy: {
+      type: String,
+      enum: ['vendor', 'admin', 'system'],
+    },
+    escalationReason: String,
+    escalationType: {
+      type: String,
+      enum: ['full', 'partial', 'quantity'],
+      // full: entire order escalated
+      // partial: some items escalated
+      // quantity: partial quantity of item(s) escalated
+    },
+    escalatedItems: [{
+      itemId: mongoose.Schema.Types.ObjectId,
+      productId: mongoose.Schema.Types.ObjectId,
+      productName: String,
+      requestedQuantity: Number,
+      availableQuantity: Number,
+      escalatedQuantity: Number,
+      reason: String,
+    }],
+    revertedAt: Date,
+    revertedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin',
+    },
+    revertReason: String,
+    originalVendorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vendor',
+      // Store original vendor when escalated
+    },
+  },
 }, {
   timestamps: true,
 });

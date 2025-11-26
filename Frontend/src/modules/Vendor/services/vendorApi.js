@@ -289,6 +289,33 @@ export async function rejectOrder(orderId, reasonData) {
 }
 
 /**
+ * Escalate Order with Partial Quantities (Scenario 3)
+ * POST /vendors/orders/:orderId/escalate-partial
+ * 
+ * IMPORTANT: This API handles partial quantity escalation where:
+ * - Vendor has some quantity of an item but not enough
+ * - Vendor can accept partial quantity and escalate the rest
+ * 
+ * @param {string} orderId - Order ID
+ * @param {Object} escalationData - {
+ *   escalatedItems: Array<{ itemId: string, escalatedQuantity: number, reason?: string }>,
+ *   reason: string,
+ *   notes?: string
+ * }
+ * @returns {Promise<Object>} - { 
+ *   message: 'Order partially escalated',
+ *   vendorOrder: Object, // Order for vendor to fulfill
+ *   escalatedOrder: Object, // Order escalated to admin
+ * }
+ */
+export async function escalateOrderPartial(orderId, escalationData) {
+  return apiRequest(`/vendors/orders/${orderId}/escalate-partial`, {
+    method: 'POST',
+    body: JSON.stringify(escalationData),
+  })
+}
+
+/**
  * Update Order Status
  * PUT /vendors/orders/:orderId/status
  * 

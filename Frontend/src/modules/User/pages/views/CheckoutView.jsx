@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useUserState, useUserDispatch } from '../../context/UserContext'
 import { useUserApi } from '../../hooks/useUserApi'
 import { ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE } from '../../services/userData'
-import { MapPinIcon, CreditCardIcon, TruckIcon, ChevronRightIcon, ChevronDownIcon, CheckIcon, PackageIcon, EditIcon, TrashIcon, XIcon } from '../../components/icons'
+import { MapPinIcon, CreditCardIcon, TruckIcon, ChevronRightIcon, ChevronDownIcon, CheckIcon, PackageIcon, XIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import { useToast } from '../../components/ToastNotification'
 import * as userApi from '../../services/userApi'
@@ -14,54 +14,35 @@ const STEPS = [
 ]
 
 export function CheckoutView({ onBack, onOrderPlaced }) {
-  const { cart, addresses, profile, assignedVendor } = useUserState()
+  const { cart, profile, assignedVendor } = useUserState()
   const dispatch = useUserDispatch()
-  const { createOrder, createPaymentIntent, confirmPayment, addAddress, updateAddress, deleteAddress, loading } = useUserApi()
+  const { createOrder, createPaymentIntent, confirmPayment, loading } = useUserApi()
   const { success, error: showError } = useToast()
   const [currentStep, setCurrentStep] = useState(1)
   const [summaryExpanded, setSummaryExpanded] = useState(true)
-  const [selectedAddress, setSelectedAddress] = useState(
-    addresses.find((a) => a.isDefault)?.id || addresses[0]?.id || null,
-  )
   const [shippingMethod, setShippingMethod] = useState('standard')
   const [paymentMethod, setPaymentMethod] = useState('razorpay')
   const [promoCode, setPromoCode] = useState('')
-  const [showAddressPanel, setShowAddressPanel] = useState(false)
-  const [editingAddress, setEditingAddress] = useState(null)
-  const [addressForm, setAddressForm] = useState({
-    name: 'Home',
-    address: '',
-    city: profile.location?.city || '',
-    state: profile.location?.state || '',
-    pincode: profile.location?.pincode || '',
-    phone: profile.phone || '',
-  })
+  const [showChangeAddressPanel, setShowChangeAddressPanel] = useState(false)
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false)
   const [pendingOrder, setPendingOrder] = useState(null)
   const [paymentPreference, setPaymentPreference] = useState('partial') // 'partial' | 'full'
   const [cartProducts, setCartProducts] = useState({})
 
-  // Remove duplicates from addresses
-  const uniqueAddresses = useMemo(() => {
-    const seen = new Set()
-    return addresses.filter((addr) => {
-      const key = `${addr.name}-${addr.address}-${addr.city}-${addr.pincode}`
-      if (seen.has(key)) {
-        return false
-      }
-      seen.add(key)
-      return true
-    })
-  }, [addresses])
-
-  // Update selected address when addresses change
-  useEffect(() => {
-    if (uniqueAddresses.length > 0 && !uniqueAddresses.find((a) => a.id === selectedAddress)) {
-      setSelectedAddress(uniqueAddresses.find((a) => a.isDefault)?.id || uniqueAddresses[0]?.id || null)
-    } else if (uniqueAddresses.length === 0) {
-      setSelectedAddress(null)
+  // Get delivery address from user profile
+  const deliveryAddress = useMemo(() => {
+    if (!profile.location || !profile.location.city || !profile.location.state || !profile.location.pincode) {
+      return null
     }
-  }, [uniqueAddresses, selectedAddress])
+    return {
+      name: profile.name || 'Home',
+      address: profile.location.address || '',
+      city: profile.location.city,
+      state: profile.location.state,
+      pincode: profile.location.pincode,
+      phone: profile.phone || '',
+    }
+  }, [profile])
 
   // Fetch product details for cart items
   useEffect(() => {
@@ -85,102 +66,6 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
     }
   }, [cart])
 
-  const handleOpenAddressPanel = (address = null) => {
-    if (address) {
-      setEditingAddress(address.id)
-      setAddressForm({
-        name: address.name,
-        address: address.address,
-        city: address.city,
-        state: address.state,
-        pincode: address.pincode,
-        phone: address.phone,
-      })
-    } else {
-      setEditingAddress(null)
-      setAddressForm({
-        name: 'Home',
-        address: '',
-        city: profile.location?.city || '',
-        state: profile.location?.state || '',
-        pincode: profile.location?.pincode || '',
-        phone: profile.phone || '',
-      })
-    }
-    setShowAddressPanel(true)
-  }
-
-  const handleCloseAddressPanel = () => {
-    setShowAddressPanel(false)
-    setTimeout(() => {
-      setEditingAddress(null)
-      setAddressForm({
-        name: 'Home',
-        address: '',
-        city: profile.location?.city || '',
-        state: profile.location?.state || '',
-        pincode: profile.location?.pincode || '',
-        phone: profile.phone || '',
-      })
-    }, 300)
-  }
-
-  const handleSaveAddress = async () => {
-    if (!addressForm.name || !addressForm.address || !addressForm.city || !addressForm.state || !addressForm.pincode || !addressForm.phone) {
-      showError('Please fill in all fields')
-      return
-    }
-
-    try {
-    if (editingAddress) {
-        // Update existing address via API
-        const result = await updateAddress(editingAddress, addressForm)
-        if (result.data) {
-          success('Address updated successfully')
-    } else {
-          showError(result.error?.message || 'Failed to update address')
-        }
-      } else {
-        // Add new address via API
-        const addressData = {
-        ...addressForm,
-        isDefault: uniqueAddresses.length === 0,
-      }
-        const result = await addAddress(addressData)
-        if (result.data) {
-          const savedAddress = result.data.address || result.data
-          setSelectedAddress(savedAddress.id || savedAddress._id)
-          success('Address added successfully')
-        } else {
-          showError(result.error?.message || 'Failed to add address')
-        }
-    }
-    handleCloseAddressPanel()
-    } catch (error) {
-      console.error('Error saving address:', error)
-      showError(error.message || 'Failed to save address')
-    }
-  }
-
-  const handleDeleteAddress = async (addressId) => {
-    if (window.confirm('Are you sure you want to delete this address?')) {
-      try {
-        const result = await deleteAddress(addressId)
-        if (result.data) {
-          success('Address deleted successfully')
-      if (selectedAddress === addressId) {
-        const remaining = uniqueAddresses.filter((a) => a.id !== addressId)
-        setSelectedAddress(remaining.length > 0 ? (remaining.find((a) => a.isDefault)?.id || remaining[0]?.id) : null)
-      }
-        } else {
-          showError(result.error?.message || 'Failed to delete address')
-        }
-      } catch (error) {
-        console.error('Error deleting address:', error)
-        showError(error.message || 'Failed to delete address')
-      }
-    }
-  }
 
   const cartItems = useMemo(() => {
     return cart.map((item) => {
@@ -289,14 +174,8 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
   }
 
   const handlePlaceOrder = async () => {
-    if (!selectedAddress) {
-      showError('Please select a delivery address')
-      return
-    }
-
-    const address = uniqueAddresses.find((a) => a.id === selectedAddress)
-    if (!address) {
-      showError('Invalid address selected')
+    if (!deliveryAddress) {
+      showError('Please update your delivery address in settings before placing an order')
       return
     }
 
@@ -306,7 +185,6 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
         productId: item.productId,
         quantity: item.quantity,
       })),
-      addressId: selectedAddress,
       shippingMethod: selectedShipping.id,
       paymentMethod: paymentMethod,
       paymentPreference,
@@ -643,89 +521,47 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-[#172022] mb-2">Delivery Address</h2>
 
-          {/* Address Selection */}
-          <div className="space-y-3">
-            {uniqueAddresses.length > 0 ? (
-              uniqueAddresses.map((address) => (
-                <div
-                  key={address.id}
-                  className={cn(
-                    'flex items-start gap-3 p-4 rounded-xl border-2 transition-all',
-                    selectedAddress === address.id
-                      ? 'border-[#1b8f5b] bg-[rgba(240,245,242,0.5)]'
-                      : 'border-[rgba(34,94,65,0.15)] bg-white'
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="address"
-                    value={address.id}
-                    checked={selectedAddress === address.id}
-                    onChange={(e) => setSelectedAddress(e.target.value)}
-                    className="mt-1 w-4 h-4 accent-[#1b8f5b] cursor-pointer"
-                  />
-                  <label className="flex-1 cursor-pointer" onClick={() => setSelectedAddress(address.id)}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-[#172022]">{address.name}</span>
-                      {address.isDefault && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-[#1b8f5b]">
-                          Default
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-[rgba(26,42,34,0.7)] mb-1">
-                      {address.address}, {address.city}, {address.state} - {address.pincode}
-                    </p>
-                    <p className="text-xs text-[rgba(26,42,34,0.6)]">{address.phone}</p>
-                  </label>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleOpenAddressPanel(address)
-                      }}
-                      className="p-2 text-[#1b8f5b] hover:bg-[rgba(240,245,242,0.5)] rounded-lg transition-colors"
-                      aria-label="Edit address"
-                    >
-                      <EditIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteAddress(address.id)
-                      }}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      aria-label="Delete address"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
+          {/* Delivery Address Display */}
+          {deliveryAddress ? (
+            <div className="p-4 rounded-xl border-2 border-[#1b8f5b] bg-[rgba(240,245,242,0.5)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold text-[#172022]">{deliveryAddress.name}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-[#1b8f5b]">
+                      Delivery Address
+                    </span>
                   </div>
+                  {deliveryAddress.address && (
+                    <p className="text-sm text-[rgba(26,42,34,0.7)] mb-1">{deliveryAddress.address}</p>
+                  )}
+                  <p className="text-sm text-[rgba(26,42,34,0.7)] mb-1">
+                    {deliveryAddress.city}, {deliveryAddress.state} - {deliveryAddress.pincode}
+                  </p>
+                  {deliveryAddress.phone && (
+                    <p className="text-xs text-[rgba(26,42,34,0.6)]">{deliveryAddress.phone}</p>
+                  )}
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-6 p-4 rounded-xl border border-[rgba(34,94,65,0.15)] bg-white">
-                <p className="text-sm text-[rgba(26,42,34,0.65)] mb-3">No addresses saved. Please add an address to continue.</p>
-                <button
-                  type="button"
-                  onClick={() => handleOpenAddressPanel()}
-                  className="px-4 py-2 rounded-xl bg-[#1b8f5b] text-white text-sm font-semibold hover:bg-[#2a9d61] transition-colors"
-                >
-                  + Add Address
-                </button>
               </div>
-            )}
-          </div>
-
-          {uniqueAddresses.length > 0 && (
-            <button
-              type="button"
-              className="w-full py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(240,245,242,0.5)] transition-colors"
-              onClick={() => handleOpenAddressPanel()}
-            >
-              + Add New Address
-            </button>
+              <button
+                type="button"
+                onClick={() => setShowChangeAddressPanel(true)}
+                className="mt-3 text-sm font-semibold text-[#1b8f5b] hover:text-[#2a9d61] transition-colors underline"
+              >
+                Want to change Delivery Address?
+              </button>
+            </div>
+          ) : (
+            <div className="text-center py-6 p-4 rounded-xl border border-red-200 bg-red-50">
+              <p className="text-sm text-red-700 mb-3">Delivery address is required to place an order.</p>
+              <button
+                type="button"
+                onClick={() => setShowChangeAddressPanel(true)}
+                className="px-4 py-2 rounded-xl bg-[#1b8f5b] text-white text-sm font-semibold hover:bg-[#2a9d61] transition-colors"
+              >
+                Add Delivery Address
+              </button>
+            </div>
           )}
 
           {/* Shipping Methods */}
@@ -882,12 +718,12 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
             type="button"
             className={cn(
               'w-full py-3.5 px-6 rounded-xl text-base font-bold transition-all',
-              currentStep === 2 && (!selectedAddress || uniqueAddresses.length === 0)
+              currentStep === 2 && !deliveryAddress
                 ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                 : 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white shadow-md hover:shadow-lg'
             )}
             onClick={handleNext}
-            disabled={currentStep === 2 && (!selectedAddress || uniqueAddresses.length === 0)}
+            disabled={currentStep === 2 && !deliveryAddress}
           >
             {currentStep === 1 ? 'Continue to Address & Shipping' : 'Continue to Payment'}
           </button>
@@ -897,12 +733,12 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
               type="button"
               className={cn(
                 'w-full py-3.5 px-6 rounded-xl text-base font-bold transition-all',
-                !selectedAddress
+                !deliveryAddress
                   ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                   : 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white shadow-md hover:shadow-lg'
               )}
               onClick={handlePlaceOrder}
-              disabled={!selectedAddress}
+              disabled={!deliveryAddress}
             >
               Pay ₹{amountDueNow.toLocaleString('en-IN')} & Place Order
             </button>
@@ -1020,134 +856,99 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
         </div>
       )}
 
-      {/* Address Form Panel */}
+      {/* Change Address Instructions Panel */}
       <div
         className={cn(
-          'user-address-panel',
-          showAddressPanel && 'user-address-panel--open'
+          'fixed inset-0 z-50 flex items-end justify-center bg-black bg-opacity-50 transition-opacity duration-300',
+          showChangeAddressPanel ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
-            handleCloseAddressPanel()
+            setShowChangeAddressPanel(false)
           }
         }}
       >
-        <div className="user-address-panel__content">
-          <div className="user-address-panel__header">
-            <h3 className="user-address-panel__title">
-              {editingAddress ? 'Edit Address' : 'Add New Address'}
-            </h3>
-            <button
-              type="button"
-              onClick={handleCloseAddressPanel}
-              className="user-address-panel__close"
-              aria-label="Close"
-            >
-              <XIcon className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div className="user-address-panel__form">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                  Address Label <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={addressForm.name}
-                  onChange={(e) => setAddressForm({ ...addressForm, name: e.target.value })}
-                  placeholder="Home, Office, etc."
-                  className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                  Street Address <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={addressForm.address}
-                  onChange={(e) => setAddressForm({ ...addressForm, address: e.target.value })}
-                  placeholder="Enter your street address"
-                  rows={3}
-                  className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b] resize-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    City <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addressForm.city}
-                    onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
-                    placeholder="City"
-                    className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    State <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addressForm.state}
-                    onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
-                    placeholder="State"
-                    className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    Pincode <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addressForm.pincode}
-                    onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
-                    placeholder="Pincode"
-                    maxLength={6}
-                    className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    Phone <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={addressForm.phone}
-                    onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
-                    placeholder="Phone number"
-                    maxLength={10}
-                    className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
-                  />
-                </div>
-              </div>
+        <div
+          className={cn(
+            'w-full max-w-md bg-white rounded-t-3xl shadow-2xl transform transition-transform duration-300 ease-out',
+            showChangeAddressPanel ? 'translate-y-0' : 'translate-y-full'
+          )}
+        >
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-[#172022]">Change Delivery Address</h3>
+              <button
+                type="button"
+                onClick={() => setShowChangeAddressPanel(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <XIcon className="h-5 w-5" />
+              </button>
             </div>
-          </div>
 
-          <div className="user-address-panel__footer">
-            <button
-              type="button"
-              onClick={handleCloseAddressPanel}
-              className="user-address-panel__cancel-btn"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveAddress}
-              className="user-address-panel__save-btn"
-            >
-              {editingAddress ? 'Update Address' : 'Save Address'}
-            </button>
+            <div className="space-y-4">
+              <p className="text-sm text-[rgba(26,42,34,0.7)] mb-4">
+                To change your delivery address, please follow these steps:
+              </p>
+
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1b8f5b] text-white flex items-center justify-center text-sm font-bold">
+                    1
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[#172022]">Go to Settings</p>
+                    <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">Navigate to your account settings</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1b8f5b] text-white flex items-center justify-center text-sm font-bold">
+                    2
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[#172022]">Locate Delivery Address</p>
+                    <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">Find the "Delivery Address" section</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1b8f5b] text-white flex items-center justify-center text-sm font-bold">
+                    3
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[#172022]">Click on Change Delivery Address</p>
+                    <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">Click the button to update your address</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1b8f5b] text-white flex items-center justify-center text-sm font-bold">
+                    4
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[#172022]">Update Your Address</p>
+                    <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">From there you can change your delivery address</p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowChangeAddressPanel(false)
+                  // Navigate to settings - you may need to adjust this based on your routing
+                  if (onBack) {
+                    // This will go back, but ideally should navigate to settings
+                    // You might want to add a prop for navigation
+                  }
+                }}
+                className="w-full mt-6 py-3 px-4 rounded-xl bg-[#1b8f5b] text-white text-sm font-semibold hover:bg-[#2a9d61] transition-colors"
+              >
+                Got it
+              </button>
+            </div>
           </div>
         </div>
       </div>

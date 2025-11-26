@@ -63,17 +63,13 @@ const vendorSchema = new mongoose.Schema({
     default: 0,
   },
   creditPolicy: {
-    limit: {
-      type: Number,
-      default: 0,
-    },
     repaymentDays: {
       type: Number,
       default: 30,
     },
     penaltyRate: {
       type: Number,
-      default: 0,
+      default: 2, // 2% default penalty rate
     },
     dueDate: Date,
   },
