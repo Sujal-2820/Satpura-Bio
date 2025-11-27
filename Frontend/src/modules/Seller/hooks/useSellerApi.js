@@ -44,7 +44,22 @@ export function useSellerApi() {
   const fetchDashboardOverview = useCallback(async () => {
     return handleApiCall(
       sellerApi.getDashboardOverview,
-      (data) => ({ type: 'SET_DASHBOARD_OVERVIEW', payload: data }),
+      (data) => {
+        // Transform backend response to frontend format
+        const transformed = {
+          totalReferrals: data.referrals?.total || 0,
+          activeReferrals: data.referrals?.active || 0,
+          currentMonthSales: data.sales?.currentMonth || 0,
+          currentMonthOrders: data.sales?.orderCount || 0,
+          averageOrderValue: data.sales?.averageOrderValue || 0,
+          monthlyTarget: data.target?.monthlyTarget || 0,
+          targetProgress: data.target?.progress || 0,
+          targetAchieved: data.target?.achieved || 0,
+          targetRemaining: data.target?.remaining || 0,
+          status: data.target?.progress >= 100 ? 'Target Achieved' : data.target?.progress >= 50 ? 'On Track' : 'Needs Attention',
+        }
+        return { type: 'SET_DASHBOARD_OVERVIEW', payload: transformed }
+      },
       'Failed to load dashboard overview',
     )
   }, [handleApiCall])
@@ -52,7 +67,17 @@ export function useSellerApi() {
   const fetchWalletData = useCallback(async () => {
     return handleApiCall(
       sellerApi.getWalletBalance,
-      (data) => ({ type: 'SET_WALLET_DATA', payload: data }),
+      (data) => {
+        // Transform backend response to frontend format
+        const transformed = {
+          balance: data.wallet?.balance || 0,
+          pending: data.wallet?.pending || 0,
+          available: data.wallet?.available || (data.wallet?.balance || 0) - (data.wallet?.pending || 0),
+          totalEarned: data.wallet?.balance || 0, // Total earned is same as balance for now
+          recentCommissions: data.recentCommissions || [],
+        }
+        return { type: 'SET_WALLET_DATA', payload: transformed }
+      },
       'Failed to load wallet data',
     )
   }, [handleApiCall])
@@ -60,7 +85,14 @@ export function useSellerApi() {
   const fetchReferrals = useCallback(async (params = {}) => {
     return handleApiCall(
       () => sellerApi.getReferrals(params),
-      (data) => ({ type: 'SET_REFERRALS_DATA', payload: data }),
+      (data) => {
+        // Transform backend response to frontend format
+        const transformed = {
+          referrals: data.referrals || [],
+          totalReferrals: data.totalReferrals || 0,
+        }
+        return { type: 'SET_REFERRALS_DATA', payload: transformed }
+      },
       'Failed to load referrals',
     )
   }, [handleApiCall])

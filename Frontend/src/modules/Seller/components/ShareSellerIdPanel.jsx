@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
+import { useSellerState } from '../context/SellerContext'
 import { sellerSnapshot } from '../services/sellerData'
 import { cn } from '../../../lib/cn'
 import { ShareIcon, CloseIcon, CheckCircleIcon } from './icons'
 
 export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
+  const { profile } = useSellerState()
   const [copied, setCopied] = useState(false)
-  const sellerId = sellerSnapshot.profile.sellerId
-  const sellerName = sellerSnapshot.profile.name
+  // Use real sellerId from profile context (from backend), fallback to snapshot if not available
+  const sellerId = profile.sellerId || sellerSnapshot.profile.sellerId
+  const sellerName = profile.name || sellerSnapshot.profile.name
   const shareText = `Hello! I'm ${sellerName}, your local IRA Sathi IRA Partner. Use my unique IRA Partner ID: *${sellerId}* when you register or place an order on the IRA Sathi app to get exclusive benefits and support. Download the app here: https://irasathi.com/download`
   const shareUrl = `https://irasathi.com/register?seller=${sellerId}`
 

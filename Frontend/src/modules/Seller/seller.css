@@ -707,6 +707,9 @@
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .seller-section__header {
@@ -1463,6 +1466,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .seller-referral-card__name {
@@ -1470,6 +1474,39 @@
   font-weight: 700;
   color: var(--seller-ink);
   margin: 0;
+  min-width: 0;
+  flex: 1;
+}
+
+.seller-referral-card__header-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.seller-referral-card__commission-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.seller-referral-card__commission-badge--standard {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.seller-referral-card__commission-badge--premium {
+  background: rgba(249, 115, 22, 0.1);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.2);
 }
 
 .seller-referral-card__status {
@@ -1649,6 +1686,26 @@
 .seller-referral-quick-stat--commission .seller-referral-quick-stat__value {
   color: var(--seller-green-600);
   font-size: 0.95rem;
+}
+
+.seller-referral-quick-stat--standard {
+  background: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.15);
+}
+
+.seller-referral-quick-stat--standard .seller-referral-quick-stat__value {
+  color: #3b82f6;
+  font-weight: 700;
+}
+
+.seller-referral-quick-stat--premium {
+  background: rgba(249, 115, 22, 0.05);
+  border-color: rgba(249, 115, 22, 0.15);
+}
+
+.seller-referral-quick-stat--premium .seller-referral-quick-stat__value {
+  color: #f97316;
+  font-weight: 700;
 }
 
 /* Empty State */
@@ -2934,6 +2991,9 @@
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .seller-performance-hero {
@@ -3000,18 +3060,22 @@
 .seller-performance-grid {
   display: grid;
   gap: 0.85rem;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  width: 100%;
 }
 
 .seller-performance-card {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 1.1rem 1.25rem;
+  padding: 1rem 1rem;
   border-radius: 18px;
   border: 1px solid rgba(34, 94, 65, 0.12);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 12px 28px -20px rgba(13, 38, 24, 0.3);
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .seller-performance-card__icon {
@@ -3052,6 +3116,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .seller-performance-card__label {
@@ -3068,11 +3134,15 @@
   font-weight: 700;
   color: var(--seller-green-600);
   margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .seller-performance-card__trend {
   font-size: 0.75rem;
   color: rgba(26, 42, 34, 0.6);
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .seller-performance-breakdown {
@@ -3182,6 +3252,556 @@
 .seller-performance-hero__back:hover {
   background: rgba(255, 255, 255, 0.3);
   transform: scale(1.1);
+}
+
+/* Commission Policy Section */
+.seller-commission-policy {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.seller-commission-policy__card {
+  padding: 1.5rem;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(240, 248, 242, 0.6) 0%, rgba(255, 255, 255, 0.9) 100%);
+  border: 1px solid rgba(27, 143, 91, 0.15);
+  box-shadow: 0 8px 24px -12px rgba(27, 143, 91, 0.2);
+}
+
+.seller-commission-policy__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.seller-commission-policy__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--seller-green-600);
+  margin: 0;
+}
+
+.seller-commission-policy__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.seller-commission-policy__slab {
+  padding: 1rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(34, 94, 65, 0.1);
+}
+
+.seller-commission-policy__slab--premium {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(255, 255, 255, 0.9) 100%);
+  border-color: rgba(249, 115, 22, 0.2);
+}
+
+.seller-commission-policy__slab-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.seller-commission-policy__slab-rate {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--seller-green-600);
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(27, 143, 91, 0.1);
+}
+
+.seller-commission-policy__slab-rate--premium {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.1);
+}
+
+.seller-commission-policy__slab-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(26, 42, 34, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.seller-commission-policy__slab-desc {
+  font-size: 0.8rem;
+  color: rgba(26, 42, 34, 0.65);
+  margin: 0.5rem 0;
+  line-height: 1.5;
+}
+
+.seller-commission-policy__slab-example {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(34, 94, 65, 0.1);
+}
+
+.seller-commission-policy__divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34, 94, 65, 0.2), transparent);
+  margin: 0.5rem 0;
+}
+
+.seller-commission-policy__footer {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(34, 94, 65, 0.1);
+}
+
+.seller-commission-policy__note {
+  font-size: 0.75rem;
+  color: rgba(26, 42, 34, 0.6);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Enhanced Performance Cards */
+.seller-performance-card--highlight {
+  border-color: rgba(27, 143, 91, 0.2);
+  background: linear-gradient(135deg, rgba(240, 248, 242, 0.6) 0%, rgba(255, 255, 255, 0.9) 100%);
+}
+
+.seller-performance-card__trend-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.seller-performance-card__trend-secondary {
+  font-size: 0.7rem;
+  color: rgba(26, 42, 34, 0.5);
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.seller-performance-card__trend--active {
+  color: var(--seller-green-600);
+  font-weight: 600;
+}
+
+.seller-performance-card__progress-ring {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  margin: 0.5rem auto;
+  flex-shrink: 0;
+}
+
+.seller-performance-card__progress-ring-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seller-performance-card__progress-ring-inner {
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seller-performance-card__progress-text {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--seller-green-600);
+}
+
+/* Enhanced Breakdown Card */
+.seller-performance-breakdown-card {
+  padding: 1.25rem;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(240, 248, 242, 0.4) 0%, rgba(255, 255, 255, 0.9) 100%);
+  border: 1px solid rgba(27, 143, 91, 0.15);
+  box-shadow: 0 8px 24px -12px rgba(27, 143, 91, 0.15);
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.seller-performance-breakdown-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.seller-performance-breakdown-card__target {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.seller-performance-breakdown-card__target-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(26, 42, 34, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+  word-break: break-word;
+}
+
+.seller-performance-breakdown-card__target-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--seller-green-600);
+  margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.seller-performance-breakdown-card__progress-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  background: rgba(27, 143, 91, 0.1);
+  border: 1px solid rgba(27, 143, 91, 0.2);
+  flex-shrink: 0;
+  min-width: 70px;
+}
+
+.seller-performance-breakdown-card__progress-percent {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--seller-green-600);
+  line-height: 1.2;
+}
+
+.seller-performance-breakdown-card__progress-label {
+  font-size: 0.65rem;
+  color: rgba(26, 42, 34, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.seller-performance-breakdown-card__progress {
+  margin-bottom: 1.25rem;
+}
+
+.seller-performance-breakdown-card__progress-bar {
+  height: 12px;
+  border-radius: 6px;
+  background: rgba(34, 94, 65, 0.1);
+  overflow: hidden;
+}
+
+.seller-performance-breakdown-card__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--seller-green-600) 0%, #2a9d61 100%);
+  border-radius: 6px;
+  transition: width 0.5s ease;
+}
+
+.seller-performance-breakdown-card__details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.seller-performance-breakdown-card__detail-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(34, 94, 65, 0.1);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.seller-performance-breakdown-card__detail-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.seller-performance-breakdown-card__detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.seller-performance-breakdown-card__detail-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: rgba(26, 42, 34, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+  word-break: break-word;
+}
+
+.seller-performance-breakdown-card__detail-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--seller-green-600);
+  margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.seller-performance-breakdown-card__detail-item--remaining .seller-performance-breakdown-card__detail-value {
+  color: #f97316;
+}
+
+/* Commission Breakdown */
+.seller-performance-commission-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.seller-performance-commission-card {
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(34, 94, 65, 0.12);
+  box-shadow: 0 8px 20px -12px rgba(13, 38, 24, 0.2);
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.seller-performance-commission-card--standard {
+  border-color: rgba(27, 143, 91, 0.2);
+  background: linear-gradient(135deg, rgba(240, 248, 242, 0.4) 0%, rgba(255, 255, 255, 0.9) 100%);
+}
+
+.seller-performance-commission-card--premium {
+  border-color: rgba(249, 115, 22, 0.2);
+  background: linear-gradient(135deg, rgba(255, 247, 237, 0.4) 0%, rgba(255, 255, 255, 0.9) 100%);
+}
+
+.seller-performance-commission-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.seller-performance-commission-card__rate {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--seller-green-600);
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(27, 143, 91, 0.1);
+}
+
+.seller-performance-commission-card--premium .seller-performance-commission-card__rate {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.1);
+}
+
+.seller-performance-commission-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.seller-performance-commission-card__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(26, 42, 34, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.seller-performance-commission-card__value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--seller-green-600);
+  margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.seller-performance-commission-card--premium .seller-performance-commission-card__value {
+  color: #f97316;
+}
+
+.seller-performance-commission-card__note {
+  font-size: 0.7rem;
+  color: rgba(26, 42, 34, 0.5);
+  margin: 0;
+}
+
+/* Enhanced Stats Grid */
+.seller-performance-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.seller-stat-card-enhanced {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(34, 94, 65, 0.12);
+  box-shadow: 0 8px 20px -12px rgba(13, 38, 24, 0.15);
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.seller-stat-card-enhanced__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.seller-stat-card-enhanced__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.seller-stat-card-enhanced__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(26, 42, 34, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.seller-stat-card-enhanced__value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--seller-green-600);
+  margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.seller-stat-card-enhanced__note {
+  font-size: 0.7rem;
+  color: rgba(26, 42, 34, 0.5);
+  margin: 0;
+}
+
+/* Top Users */
+.seller-performance-top-users {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.seller-performance-top-user-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(34, 94, 65, 0.12);
+  box-shadow: 0 4px 12px -8px rgba(13, 38, 24, 0.15);
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.seller-performance-top-user-card__rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(27, 143, 91, 0.1);
+  color: var(--seller-green-600);
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.seller-performance-top-user-card__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--seller-green-600) 0%, #2a9d61 100%);
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.seller-performance-top-user-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.seller-performance-top-user-card__name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--seller-ink);
+  margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.seller-performance-top-user-card__purchase {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--seller-green-600);
+  margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.seller-performance-top-user-card__commission {
+  font-size: 0.7rem;
+  color: rgba(26, 42, 34, 0.6);
+  margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Announcement Detail */

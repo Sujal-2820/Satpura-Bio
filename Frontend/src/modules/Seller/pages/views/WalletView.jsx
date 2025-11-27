@@ -38,11 +38,66 @@ export function WalletView({ openPanel }) {
         // Fetch wallet balance (stored in context)
         await fetchWalletData()
         
-        // Fetch transactions
-        const result = await sellerApi.getWalletTransactions({ limit: 50 })
-        if (result.success && result.data?.transactions) {
-          setTransactions(result.data.transactions)
+        // Fetch transactions (commissions)
+        const transactionsResult = await sellerApi.getWalletTransactions({ limit: 50 })
+        
+        // Fetch withdrawal requests
+        const withdrawalsResult = await sellerApi.getWithdrawalRequests({ limit: 50 })
+        
+        const allTransactions = []
+        
+        // Add commission transactions
+        if (transactionsResult.success && transactionsResult.data?.transactions) {
+          const commissionTransactions = transactionsResult.data.transactions.map((txn) => {
+            const userId = txn.userId?._id || txn.userId
+            const userName = txn.userId?.name || 'User'
+            const orderNumber = txn.orderId?.orderNumber || 'N/A'
+            
+            return {
+              id: txn._id || txn.id,
+              type: 'commission',
+              transactionType: 'commission',
+              amount: txn.commissionAmount || 0,
+              description: `Commission for order ${orderNumber}`,
+              note: `Commission earned from ${userName}`,
+              reason: `Order ${orderNumber}`,
+              status: txn.status === 'credited' ? 'Completed' : txn.status || 'Completed',
+              date: txn.createdAt || txn.creditedAt,
+              createdAt: txn.createdAt || txn.creditedAt,
+              userId: userId,
+              userName: userName,
+              orderId: txn.orderId?._id || txn.orderId,
+              orderNumber: orderNumber,
+              commissionRate: txn.commissionRate || 0,
+              orderAmount: txn.orderAmount || 0,
+            }
+          })
+          allTransactions.push(...commissionTransactions)
         }
+        
+        // Add withdrawal transactions
+        if (withdrawalsResult.success && withdrawalsResult.data?.withdrawals) {
+          const withdrawalTransactions = withdrawalsResult.data.withdrawals.map((wd) => ({
+            id: wd._id || wd.id,
+            type: 'withdrawal',
+            transactionType: 'withdrawal',
+            amount: -(wd.amount || 0), // Negative for withdrawals
+            description: `Withdrawal request`,
+            note: wd.notes || `Withdrawal of ₹${wd.amount}`,
+            reason: `Withdrawal request`,
+            status: wd.status === 'approved' ? 'Completed' : wd.status === 'rejected' ? 'Rejected' : 'Pending',
+            date: wd.createdAt,
+            createdAt: wd.createdAt,
+            withdrawalId: wd._id || wd.id,
+            paymentMethod: wd.paymentMethod || 'bank_transfer',
+          }))
+          allTransactions.push(...withdrawalTransactions)
+        }
+        
+        // Sort by date (newest first)
+        allTransactions.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))
+        
+        setTransactions(allTransactions)
       } catch (error) {
         console.error('Failed to fetch wallet data:', error)
       } finally {

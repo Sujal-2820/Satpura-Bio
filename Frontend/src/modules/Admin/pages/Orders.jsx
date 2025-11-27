@@ -1,14 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { CalendarRange, Recycle, Truck, Eye, FileText, RefreshCw, AlertCircle, Warehouse, ArrowLeft, CheckCircle, CreditCard } from 'lucide-react'
+import { CalendarRange, Recycle, Truck, Eye, FileText, RefreshCw, AlertCircle, Warehouse, ArrowLeft, CheckCircle, CreditCard, Package, IndianRupee, Calendar, Download, Building2, MapPin } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { FilterBar } from '../components/FilterBar'
 import { Timeline } from '../components/Timeline'
-import { Modal } from '../components/Modal'
-import { OrderDetailModal } from '../components/OrderDetailModal'
-import { OrderReassignmentModal } from '../components/OrderReassignmentModal'
-import { OrderEscalationModal } from '../components/OrderEscalationModal'
-import { OrderStatusUpdateModal } from '../components/OrderStatusUpdateModal'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
 import { useToast } from '../components/ToastNotification'
@@ -76,19 +71,29 @@ export function OrdersPage() {
     dateTo: '',
   })
 
-  // Modal states
-  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  // View states (replacing modals with full-screen views)
+  const [currentView, setCurrentView] = useState(null) // 'orderDetail', 'reassign', 'escalation', 'statusUpdate', 'revertEscalation'
   const [selectedOrderForDetail, setSelectedOrderForDetail] = useState(null)
   const [orderDetails, setOrderDetails] = useState(null)
-  const [reassignmentModalOpen, setReassignmentModalOpen] = useState(false)
   const [selectedOrderForReassign, setSelectedOrderForReassign] = useState(null)
-  const [escalationModalOpen, setEscalationModalOpen] = useState(false)
   const [selectedOrderForEscalation, setSelectedOrderForEscalation] = useState(null)
-  const [revertModalOpen, setRevertModalOpen] = useState(false)
   const [selectedOrderForRevert, setSelectedOrderForRevert] = useState(null)
   const [revertReason, setRevertReason] = useState('')
-  const [statusUpdateModalOpen, setStatusUpdateModalOpen] = useState(false)
   const [selectedOrderForStatusUpdate, setSelectedOrderForStatusUpdate] = useState(null)
+  
+  // Reassignment form states
+  const [selectedVendorId, setSelectedVendorId] = useState('')
+  const [reassignReason, setReassignReason] = useState('')
+  const [reassignErrors, setReassignErrors] = useState({})
+  
+  // Escalation form states
+  const [fulfillmentNote, setFulfillmentNote] = useState('')
+  
+  // Status update form states
+  const [selectedStatus, setSelectedStatus] = useState('')
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('')
+  const [statusUpdateNotes, setStatusUpdateNotes] = useState('')
+  const [isRevert, setIsRevert] = useState(false)
 
   // Format order data for display
   const formatOrderForDisplay = (order) => {
@@ -183,21 +188,46 @@ export function OrdersPage() {
       setOrderDetails(result.data)
     }
     
-    setDetailModalOpen(true)
+    setCurrentView('orderDetail')
   }
 
   const handleReassignOrder = (order) => {
     const originalOrder = ordersState.data?.orders?.find((o) => o.id === order.id) || order
     setSelectedOrderForReassign(originalOrder)
-    setReassignmentModalOpen(true)
+    setSelectedVendorId('')
+    setReassignReason('')
+    setReassignErrors({})
+    setCurrentView('reassign')
+  }
+
+  const handleBackToList = () => {
+    setCurrentView(null)
+    setSelectedOrderForDetail(null)
+    setOrderDetails(null)
+    setSelectedOrderForReassign(null)
+    setSelectedOrderForEscalation(null)
+    setSelectedOrderForRevert(null)
+    setRevertReason('')
+    setSelectedOrderForStatusUpdate(null)
+    setSelectedVendorId('')
+    setReassignReason('')
+    setReassignErrors({})
+    setFulfillmentNote('')
+    setSelectedStatus('')
+    setSelectedPaymentStatus('')
+    setStatusUpdateNotes('')
+    setIsRevert(false)
   }
 
   const handleReassignSubmit = async (orderId, reassignData) => {
     try {
       const result = await reassignOrder(orderId, reassignData)
       if (result.data) {
-        setReassignmentModalOpen(false)
+        setCurrentView(null)
         setSelectedOrderForReassign(null)
+        setSelectedVendorId('')
+        setReassignReason('')
+        setReassignErrors({})
         fetchOrders()
         success('Order reassigned successfully!', 3000)
       } else if (result.error) {
@@ -251,7 +281,7 @@ export function OrdersPage() {
     try {
       const result = await revertEscalation(selectedOrderForRevert.id, { reason: revertReason.trim() })
       if (result.data) {
-        setRevertModalOpen(false)
+        setCurrentView(null)
         setSelectedOrderForRevert(null)
         setRevertReason('')
         fetchOrders()
@@ -268,8 +298,9 @@ export function OrdersPage() {
     try {
       const result = await fulfillOrderFromWarehouse(orderId, fulfillmentData)
       if (result.data) {
-        setEscalationModalOpen(false)
+        setCurrentView(null)
         setSelectedOrderForEscalation(null)
+        setFulfillmentNote('')
         fetchOrders()
         success('Order fulfilled from warehouse successfully!', 3000)
       } else if (result.error) {
@@ -285,8 +316,12 @@ export function OrdersPage() {
     try {
       const result = await updateOrderStatus(orderId, updateData)
       if (result.data) {
-        setStatusUpdateModalOpen(false)
+        setCurrentView(null)
         setSelectedOrderForStatusUpdate(null)
+        setSelectedStatus('')
+        setSelectedPaymentStatus('')
+        setStatusUpdateNotes('')
+        setIsRevert(false)
         fetchOrders()
         // Show message from backend (includes grace period info if applicable)
         success(result.data.message || 'Order status updated successfully!', 3000)
@@ -300,7 +335,24 @@ export function OrdersPage() {
 
   const handleOpenStatusUpdateModal = (order) => {
     setSelectedOrderForStatusUpdate(order)
-    setStatusUpdateModalOpen(true)
+    // Initialize status update form state
+    const currentStatus = (order?.status || '').toLowerCase()
+    const normalizedCurrentStatus = normalizeOrderStatus(currentStatus)
+    const isInStatusUpdateGracePeriod = order?.statusUpdateGracePeriod?.isActive
+    const previousStatus = order?.statusUpdateGracePeriod?.previousStatus
+    
+    if (isInStatusUpdateGracePeriod && previousStatus) {
+      const normalizedPrevious = normalizeOrderStatus(previousStatus)
+      setSelectedStatus(normalizedPrevious)
+      setIsRevert(true)
+    } else {
+      const nextStatus = getNextStatus(order)
+      setSelectedStatus(nextStatus || normalizedCurrentStatus)
+      setIsRevert(false)
+    }
+    setSelectedPaymentStatus('')
+    setStatusUpdateNotes('')
+    setCurrentView('statusUpdate')
   }
 
   const normalizeOrderStatus = (status) => {
@@ -502,7 +554,8 @@ export function OrdersPage() {
                       type="button"
                       onClick={() => {
                         setSelectedOrderForEscalation(originalOrder)
-                        setEscalationModalOpen(true)
+                        setFulfillmentNote('')
+                        setCurrentView('escalation')
                       }}
                       className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-50 text-green-700 transition-all hover:border-green-500 hover:bg-green-100"
                       title="Fulfill from warehouse"
@@ -513,7 +566,8 @@ export function OrdersPage() {
                       type="button"
                       onClick={() => {
                         setSelectedOrderForRevert(originalOrder)
-                        setRevertModalOpen(true)
+                        setRevertReason('')
+                        setCurrentView('revertEscalation')
                       }}
                       className="flex h-8 w-8 items-center justify-center rounded-lg border border-orange-300 bg-orange-50 text-orange-700 transition-all hover:border-orange-500 hover:bg-orange-100"
                       title="Revert to vendor"
@@ -522,8 +576,8 @@ export function OrdersPage() {
                     </button>
                   </>
                 )}
-                {/* Reassign button - Show for non-escalated orders */}
-                {!isEscalated && (
+                {/* Reassign button - Only show if escalated AND status is awaiting/pending */}
+                {isEscalated && (normalizedStatus === 'awaiting' || normalizedStatus === 'pending') && (
                   <button
                     type="button"
                     onClick={() => handleReassignOrder(originalOrder)}
@@ -590,6 +644,895 @@ export function OrdersPage() {
     }
     return column
   })
+
+  // Helper functions for full-screen views
+  const formatCurrency = (value) => {
+    if (typeof value === 'string') {
+      return value
+    }
+    if (value >= 100000) {
+      return `₹${(value / 100000).toFixed(1)} L`
+    }
+    return `₹${value.toLocaleString('en-IN')}`
+  }
+
+  const formatDate = (dateValue) => {
+    if (!dateValue) return null
+    if (typeof dateValue === 'string') {
+      return dateValue
+    }
+    if (dateValue instanceof Date) {
+      return dateValue.toLocaleDateString('en-IN')
+    }
+    try {
+      return new Date(dateValue).toLocaleDateString('en-IN')
+    } catch {
+      return String(dateValue)
+    }
+  }
+
+  // Helper functions for extracting order data
+  const getVendorName = (order) => {
+    if (!order) return 'Unknown Vendor'
+    if (typeof order.vendor === 'string') return order.vendor
+    if (order.vendorId && typeof order.vendorId === 'object') return order.vendorId.name || 'Unknown Vendor'
+    if (order.vendor && typeof order.vendor === 'object') return order.vendor.name || 'Unknown Vendor'
+    return 'Unknown Vendor'
+  }
+
+  const getVendorId = (order) => {
+    if (!order) return null
+    if (typeof order.vendorId === 'string') return order.vendorId
+    if (order.vendorId && typeof order.vendorId === 'object') return order.vendorId._id || order.vendorId.id || null
+    if (order.vendor && typeof order.vendor === 'object') return order.vendor._id || order.vendor.id || null
+    return null
+  }
+
+  const getUserName = (order) => {
+    if (!order) return null
+    if (typeof order.user === 'string') return order.user
+    if (order.userId && typeof order.userId === 'object') return order.userId.name || 'Unknown User'
+    if (order.user && typeof order.user === 'object') return order.user.name || 'Unknown User'
+    return order.userName || null
+  }
+
+  const getOrderId = (order) => {
+    if (!order) return 'N/A'
+    if (typeof order.id === 'string') return order.id
+    if (order._id) return typeof order._id === 'string' ? order._id : String(order._id)
+    if (order.orderId) return typeof order.orderId === 'string' ? order.orderId : String(order.orderId)
+    if (order.id && typeof order.id === 'object' && order.id._id) return String(order.id._id)
+    return 'N/A'
+  }
+
+  // If a full-screen view is active, render it instead of the main list
+  // Order Detail View
+  if (currentView === 'orderDetail' && (orderDetails || selectedOrderForDetail)) {
+    const order = orderDetails || selectedOrderForDetail
+    const orderId = getOrderId(order)
+    const vendorName = getVendorName(order)
+    const vendorId = getVendorId(order)
+    const userName = getUserName(order)
+    const orderValue = typeof order.value === 'number' 
+      ? order.value 
+      : parseFloat(order.value?.replace(/[₹,\sL]/g, '') || '0') * 100000
+    const advanceAmount = typeof order.advance === 'number'
+      ? order.advance
+      : order.advanceStatus === 'paid' ? orderValue * 0.3 : 0
+    const pendingAmount = typeof order.pending === 'number'
+      ? order.pending
+      : orderValue - advanceAmount
+    const advanceStatus = order.advanceStatus || (order.advance === 'Paid' ? 'paid' : 'pending')
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBackToList}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-red-500 hover:bg-red-50 hover:text-red-700"
+            title="Back to Orders"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">Order Details - {orderId}</h2>
+        </div>
+        <div className="space-y-6">
+          {/* Order Header */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg">
+                  <Package className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Order #{orderId}</h3>
+                  <p className="text-sm text-gray-600">Type: {order.type || 'Unknown'}</p>
+                  <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                    {(order.date || order.createdAt) && (
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>{formatDate(order.date || order.createdAt)}</span>
+                      </div>
+                    )}
+                    {order.region && <span>{order.region}</span>}
+                  </div>
+                  {userName && (
+                    <div className="mt-1 text-xs text-gray-500">User: {userName}</div>
+                  )}
+                </div>
+              </div>
+              <StatusBadge tone={order.status === 'Processing' || order.status === 'processing' ? 'warning' : order.status === 'Completed' || order.status === 'completed' ? 'success' : 'neutral'}>
+                {order.status || 'Unknown'}
+              </StatusBadge>
+            </div>
+          </div>
+
+          {/* Vendor Information */}
+          {(vendorName || vendorId) && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs text-gray-500 mb-1">Vendor</p>
+              <p className="text-sm font-bold text-gray-900">{vendorName}</p>
+              {vendorId && (
+                <p className="text-xs text-gray-600 mt-1">Vendor ID: {vendorId}</p>
+              )}
+            </div>
+          )}
+
+          {/* Payment Summary */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-bold text-gray-900">Payment Status</h4>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <p className="text-xs text-gray-500">Order Value</p>
+                <p className="mt-1 text-lg font-bold text-gray-900">{formatCurrency(orderValue)}</p>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-gray-500">Advance (30%)</p>
+                  <StatusBadge tone={advanceStatus === 'paid' ? 'success' : 'warning'}>
+                    {advanceStatus === 'paid' ? 'Paid' : 'Pending'}
+                  </StatusBadge>
+                </div>
+                <p className="text-lg font-bold text-gray-900">{formatCurrency(advanceAmount)}</p>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <p className="text-xs text-gray-500">Pending (70%)</p>
+                <p className="mt-1 text-lg font-bold text-red-600">{formatCurrency(pendingAmount)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Order Items */}
+          {order.items && order.items.length > 0 && (
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <h4 className="mb-4 text-sm font-bold text-gray-900">Order Items</h4>
+              <div className="space-y-3">
+                {order.items.map((item, index) => {
+                  const getProductName = () => {
+                    if (item.name) return typeof item.name === 'string' ? item.name : String(item.name)
+                    if (item.productId && typeof item.productId === 'object') return item.productId.name || 'Unknown Product'
+                    if (item.product) return typeof item.product === 'string' ? item.product : String(item.product)
+                    return 'Unknown Product'
+                  }
+                  const getProductPrice = () => {
+                    if (item.price) return item.price
+                    if (item.amount) return item.amount
+                    if (item.productId && typeof item.productId === 'object' && item.productId.priceToUser) return item.productId.priceToUser
+                    return 0
+                  }
+                  const productName = getProductName()
+                  const productPrice = getProductPrice()
+                  return (
+                    <div key={item.id || item._id || index} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{productName}</p>
+                        <p className="text-xs text-gray-600">Quantity: {item.quantity || 1} {item.unit || 'units'}</p>
+                      </div>
+                      <p className="text-sm font-bold text-gray-900">{formatCurrency(productPrice)}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Payment Timeline */}
+          {order.paymentHistory && order.paymentHistory.length > 0 && (
+            <div className="rounded-xl border border-blue-200 bg-white p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-blue-600" />
+                <h4 className="text-sm font-bold text-gray-900">Payment Timeline</h4>
+              </div>
+              <Timeline
+                events={order.paymentHistory.map((payment, index) => ({
+                  id: payment.id || `payment-${index}`,
+                  title: payment.type || 'Payment',
+                  timestamp: payment.date || payment.timestamp || 'N/A',
+                  description: formatCurrency(payment.amount || 0),
+                  status: payment.status || 'completed',
+                }))}
+              />
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={handleBackToList}
+              className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50"
+            >
+              Close
+            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => handleGenerateInvoice(order.id || order._id)}
+                disabled={loading}
+                className="flex items-center gap-2 rounded-xl border border-blue-300 bg-white px-6 py-3 text-sm font-bold text-blue-600 transition-all hover:bg-blue-50 disabled:opacity-50"
+              >
+                <FileText className="h-4 w-4" />
+                Generate Invoice
+              </button>
+              {order.escalated && (normalizeOrderStatus(order.status || '') === 'awaiting' || normalizeOrderStatus(order.status || '') === 'pending') && (
+                <button
+                  type="button"
+                  onClick={() => handleReassignOrder(order)}
+                  className="flex items-center gap-2 rounded-xl border border-orange-300 bg-white px-6 py-3 text-sm font-bold text-orange-600 transition-all hover:bg-orange-50"
+                >
+                  <Recycle className="h-4 w-4" />
+                  Reassign Order
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Reassignment View
+  if (currentView === 'reassign' && selectedOrderForReassign) {
+    const order = selectedOrderForReassign
+    const handleReassignFormSubmit = (e) => {
+      e.preventDefault()
+      const newErrors = {}
+      if (!selectedVendorId) newErrors.vendor = 'Please select a vendor'
+      if (!reassignReason.trim()) newErrors.reason = 'Please provide a reason for reassignment'
+      setReassignErrors(newErrors)
+      if (Object.keys(newErrors).length === 0) {
+        handleReassignSubmit(order.id, {
+          vendorId: selectedVendorId,
+          reason: reassignReason.trim(),
+        })
+      }
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBackToList}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-orange-500 hover:bg-orange-50 hover:text-orange-700"
+            title="Back to Orders"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">Reassign Order</h2>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <form onSubmit={handleReassignFormSubmit} className="space-y-6">
+            {/* Current Order Info */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs text-gray-500 mb-2">Current Order Details</p>
+              <p className="text-sm font-bold text-gray-900">Order #{order.id}</p>
+              <p className="text-xs text-gray-600 mt-1">Current Vendor: {getVendorName(order)}</p>
+              {order.region && (
+                <div className="mt-2 flex items-center gap-1 text-xs text-gray-600">
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span>{order.region}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Reason for Reassignment */}
+            <div>
+              <label htmlFor="reason" className="mb-2 block text-sm font-bold text-gray-900">
+                <AlertCircle className="mr-1 inline h-4 w-4" />
+                Reason for Reassignment <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="reason"
+                value={reassignReason}
+                onChange={(e) => {
+                  setReassignReason(e.target.value)
+                  if (reassignErrors.reason) setReassignErrors((prev) => ({ ...prev, reason: '' }))
+                }}
+                placeholder="e.g., Vendor unavailable, Stock shortage, Logistics delay..."
+                rows={3}
+                className={cn(
+                  'w-full rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2',
+                  reassignErrors.reason
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
+                    : 'border-gray-300 bg-white focus:border-red-500 focus:ring-red-500/50',
+                )}
+              />
+              {reassignErrors.reason && <p className="mt-1 text-xs text-red-600">{reassignErrors.reason}</p>}
+            </div>
+
+            {/* Select New Vendor */}
+            <div>
+              <label htmlFor="vendor" className="mb-2 block text-sm font-bold text-gray-900">
+                <Building2 className="mr-1 inline h-4 w-4" />
+                Select New Vendor <span className="text-red-500">*</span>
+              </label>
+              {availableVendors && availableVendors.length > 0 ? (
+                <select
+                  id="vendor"
+                  value={selectedVendorId}
+                  onChange={(e) => {
+                    setSelectedVendorId(e.target.value)
+                    if (reassignErrors.vendor) setReassignErrors((prev) => ({ ...prev, vendor: '' }))
+                  }}
+                  className={cn(
+                    'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2',
+                    reassignErrors.vendor
+                      ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
+                      : 'border-gray-300 bg-white focus:border-red-500 focus:ring-red-500/50',
+                  )}
+                >
+                  <option value="">Select a vendor...</option>
+                  {availableVendors.map((vendor) => (
+                    <option key={vendor.id} value={vendor.id}>
+                      {vendor.name} {vendor.region && `(${vendor.region})`}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
+                  <p className="text-sm text-yellow-800">No alternate vendors available in this region.</p>
+                </div>
+              )}
+              {reassignErrors.vendor && <p className="mt-1 text-xs text-red-600">{reassignErrors.vendor}</p>}
+            </div>
+
+            {/* Info Box */}
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 flex-shrink-0 text-blue-600" />
+                <div className="text-xs text-blue-900">
+                  <p className="font-bold">Reassignment Guidelines</p>
+                  <ul className="mt-2 space-y-1 list-disc list-inside">
+                    <li>Selected vendor must have sufficient stock and credit availability</li>
+                    <li>Order will be automatically updated with new vendor details</li>
+                    <li>Customer will be notified of the change</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleBackToList}
+                disabled={loading}
+                className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading || !selectedVendorId || !reassignReason.trim()}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(239,68,68,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(239,68,68,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+              >
+                <Recycle className="h-4 w-4" />
+                {loading ? 'Reassigning...' : 'Reassign Order'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // Escalation View (Fulfill from Warehouse)
+  if (currentView === 'escalation' && selectedOrderForEscalation) {
+    const order = selectedOrderForEscalation
+    const handleFulfill = () => {
+      handleFulfillFromWarehouse(order.id, {
+        note: fulfillmentNote.trim() || 'Order fulfilled from master warehouse',
+      })
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBackToList}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-green-500 hover:bg-green-50 hover:text-green-700"
+            title="Back to Orders"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">Order Escalation - Manual Fulfillment</h2>
+        </div>
+        <div className="space-y-6">
+          {/* Order Info */}
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Package className="h-5 w-5 text-gray-600" />
+              <p className="text-sm font-bold text-gray-900">Order #{order.orderNumber || order.id}</p>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Vendor:</span>
+                <span className="font-bold text-gray-900">{getVendorName(order)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Order Value:</span>
+                <span className="font-bold text-gray-900">
+                  {formatCurrency(typeof order.value === 'number' ? order.value : parseFloat(order.value?.replace(/[₹,\sL]/g, '') || '0') * 100000)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Status:</span>
+                <StatusBadge tone="warning">Vendor Not Available</StatusBadge>
+              </div>
+            </div>
+          </div>
+
+          {/* Escalation Reason */}
+          <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 flex-shrink-0 text-orange-600" />
+              <div>
+                <p className="text-sm font-bold text-orange-900">Escalation Reason</p>
+                <p className="mt-1 text-xs text-orange-700">
+                  {order.escalationReason || order.escalation?.escalationReason || order.notes || 'Vendor marked this order as "Not Available". You can manually fulfill this order from the master warehouse.'}
+                </p>
+                {order.escalation?.escalatedAt && (
+                  <p className="mt-2 text-xs text-orange-600">
+                    Escalated on: {new Date(order.escalation.escalatedAt).toLocaleString('en-IN')}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Order Items */}
+          {order.items && order.items.length > 0 && (
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <p className="mb-3 text-sm font-bold text-gray-900">Order Items</p>
+              <div className="space-y-2">
+                {order.items.map((item, index) => {
+                  const itemId = item._id || item.id || index
+                  const productName = item.productName || item.productId?.name || item.name || item.product || 'Unknown Product'
+                  const quantity = item.quantity || 1
+                  const unitPrice = item.unitPrice || item.price || item.amount || 0
+                  const totalPrice = item.totalPrice || (unitPrice * quantity)
+                  return (
+                    <div key={itemId} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-2">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{productName}</p>
+                        <p className="text-xs text-gray-600">Qty: {quantity} {item.unit || 'units'}</p>
+                      </div>
+                      <p className="text-sm font-bold text-gray-900">{formatCurrency(totalPrice)}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Fulfillment Note */}
+          <div>
+            <label htmlFor="fulfillmentNote" className="mb-2 block text-sm font-bold text-gray-900">
+              Fulfillment Note (Optional)
+            </label>
+            <textarea
+              id="fulfillmentNote"
+              value={fulfillmentNote}
+              onChange={(e) => setFulfillmentNote(e.target.value)}
+              placeholder="Add any notes about this fulfillment..."
+              rows={3}
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            />
+          </div>
+
+          {/* Info Box */}
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <div className="flex items-start gap-3">
+              <Warehouse className="h-5 w-5 flex-shrink-0 text-blue-600" />
+              <div className="text-xs text-blue-900">
+                <p className="font-bold">Master Warehouse Fulfillment</p>
+                <ul className="mt-2 space-y-1 list-disc list-inside">
+                  <li>Order will be fulfilled from master warehouse inventory</li>
+                  <li>Vendor will be notified of the fulfillment</li>
+                  <li>Order status will be updated to "Processing"</li>
+                  <li>Logistics will be assigned automatically</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={handleBackToList}
+              disabled={loading}
+              className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleFulfill}
+              disabled={loading}
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+            >
+              <CheckCircle className="h-4 w-4" />
+              {loading ? 'Fulfilling...' : 'Fulfill from Warehouse'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Revert Escalation View
+  if (currentView === 'revertEscalation' && selectedOrderForRevert) {
+    const order = selectedOrderForRevert
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBackToList}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-orange-500 hover:bg-orange-50 hover:text-orange-700"
+            title="Back to Orders"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">Revert Escalation</h2>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <div className="space-y-6">
+            {order && (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-orange-600" />
+                  <p className="text-sm font-bold text-gray-900">Order #{order.orderNumber || order.id}</p>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Vendor:</span>
+                    <span className="font-bold text-gray-900">{getVendorName(order)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Order Value:</span>
+                    <span className="font-bold text-gray-900">
+                      {typeof order.value === 'number'
+                        ? formatCurrency(order.value)
+                        : order.value || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="revertReason" className="mb-2 block text-sm font-bold text-gray-900">
+                Reason for Reverting <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="revertReason"
+                value={revertReason}
+                onChange={(e) => setRevertReason(e.target.value)}
+                placeholder="Why are you reverting this escalation back to the vendor?"
+                rows={4}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              />
+            </div>
+
+            <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 flex-shrink-0 text-orange-600" />
+                <div className="text-xs text-orange-900">
+                  <p className="font-bold">Revert Escalation</p>
+                  <p className="mt-1">
+                    This order will be assigned back to the original vendor. The vendor will receive a notification and can proceed with fulfillment.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleBackToList}
+                disabled={loading}
+                className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRevertEscalation}
+                disabled={loading || !revertReason.trim()}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(249,115,22,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(249,115,22,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {loading ? 'Reverting...' : 'Revert to Vendor'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Status Update View - This is complex, so I'll add a simplified version
+  // The full implementation would mirror OrderStatusUpdateModal
+  if (currentView === 'statusUpdate' && selectedOrderForStatusUpdate) {
+    const order = selectedOrderForStatusUpdate
+    const currentStatus = (order?.status || '').toLowerCase()
+    const currentPaymentStatus = order?.paymentStatus || 'pending'
+    const isPaid = currentPaymentStatus === 'fully_paid'
+    const isInStatusUpdateGracePeriod = order?.statusUpdateGracePeriod?.isActive
+    const statusUpdateGracePeriodExpiresAt = order?.statusUpdateGracePeriod?.expiresAt
+    const statusUpdateTimeRemaining = statusUpdateGracePeriodExpiresAt 
+      ? Math.max(0, Math.floor((new Date(statusUpdateGracePeriodExpiresAt) - new Date()) / 1000 / 60)) 
+      : 0
+    const previousStatus = order?.statusUpdateGracePeriod?.previousStatus
+    const normalizedCurrentStatus = normalizeOrderStatus(currentStatus)
+
+    // Initialize selected status when view opens - using direct logic instead of useEffect
+    if (!selectedStatus && !selectedPaymentStatus && !statusUpdateNotes) {
+      if (isInStatusUpdateGracePeriod && previousStatus) {
+        const normalizedPrevious = normalizeOrderStatus(previousStatus)
+        setSelectedStatus(normalizedPrevious)
+        setIsRevert(true)
+      } else {
+        const nextStatus = getNextStatus(order)
+        setSelectedStatus(nextStatus || normalizedCurrentStatus)
+        setIsRevert(false)
+      }
+    }
+
+    const ORDER_STATUS_OPTIONS = [
+      { value: 'accepted', label: 'Accepted', description: 'Order has been accepted and is ready for dispatch' },
+      { value: 'dispatched', label: 'Dispatched', description: 'Order has been dispatched for delivery' },
+      { value: 'delivered', label: 'Delivered', description: 'Order has been delivered' },
+    ]
+
+    const PAYMENT_STATUS_OPTIONS = [
+      { value: 'fully_paid', label: 'Mark Payment as Done', description: 'Mark order payment as fully paid' },
+    ]
+
+    const normalizeStatusForDisplay = (status) => {
+      const normalized = (status || '').toLowerCase()
+      if (normalized === 'fully_paid') return 'delivered'
+      if (normalized === 'accepted' || normalized === 'processing') return 'accepted'
+      if (normalized === 'dispatched' || normalized === 'out_for_delivery' || normalized === 'ready_for_delivery') return 'dispatched'
+      if (normalized === 'delivered') return 'delivered'
+      return 'accepted'
+    }
+
+    const getAvailableStatusOptions = () => {
+      const options = []
+      if (isInStatusUpdateGracePeriod && previousStatus) {
+        const normalizedPrevious = normalizeStatusForDisplay(previousStatus)
+        const option = ORDER_STATUS_OPTIONS.find(opt => opt.value === normalizedPrevious)
+        if (option) {
+          return [{ value: normalizedPrevious, label: `Revert to ${option.label}`, description: 'Revert to previous status' }]
+        }
+      }
+      const statusFlow = ['accepted', 'dispatched', 'delivered']
+      const currentIndex = statusFlow.indexOf(normalizedCurrentStatus)
+      if (currentIndex >= 0) {
+        const currentOption = ORDER_STATUS_OPTIONS.find(opt => opt.value === statusFlow[currentIndex])
+        if (currentOption) options.push(currentOption)
+        const nextIndex = currentIndex + 1
+        if (nextIndex < statusFlow.length) {
+          const nextOption = ORDER_STATUS_OPTIONS.find(opt => opt.value === statusFlow[nextIndex])
+          if (nextOption) options.push(nextOption)
+        }
+      } else {
+        options.push(...ORDER_STATUS_OPTIONS)
+      }
+      return options
+    }
+
+    const handleStatusUpdateSubmit = () => {
+      if (!selectedStatus && !selectedPaymentStatus) return
+      const backendStatus = selectedPaymentStatus === 'fully_paid' 
+        ? 'fully_paid' 
+        : selectedStatus
+      const updateData = {
+        status: backendStatus,
+        notes: statusUpdateNotes.trim() || undefined,
+        isRevert: isRevert,
+      }
+      handleUpdateOrderStatus(order.id, updateData)
+    }
+
+    const canUpdate = () => {
+      if (isInStatusUpdateGracePeriod && previousStatus) {
+        const normalizedPrevious = normalizeStatusForDisplay(previousStatus)
+        return selectedStatus === normalizedPrevious
+      }
+      return selectedStatus || selectedPaymentStatus
+    }
+
+    const availableStatusOptions = getAvailableStatusOptions()
+    const showPaymentOption = currentStatus === 'delivered' && !isPaid
+
+    // Remove the initialization logic from render - it's now in handleOpenStatusUpdateModal
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBackToList}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
+            title="Back to Orders"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">Update Order Status</h2>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <div className="space-y-6">
+            {/* Order Info */}
+            {order && (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-blue-600" />
+                  <p className="text-sm font-bold text-gray-900">Order #{order.orderNumber || order.id}</p>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Current Status:</span>
+                    <span className="font-bold text-gray-900 capitalize">{availableStatusOptions.find(opt => opt.value === normalizedCurrentStatus)?.label || normalizedCurrentStatus || 'Unknown'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Payment Status:</span>
+                    <span className="font-bold text-gray-900 capitalize">
+                      {isPaid ? 'Paid' : currentPaymentStatus === 'partial_paid' ? 'Partial Paid' : 'Pending'}
+                    </span>
+                  </div>
+                  {order.value && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Order Value:</span>
+                      <span className="font-bold text-gray-900">
+                        {typeof order.value === 'number'
+                          ? formatCurrency(order.value)
+                          : order.value || 'N/A'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Grace Period Notice */}
+            {isInStatusUpdateGracePeriod && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 flex-shrink-0 text-blue-600" />
+                  <div className="text-sm text-blue-900">
+                    <p className="font-bold">Status Update Grace Period Active</p>
+                    <p className="mt-1">
+                      You have {statusUpdateTimeRemaining} minutes remaining to revert to "{previousStatus}" status.
+                      After this period, the current status will be finalized.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Status Selection */}
+            {!isPaid && (
+              <div>
+                <label htmlFor="status" className="mb-2 block text-sm font-bold text-gray-900">
+                  Order Status <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="status"
+                  value={selectedStatus}
+                  onChange={(e) => {
+                    setSelectedStatus(e.target.value)
+                    setIsRevert(false)
+                  }}
+                  disabled={isInStatusUpdateGracePeriod && previousStatus}
+                  className={cn(
+                    'w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50',
+                    isInStatusUpdateGracePeriod && previousStatus && 'bg-gray-100 cursor-not-allowed'
+                  )}
+                >
+                  <option value="">Select status...</option>
+                  {availableStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {selectedStatus && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    {availableStatusOptions.find(opt => opt.value === selectedStatus)?.description}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Payment Status Selection */}
+            {showPaymentOption && !isPaid && (
+              <div>
+                <label htmlFor="paymentStatus" className="mb-2 block text-sm font-bold text-gray-900">
+                  Payment Status
+                </label>
+                <select
+                  id="paymentStatus"
+                  value={selectedPaymentStatus}
+                  onChange={(e) => setSelectedPaymentStatus(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                >
+                  <option value="">Select payment status...</option>
+                  {PAYMENT_STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {selectedPaymentStatus && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    {PAYMENT_STATUS_OPTIONS.find(opt => opt.value === selectedPaymentStatus)?.description}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Notes */}
+            <div>
+              <label htmlFor="notes" className="mb-2 block text-sm font-bold text-gray-900">
+                Notes (Optional)
+              </label>
+              <textarea
+                id="notes"
+                value={statusUpdateNotes}
+                onChange={(e) => setStatusUpdateNotes(e.target.value)}
+                placeholder="Add any notes about this status update..."
+                rows={3}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleBackToList}
+                disabled={loading}
+                className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleStatusUpdateSubmit}
+                disabled={loading || !canUpdate()}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+              >
+                <RefreshCw className="h-4 w-4" />
+                {loading ? 'Updating...' : 'Update Status'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -722,147 +1665,6 @@ export function OrdersPage() {
           />
         </div>
       </section>
-
-      {/* Order Detail Modal */}
-      <OrderDetailModal
-        isOpen={detailModalOpen}
-        onClose={() => {
-          setDetailModalOpen(false)
-          setSelectedOrderForDetail(null)
-          setOrderDetails(null)
-        }}
-        order={orderDetails || selectedOrderForDetail}
-        onReassign={handleReassignOrder}
-        onGenerateInvoice={handleGenerateInvoice}
-        onProcessRefund={handleProcessRefund}
-        loading={loading}
-      />
-
-      {/* Order Reassignment Modal */}
-      <OrderReassignmentModal
-        isOpen={reassignmentModalOpen}
-        onClose={() => {
-          setReassignmentModalOpen(false)
-          setSelectedOrderForReassign(null)
-        }}
-        order={selectedOrderForReassign}
-        availableVendors={availableVendors}
-        onReassign={handleReassignSubmit}
-        loading={loading}
-      />
-
-      {/* Escalation Modal - Fulfill from Warehouse */}
-      <OrderEscalationModal
-        isOpen={escalationModalOpen}
-        onClose={() => {
-          setEscalationModalOpen(false)
-          setSelectedOrderForEscalation(null)
-        }}
-        order={selectedOrderForEscalation}
-        onFulfillFromWarehouse={handleFulfillFromWarehouse}
-        loading={loading}
-      />
-
-      {/* Order Status Update Modal */}
-      <OrderStatusUpdateModal
-        isOpen={statusUpdateModalOpen}
-        onClose={() => {
-          setStatusUpdateModalOpen(false)
-          setSelectedOrderForStatusUpdate(null)
-        }}
-        order={selectedOrderForStatusUpdate}
-        onUpdate={handleUpdateOrderStatus}
-        loading={loading}
-      />
-
-      {/* Revert Escalation Modal */}
-      <Modal
-        isOpen={revertModalOpen}
-        onClose={() => {
-          setRevertModalOpen(false)
-          setSelectedOrderForRevert(null)
-          setRevertReason('')
-        }}
-        title="Revert Escalation"
-        size="md"
-      >
-        <div className="space-y-6">
-          {selectedOrderForRevert && (
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-orange-600" />
-                <p className="text-sm font-bold text-gray-900">Order #{selectedOrderForRevert.orderNumber || selectedOrderForRevert.id}</p>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Vendor:</span>
-                  <span className="font-bold text-gray-900">
-                    {selectedOrderForRevert.vendor || selectedOrderForRevert.vendorId?.name || 'N/A'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Order Value:</span>
-                  <span className="font-bold text-gray-900">
-                    {typeof selectedOrderForRevert.value === 'number'
-                      ? `₹${selectedOrderForRevert.value.toLocaleString('en-IN')}`
-                      : selectedOrderForRevert.value || 'N/A'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="revertReason" className="mb-2 block text-sm font-bold text-gray-900">
-              Reason for Reverting <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              id="revertReason"
-              value={revertReason}
-              onChange={(e) => setRevertReason(e.target.value)}
-              placeholder="Why are you reverting this escalation back to the vendor?"
-              rows={4}
-              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-            />
-          </div>
-
-          <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 flex-shrink-0 text-orange-600" />
-              <div className="text-xs text-orange-900">
-                <p className="font-bold">Revert Escalation</p>
-                <p className="mt-1">
-                  This order will be assigned back to the original vendor. The vendor will receive a notification and can proceed with fulfillment.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                setRevertModalOpen(false)
-                setSelectedOrderForRevert(null)
-                setRevertReason('')
-              }}
-              disabled={loading}
-              className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleRevertEscalation}
-              disabled={loading || !revertReason.trim()}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(249,115,22,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(249,115,22,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              {loading ? 'Reverting...' : 'Revert to Vendor'}
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   )
 }

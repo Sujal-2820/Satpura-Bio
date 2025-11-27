@@ -1,29 +1,91 @@
-import { useMemo } from 'react'
-import { sellerSnapshot } from '../../services/sellerData'
+import { useMemo, useEffect, useState } from 'react'
+import { useSellerState } from '../../context/SellerContext'
+import { useSellerApi } from '../../hooks/useSellerApi'
 import { cn } from '../../../../lib/cn'
-import { TrendingUpIcon, TargetIcon, UsersIcon, WalletIcon, CloseIcon } from '../../components/icons'
+import { TrendingUpIcon, UsersIcon, WalletIcon, CloseIcon } from '../../components/icons'
+import * as sellerApi from '../../services/sellerApi'
 
 export function PerformanceView({ onBack }) {
-  const overview = sellerSnapshot.overview
-  const profile = sellerSnapshot.profile
+  const { dashboard, profile } = useSellerState()
+  const { fetchPerformance } = useSellerApi()
+  const [performanceAnalytics, setPerformanceAnalytics] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  // Calculate performance metrics
+  const overview = dashboard.overview || {}
+
+  // Fetch performance analytics on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        const result = await sellerApi.getPerformanceAnalytics({ period: '30' })
+        if (result.success && result.data?.analytics) {
+          setPerformanceAnalytics(result.data.analytics)
+        }
+      } catch (error) {
+        console.error('Failed to fetch performance analytics:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  // Calculate performance metrics from real data
+  // Priority: Use backend analytics if available, otherwise calculate from overview
   const performanceData = useMemo(() => {
-    const totalSales = parseFloat(overview.totalSales.replace(/[₹,\sL]/g, '')) || 0
-    const monthlyTarget = parseFloat(overview.monthlyTarget.replace(/[₹,\sL]/g, '')) || 0
-    const thisMonthSales = parseFloat(overview.thisMonthSales.replace(/[₹,\sL]/g, '')) || 0
+    // If backend analytics are available, use them
+    if (performanceAnalytics) {
+      return {
+        totalSales: performanceAnalytics.totalSales || overview.currentMonthSales || 0,
+        thisMonthSales: performanceAnalytics.currentMonthSales || overview.currentMonthSales || 0,
+        totalReferrals: performanceAnalytics.totalReferrals || overview.totalReferrals || 0,
+        activeReferrals: performanceAnalytics.activeReferrals || overview.activeReferrals || 0,
+        avgCommissionPerSale: performanceAnalytics.avgCommissionPerSale || 0,
+        conversionRate: performanceAnalytics.conversionRate || 0,
+        orderCount: performanceAnalytics.orderCount || overview.currentMonthOrders || 0,
+        averageOrderValue: performanceAnalytics.averageOrderValue || overview.averageOrderValue || 0,
+        totalCommission: performanceAnalytics.totalCommission || 0,
+        commissionRate2Percent: performanceAnalytics.commissionRate2Percent || 0,
+        commissionRate3Percent: performanceAnalytics.commissionRate3Percent || 0,
+        topUsers: performanceAnalytics.topUsers || [],
+        weeklyTrend: performanceAnalytics.weeklyTrend || [],
+      }
+    }
+
+    // Fallback: Calculate from overview data
+    const totalSales = overview.currentMonthSales || 0
+    const thisMonthSales = overview.currentMonthSales || 0
+    const totalReferrals = overview.totalReferrals || 0
+    const activeReferrals = overview.activeReferrals || 0
+
+    // Calculate average commission per sale (assuming 2-3% commission)
+    const avgCommissionRate = 0.025 // Average of 2% and 3%
+    const avgCommissionPerSale = totalSales > 0 && overview.currentMonthOrders > 0
+      ? (totalSales * avgCommissionRate) / overview.currentMonthOrders
+      : 0
+
+    // Calculate conversion rate (active referrals / total referrals)
+    const conversionRate = totalReferrals > 0
+      ? (activeReferrals / totalReferrals) * 100
+      : 0
 
     return {
       totalSales,
-      monthlyTarget,
       thisMonthSales,
-      targetProgress: overview.targetProgress,
-      totalReferrals: overview.totalReferrals,
-      thisMonthReferrals: overview.thisMonthReferrals,
-      avgCommissionPerSale: totalSales > 0 ? (totalSales * 0.05).toFixed(2) : 0,
-      conversionRate: overview.totalReferrals > 0 ? ((overview.totalReferrals / 300) * 100).toFixed(1) : 0,
+      totalReferrals,
+      activeReferrals,
+      avgCommissionPerSale: Math.round(avgCommissionPerSale * 100) / 100,
+      conversionRate: Math.round(conversionRate * 100) / 100,
+      orderCount: overview.currentMonthOrders || 0,
+      averageOrderValue: overview.averageOrderValue || 0,
+      totalCommission: totalSales * avgCommissionRate,
+      commissionRate2Percent: 0,
+      commissionRate3Percent: 0,
+      topUsers: [],
+      weeklyTrend: [],
     }
-  }, [overview])
+  }, [overview, performanceAnalytics])
 
   const formatCurrency = (value) => {
     if (value >= 100000) {
@@ -61,137 +123,246 @@ export function PerformanceView({ onBack }) {
         </div>
       </section>
 
-      {/* Key Metrics */}
+      {/* Key Metrics - Enhanced with better visuals */}
       <section id="seller-performance-metrics" className="seller-section">
         <div className="seller-section__header">
           <div>
             <h3 className="seller-section__title">Key Metrics</h3>
+            <p className="seller-section__subtitle">Your performance at a glance</p>
           </div>
         </div>
         <div className="seller-performance-grid">
-          <div className="seller-performance-card">
+          <div className="seller-performance-card seller-performance-card--highlight">
             <div className="seller-performance-card__icon seller-performance-card__icon--sales">
               <TrendingUpIcon className="h-5 w-5" />
             </div>
             <div className="seller-performance-card__content">
               <p className="seller-performance-card__label">Total Sales</p>
-              <h4 className="seller-performance-card__value">{overview.totalSales}</h4>
-              <span className="seller-performance-card__trend">+12% vs last month</span>
+              <h4 className="seller-performance-card__value">{formatCurrency(performanceData.totalSales)}</h4>
+              <div className="seller-performance-card__trend-group">
+                <span className="seller-performance-card__trend">{performanceData.orderCount} orders this month</span>
+                {performanceData.averageOrderValue > 0 && (
+                  <span className="seller-performance-card__trend-secondary">
+                    Avg: {formatCurrency(performanceData.averageOrderValue)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="seller-performance-card">
-            <div className="seller-performance-card__icon seller-performance-card__icon--target">
-              <TargetIcon className="h-5 w-5" />
-            </div>
-            <div className="seller-performance-card__content">
-              <p className="seller-performance-card__label">Target Progress</p>
-              <h4 className="seller-performance-card__value">{overview.targetProgress}%</h4>
-              <span className="seller-performance-card__trend">{overview.status}</span>
-            </div>
-          </div>
-
-          <div className="seller-performance-card">
+          <div className="seller-performance-card seller-performance-card--referrals">
             <div className="seller-performance-card__icon seller-performance-card__icon--referrals">
               <UsersIcon className="h-5 w-5" />
             </div>
             <div className="seller-performance-card__content">
               <p className="seller-performance-card__label">Total Referrals</p>
-              <h4 className="seller-performance-card__value">{overview.totalReferrals}</h4>
-              <span className="seller-performance-card__trend">+{overview.thisMonthReferrals} this month</span>
+              <h4 className="seller-performance-card__value">{performanceData.totalReferrals}</h4>
+              <div className="seller-performance-card__trend-group">
+                <span className="seller-performance-card__trend seller-performance-card__trend--active">
+                  {performanceData.activeReferrals} active
+                </span>
+                {performanceData.conversionRate > 0 && (
+                  <span className="seller-performance-card__trend-secondary">
+                    {performanceData.conversionRate.toFixed(1)}% conversion
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="seller-performance-card">
+          <div className="seller-performance-card seller-performance-card--commission">
             <div className="seller-performance-card__icon seller-performance-card__icon--commission">
               <WalletIcon className="h-5 w-5" />
             </div>
             <div className="seller-performance-card__content">
-              <p className="seller-performance-card__label">Avg Commission</p>
-              <h4 className="seller-performance-card__value">₹{performanceData.avgCommissionPerSale}</h4>
-              <span className="seller-performance-card__trend">Per sale</span>
+              <p className="seller-performance-card__label">Total Commission</p>
+              <h4 className="seller-performance-card__value">
+                {formatCurrency(performanceData.totalCommission || (performanceData.totalSales * 0.025))}
+              </h4>
+              <div className="seller-performance-card__trend-group">
+                <span className="seller-performance-card__trend">
+                  Avg: ₹{performanceData.avgCommissionPerSale.toLocaleString('en-IN')}/order
+                </span>
+                {(performanceData.commissionRate2Percent > 0 || performanceData.commissionRate3Percent > 0) && (
+                  <span className="seller-performance-card__trend-secondary">
+                    {performanceData.commissionRate2Percent > 0 && `${performanceData.commissionRate2Percent} @ 2%`}
+                    {performanceData.commissionRate2Percent > 0 && performanceData.commissionRate3Percent > 0 && ' • '}
+                    {performanceData.commissionRate3Percent > 0 && `${performanceData.commissionRate3Percent} @ 3%`}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Sales Breakdown */}
+      {/* Sales Summary - Enhanced Visual */}
       <section id="seller-performance-breakdown" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Sales Breakdown</h3>
-            <p className="seller-section__subtitle">This month's performance</p>
+            <h3 className="seller-section__title">Sales Summary</h3>
+            <p className="seller-section__subtitle">This month's sales overview</p>
           </div>
         </div>
-        <div className="seller-performance-breakdown">
-          <div className="seller-breakdown-item">
-            <div className="seller-breakdown-item__info">
-              <span className="seller-breakdown-item__label">Monthly Target</span>
-              <span className="seller-breakdown-item__value">{overview.monthlyTarget}</span>
+        <div className="seller-performance-breakdown-card">
+          <div className="seller-performance-breakdown-card__header">
+            <div className="seller-performance-breakdown-card__target">
+              <TrendingUpIcon className="h-5 w-5 text-[#1b8f5b]" />
+              <div>
+                <p className="seller-performance-breakdown-card__target-label">Total Sales</p>
+                <p className="seller-performance-breakdown-card__target-value">{formatCurrency(performanceData.thisMonthSales)}</p>
+              </div>
             </div>
-            <div className="seller-breakdown-item__bar">
-              <div className="seller-breakdown-item__bar-fill" style={{ width: '100%' }} />
-            </div>
-          </div>
-          <div className="seller-breakdown-item">
-            <div className="seller-breakdown-item__info">
-              <span className="seller-breakdown-item__label">Achieved</span>
-              <span className="seller-breakdown-item__value seller-breakdown-item__value--achieved">
-                {overview.thisMonthSales}
-              </span>
-            </div>
-            <div className="seller-breakdown-item__bar">
-              <div
-                className="seller-breakdown-item__bar-fill seller-breakdown-item__bar-fill--achieved"
-                style={{ width: `${overview.targetProgress}%` }}
-              />
+            <div className="seller-performance-breakdown-card__progress-badge">
+              <span className="seller-performance-breakdown-card__progress-percent">{performanceData.orderCount}</span>
+              <span className="seller-performance-breakdown-card__progress-label">Orders</span>
             </div>
           </div>
-          <div className="seller-breakdown-item">
-            <div className="seller-breakdown-item__info">
-              <span className="seller-breakdown-item__label">Remaining</span>
-              <span className="seller-breakdown-item__value seller-breakdown-item__value--remaining">
-                {formatCurrency(performanceData.monthlyTarget - performanceData.thisMonthSales)}
-              </span>
+          <div className="seller-performance-breakdown-card__details">
+            <div className="seller-performance-breakdown-card__detail-item seller-performance-breakdown-card__detail-item--achieved">
+              <div className="seller-performance-breakdown-card__detail-icon" style={{ background: 'rgba(27,143,91,0.1)' }}>
+                <WalletIcon className="h-4 w-4 text-[#1b8f5b]" />
+              </div>
+              <div className="seller-performance-breakdown-card__detail-content">
+                <p className="seller-performance-breakdown-card__detail-label">Total Commission</p>
+                <p className="seller-performance-breakdown-card__detail-value">
+                  {formatCurrency(performanceData.totalCommission || (performanceData.totalSales * 0.025))}
+                </p>
+              </div>
             </div>
-            <div className="seller-breakdown-item__bar">
-              <div
-                className="seller-breakdown-item__bar-fill seller-breakdown-item__bar-fill--remaining"
-                style={{ width: `${100 - overview.targetProgress}%` }}
-              />
+            <div className="seller-performance-breakdown-card__detail-item seller-performance-breakdown-card__detail-item--remaining">
+              <div className="seller-performance-breakdown-card__detail-icon" style={{ background: 'rgba(59,130,246,0.1)' }}>
+                <TrendingUpIcon className="h-4 w-4 text-[#3b82f6]" />
+              </div>
+              <div className="seller-performance-breakdown-card__detail-content">
+                <p className="seller-performance-breakdown-card__detail-label">Avg Order Value</p>
+                <p className="seller-performance-breakdown-card__detail-value">
+                  {formatCurrency(performanceData.averageOrderValue || 0)}
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Statistics */}
+      {/* Commission Breakdown */}
+      {(performanceData.commissionRate2Percent > 0 || performanceData.commissionRate3Percent > 0 || performanceData.totalCommission > 0) && (
+        <section id="seller-performance-commission" className="seller-section">
+          <div className="seller-section__header">
+            <div>
+              <h3 className="seller-section__title">Commission Breakdown</h3>
+              <p className="seller-section__subtitle">Earnings by commission rate</p>
+            </div>
+          </div>
+          <div className="seller-performance-commission-grid">
+            <div className="seller-performance-commission-card seller-performance-commission-card--standard">
+              <div className="seller-performance-commission-card__header">
+                <WalletIcon className="h-5 w-5 text-[#1b8f5b]" />
+                <span className="seller-performance-commission-card__rate">2% Rate</span>
+              </div>
+              <div className="seller-performance-commission-card__content">
+                <p className="seller-performance-commission-card__label">Users at 2%</p>
+                <p className="seller-performance-commission-card__value">{performanceData.commissionRate2Percent || 0}</p>
+                <p className="seller-performance-commission-card__note">Up to ₹50,000/month</p>
+              </div>
+            </div>
+            <div className="seller-performance-commission-card seller-performance-commission-card--premium">
+              <div className="seller-performance-commission-card__header">
+                <WalletIcon className="h-5 w-5 text-[#f97316]" />
+                <span className="seller-performance-commission-card__rate">3% Rate</span>
+              </div>
+              <div className="seller-performance-commission-card__content">
+                <p className="seller-performance-commission-card__label">Users at 3%</p>
+                <p className="seller-performance-commission-card__value">{performanceData.commissionRate3Percent || 0}</p>
+                <p className="seller-performance-commission-card__note">Above ₹50,000/month</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Statistics - Enhanced Grid */}
       <section id="seller-performance-stats" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Statistics</h3>
+            <h3 className="seller-section__title">Performance Statistics</h3>
+            <p className="seller-section__subtitle">Key performance indicators</p>
           </div>
         </div>
-        <div className="seller-performance-stats">
-          <div className="seller-stat-item">
-            <span className="seller-stat-item__label">Conversion Rate</span>
-            <span className="seller-stat-item__value">{performanceData.conversionRate}%</span>
+        <div className="seller-performance-stats-grid">
+          <div className="seller-stat-card-enhanced">
+            <div className="seller-stat-card-enhanced__icon" style={{ background: 'rgba(27,143,91,0.1)' }}>
+              <UsersIcon className="h-5 w-5 text-[#1b8f5b]" />
+            </div>
+            <div className="seller-stat-card-enhanced__content">
+              <p className="seller-stat-card-enhanced__label">Conversion Rate</p>
+              <p className="seller-stat-card-enhanced__value">{performanceData.conversionRate.toFixed(1)}%</p>
+              <p className="seller-stat-card-enhanced__note">Active vs Total Referrals</p>
+            </div>
           </div>
-          <div className="seller-stat-item">
-            <span className="seller-stat-item__label">Active Users</span>
-            <span className="seller-stat-item__value">
-              {sellerSnapshot.referrals.filter((r) => r.status === 'Active').length}
-            </span>
+          <div className="seller-stat-card-enhanced">
+            <div className="seller-stat-card-enhanced__icon" style={{ background: 'rgba(59,130,246,0.1)' }}>
+              <UsersIcon className="h-5 w-5 text-[#3b82f6]" />
+            </div>
+            <div className="seller-stat-card-enhanced__content">
+              <p className="seller-stat-card-enhanced__label">Active Users</p>
+              <p className="seller-stat-card-enhanced__value">{performanceData.activeReferrals}</p>
+              <p className="seller-stat-card-enhanced__note">Made purchases this month</p>
+            </div>
           </div>
-          <div className="seller-stat-item">
-            <span className="seller-stat-item__label">Avg Purchase Value</span>
-            <span className="seller-stat-item__value">₹2,400</span>
+          <div className="seller-stat-card-enhanced">
+            <div className="seller-stat-card-enhanced__icon" style={{ background: 'rgba(234,179,8,0.1)' }}>
+              <TrendingUpIcon className="h-5 w-5 text-[#eab308]" />
+            </div>
+            <div className="seller-stat-card-enhanced__content">
+              <p className="seller-stat-card-enhanced__label">Avg Purchase Value</p>
+              <p className="seller-stat-card-enhanced__value">₹{Math.round(performanceData.averageOrderValue).toLocaleString('en-IN')}</p>
+              <p className="seller-stat-card-enhanced__note">Per order average</p>
+            </div>
           </div>
-          <div className="seller-stat-item">
-            <span className="seller-stat-item__label">Commission Rate</span>
-            <span className="seller-stat-item__value">{profile.commissionRate}</span>
+          <div className="seller-stat-card-enhanced">
+            <div className="seller-stat-card-enhanced__icon" style={{ background: 'rgba(139,92,246,0.1)' }}>
+              <TrendingUpIcon className="h-5 w-5 text-[#8b5cf6]" />
+            </div>
+            <div className="seller-stat-card-enhanced__content">
+              <p className="seller-stat-card-enhanced__label">Orders This Month</p>
+              <p className="seller-stat-card-enhanced__value">{performanceData.orderCount}</p>
+              <p className="seller-stat-card-enhanced__note">Total orders processed</p>
+            </div>
           </div>
         </div>
       </section>
+
+      {/* Top Performers (if available from backend) */}
+      {performanceData.topUsers && performanceData.topUsers.length > 0 && (
+        <section id="seller-performance-top-users" className="seller-section">
+          <div className="seller-section__header">
+            <div>
+              <h3 className="seller-section__title">Top Performing Users</h3>
+              <p className="seller-section__subtitle">Your highest value referrals this month</p>
+            </div>
+          </div>
+          <div className="seller-performance-top-users">
+            {performanceData.topUsers.slice(0, 5).map((user, index) => (
+              <div key={user.id || index} className="seller-performance-top-user-card">
+                <div className="seller-performance-top-user-card__rank">
+                  <span>#{index + 1}</span>
+                </div>
+                <div className="seller-performance-top-user-card__avatar">
+                  {user.name ? user.name.substring(0, 2).toUpperCase() : 'U'}
+                </div>
+                <div className="seller-performance-top-user-card__content">
+                  <p className="seller-performance-top-user-card__name">{user.name || 'User'}</p>
+                  <p className="seller-performance-top-user-card__purchase">{formatCurrency(user.monthlyPurchases || 0)}</p>
+                  <p className="seller-performance-top-user-card__commission">
+                    Commission: {formatCurrency(user.commission || 0)} @ {user.commissionRate ? `${user.commissionRate * 100}%` : '2-3%'}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

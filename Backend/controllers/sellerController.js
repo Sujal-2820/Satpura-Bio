@@ -795,7 +795,8 @@ exports.getReferrals = async (req, res, next) => {
         const orderCount = userPurchases[0]?.orderCount || 0;
 
         // Determine commission rate based on monthly purchases
-        const commissionRate = monthlyPurchases <= IRA_PARTNER_COMMISSION_THRESHOLD
+        // 3% if >= 50000, 2% if < 50000
+        const commissionRate = monthlyPurchases < IRA_PARTNER_COMMISSION_THRESHOLD
           ? IRA_PARTNER_COMMISSION_RATE_LOW
           : IRA_PARTNER_COMMISSION_RATE_HIGH;
 
@@ -1197,7 +1198,8 @@ exports.getReferralDetails = async (req, res, next) => {
     );
 
     // Determine commission rate based on monthly purchases
-    const commissionRate = monthlyPurchaseTotal <= IRA_PARTNER_COMMISSION_THRESHOLD
+    // 3% if >= 50000, 2% if < 50000
+    const commissionRate = monthlyPurchaseTotal < IRA_PARTNER_COMMISSION_THRESHOLD
       ? IRA_PARTNER_COMMISSION_RATE_LOW
       : IRA_PARTNER_COMMISSION_RATE_HIGH;
 

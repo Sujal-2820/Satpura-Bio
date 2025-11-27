@@ -2263,7 +2263,8 @@ exports.confirmPayment = async (req, res, next) => {
           const newCumulativePurchaseAmount = cumulativePurchaseAmount + order.totalAmount;
 
           // Determine commission rate based on monthly purchases
-          const commissionRate = newCumulativePurchaseAmount <= IRA_PARTNER_COMMISSION_THRESHOLD
+          // 3% if >= 50000, 2% if < 50000
+          const commissionRate = newCumulativePurchaseAmount < IRA_PARTNER_COMMISSION_THRESHOLD
             ? IRA_PARTNER_COMMISSION_RATE_LOW
             : IRA_PARTNER_COMMISSION_RATE_HIGH;
 
@@ -2507,7 +2508,8 @@ exports.confirmRemainingPayment = async (req, res, next) => {
           const newCumulativePurchaseAmount = cumulativePurchaseAmount + order.totalAmount;
 
           // Determine commission rate based on monthly purchases
-          const commissionRate = newCumulativePurchaseAmount <= IRA_PARTNER_COMMISSION_THRESHOLD
+          // 3% if >= 50000, 2% if < 50000
+          const commissionRate = newCumulativePurchaseAmount < IRA_PARTNER_COMMISSION_THRESHOLD
             ? IRA_PARTNER_COMMISSION_RATE_LOW
             : IRA_PARTNER_COMMISSION_RATE_HIGH;
 

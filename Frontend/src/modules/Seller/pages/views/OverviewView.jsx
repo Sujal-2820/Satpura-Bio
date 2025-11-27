@@ -2,14 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 import { useSellerState } from '../../context/SellerContext'
 import { useSellerApi } from '../../hooks/useSellerApi'
 import { cn } from '../../../../lib/cn'
-import { UsersIcon, WalletIcon, ChartIcon, SparkIcon, ShareIcon, TargetIcon, TrendingUpIcon } from '../../components/icons'
+import { UsersIcon, WalletIcon, ChartIcon, SparkIcon, ShareIcon, TrendingUpIcon } from '../../components/icons'
 import * as sellerApi from '../../services/sellerApi'
 
 export function OverviewView({ onNavigate, openPanel }) {
   const { profile, dashboard } = useSellerState()
   const { fetchDashboardOverview, fetchWalletData } = useSellerApi()
-  const [showActivitySheet, setShowActivitySheet] = useState(false)
-  const [renderActivitySheet, setRenderActivitySheet] = useState(false)
   const servicesRef = useRef(null)
   const [servicePage, setServicePage] = useState(0)
   const [recentActivity, setRecentActivity] = useState([])
@@ -36,13 +34,28 @@ export function OverviewView({ onNavigate, openPanel }) {
         // Fetch recent activity
         const activityResult = await sellerApi.getRecentActivity({ limit: 15 })
         if (activityResult.success && activityResult.data?.activities) {
-          setRecentActivity(activityResult.data.activities)
+          // Transform backend activity data to frontend format
+          const transformedActivities = activityResult.data.activities.map((activity) => ({
+            id: activity.id || activity._id,
+            type: activity.type || 'commission',
+            action: activity.title || activity.message || 'Activity',
+            amount: activity.amount || 0,
+            date: activity.timestamp || activity.createdAt,
+            createdAt: activity.timestamp || activity.createdAt,
+            userName: activity.userName || activity.user?.name || 'User',
+            user: activity.userName || activity.user?.name || 'User',
+            orderId: activity.orderId,
+            orderNumber: activity.orderNumber,
+            status: activity.status,
+          }))
+          setRecentActivity(transformedActivities)
         }
 
         // Fetch highlights
         const highlightsResult = await sellerApi.getDashboardHighlights()
         if (highlightsResult.success && highlightsResult.data) {
-          setHighlights(Array.isArray(highlightsResult.data) ? highlightsResult.data : highlightsResult.data.highlights || [])
+          const highlightsData = highlightsResult.data.highlights || highlightsResult.data || []
+          setHighlights(Array.isArray(highlightsData) ? highlightsData : [])
         }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
@@ -66,14 +79,16 @@ export function OverviewView({ onNavigate, openPanel }) {
     return amount || '₹0'
   }
 
-  // Format overview data
+  // Format overview data - use actual values from backend
+  // Calculate total commission from sales (average 2.5% commission rate)
+  const totalCommission = overview.totalCommission || (overview.currentMonthSales || 0) * 0.025
+  
   const overviewData = {
     walletBalance: formatCurrency(wallet.balance || 0),
-    monthlyTarget: formatCurrency(overview.monthlyTarget || 0),
-    targetProgress: overview.targetProgress || 0,
     totalReferrals: overview.totalReferrals || 0,
     thisMonthSales: formatCurrency(overview.currentMonthSales || 0),
-    status: overview.status || 'On Track',
+    activeReferrals: overview.activeReferrals || 0,
+    totalCommission: formatCurrency(totalCommission),
   }
 
   const services = [
@@ -161,9 +176,9 @@ export function OverviewView({ onNavigate, openPanel }) {
           <div className="seller-hero__stats">
             {[
               { label: 'Total Referrals', value: overviewData.totalReferrals.toString() },
-              { label: 'Target Progress', value: `${overviewData.targetProgress}%` },
+              { label: 'Active Users', value: overviewData.activeReferrals.toString() },
               { label: 'This Month Sales', value: overviewData.thisMonthSales },
-              { label: 'Status', value: overviewData.status },
+              { label: 'Total Commission', value: overviewData.totalCommission },
             ].map((item) => (
               <div key={item.label} className="seller-stat-card">
                 <p>{item.label}</p>
@@ -219,16 +234,6 @@ export function OverviewView({ onNavigate, openPanel }) {
           <div>
             <h3 className="seller-section__title">Recent activity</h3>
           </div>
-          <button
-            type="button"
-            className="seller-section__cta"
-            onClick={() => {
-              setRenderActivitySheet(true)
-              requestAnimationFrame(() => setShowActivitySheet(true))
-            }}
-          >
-            See all
-          </button>
         </div>
         <div className="seller-activity__list">
           {loading ? (
@@ -272,69 +277,6 @@ export function OverviewView({ onNavigate, openPanel }) {
         </div>
       </section>
 
-      {/* Activity Sheet Modal */}
-      {renderActivitySheet ? (
-        <div className={cn('seller-activity-sheet', showActivitySheet && 'is-open')}>
-          <div
-            className={cn('seller-activity-sheet__overlay', showActivitySheet && 'is-open')}
-            onClick={() => {
-              setShowActivitySheet(false)
-              setTimeout(() => setRenderActivitySheet(false), 260)
-            }}
-          />
-          <div className={cn('seller-activity-sheet__panel', showActivitySheet && 'is-open')}>
-            <div className="seller-activity-sheet__header">
-              <h4>All activity</h4>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowActivitySheet(false)
-                  setTimeout(() => setRenderActivitySheet(false), 260)
-                }}
-              >
-                Close
-              </button>
-            </div>
-            <div className="seller-activity-sheet__body">
-              {recentActivity.length === 0 ? (
-                <div className="seller-activity__item">
-                  <p className="text-sm text-gray-500">No recent activity</p>
-                </div>
-              ) : (
-                recentActivity.map((item) => {
-                  const avatar = item.userName ? item.userName.substring(0, 2).toUpperCase() : 'U'
-                  const amount = item.amount ? (item.amount > 0 ? `+₹${item.amount.toLocaleString('en-IN')}` : `₹${Math.abs(item.amount).toLocaleString('en-IN')}`) : '₹0'
-                  const date = item.date || item.createdAt ? new Date(item.date || item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Recently'
-                  
-                  return (
-                    <div key={item.id || item._id} className="seller-activity__item">
-                      <div className="seller-activity__avatar">{avatar}</div>
-                      <div className="seller-activity__details">
-                        <div className="seller-activity__row">
-                          <span className="seller-activity__name">{item.userName || item.user || 'User'}</span>
-                          <span
-                            className={cn(
-                              'seller-activity__amount',
-                              amount.startsWith('-') ? 'is-negative' : 'is-positive',
-                            )}
-                          >
-                            {amount}
-                          </span>
-                        </div>
-                        <div className="seller-activity__meta">
-                          <span>{item.action || item.type || 'Activity'}</span>
-                          <span>{date}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       {/* Quick Summary Section */}
       <section id="seller-overview-snapshot" className="seller-section">
         <div className="seller-section__header">
@@ -349,12 +291,10 @@ export function OverviewView({ onNavigate, openPanel }) {
             </div>
           ) : (
             highlights.map((item) => {
-              const progress = item.id === 'target' 
-                ? overviewData.targetProgress 
-                : item.id === 'referrals' 
+              const progress = item.id === 'referrals' 
                 ? Math.min((overviewData.totalReferrals / 100) * 100, 100)
                 : item.id === 'sales'
-                ? Math.min((overviewData.targetProgress * 0.7), 100)
+                ? Math.min((overviewData.totalReferrals * 0.7), 100)
                 : item.progress || 0
               
               return (
@@ -374,32 +314,53 @@ export function OverviewView({ onNavigate, openPanel }) {
         </div>
       </section>
 
-      {/* Target Progress Section */}
-      <section id="seller-target-progress" className="seller-section">
+
+      {/* Commission Policy Section */}
+      <section id="seller-overview-commission" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Monthly Target</h3>
-            <p className="seller-section__subtitle">Progress towards your goal</p>
+            <h3 className="seller-section__title">Commission Structure</h3>
+            <p className="seller-section__subtitle">Understand how you earn commissions</p>
           </div>
         </div>
-        <div className="seller-target-card">
-          <div className="seller-target-card__header">
-            <div className="seller-target-card__info">
-              <span className="seller-target-card__label">Target</span>
-              <span className="seller-target-card__value">{overviewData.monthlyTarget}</span>
+        <div className="seller-commission-policy">
+          <div className="seller-commission-policy__card">
+            <div className="seller-commission-policy__header">
+              <WalletIcon className="h-5 w-5 text-[#1b8f5b]" />
+              <h4 className="seller-commission-policy__title">Your Commission Rates</h4>
             </div>
-            <div className="seller-target-card__info">
-              <span className="seller-target-card__label">Achieved</span>
-              <span className="seller-target-card__value">{overviewData.thisMonthSales}</span>
+            <div className="seller-commission-policy__content">
+              <div className="seller-commission-policy__slab">
+                <div className="seller-commission-policy__slab-header">
+                  <span className="seller-commission-policy__slab-rate">2%</span>
+                  <span className="seller-commission-policy__slab-label">Standard Rate</span>
+                </div>
+                <p className="seller-commission-policy__slab-desc">
+                  Applied when a user's monthly purchases are up to ₹50,000
+                </p>
+                <div className="seller-commission-policy__slab-example">
+                  <span className="text-xs text-[rgba(26,42,34,0.6)]">Example: ₹30,000 purchase = ₹600 commission</span>
+                </div>
+              </div>
+              <div className="seller-commission-policy__divider" />
+              <div className="seller-commission-policy__slab seller-commission-policy__slab--premium">
+                <div className="seller-commission-policy__slab-header">
+                  <span className="seller-commission-policy__slab-rate seller-commission-policy__slab-rate--premium">3%</span>
+                  <span className="seller-commission-policy__slab-label">Premium Rate</span>
+                </div>
+                <p className="seller-commission-policy__slab-desc">
+                  Applied when a user's monthly purchases exceed ₹50,000
+                </p>
+                <div className="seller-commission-policy__slab-example">
+                  <span className="text-xs text-[rgba(26,42,34,0.6)]">Example: ₹75,000 purchase = ₹2,250 commission</span>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="seller-target-card__progress">
-            <div className="seller-target-card__progress-bar">
-              <span style={{ width: `${overviewData.targetProgress}%` }} />
-            </div>
-            <div className="seller-target-card__progress-text">
-              <span>{overviewData.targetProgress}% Complete</span>
-              <span>{overviewData.status}</span>
+            <div className="seller-commission-policy__footer">
+              <p className="seller-commission-policy__note">
+                <span className="font-semibold">Note:</span> Commission rates are calculated per user, per month. 
+                The rate resets on the 1st of each month based on that user's purchase amount.
+              </p>
             </div>
           </div>
         </div>

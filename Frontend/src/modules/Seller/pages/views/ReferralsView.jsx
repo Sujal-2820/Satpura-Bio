@@ -28,7 +28,24 @@ export function ReferralsView({ onNavigate }) {
       try {
         const result = await fetchReferrals({ limit: 100 })
         if (result.data?.referrals) {
-          setReferrals(result.data.referrals)
+          // Transform backend response to frontend format
+          const transformedReferrals = result.data.referrals.map((ref) => ({
+            id: ref._id || ref.id,
+            userId: ref._id || ref.id,
+            name: ref.name || 'User',
+            phone: ref.phone || '',
+            email: ref.email || '',
+            monthlyPurchases: ref.monthlyPurchases || 0,
+            orderCount: ref.orderCount || 0,
+            commissionRate: ref.commissionRate || 0.02,
+            estimatedCommission: ref.estimatedCommission || 0,
+            status: ref.monthlyPurchases > 0 ? 'Active' : 'Registered',
+            createdAt: ref.createdAt,
+            registeredDate: ref.createdAt,
+            totalAmount: ref.monthlyPurchases || 0, // For display purposes
+            totalPurchases: ref.orderCount || 0,
+          }))
+          setReferrals(transformedReferrals)
         }
       } catch (error) {
         console.error('Failed to fetch referrals:', error)
@@ -46,7 +63,8 @@ export function ReferralsView({ onNavigate }) {
 
   const getCommissionInfo = (amount) => {
     const purchaseAmount = Number(amount) || 0
-    const rate = purchaseAmount > 50000 ? 0.03 : 0.02
+    // Commission rate: 2% if <= 50000, 3% if > 50000 (based on monthly purchases)
+    const rate = purchaseAmount >= 50000 ? 0.03 : 0.02
     const commissionAmount = Math.round(purchaseAmount * rate)
     return {
       purchaseAmount,
@@ -228,9 +246,12 @@ export function ReferralsView({ onNavigate }) {
         ) : (
           <div className="seller-referrals-list">
             {filteredReferrals.map((referral) => {
+              // Calculate monthly purchases - handle both number and string formats
               const monthlyPurchases = typeof referral.monthlyPurchases === 'number'
                 ? referral.monthlyPurchases
                 : parseFloat((referral.monthlyPurchases || '0').toString().replace(/[₹,\sL]/g, '')) || 0
+              
+              // Always calculate commission rate based on monthlyPurchases (not backend commissionRate)
               const commissionInfo = getCommissionInfo(monthlyPurchases)
               const monthlyPurchaseDisplay = formatCurrency(commissionInfo.purchaseAmount)
               const commissionDisplay = formatCurrency(commissionInfo.commissionAmount)
@@ -248,6 +269,9 @@ export function ReferralsView({ onNavigate }) {
               const lastPurchase = referral.lastPurchase || referral.lastOrderDate 
                 ? formatDate(referral.lastPurchase || referral.lastOrderDate)
                 : 'Never'
+              
+              // Determine commission rate badge style
+              const isPremiumRate = commissionInfo.rate >= 0.03
 
               return (
                 <div
@@ -262,14 +286,25 @@ export function ReferralsView({ onNavigate }) {
                   <div className="seller-referral-card__info">
                     <div className="seller-referral-card__row">
                       <h3 className="seller-referral-card__name">{referral.name || 'User'}</h3>
-                      <span
-                        className={cn(
-                          'seller-referral-card__status',
-                          (status === 'Active' || status === 'active') ? 'is-active' : 'is-registered',
-                        )}
-                      >
-                        {status}
-                      </span>
+                      <div className="seller-referral-card__header-badges">
+                        <span
+                          className={cn(
+                            'seller-referral-card__commission-badge',
+                            isPremiumRate ? 'seller-referral-card__commission-badge--premium' : 'seller-referral-card__commission-badge--standard'
+                          )}
+                          title={`Commission Rate: ${commissionRateLabel} for this month`}
+                        >
+                          {commissionRateLabel}
+                        </span>
+                        <span
+                          className={cn(
+                            'seller-referral-card__status',
+                            (status === 'Active' || status === 'active') ? 'is-active' : 'is-registered',
+                          )}
+                        >
+                          {status}
+                        </span>
+                      </div>
                     </div>
                     <div className="seller-referral-card__meta">
                       <span className="seller-referral-card__id">{userId}</span>
@@ -299,18 +334,30 @@ export function ReferralsView({ onNavigate }) {
                       <div className="seller-referral-stat">
                         <p className="seller-referral-stat__label">This Month Purchases</p>
                         <span className="seller-referral-stat__value">{monthlyPurchaseDisplay}</span>
-                        <p className="mt-1 text-[0.7rem] text-[rgba(26,42,34,0.6)]">
-                          {commissionInfo.purchaseAmount >= 50000
-                            ? '3% slab unlocked for this user.'
-                            : `${amountToNextSlabDisplay} more unlocks 3% rate.`}
-                        </p>
+                        <div className="mt-1 flex items-center gap-2">
+                          <span className={cn(
+                            'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.7rem] font-semibold',
+                            isPremiumRate 
+                              ? 'bg-orange-100 text-orange-700 border border-orange-200' 
+                              : 'bg-blue-100 text-blue-700 border border-blue-200'
+                          )}>
+                            Commission Rate: {commissionRateLabel}
+                          </span>
+                        </div>
+                        {commissionInfo.purchaseAmount < 50000 && (
+                          <p className="mt-1 text-[0.7rem] text-[rgba(26,42,34,0.6)]">
+                            {amountToNextSlabDisplay} more unlocks 3% rate
+                          </p>
+                        )}
                       </div>
                       <div className="seller-referral-stat">
                         <p className="seller-referral-stat__label">Commission (This Month)</p>
                         <span className="seller-referral-stat__value seller-referral-stat__value--commission">
                           {commissionDisplay}
                         </span>
-                        <p className="mt-1 text-[0.7rem] text-[rgba(26,42,34,0.6)]">Current rate: {commissionRateLabel}</p>
+                        <p className="mt-1 text-[0.7rem] text-[rgba(26,42,34,0.6)]">
+                          Calculated at {commissionRateLabel} rate
+                        </p>
                       </div>
                       <div className="seller-referral-stat">
                         <p className="seller-referral-stat__label">Last Purchase</p>
@@ -343,6 +390,13 @@ export function ReferralsView({ onNavigate }) {
                     <div className="seller-referral-quick-stat seller-referral-quick-stat--commission">
                       <span className="seller-referral-quick-stat__label">Commission</span>
                       <span className="seller-referral-quick-stat__value">{commissionDisplay}</span>
+                    </div>
+                    <div className={cn(
+                      'seller-referral-quick-stat',
+                      isPremiumRate ? 'seller-referral-quick-stat--premium' : 'seller-referral-quick-stat--standard'
+                    )}>
+                      <span className="seller-referral-quick-stat__label">Rate</span>
+                      <span className="seller-referral-quick-stat__value">{commissionRateLabel}</span>
                     </div>
                   </div>
                 </div>
