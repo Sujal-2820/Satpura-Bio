@@ -1,13 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Building2, CreditCard, MapPin, ShieldAlert, Edit2, Eye, Package, Ban, Unlock, CheckCircle, XCircle } from 'lucide-react'
+import { Building2, CreditCard, MapPin, ShieldAlert, Edit2, Eye, Package, Ban, Unlock, CheckCircle, XCircle, ArrowLeft, Calendar } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { Timeline } from '../components/Timeline'
-import { Modal } from '../components/Modal'
 import { VendorMap } from '../components/VendorMap'
 import { CreditPolicyForm } from '../components/CreditPolicyForm'
-import { PurchaseRequestModal } from '../components/PurchaseRequestModal'
-import { VendorDetailModal } from '../components/VendorDetailModal'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
 import { useToast } from '../components/ToastNotification'
@@ -100,17 +97,19 @@ export function VendorsPage() {
   const [purchaseRequests, setPurchaseRequests] = useState([])
   const [coverageReport, setCoverageReport] = useState(null)
   
-  // Modal states
-  const [banModalOpen, setBanModalOpen] = useState(false)
-  const [selectedVendorForBan, setSelectedVendorForBan] = useState(null)
-  const [creditPolicyModalOpen, setCreditPolicyModalOpen] = useState(false)
+  // View states (replacing modals with full-screen views)
+  const [currentView, setCurrentView] = useState(null) // 'creditPolicy', 'vendorDetail', 'vendorMap', 'purchaseRequest', 'approveVendor', 'rejectVendor', 'banVendor', 'unbanVendor'
   const [selectedVendorForPolicy, setSelectedVendorForPolicy] = useState(null)
-  const [purchaseRequestModalOpen, setPurchaseRequestModalOpen] = useState(false)
   const [selectedPurchaseRequest, setSelectedPurchaseRequest] = useState(null)
-  const [vendorDetailModalOpen, setVendorDetailModalOpen] = useState(false)
   const [selectedVendorForDetail, setSelectedVendorForDetail] = useState(null)
-  const [mapModalOpen, setMapModalOpen] = useState(false)
   const [selectedVendorForMap, setSelectedVendorForMap] = useState(null)
+  const [selectedVendorForAction, setSelectedVendorForAction] = useState(null)
+  const [actionData, setActionData] = useState(null) // For storing form data for actions like reject/ban
+  const [rejectReason, setRejectReason] = useState('')
+  const [banType, setBanType] = useState('temporary')
+  const [banReason, setBanReason] = useState('')
+  const [revocationReason, setRevocationReason] = useState('')
+  const [purchaseRejectReason, setPurchaseRejectReason] = useState(null) // null = not showing, '' = showing input
 
   // Format vendor data for display
   const formatVendorForDisplay = (vendor, flaggedVendorIds = new Set()) => {
@@ -194,8 +193,9 @@ export function VendorsPage() {
     try {
       const result = await banVendor(vendorId, banData)
       if (result.data) {
-        setBanModalOpen(false)
-        setSelectedVendorForBan(null)
+        setCurrentView(null)
+        setSelectedVendorForAction(null)
+        setActionData(null)
         fetchVendors()
         success(`Vendor ${banData.banType === 'permanent' ? 'permanently' : 'temporarily'} banned successfully!`, 3000)
       } else if (result.error) {
@@ -226,7 +226,7 @@ export function VendorsPage() {
     try {
       const result = await updateVendorCreditPolicy(selectedVendorForPolicy.id, policyData)
       if (result.data) {
-        setCreditPolicyModalOpen(false)
+        setCurrentView(null)
         setSelectedVendorForPolicy(null)
         fetchVendors()
         success('Credit policy updated successfully!', 4000)
@@ -249,12 +249,15 @@ export function VendorsPage() {
     try {
       const result = await approveVendor(vendorId)
       if (result.success || result.data) {
+        setCurrentView(null)
+        setSelectedVendorForAction(null)
         success('Vendor approved successfully!', 3000)
         // Refresh vendors list
         const vendorsResult = await getVendors({})
         if (vendorsResult.data) {
           setRawVendors(vendorsResult.data.vendors || [])
         }
+        fetchVendors()
       } else {
         const errorMessage = result.error?.message || 'Failed to approve vendor'
         showError(errorMessage, 5000)
@@ -268,12 +271,16 @@ export function VendorsPage() {
     try {
       const result = await rejectVendor(vendorId, rejectionData)
       if (result.success || result.data) {
+        setCurrentView(null)
+        setSelectedVendorForAction(null)
+        setActionData(null)
         success('Vendor application rejected.', 3000)
         // Refresh vendors list
         const vendorsResult = await getVendors({})
         if (vendorsResult.data) {
           setRawVendors(vendorsResult.data.vendors || [])
         }
+        fetchVendors()
       } else {
         const errorMessage = result.error?.message || 'Failed to reject vendor'
         showError(errorMessage, 5000)
@@ -287,7 +294,7 @@ export function VendorsPage() {
     try {
       const result = await approveVendorPurchase(requestId)
       if (result.data) {
-        setPurchaseRequestModalOpen(false)
+        setCurrentView(null)
         setSelectedPurchaseRequest(null)
         fetchPurchaseRequests()
         fetchVendors()
@@ -309,8 +316,9 @@ export function VendorsPage() {
     try {
       const result = await rejectVendorPurchase(requestId, rejectionData)
       if (result.data) {
-        setPurchaseRequestModalOpen(false)
+        setCurrentView(null)
         setSelectedPurchaseRequest(null)
+        setActionData(null)
         fetchPurchaseRequests()
         fetchVendors()
         success('Vendor purchase request rejected.', 3000)
@@ -326,13 +334,27 @@ export function VendorsPage() {
   const handleViewVendorDetails = (vendor) => {
     const originalVendor = withCoverageMeta(getRawVendorById(vendor.id) || vendor)
     setSelectedVendorForDetail(originalVendor)
-    setVendorDetailModalOpen(true)
+    setCurrentView('vendorDetail')
   }
 
   const handleViewVendorMap = (vendor) => {
     const originalVendor = withCoverageMeta(getRawVendorById(vendor.id) || vendor)
     setSelectedVendorForMap(originalVendor)
-    setMapModalOpen(true)
+    setCurrentView('vendorMap')
+  }
+
+  const handleBackToList = () => {
+    setCurrentView(null)
+    setSelectedVendorForPolicy(null)
+    setSelectedPurchaseRequest(null)
+    setSelectedVendorForDetail(null)
+    setSelectedVendorForMap(null)
+    setSelectedVendorForAction(null)
+    setRejectReason('')
+    setBanType('temporary')
+    setBanReason('')
+    setRevocationReason('')
+    setPurchaseRejectReason(null)
   }
 
 
@@ -420,9 +442,8 @@ export function VendorsPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm(`Approve vendor "${originalVendor.name}"?`)) {
-                        handleApproveVendor(originalVendor.id)
-                      }
+                      setSelectedVendorForAction(originalVendor)
+                      setCurrentView('approveVendor')
                     }}
                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-50 text-green-700 transition-all hover:border-green-500 hover:bg-green-100 hover:text-green-800"
                     title="Approve vendor"
@@ -431,12 +452,11 @@ export function VendorsPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      const reason = window.prompt('Enter rejection reason (optional):') || 'Application rejected by admin'
-                      if (reason) {
-                        handleRejectVendor(originalVendor.id, { reason })
-                      }
-                    }}
+                  onClick={() => {
+                    setSelectedVendorForAction(originalVendor)
+                    setRejectReason('')
+                    setCurrentView('rejectVendor')
+                  }}
                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition-all hover:border-red-500 hover:bg-red-100 hover:text-red-800"
                     title="Reject vendor"
                   >
@@ -452,7 +472,7 @@ export function VendorsPage() {
                     type="button"
                     onClick={() => {
                       setSelectedVendorForPolicy(originalVendor)
-                      setCreditPolicyModalOpen(true)
+                      setCurrentView('creditPolicy')
                     }}
                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-green-500 hover:bg-green-50 hover:text-green-700"
                     title="Update credit policy"
@@ -461,13 +481,12 @@ export function VendorsPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      const banType = window.confirm('Ban permanently? (Cancel for temporary ban)') ? 'permanent' : 'temporary'
-                      const banReason = window.prompt('Enter ban reason:') || 'Banned by admin'
-                      if (banReason) {
-                        handleBanVendor(originalVendor.id, { banType, banReason })
-                      }
-                    }}
+                  onClick={() => {
+                    setSelectedVendorForAction(originalVendor)
+                    setBanType('temporary')
+                    setBanReason('')
+                    setCurrentView('banVendor')
+                  }}
                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition-all hover:border-red-500 hover:bg-red-100 hover:text-red-800"
                     title="Ban vendor"
                   >
@@ -479,8 +498,9 @@ export function VendorsPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    const revocationReason = window.prompt('Enter unban reason (optional):') || 'Ban revoked by admin'
-                    handleUnbanVendor(originalVendor.id, { revocationReason })
+                    setSelectedVendorForAction(originalVendor)
+                    setRevocationReason('')
+                    setCurrentView('unbanVendor')
                   }}
                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-50 text-green-700 transition-all hover:border-green-500 hover:bg-green-100 hover:text-green-800"
                   title="Unban vendor"
@@ -496,6 +516,703 @@ export function VendorsPage() {
     return column
   })
 
+  // Render full-screen views
+  if (currentView === 'creditPolicy' && selectedVendorForPolicy) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Vendors
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 3 • Vendor Management</p>
+            <h2 className="text-2xl font-bold text-gray-900">Update Credit Policy</h2>
+            <p className="text-sm text-gray-600">
+              Configure credit limit, repayment terms, and penalty rates for {selectedVendorForPolicy.name}.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <CreditPolicyForm
+            vendor={selectedVendorForPolicy}
+            onSubmit={handleUpdateCreditPolicy}
+            onCancel={handleBackToList}
+            loading={loading}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === 'vendorDetail' && selectedVendorForDetail) {
+    const vendor = selectedVendorForDetail
+    const formatCurrency = (value) => {
+      if (typeof value === 'string') return value
+      if (value >= 100000) return `₹${(value / 100000).toFixed(1)} L`
+      return `₹${value.toLocaleString('en-IN')}`
+    }
+    const creditLimit = typeof vendor.creditLimit === 'number' 
+      ? vendor.creditLimit 
+      : parseFloat(vendor.creditLimit?.replace(/[₹,\sL]/g, '') || '0') * 100000
+    const dues = typeof vendor.dues === 'number'
+      ? vendor.dues
+      : parseFloat(vendor.dues?.replace(/[₹,\sL]/g, '') || '0') * 100000
+    const creditUtilization = creditLimit > 0 ? ((dues / creditLimit) * 100).toFixed(1) : 0
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Vendors
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 3 • Vendor Management</p>
+            <h2 className="text-2xl font-bold text-gray-900">Vendor Details & Performance</h2>
+            <p className="text-sm text-gray-600">
+              Comprehensive view of vendor information, credit status, and performance metrics.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="space-y-6">
+            {/* Vendor Header */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg">
+                    <Building2 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">{vendor.name}</h3>
+                    <p className="text-sm text-gray-600">Vendor ID: {vendor.id}</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm text-gray-600">{vendor.region}</span>
+                    </div>
+                  </div>
+                </div>
+                <StatusBadge tone={vendor.status === 'On Track' || vendor.status === 'on_track' ? 'success' : vendor.status === 'Delayed' || vendor.status === 'delayed' ? 'warning' : 'neutral'}>
+                  {vendor.status || 'Unknown'}
+                </StatusBadge>
+              </div>
+            </div>
+
+            {/* Credit Performance Metrics */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <p className="text-xs text-gray-500">Credit Limit</p>
+                <p className="mt-1 text-lg font-bold text-gray-900">{formatCurrency(creditLimit)}</p>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <p className="text-xs text-gray-500">Outstanding Dues</p>
+                <p className="mt-1 text-lg font-bold text-red-600">{formatCurrency(dues)}</p>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <p className="text-xs text-gray-500">Credit Utilization</p>
+                <p className="mt-1 text-lg font-bold text-gray-900">{creditUtilization}%</p>
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all',
+                      parseFloat(creditUtilization) > 80 ? 'bg-gradient-to-r from-red-500 to-red-600' : parseFloat(creditUtilization) > 60 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' : 'bg-gradient-to-r from-green-500 to-green-600',
+                    )}
+                    style={{ width: `${Math.min(creditUtilization, 100)}%` }}
+                  />
+                </div>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <p className="text-xs text-gray-500">Repayment Days</p>
+                <p className="mt-1 text-lg font-bold text-gray-900">{vendor.repaymentDays || vendor.repayment || 'N/A'}</p>
+              </div>
+            </div>
+
+            {/* Coverage & Policy */}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-900">Coverage Radius</h4>
+                    <p className="mt-2 text-2xl font-bold text-blue-900">
+                      {vendor.coverageRadius ? `${vendor.coverageRadius} km` : 'N/A'}
+                    </p>
+                    {vendor.serviceArea && <p className="text-xs text-blue-700">{vendor.serviceArea}</p>}
+                  </div>
+                  <StatusBadge tone={vendor.coverageConflicts?.length ? 'warning' : 'success'}>
+                    {vendor.coverageConflicts?.length ? 'Conflict' : 'Compliant'}
+                  </StatusBadge>
+                </div>
+                {vendor.coverageConflicts?.length ? (
+                  <ul className="mt-4 space-y-2 text-xs text-blue-900">
+                    {vendor.coverageConflicts.map((conflict) => {
+                      const otherVendor = conflict.vendorA.id === vendor.id ? conflict.vendorB : conflict.vendorA
+                      return (
+                        <li key={`${vendor.id}-${otherVendor.id}`} className="rounded-lg border border-blue-200 bg-white/80 px-3 py-2">
+                          <p className="font-semibold">{otherVendor.name}</p>
+                          <p className="text-[0.7rem] text-blue-700">
+                            Distance: {conflict.distanceKm} km • Overlap: {conflict.overlapKm} km
+                          </p>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : (
+                  <p className="mt-4 text-xs text-blue-800">
+                    No overlapping vendors detected within the 20 km exclusivity rule.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-green-200 bg-green-50 p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-green-900">Credit Policy</h4>
+                    <div className="mt-2 grid gap-2 text-xs text-green-800 sm:grid-cols-3">
+                      <div>
+                        <span className="font-semibold">Limit: </span>
+                        <span>{formatCurrency(creditLimit)}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold">Repayment: </span>
+                        <span>{vendor.repaymentDays || vendor.repayment || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold">Penalty: </span>
+                        <span>{vendor.penaltyRate || vendor.penalty || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedVendorForPolicy(vendor)
+                      setCurrentView('creditPolicy')
+                    }}
+                    className="rounded-lg border border-green-300 bg-white px-4 py-2 text-xs font-bold text-green-700 transition-all hover:bg-green-100"
+                  >
+                    Update Policy
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Performance Alerts */}
+            {parseFloat(creditUtilization) > 80 && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <div className="flex items-start gap-3">
+                  <ShieldAlert className="h-5 w-5 flex-shrink-0 text-red-600" />
+                  <div>
+                    <p className="text-sm font-bold text-red-900">High Credit Utilization Alert</p>
+                    <p className="mt-1 text-xs text-red-700">
+                      This vendor has exceeded 80% credit utilization. Consider reviewing their credit limit or requesting immediate repayment.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === 'vendorMap' && selectedVendorForMap) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Vendors
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 3 • Vendor Management</p>
+            <h2 className="text-2xl font-bold text-gray-900">{selectedVendorForMap.name} Location</h2>
+            <p className="text-sm text-gray-600">
+              View vendor location and coverage area on the map.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <VendorMap vendor={selectedVendorForMap} className="h-[600px]" />
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === 'purchaseRequest' && selectedPurchaseRequest) {
+    const request = selectedPurchaseRequest
+    const formatCurrency = (value) => {
+      if (typeof value === 'string') return value
+      if (value >= 100000) return `₹${(value / 100000).toFixed(1)} L`
+      return `₹${value.toLocaleString('en-IN')}`
+    }
+
+    const handleRejectWithReason = () => {
+      handleRejectPurchase(request.id, { reason: purchaseRejectReason || 'Purchase request rejected by admin' })
+    }
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Vendors
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 3 • Vendor Management</p>
+            <h2 className="text-2xl font-bold text-gray-900">Vendor Purchase Request Review</h2>
+            <p className="text-sm text-gray-600">
+              Review and approve or reject vendor purchase requests (minimum ₹50,000).
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="space-y-6">
+            {/* Request Header */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg">
+                    <Package className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">
+                      Request #{request.id?.slice(-8) || request.requestId?.slice(-8) || 'N/A'}
+                    </h3>
+                    <p className="text-sm text-gray-600">Vendor: {request.vendorName || request.vendor}</p>
+                    <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                      {request.date && (
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3.5 w-3.5" />
+                          <span>{new Date(request.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <StatusBadge tone={request.status === 'pending' ? 'warning' : request.status === 'approved' ? 'success' : 'neutral'}>
+                  {request.status || 'Pending'}
+                </StatusBadge>
+              </div>
+            </div>
+
+            {/* Purchase Details */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-900">Purchase Details</h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-xs text-gray-500">Request Amount</p>
+                  <p className="mt-1 text-lg font-bold text-gray-900">
+                    {formatCurrency(request.amount || request.value || 0)}
+                  </p>
+                </div>
+                {request.advance && (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-xs text-gray-500">Advance Payment (30%)</p>
+                    <p className="mt-1 text-lg font-bold text-gray-900">{formatCurrency(request.advance)}</p>
+                  </div>
+                )}
+              </div>
+
+              {request.products && request.products.length > 0 && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="mb-3 text-xs font-bold text-gray-500">Products Requested</p>
+                  <div className="space-y-2">
+                    {request.products.map((product, index) => (
+                      <div key={index} className="flex items-center justify-between rounded-lg bg-white p-3">
+                        <span className="text-sm text-gray-700">{product.name || product}</span>
+                        {product.quantity && <span className="text-xs text-gray-500">Qty: {product.quantity}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {request.description && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="mb-2 text-xs text-gray-500">Description</p>
+                  <p className="text-sm text-gray-700">{request.description}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Rejection Reason Input (shown when rejecting) */}
+            {purchaseRejectReason !== null && (
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <label className="mb-2 block text-sm font-bold text-gray-900">
+                  Rejection Reason <span className="text-xs font-normal text-gray-500">(Required for rejection)</span>
+                </label>
+                <textarea
+                  value={purchaseRejectReason}
+                  onChange={(e) => setPurchaseRejectReason(e.target.value)}
+                  placeholder="Enter reason for rejection"
+                  rows={3}
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                />
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleBackToList}
+                disabled={loading}
+                className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (purchaseRejectReason === null) {
+                      setPurchaseRejectReason('')
+                    } else {
+                      handleRejectWithReason()
+                    }
+                  }}
+                  disabled={loading}
+                  className="flex items-center gap-2 rounded-xl border border-red-300 bg-white px-6 py-3 text-sm font-bold text-red-600 transition-all hover:bg-red-50 disabled:opacity-50"
+                >
+                  <XCircle className="h-4 w-4" />
+                  {purchaseRejectReason === null ? 'Reject' : 'Confirm Rejection'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApprovePurchase(request.id)}
+                  disabled={loading}
+                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  {loading ? 'Processing...' : 'Approve Request'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Action views (Approve, Reject, Ban, Unban)
+  if (currentView === 'approveVendor' && selectedVendorForAction) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Vendors
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 3 • Vendor Management</p>
+            <h2 className="text-2xl font-bold text-gray-900">Approve Vendor</h2>
+            <p className="text-sm text-gray-600">
+              Approve vendor application for {selectedVendorForAction.name}.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-green-200 bg-green-50 p-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg">
+                  <CheckCircle className="h-8 w-8" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{selectedVendorForAction.name}</h3>
+                  <p className="text-sm text-gray-600">Vendor ID: {selectedVendorForAction.id}</p>
+                  <p className="text-sm text-gray-600">Region: {selectedVendorForAction.region}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+              <p className="text-sm font-bold text-gray-900 mb-4">Are you sure you want to approve this vendor?</p>
+              <p className="text-sm text-gray-600 mb-6">
+                Once approved, the vendor will be able to access their dashboard and start receiving orders.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleBackToList}
+                  className="flex-1 rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApproveVendor(selectedVendorForAction.id)}
+                  disabled={loading}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+                >
+                  {loading ? 'Approving...' : 'Approve Vendor'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === 'rejectVendor' && selectedVendorForAction) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Vendors
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 3 • Vendor Management</p>
+            <h2 className="text-2xl font-bold text-gray-900">Reject Vendor</h2>
+            <p className="text-sm text-gray-600">
+              Reject vendor application for {selectedVendorForAction.name}.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg">
+                  <XCircle className="h-8 w-8" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{selectedVendorForAction.name}</h3>
+                  <p className="text-sm text-gray-600">Vendor ID: {selectedVendorForAction.id}</p>
+                  <p className="text-sm text-gray-600">Region: {selectedVendorForAction.region}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+              <label className="mb-2 block text-sm font-bold text-gray-900">
+                Rejection Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Enter reason for rejection (optional)"
+                rows={4}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+              />
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleBackToList}
+                  className="flex-1 rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRejectVendor(selectedVendorForAction.id, { reason: rejectReason || 'Application rejected by admin' })}
+                  disabled={loading}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(239,68,68,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(239,68,68,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+                >
+                  {loading ? 'Rejecting...' : 'Reject Vendor'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === 'banVendor' && selectedVendorForAction) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Vendors
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 3 • Vendor Management</p>
+            <h2 className="text-2xl font-bold text-gray-900">Ban Vendor</h2>
+            <p className="text-sm text-gray-600">
+              Ban vendor {selectedVendorForAction.name} temporarily or permanently.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg">
+                  <Ban className="h-8 w-8" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{selectedVendorForAction.name}</h3>
+                  <p className="text-sm text-gray-600">Vendor ID: {selectedVendorForAction.id}</p>
+                  <p className="text-sm text-gray-600">Region: {selectedVendorForAction.region}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+              <label className="mb-2 block text-sm font-bold text-gray-900">
+                Ban Type <span className="text-red-500">*</span>
+              </label>
+              <div className="mb-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setBanType('temporary')}
+                  className={cn(
+                    'flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-all',
+                    banType === 'temporary'
+                      ? 'border-yellow-500 bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-[0_4px_15px_rgba(234,179,8,0.3),inset_0_1px_0_rgba(255,255,255,0.2)]'
+                      : 'border-gray-300 bg-white text-gray-700 hover:border-yellow-300 hover:bg-yellow-50',
+                  )}
+                >
+                  Temporary
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBanType('permanent')}
+                  className={cn(
+                    'flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-all',
+                    banType === 'permanent'
+                      ? 'border-red-500 bg-gradient-to-br from-red-500 to-red-600 text-white shadow-[0_4px_15px_rgba(239,68,68,0.3),inset_0_1px_0_rgba(255,255,255,0.2)]'
+                      : 'border-gray-300 bg-white text-gray-700 hover:border-red-300 hover:bg-red-50',
+                  )}
+                >
+                  Permanent
+                </button>
+              </div>
+              <label className="mb-2 block text-sm font-bold text-gray-900">
+                Ban Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={banReason}
+                onChange={(e) => setBanReason(e.target.value)}
+                placeholder="Enter reason for banning this vendor"
+                rows={4}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+              />
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleBackToList}
+                  className="flex-1 rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBanVendor(selectedVendorForAction.id, { banType, banReason: banReason || 'Banned by admin' })}
+                  disabled={loading || !banReason.trim()}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(239,68,68,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(239,68,68,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+                >
+                  {loading ? 'Banning...' : `Ban Vendor (${banType})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === 'unbanVendor' && selectedVendorForAction) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Vendors
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 3 • Vendor Management</p>
+            <h2 className="text-2xl font-bold text-gray-900">Unban Vendor</h2>
+            <p className="text-sm text-gray-600">
+              Revoke ban for vendor {selectedVendorForAction.name}.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-green-200 bg-green-50 p-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg">
+                  <Unlock className="h-8 w-8" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{selectedVendorForAction.name}</h3>
+                  <p className="text-sm text-gray-600">Vendor ID: {selectedVendorForAction.id}</p>
+                  <p className="text-sm text-gray-600">Region: {selectedVendorForAction.region}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+              <label className="mb-2 block text-sm font-bold text-gray-900">
+                Revocation Reason <span className="text-xs font-normal text-gray-500">(Optional)</span>
+              </label>
+              <textarea
+                value={revocationReason}
+                onChange={(e) => setRevocationReason(e.target.value)}
+                placeholder="Enter reason for revoking ban (optional)"
+                rows={4}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/50"
+              />
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleBackToList}
+                  className="flex-1 rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUnbanVendor(selectedVendorForAction.id, { revocationReason: revocationReason || 'Ban revoked by admin' })}
+                  disabled={loading}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+                >
+                  {loading ? 'Unbanning...' : 'Unban Vendor'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Main vendors list view
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -511,7 +1228,7 @@ export function VendorsPage() {
             <button
               onClick={() => {
                 setSelectedPurchaseRequest(purchaseRequests[0])
-                setPurchaseRequestModalOpen(true)
+                setCurrentView('purchaseRequest')
               }}
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105"
             >
@@ -679,67 +1396,6 @@ export function VendorsPage() {
       </section>
 
 
-      {/* Credit Policy Modal */}
-      <Modal
-        isOpen={creditPolicyModalOpen}
-        onClose={() => {
-          setCreditPolicyModalOpen(false)
-          setSelectedVendorForPolicy(null)
-        }}
-        title="Update Credit Policy"
-        size="md"
-      >
-        <CreditPolicyForm
-          vendor={selectedVendorForPolicy}
-          onSubmit={handleUpdateCreditPolicy}
-          onCancel={() => {
-            setCreditPolicyModalOpen(false)
-            setSelectedVendorForPolicy(null)
-          }}
-          loading={loading}
-        />
-      </Modal>
-
-      {/* Purchase Request Modal */}
-      <PurchaseRequestModal
-        isOpen={purchaseRequestModalOpen}
-        onClose={() => {
-          setPurchaseRequestModalOpen(false)
-          setSelectedPurchaseRequest(null)
-        }}
-        request={selectedPurchaseRequest}
-        onApprove={handleApprovePurchase}
-        onReject={handleRejectPurchase}
-        loading={loading}
-      />
-
-      {/* Vendor Detail Modal */}
-      <VendorDetailModal
-        isOpen={vendorDetailModalOpen}
-        onClose={() => {
-          setVendorDetailModalOpen(false)
-          setSelectedVendorForDetail(null)
-        }}
-        vendor={selectedVendorForDetail}
-        onUpdateCreditPolicy={(vendor) => {
-          setVendorDetailModalOpen(false)
-          setSelectedVendorForPolicy(vendor)
-          setCreditPolicyModalOpen(true)
-        }}
-      />
-
-      {/* Vendor Map Modal */}
-      <Modal
-        isOpen={mapModalOpen}
-        onClose={() => {
-          setMapModalOpen(false)
-          setSelectedVendorForMap(null)
-        }}
-        title={`${selectedVendorForMap?.name || 'Vendor'} Location`}
-        size="lg"
-      >
-        <VendorMap vendor={selectedVendorForMap} className="h-[400px]" />
-      </Modal>
     </div>
   )
 }

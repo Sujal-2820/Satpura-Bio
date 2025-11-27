@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Layers3, MapPin, ToggleRight, Edit2, Trash2 } from 'lucide-react'
+import { Layers3, MapPin, ToggleRight, Edit2, Trash2, ArrowLeft } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { FilterBar } from '../components/FilterBar'
-import { Modal } from '../components/Modal'
 import { ProductForm } from '../components/ProductForm'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
@@ -28,7 +27,7 @@ export function ProductsPage() {
   const { getProducts, createProduct, updateProduct, deleteProduct, toggleProductVisibility, loading } = useAdminApi()
   const { success, error: showError, warning: showWarning } = useToast()
   
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [showForm, setShowForm] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [productsList, setProductsList] = useState([])
 
@@ -110,14 +109,14 @@ export function ProductsPage() {
 
   const handleAddProduct = () => {
     setSelectedProduct(null)
-    setIsModalOpen(true)
+    setShowForm(true)
   }
 
   const handleEditProduct = (product) => {
     // Find original product data (before formatting)
     const originalProduct = products.data?.products?.find((p) => p.id === product.id) || product
     setSelectedProduct(originalProduct)
-    setIsModalOpen(true)
+    setShowForm(true)
   }
 
   const handleDeleteProduct = async (productId) => {
@@ -166,7 +165,7 @@ export function ProductsPage() {
         // Update existing product
         const result = await updateProduct(selectedProduct.id, formData)
         if (result.data) {
-          setIsModalOpen(false)
+          setShowForm(false)
           setSelectedProduct(null)
           fetchProducts()
           success('Product updated successfully!', 3000)
@@ -182,7 +181,7 @@ export function ProductsPage() {
         // Create new product
         const result = await createProduct(formData)
         if (result.data) {
-          setIsModalOpen(false)
+          setShowForm(false)
           fetchProducts()
           success('Product created successfully!', 3000)
         } else if (result.error) {
@@ -199,8 +198,8 @@ export function ProductsPage() {
     }
   }
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
+  const handleBackToList = () => {
+    setShowForm(false)
     setSelectedProduct(null)
   }
 
@@ -257,6 +256,47 @@ export function ProductsPage() {
     return column
   })
 
+  // Show full-screen form view
+  if (showForm) {
+    return (
+      <div className="space-y-6">
+        {/* Header with Back Button */}
+        <div>
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Products
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 2 • Master Product Management</p>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {selectedProduct ? 'Edit Product' : 'Add New Product'}
+            </h2>
+            <p className="text-sm text-gray-600">
+              {selectedProduct 
+                ? 'Update product details, pricing, and stock information.'
+                : 'Create a new product entry with pricing, stock, and visibility settings.'}
+            </p>
+          </div>
+        </div>
+
+        {/* Form Container */}
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <ProductForm
+            product={selectedProduct}
+            onSubmit={handleFormSubmit}
+            onCancel={handleBackToList}
+            loading={loading}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // Show products list view
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -369,21 +409,6 @@ export function ProductsPage() {
           })}
         </div>
       </div>
-
-      {/* Product Form Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        title={selectedProduct ? 'Edit Product' : 'Add New Product'}
-        size="md"
-      >
-        <ProductForm
-          product={selectedProduct}
-          onSubmit={handleFormSubmit}
-          onCancel={handleCloseModal}
-          loading={loading}
-        />
-      </Modal>
     </div>
   )
 }

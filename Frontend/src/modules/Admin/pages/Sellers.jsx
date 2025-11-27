@@ -1,12 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Award, Gift, Users, Edit2, Eye, Wallet, CheckCircle, XCircle } from 'lucide-react'
+import { Award, Gift, Users, Edit2, Eye, Wallet, CheckCircle, XCircle, ArrowLeft, User, Hash, Percent, Target, IndianRupee, TrendingUp, Calendar } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { ProgressList } from '../components/ProgressList'
-import { Modal } from '../components/Modal'
 import { SellerForm } from '../components/SellerForm'
-import { SellerDetailModal } from '../components/SellerDetailModal'
-import { WithdrawalRequestModal } from '../components/WithdrawalRequestModal'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
 import { useToast } from '../components/ToastNotification'
@@ -45,13 +42,14 @@ export function SellersPage() {
   const [sellersList, setSellersList] = useState([])
   const [withdrawalRequests, setWithdrawalRequests] = useState([])
   
-  // Modal states
-  const [sellerModalOpen, setSellerModalOpen] = useState(false)
+  // View states (replacing modals with full-screen views)
+  const [currentView, setCurrentView] = useState(null) // 'sellerForm', 'sellerDetail', 'withdrawalRequest', 'approveSeller', 'rejectSeller'
   const [selectedSeller, setSelectedSeller] = useState(null)
-  const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedSellerForDetail, setSelectedSellerForDetail] = useState(null)
-  const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false)
   const [selectedWithdrawalRequest, setSelectedWithdrawalRequest] = useState(null)
+  const [selectedSellerForAction, setSelectedSellerForAction] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [withdrawalRejectReason, setWithdrawalRejectReason] = useState(null) // null = not showing, '' = showing input
 
   // Format seller data for display
   const formatSellerForDisplay = (seller) => {
@@ -123,19 +121,29 @@ export function SellersPage() {
 
   const handleCreateSeller = () => {
     setSelectedSeller(null)
-    setSellerModalOpen(true)
+    setCurrentView('sellerForm')
   }
 
   const handleEditSeller = (seller) => {
     const originalSeller = sellersState.data?.sellers?.find((s) => s.id === seller.id) || seller
     setSelectedSeller(originalSeller)
-    setSellerModalOpen(true)
+    setCurrentView('sellerForm')
   }
 
   const handleViewSellerDetails = (seller) => {
     const originalSeller = sellersState.data?.sellers?.find((s) => s.id === seller.id) || seller
     setSelectedSellerForDetail(originalSeller)
-    setDetailModalOpen(true)
+    setCurrentView('sellerDetail')
+  }
+
+  const handleBackToList = () => {
+    setCurrentView(null)
+    setSelectedSeller(null)
+    setSelectedSellerForDetail(null)
+    setSelectedWithdrawalRequest(null)
+    setSelectedSellerForAction(null)
+    setRejectReason('')
+    setWithdrawalRejectReason(null)
   }
 
   const handleDeleteSeller = async (sellerId) => {
@@ -165,7 +173,7 @@ export function SellersPage() {
         // Update existing seller
         const result = await updateSeller(selectedSeller.id, formData)
         if (result.data) {
-          setSellerModalOpen(false)
+          setCurrentView(null)
           setSelectedSeller(null)
           fetchSellers()
           success('Seller updated successfully!', 3000)
@@ -181,7 +189,7 @@ export function SellersPage() {
         // Create new seller
         const result = await createSeller(formData)
         if (result.data) {
-          setSellerModalOpen(false)
+          setCurrentView(null)
           fetchSellers()
           success('Seller created successfully!', 3000)
         } else if (result.error) {
@@ -202,8 +210,9 @@ export function SellersPage() {
     try {
       const result = await approveSellerWithdrawal(requestId)
       if (result.data) {
-        setWithdrawalModalOpen(false)
+        setCurrentView(null)
         setSelectedWithdrawalRequest(null)
+        setWithdrawalRejectReason(null)
         fetchWithdrawalRequests()
         success('Withdrawal request approved successfully!', 3000)
       } else if (result.error) {
@@ -223,8 +232,9 @@ export function SellersPage() {
     try {
       const result = await rejectSellerWithdrawal(requestId, rejectionData)
       if (result.data) {
-        setWithdrawalModalOpen(false)
+        setCurrentView(null)
         setSelectedWithdrawalRequest(null)
+        setWithdrawalRejectReason(null)
         fetchWithdrawalRequests()
         success('Withdrawal request rejected.', 3000)
       } else if (result.error) {
@@ -240,6 +250,8 @@ export function SellersPage() {
     try {
       const result = await approveSeller(sellerId)
       if (result.data) {
+        setCurrentView(null)
+        setSelectedSellerForAction(null)
         fetchSellers()
         success('Seller approved successfully!', 3000)
       } else if (result.error) {
@@ -251,13 +263,13 @@ export function SellersPage() {
     }
   }
 
-  const handleRejectSeller = async (sellerId) => {
-    const reason = window.prompt('Please provide a reason for rejection (optional):')
-    if (reason === null) return // User cancelled
-
+  const handleRejectSeller = async (sellerId, rejectionData) => {
     try {
-      const result = await rejectSeller(sellerId, { reason: reason || undefined })
+      const result = await rejectSeller(sellerId, rejectionData)
       if (result.data) {
+        setCurrentView(null)
+        setSelectedSellerForAction(null)
+        setRejectReason('')
         fetchSellers()
         success('Seller rejected successfully.', 3000)
       } else if (result.error) {
@@ -335,7 +347,10 @@ export function SellersPage() {
                 <>
                   <button
                     type="button"
-                    onClick={() => handleApproveSeller(originalSeller.id || row.id)}
+                    onClick={() => {
+                      setSelectedSellerForAction(originalSeller)
+                      setCurrentView('approveSeller')
+                    }}
                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-50 text-green-700 transition-all hover:border-green-500 hover:bg-green-100"
                     title="Approve seller"
                   >
@@ -343,7 +358,11 @@ export function SellersPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleRejectSeller(originalSeller.id || row.id)}
+                    onClick={() => {
+                      setSelectedSellerForAction(originalSeller)
+                      setRejectReason('')
+                      setCurrentView('rejectSeller')
+                    }}
                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition-all hover:border-red-500 hover:bg-red-100"
                     title="Reject seller"
                   >
@@ -371,6 +390,578 @@ export function SellersPage() {
 
   const totalPendingWithdrawals = withdrawalRequests.reduce((sum, req) => sum + (req.amount || 0), 0)
 
+  // Helper functions for seller detail view
+  const formatCurrency = (value) => {
+    if (typeof value === 'string') {
+      return value
+    }
+    if (value >= 100000) {
+      return `₹${(value / 100000).toFixed(1)} L`
+    }
+    return `₹${value.toLocaleString('en-IN')}`
+  }
+
+  // Helper functions for withdrawal request view
+  const getRequestId = (request) => {
+    if (!request) return null
+    if (typeof request.id === 'string') {
+      return request.id
+    }
+    if (request._id) {
+      return typeof request._id === 'string' ? request._id : String(request._id)
+    }
+    if (request.requestId) {
+      return typeof request.requestId === 'string' ? request.requestId : String(request.requestId)
+    }
+    if (request.id && typeof request.id === 'object' && request.id._id) {
+      return String(request.id._id)
+    }
+    return null
+  }
+
+  const getSellerId = (request) => {
+    if (!request) return null
+    if (typeof request.sellerId === 'string') {
+      return request.sellerId
+    }
+    if (request.sellerId && typeof request.sellerId === 'object') {
+      return request.sellerId.sellerId || request.sellerId._id || request.sellerId.id
+    }
+    if (request.seller && typeof request.seller === 'object') {
+      return request.seller.sellerId || request.seller._id || request.seller.id
+    }
+    return null
+  }
+
+  const getSellerName = (request) => {
+    if (!request) return 'Unknown IRA Partner'
+    if (request.sellerName) {
+      return request.sellerName
+    }
+    if (request.sellerId && typeof request.sellerId === 'object') {
+      return request.sellerId.name
+    }
+    if (request.seller && typeof request.seller === 'object') {
+      return request.seller.name
+    }
+    return 'Unknown IRA Partner'
+  }
+
+  // If a full-screen view is active, render it instead of the main list
+  if (currentView === 'sellerForm') {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBackToList}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
+            title="Back to IRA Partners"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {selectedSeller ? 'Edit IRA Partner Profile' : 'Create New IRA Partner Profile'}
+          </h2>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <SellerForm
+            seller={selectedSeller}
+            onSubmit={handleFormSubmit}
+            onCancel={handleBackToList}
+            loading={loading}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === 'sellerDetail' && selectedSellerForDetail) {
+    const seller = selectedSellerForDetail
+    const monthlyTarget = typeof seller.monthlyTarget === 'number'
+      ? seller.monthlyTarget
+      : parseFloat(seller.target?.replace(/[₹,\sL]/g, '') || '0') * 100000
+
+    const totalSales = typeof seller.totalSales === 'number'
+      ? seller.totalSales
+      : parseFloat(seller.sales?.replace(/[₹,\sL]/g, '') || '0') * 100000
+
+    const achieved = typeof seller.achieved === 'number'
+      ? seller.achieved
+      : typeof seller.progress === 'number'
+      ? seller.progress
+      : monthlyTarget > 0 ? ((totalSales / monthlyTarget) * 100).toFixed(1) : 0
+
+    const cashbackRate = typeof seller.cashbackRate === 'number'
+      ? seller.cashbackRate
+      : parseFloat(seller.cashback?.replace(/[%\s]/g, '') || '0')
+
+    const commissionRate = typeof seller.commissionRate === 'number'
+      ? seller.commissionRate
+      : parseFloat(seller.commission?.replace(/[%\s]/g, '') || '0')
+
+    const referrals = seller.referrals || seller.referredUsers || 0
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBackToList}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
+            title="Back to IRA Partners"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">IRA Partner Performance Details</h2>
+        </div>
+        <div className="space-y-6">
+          {/* IRA Partner Header */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-lg">
+                  <User className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{seller.name}</h3>
+                  <p className="text-sm text-gray-600">IRA Partner ID: {seller.sellerId || seller.id}</p>
+                  {seller.area && (
+                    <p className="mt-1 text-xs text-gray-500">{seller.area}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <StatusBadge tone={seller.status === 'On Track' || seller.status === 'on_track' ? 'success' : 'warning'}>
+                  {seller.status || 'Unknown'}
+                </StatusBadge>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedSeller(seller)
+                    setCurrentView('sellerForm')
+                  }}
+                  className="rounded-lg border border-yellow-300 bg-white px-4 py-2 text-xs font-bold text-yellow-700 transition-all hover:bg-yellow-50"
+                >
+                  Edit Profile
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Performance Metrics */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Target className="h-4 w-4" />
+                <span>Monthly Target</span>
+              </div>
+              <p className="mt-1 text-lg font-bold text-gray-900">
+                {formatCurrency(monthlyTarget)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <TrendingUp className="h-4 w-4" />
+                <span>Total Sales</span>
+              </div>
+              <p className="mt-1 text-lg font-bold text-gray-900">
+                {formatCurrency(totalSales)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Users className="h-4 w-4" />
+                <span>Referred Users</span>
+              </div>
+              <p className="mt-1 text-lg font-bold text-gray-900">
+                {referrals.toLocaleString('en-IN')}
+              </p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Award className="h-4 w-4" />
+                <span>Progress</span>
+              </div>
+              <p className="mt-1 text-lg font-bold text-gray-900">
+                {parseFloat(achieved).toFixed(1)}%
+              </p>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-5">
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="font-bold text-gray-900">Target Achievement</span>
+              <span className="font-bold text-yellow-700">{parseFloat(achieved).toFixed(1)}%</span>
+            </div>
+            <div className="h-4 w-full overflow-hidden rounded-full bg-gray-200 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all shadow-[0_2px_8px_rgba(234,179,8,0.3)]',
+                  parseFloat(achieved) >= 100
+                    ? 'bg-gradient-to-r from-green-500 to-green-600'
+                    : parseFloat(achieved) >= 80
+                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                    : 'bg-gradient-to-r from-orange-500 to-orange-600',
+                )}
+                style={{ width: `${Math.min(achieved, 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Incentive Settings */}
+          <div className="rounded-xl border border-yellow-200 bg-white p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-gray-900">Incentive Settings</h4>
+                <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <span className="text-gray-500">Cashback Rate: </span>
+                    <span className="font-bold text-gray-900">{cashbackRate}%</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Commission Rate: </span>
+                    <span className="font-bold text-gray-900">{commissionRate}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Information */}
+          {(seller.email || seller.phone) && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+              <h4 className="mb-3 text-sm font-bold text-gray-900">Contact Information</h4>
+              <div className="grid gap-2 text-sm sm:grid-cols-2">
+                {seller.email && (
+                  <div>
+                    <span className="text-gray-500">Email: </span>
+                    <span className="text-gray-900">{seller.email}</span>
+                  </div>
+                )}
+                {seller.phone && (
+                  <div>
+                    <span className="text-gray-500">Phone: </span>
+                    <span className="text-gray-900">{seller.phone}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === 'withdrawalRequest' && selectedWithdrawalRequest) {
+    const request = selectedWithdrawalRequest
+    const requestId = getRequestId(request)
+    const sellerId = getSellerId(request)
+    const sellerName = getSellerName(request)
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBackToList}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
+            title="Back to IRA Partners"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">IRA Partner Withdrawal Request Review</h2>
+        </div>
+        <div className="space-y-6">
+          {/* Request Header */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-lg">
+                  <Wallet className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Request #{requestId || 'N/A'}</h3>
+                  <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
+                    <User className="h-4 w-4" />
+                    <span>{sellerName}</span>
+                  </div>
+                  {sellerId && (
+                    <p className="mt-1 text-xs text-gray-500">IRA Partner ID: {sellerId}</p>
+                  )}
+                  {(request.date || request.createdAt) && (
+                    <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>
+                        {request.date 
+                          ? (typeof request.date === 'string' ? request.date : new Date(request.date).toLocaleDateString('en-IN'))
+                          : request.createdAt 
+                          ? (typeof request.createdAt === 'string' ? request.createdAt : new Date(request.createdAt).toLocaleDateString('en-IN'))
+                          : ''}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <StatusBadge tone={request.status === 'pending' ? 'warning' : request.status === 'approved' ? 'success' : 'neutral'}>
+                {request.status || 'Pending'}
+              </StatusBadge>
+            </div>
+          </div>
+
+          {/* Withdrawal Details */}
+          <div className="space-y-4">
+            <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-5">
+              <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                <IndianRupee className="h-4 w-4" />
+                <span>Withdrawal Amount</span>
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatCurrency(request.amount || 0)}
+              </p>
+            </div>
+
+            {request.bankDetails && (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="mb-2 text-xs font-bold text-gray-500">Bank Account Details</p>
+                <div className="space-y-1 text-sm text-gray-700">
+                  {request.bankDetails.accountNumber && (
+                    <p>Account: {request.bankDetails.accountNumber}</p>
+                  )}
+                  {request.bankDetails.ifsc && (
+                    <p>IFSC: {request.bankDetails.ifsc}</p>
+                  )}
+                  {request.bankDetails.bankName && (
+                    <p>Bank: {request.bankDetails.bankName}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {request.reason && (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="mb-2 text-xs font-bold text-gray-500">Reason for Withdrawal</p>
+                <p className="text-sm text-gray-700">{request.reason}</p>
+              </div>
+            )}
+
+            {request.sellerPerformance && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <p className="mb-2 text-xs font-bold text-blue-900">IRA Partner Performance Summary</p>
+                <div className="grid gap-2 text-xs text-blue-800 sm:grid-cols-2">
+                  {request.sellerPerformance.totalSales && (
+                    <div>
+                      <span className="font-semibold">Total Sales: </span>
+                      <span>{formatCurrency(request.sellerPerformance.totalSales)}</span>
+                    </div>
+                  )}
+                  {request.sellerPerformance.pendingEarnings && (
+                    <div>
+                      <span className="font-semibold">Pending Earnings: </span>
+                      <span>{formatCurrency(request.sellerPerformance.pendingEarnings)}</span>
+                    </div>
+                  )}
+                  {request.sellerPerformance.targetAchievement && (
+                    <div>
+                      <span className="font-semibold">Target Achievement: </span>
+                      <span>{request.sellerPerformance.targetAchievement}%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {withdrawalRejectReason !== null && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <label className="mb-2 block text-xs font-bold text-gray-700">Rejection Reason</label>
+                <textarea
+                  value={withdrawalRejectReason}
+                  onChange={(e) => setWithdrawalRejectReason(e.target.value)}
+                  placeholder="Please provide a reason for rejection..."
+                  className="w-full rounded-lg border border-red-300 bg-white p-3 text-sm text-gray-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                  rows={3}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={handleBackToList}
+              disabled={loading}
+              className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <div className="flex gap-3">
+              {withdrawalRejectReason === null ? (
+                <button
+                  type="button"
+                  onClick={() => setWithdrawalRejectReason('')}
+                  disabled={loading}
+                  className="flex items-center gap-2 rounded-xl border border-red-300 bg-white px-6 py-3 text-sm font-bold text-red-600 transition-all hover:bg-red-50 disabled:opacity-50"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Reject
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (requestId) {
+                      handleRejectWithdrawal(requestId, { reason: withdrawalRejectReason || undefined })
+                    }
+                  }}
+                  disabled={loading}
+                  className="flex items-center gap-2 rounded-xl border border-red-300 bg-red-600 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-red-700 disabled:opacity-50"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Confirm Rejection
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (requestId) {
+                    handleApproveWithdrawal(requestId)
+                  }
+                }}
+                disabled={loading}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-yellow-500 to-yellow-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(234,179,8,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(234,179,8,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+              >
+                <CheckCircle className="h-4 w-4" />
+                {loading ? 'Processing...' : 'Approve Withdrawal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === 'approveSeller' && selectedSellerForAction) {
+    const seller = selectedSellerForAction
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBackToList}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
+            title="Back to IRA Partners"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">Approve IRA Partner</h2>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <div className="space-y-6">
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg">
+                  <CheckCircle className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{seller.name}</h3>
+                  <p className="text-sm text-gray-600">IRA Partner ID: {seller.sellerId || seller.id}</p>
+                  {seller.email && (
+                    <p className="mt-1 text-xs text-gray-500">Email: {seller.email}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-5">
+              <p className="text-sm text-gray-700">
+                Are you sure you want to approve this IRA Partner? This action will activate their account and allow them to start earning commissions.
+              </p>
+            </div>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleBackToList}
+                className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleApproveSeller(seller.id || seller._id)}
+                disabled={loading}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+              >
+                <CheckCircle className="h-4 w-4" />
+                {loading ? 'Processing...' : 'Approve IRA Partner'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === 'rejectSeller' && selectedSellerForAction) {
+    const seller = selectedSellerForAction
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBackToList}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
+            title="Back to IRA Partners"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">Reject IRA Partner</h2>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <div className="space-y-6">
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg">
+                  <XCircle className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{seller.name}</h3>
+                  <p className="text-sm text-gray-600">IRA Partner ID: {seller.sellerId || seller.id}</p>
+                  {seller.email && (
+                    <p className="mt-1 text-xs text-gray-500">Email: {seller.email}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-red-200 bg-red-50 p-5">
+              <label className="mb-2 block text-sm font-bold text-gray-700">Rejection Reason (Optional)</label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Please provide a reason for rejection (optional)..."
+                className="w-full rounded-lg border border-red-300 bg-white p-3 text-sm text-gray-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                rows={4}
+              />
+            </div>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleBackToList}
+                className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRejectSeller(seller.id || seller._id, { reason: rejectReason || undefined })}
+                disabled={loading}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(239,68,68,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(239,68,68,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+              >
+                <XCircle className="h-4 w-4" />
+                {loading ? 'Processing...' : 'Reject IRA Partner'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -386,7 +977,7 @@ export function SellersPage() {
             <button
               onClick={() => {
                 setSelectedWithdrawalRequest(withdrawalRequests[0])
-                setWithdrawalModalOpen(true)
+                setCurrentView('withdrawalRequest')
               }}
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105"
             >
@@ -468,55 +1059,6 @@ export function SellersPage() {
           ]}
         />
       </section>
-
-      {/* Seller Form Modal */}
-      <Modal
-        isOpen={sellerModalOpen}
-        onClose={() => {
-          setSellerModalOpen(false)
-          setSelectedSeller(null)
-        }}
-        title={selectedSeller ? 'Edit Seller Profile' : 'Create New Seller'}
-        size="md"
-      >
-        <SellerForm
-          seller={selectedSeller}
-          onSubmit={handleFormSubmit}
-          onCancel={() => {
-            setSellerModalOpen(false)
-            setSelectedSeller(null)
-          }}
-          loading={loading}
-        />
-      </Modal>
-
-      {/* Seller Detail Modal */}
-      <SellerDetailModal
-        isOpen={detailModalOpen}
-        onClose={() => {
-          setDetailModalOpen(false)
-          setSelectedSellerForDetail(null)
-        }}
-        seller={selectedSellerForDetail}
-        onEdit={(seller) => {
-          setDetailModalOpen(false)
-          setSelectedSeller(seller)
-          setSellerModalOpen(true)
-        }}
-      />
-
-      {/* Withdrawal Request Modal */}
-      <WithdrawalRequestModal
-        isOpen={withdrawalModalOpen}
-        onClose={() => {
-          setWithdrawalModalOpen(false)
-          setSelectedWithdrawalRequest(null)
-        }}
-        request={selectedWithdrawalRequest}
-        onApprove={handleApproveWithdrawal}
-        onReject={handleRejectWithdrawal}
-        loading={loading}
-      />
     </div>
   )
 }

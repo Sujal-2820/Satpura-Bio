@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Calendar, Package, IndianRupee, Eye, EyeOff } from 'lucide-react'
+import { Calendar, Package, IndianRupee, Eye, EyeOff, Tag, X } from 'lucide-react'
 import { cn } from '../../../lib/cn'
 
 const STOCK_UNITS = ['kg', 'L', 'bags', 'units']
@@ -20,6 +20,70 @@ const FERTILIZER_CATEGORIES = [
   { value: 'specialty', label: 'Specialty Fertilizers', description: 'Specialized fertilizers' },
 ]
 
+// Category-specific attributes configuration
+const CATEGORY_ATTRIBUTES = {
+  npk: [
+    { key: 'npkRatio', label: 'NPK Ratio (N-P-K)', type: 'text', placeholder: 'e.g., 19:19:19', required: false },
+    { key: 'form', label: 'Form', type: 'select', options: ['Granular', 'Liquid', 'Powder'], required: false },
+    { key: 'grade', label: 'Grade', type: 'text', placeholder: 'e.g., Premium, Standard', required: false },
+  ],
+  nitrogen: [
+    { key: 'nitrogenContent', label: 'Nitrogen Content (%)', type: 'number', placeholder: 'e.g., 46', required: false },
+    { key: 'form', label: 'Form', type: 'select', options: ['Urea', 'Ammonium', 'Nitrate', 'Liquid'], required: false },
+    { key: 'applicationMethod', label: 'Application Method', type: 'select', options: ['Soil', 'Foliar', 'Drip'], required: false },
+  ],
+  phosphorus: [
+    { key: 'phosphorusContent', label: 'Phosphorus Content (%)', type: 'number', placeholder: 'e.g., 20', required: false },
+    { key: 'form', label: 'Form', type: 'select', options: ['Granular', 'Liquid', 'Powder'], required: false },
+    { key: 'applicationMethod', label: 'Application Method', type: 'select', options: ['Soil', 'Foliar', 'Drip'], required: false },
+  ],
+  potassium: [
+    { key: 'potassiumContent', label: 'Potassium Content (%)', type: 'number', placeholder: 'e.g., 60', required: false },
+    { key: 'form', label: 'Form', type: 'select', options: ['Granular', 'Liquid', 'Powder'], required: false },
+    { key: 'applicationMethod', label: 'Application Method', type: 'select', options: ['Soil', 'Foliar', 'Drip'], required: false },
+  ],
+  organic: [
+    { key: 'organicCertified', label: 'Organic Certified', type: 'select', options: ['Yes', 'No'], required: false },
+    { key: 'source', label: 'Source', type: 'select', options: ['Plant-based', 'Animal-based', 'Mixed'], required: false },
+    { key: 'form', label: 'Form', type: 'select', options: ['Compost', 'Manure', 'Liquid', 'Granular'], required: false },
+  ],
+  biofertilizer: [
+    { key: 'microorganismType', label: 'Microorganism Type', type: 'text', placeholder: 'e.g., Rhizobium, Azotobacter', required: false },
+    { key: 'applicationMethod', label: 'Application Method', type: 'select', options: ['Seed Treatment', 'Soil Application', 'Foliar'], required: false },
+    { key: 'shelfLife', label: 'Shelf Life (months)', type: 'number', placeholder: 'e.g., 12', required: false },
+  ],
+  micronutrient: [
+    { key: 'micronutrientType', label: 'Micronutrient Type', type: 'select', options: ['Zinc', 'Iron', 'Boron', 'Manganese', 'Copper', 'Molybdenum'], required: false },
+    { key: 'concentration', label: 'Concentration (%)', type: 'number', placeholder: 'e.g., 12', required: false },
+    { key: 'form', label: 'Form', type: 'select', options: ['Chelated', 'Sulfate', 'Liquid'], required: false },
+  ],
+  liquid: [
+    { key: 'concentration', label: 'Concentration (%)', type: 'number', placeholder: 'e.g., 20', required: false },
+    { key: 'applicationMethod', label: 'Application Method', type: 'select', options: ['Foliar', 'Drip', 'Soil Drench'], required: false },
+    { key: 'dilutionRatio', label: 'Dilution Ratio', type: 'text', placeholder: 'e.g., 1:100', required: false },
+  ],
+  granular: [
+    { key: 'granuleSize', label: 'Granule Size', type: 'select', options: ['Fine', 'Medium', 'Coarse'], required: false },
+    { key: 'applicationMethod', label: 'Application Method', type: 'select', options: ['Broadcast', 'Band Placement', 'Side Dressing'], required: false },
+    { key: 'releaseType', label: 'Release Type', type: 'select', options: ['Immediate', 'Slow Release', 'Controlled Release'], required: false },
+  ],
+  foliar: [
+    { key: 'applicationMethod', label: 'Application Method', type: 'select', options: ['Spray', 'Mist', 'Drip'], required: false },
+    { key: 'dilutionRatio', label: 'Dilution Ratio', type: 'text', placeholder: 'e.g., 1:200', required: false },
+    { key: 'cropCompatibility', label: 'Crop Compatibility', type: 'text', placeholder: 'e.g., All crops, Vegetables', required: false },
+  ],
+  'soil-conditioner': [
+    { key: 'phAdjustment', label: 'pH Adjustment', type: 'select', options: ['Acidic', 'Alkaline', 'Neutral'], required: false },
+    { key: 'organicMatter', label: 'Organic Matter (%)', type: 'number', placeholder: 'e.g., 30', required: false },
+    { key: 'applicationRate', label: 'Application Rate (kg/acre)', type: 'number', placeholder: 'e.g., 100', required: false },
+  ],
+  specialty: [
+    { key: 'specialProperties', label: 'Special Properties', type: 'text', placeholder: 'e.g., Water-soluble, Slow-release', required: false },
+    { key: 'applicationMethod', label: 'Application Method', type: 'select', options: ['Foliar', 'Soil', 'Drip', 'Hydroponic'], required: false },
+    { key: 'targetCrops', label: 'Target Crops', type: 'text', placeholder: 'e.g., Fruits, Vegetables, Flowers', required: false },
+  ],
+}
+
 export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -33,8 +97,11 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     expiry: '',
     visibility: 'active',
     batchNumber: '',
+    tags: [],
+    attributes: {},
   })
 
+  const [tagInput, setTagInput] = useState('')
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
@@ -118,6 +185,22 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
         }
       }
 
+      // Parse specifications (attributes) from product
+      const attributes = {}
+      if (product.specifications && typeof product.specifications === 'object') {
+        // Handle Map type from MongoDB
+        if (product.specifications instanceof Map) {
+          product.specifications.forEach((value, key) => {
+            attributes[key] = value
+          })
+        } else {
+          // Handle plain object
+          Object.keys(product.specifications).forEach((key) => {
+            attributes[key] = product.specifications[key]
+          })
+        }
+      }
+
       setFormData({
         name: product.name || '',
         category: product.category || 'npk',
@@ -130,6 +213,8 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
         expiry: expiryDate,
         visibility: product.isActive !== false ? 'active' : 'inactive',
         batchNumber: product.batchNumber || '',
+        tags: product.tags && Array.isArray(product.tags) ? product.tags : [],
+        attributes: attributes,
       })
     }
   }, [product])
@@ -141,6 +226,42 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }))
     }
+    
+    // Reset attributes when category changes
+    if (name === 'category') {
+      setFormData((prev) => ({ ...prev, attributes: {} }))
+    }
+  }
+
+  const handleAttributeChange = (key, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      attributes: {
+        ...prev.attributes,
+        [key]: value,
+      },
+    }))
+  }
+
+  const handleAddTag = (e) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault()
+      const newTag = tagInput.trim().toLowerCase()
+      if (!formData.tags.includes(newTag)) {
+        setFormData((prev) => ({
+          ...prev,
+          tags: [...prev.tags, newTag],
+        }))
+      }
+      setTagInput('')
+    }
+  }
+
+  const handleRemoveTag = (tagToRemove) => {
+    setFormData((prev) => ({
+      ...prev,
+      tags: prev.tags.filter((tag) => tag !== tagToRemove),
+    }))
   }
 
   // Sync displayStock unit when stockUnit changes
@@ -202,6 +323,15 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     const vendorPrice = parseFloat(formData.vendorPrice)
     const userPrice = parseFloat(formData.userPrice)
 
+    // Build specifications object from attributes (only include non-empty values)
+    const specifications = {}
+    Object.keys(formData.attributes).forEach((key) => {
+      const value = formData.attributes[key]
+      if (value !== '' && value !== null && value !== undefined) {
+        specifications[key] = String(value)
+      }
+    })
+
     const submitData = {
       name: formData.name.trim(),
       category: formData.category,
@@ -214,6 +344,8 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       expiry: formData.expiry,
       isActive: formData.visibility === 'active',
       ...(formData.batchNumber && { batchNumber: formData.batchNumber.trim() }),
+      tags: formData.tags.filter((tag) => tag.trim() !== ''),
+      ...(Object.keys(specifications).length > 0 && { specifications }),
     }
 
     onSubmit(submitData)
@@ -460,6 +592,89 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
             )}
           />
           {errors.userPrice && <p className="mt-1 text-xs text-red-600">{errors.userPrice}</p>}
+        </div>
+      </div>
+
+      {/* Category-Specific Attributes */}
+      {CATEGORY_ATTRIBUTES[formData.category] && CATEGORY_ATTRIBUTES[formData.category].length > 0 && (
+        <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 p-5">
+          <h3 className="mb-4 text-lg font-bold text-blue-700">Category-Specific Attributes</h3>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {CATEGORY_ATTRIBUTES[formData.category].map((attr) => (
+              <div key={attr.key}>
+                <label htmlFor={attr.key} className="mb-2 block text-sm font-bold text-gray-900">
+                  {attr.label}
+                  {attr.required && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                {attr.type === 'select' ? (
+                  <select
+                    id={attr.key}
+                    name={attr.key}
+                    value={formData.attributes[attr.key] || ''}
+                    onChange={(e) => handleAttributeChange(attr.key, e.target.value)}
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  >
+                    <option value="">Select {attr.label}</option>
+                    {attr.options.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={attr.type}
+                    id={attr.key}
+                    name={attr.key}
+                    value={formData.attributes[attr.key] || ''}
+                    onChange={(e) => handleAttributeChange(attr.key, e.target.value)}
+                    placeholder={attr.placeholder}
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tags */}
+      <div>
+        <label htmlFor="tags" className="mb-2 block text-sm font-bold text-gray-900">
+          <Tag className="mr-1 inline h-4 w-4" />
+          Product Tags
+          <span className="text-xs font-normal text-gray-500 ml-2">(Press Enter to add, used for search and identification)</span>
+        </label>
+        <div className="space-y-3">
+          <input
+            type="text"
+            id="tags"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={handleAddTag}
+            placeholder="Type a tag and press Enter (e.g., organic, premium, fast-acting)"
+            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+          />
+          {formData.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {formData.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100 px-3 py-1.5 text-xs font-bold text-purple-700 shadow-[0_2px_8px_rgba(168,85,247,0.2),inset_0_1px_0_rgba(255,255,255,0.8)]"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTag(tag)}
+                    className="ml-1 rounded-full hover:bg-purple-200 transition-colors"
+                    aria-label={`Remove ${tag} tag`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

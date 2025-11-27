@@ -774,8 +774,26 @@ exports.createProduct = async (req, res, next) => {
       // Store unit in weight.unit for consistency
       productData.weight = { ...(productData.weight || {}), unit: stockUnit };
     }
-    if (tags && Array.isArray(tags)) productData.tags = tags;
-    if (specifications) productData.specifications = specifications;
+    // Handle tags - normalize: trim, lowercase, remove empty strings
+    if (tags && Array.isArray(tags)) {
+      productData.tags = tags
+        .map(tag => String(tag).trim().toLowerCase())
+        .filter(tag => tag.length > 0);
+    }
+    // Handle specifications (attributes) - Mongoose will convert plain object to Map
+    if (specifications && typeof specifications === 'object' && !Array.isArray(specifications)) {
+      // Filter out empty values and convert to strings
+      const cleanSpecs = {};
+      Object.keys(specifications).forEach(key => {
+        const value = specifications[key];
+        if (value !== null && value !== undefined && value !== '') {
+          cleanSpecs[key] = String(value);
+        }
+      });
+      if (Object.keys(cleanSpecs).length > 0) {
+        productData.specifications = cleanSpecs;
+      }
+    }
     if (sku) productData.sku = sku.toUpperCase();
     if (batchNumber) productData.batchNumber = batchNumber.trim();
 
@@ -875,9 +893,41 @@ exports.updateProduct = async (req, res, next) => {
       }
     }
 
-    // Update other fields
+    // Handle tags
+    if (updateData.tags !== undefined) {
+      if (Array.isArray(updateData.tags)) {
+        // Normalize tags: trim, lowercase, remove empty strings
+        product.tags = updateData.tags
+          .map(tag => String(tag).trim().toLowerCase())
+          .filter(tag => tag.length > 0);
+      } else {
+        product.tags = [];
+      }
+    }
+
+    // Handle specifications (attributes) - Mongoose will convert plain object to Map
+    if (updateData.specifications !== undefined) {
+      if (updateData.specifications && typeof updateData.specifications === 'object' && !Array.isArray(updateData.specifications)) {
+        // Filter out empty values and convert to strings
+        const cleanSpecs = {};
+        Object.keys(updateData.specifications).forEach(key => {
+          const value = updateData.specifications[key];
+          if (value !== null && value !== undefined && value !== '') {
+            cleanSpecs[key] = String(value);
+          }
+        });
+        // Mongoose will convert plain object to Map automatically
+        product.specifications = cleanSpecs;
+      } else {
+        // Clear specifications if empty or invalid
+        product.specifications = {};
+      }
+    }
+
+    // Update other fields (excluding handled fields)
+    const excludedFields = ['actualStock', 'displayStock', 'stock', 'stockUnit', 'batchNumber', 'isActive', 'tags', 'specifications'];
     Object.keys(updateData).forEach(key => {
-      if (updateData[key] !== undefined && key !== 'actualStock' && key !== 'displayStock' && key !== 'stock' && key !== 'stockUnit' && key !== 'batchNumber' && key !== 'isActive') {
+      if (updateData[key] !== undefined && !excludedFields.includes(key)) {
         product[key] = updateData[key];
       }
     });
