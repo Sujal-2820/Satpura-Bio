@@ -11,29 +11,29 @@ export function AdminLayout({ sidebar, children, onExit }) {
         className={cn(
           'sticky top-0 h-screen overflow-y-auto transition-all duration-300 ease-in-out',
           open ? 'w-64' : 'w-[4.5rem]',
-          'hidden lg:block border-r border-gray-200/50 bg-white/90 backdrop-blur-xl shadow-[2px_0_8px_rgba(0,0,0,0.05)]',
+          'hidden lg:block border-r border-gray-200/50 bg-blue-500 backdrop-blur-xl shadow-[2px_0_8px_rgba(0,0,0,0.05)]',
         )}
         style={{
           boxShadow: '2px 0 8px rgba(0, 0, 0, 0.05)',
         }}
       >
         <div className={cn(
-          'flex h-16 items-center border-b border-gray-200/50 bg-white/95 backdrop-blur-sm shadow-[0_1px_4px_rgba(0,0,0,0.03)]',
+          'flex h-16 items-center border-b border-white/30 bg-blue-600/50 backdrop-blur-sm shadow-[0_1px_4px_rgba(0,0,0,0.03)]',
           open ? 'justify-between px-4' : 'justify-center px-3'
         )}>
           <div className={cn('flex items-center gap-3 overflow-hidden transition-all', open ? 'opacity-100' : 'opacity-0 w-0')}>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-[0_2px_6px_rgba(0,0,0,0.1)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-blue-600 shadow-[0_2px_6px_rgba(0,0,0,0.1)]">
               <span className="text-lg font-bold">A</span>
             </div>
             <div>
-              <p className="text-sm font-bold text-gray-900">IRA Sathi</p>
-              <p className="text-xs text-gray-500">Administrator</p>
+              <p className="text-sm font-bold text-white">IRA Sathi</p>
+              <p className="text-xs text-white/80">Administrator</p>
             </div>
           </div>
           <button
             type="button"
             className={cn(
-              'flex items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-all duration-200 hover:bg-gray-200 hover:shadow-[0_2px_6px_rgba(0,0,0,0.08)] active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50',
+              'flex items-center justify-center rounded-xl bg-white/20 text-white transition-all duration-200 hover:bg-white/30 hover:shadow-[0_2px_6px_rgba(0,0,0,0.08)] active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50',
               open ? 'h-9 w-9' : 'h-10 w-10',
             )}
             onClick={() => setOpen((prev) => !prev)}

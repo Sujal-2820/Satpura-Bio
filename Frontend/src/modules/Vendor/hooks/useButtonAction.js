@@ -293,6 +293,17 @@ export const BUTTON_CONFIGS = {
       ],
     },
   },
+  'request-withdrawal': {
+    intent: BUTTON_INTENT.UPDATION,
+    title: 'Request Withdrawal',
+    data: {
+      type: 'withdrawal_request',
+      fields: [
+        { name: 'amount', label: 'Withdrawal Amount', value: '', type: 'number', required: true, min: 100, placeholder: 'Enter amount (min ₹100)' },
+        { name: 'bankAccountId', label: 'Bank Account', value: '', type: 'select', required: true, placeholder: 'Select bank account' },
+      ],
+    },
+  },
 
   // Profile/Settings
   'profile-settings': {
@@ -317,12 +328,16 @@ export function useButtonAction() {
     }
 
     // If additional data contains fields to pre-fill (like currentStock), update the fields
-    const updatedData = { ...config.data }
+    const updatedData = { ...config.data, ...additionalData }
     if (config.intent === 'updation' && config.data.fields) {
       updatedData.fields = config.data.fields.map((field) => {
         // Pre-fill fields based on additional data keys
         if (additionalData[field.name] !== undefined) {
           return { ...field, value: additionalData[field.name] }
+        }
+        // For bankAccountId, set default value if provided
+        if (field.name === 'bankAccountId' && additionalData.bankAccountId) {
+          return { ...field, value: additionalData.bankAccountId }
         }
         // Map common field names
         if (field.name === 'currentStock' && additionalData.currentStock !== undefined) {

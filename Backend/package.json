@@ -42,6 +42,7 @@
     "mongodb": "^7.0.0",
     "mongoose": "^8.19.3",
     "morgan": "^1.10.0",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "razorpay": "^2.9.6"
   }
 }

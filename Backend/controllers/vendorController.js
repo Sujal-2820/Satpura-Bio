@@ -10,6 +10,10 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const ProductAssignment = require('../models/ProductAssignment');
 const CreditPurchase = require('../models/CreditPurchase');
+const VendorEarning = require('../models/VendorEarning');
+const WithdrawalRequest = require('../models/WithdrawalRequest');
+const BankAccount = require('../models/BankAccount');
+const PaymentHistory = require('../models/PaymentHistory');
 
 const { generateOTP, sendOTP } = require('../config/sms');
 const { generateToken } = require('../middleware/auth');
@@ -77,12 +81,62 @@ async function processPendingDeliveries(vendorId) {
  */
 exports.register = async (req, res, next) => {
   try {
-    const { name, phone, location } = req.body;
+    const { name, email, phone, location, aadhaarCard, panCard } = req.body;
 
     if (!name || !phone || !location) {
       return res.status(400).json({
         success: false,
         message: 'Name, phone, and location are required',
+      });
+    }
+
+    // Validate documents - must be uploaded
+    if (!aadhaarCard || !aadhaarCard.url) {
+      return res.status(400).json({
+        success: false,
+        message: 'Aadhaar card image is required. Please upload an image file (max 2MB).',
+      });
+    }
+
+    if (!panCard || !panCard.url) {
+      return res.status(400).json({
+        success: false,
+        message: 'PAN card image is required. Please upload an image file (max 2MB).',
+      });
+    }
+
+    // Validate document formats - must be images only (no PDF)
+    const imageFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+    const aadhaarFormat = aadhaarCard.format?.toLowerCase();
+    const panFormat = panCard.format?.toLowerCase();
+
+    if (!aadhaarFormat || !imageFormats.includes(aadhaarFormat)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Aadhaar card must be an image file (JPG, PNG, GIF, etc.). PDF files are not accepted.',
+      });
+    }
+
+    if (!panFormat || !imageFormats.includes(panFormat)) {
+      return res.status(400).json({
+        success: false,
+        message: 'PAN card must be an image file (JPG, PNG, GIF, etc.). PDF files are not accepted.',
+      });
+    }
+
+    // Validate document sizes - must be less than 2MB
+    const maxSize = 2000000; // 2MB in bytes
+    if (aadhaarCard.size && aadhaarCard.size > maxSize) {
+      return res.status(400).json({
+        success: false,
+        message: `Aadhaar card image size (${(aadhaarCard.size / 1024 / 1024).toFixed(2)}MB) exceeds 2MB limit. Please upload a smaller image.`,
+      });
+    }
+
+    if (panCard.size && panCard.size > maxSize) {
+      return res.status(400).json({
+        success: false,
+        message: `PAN card image size (${(panCard.size / 1024 / 1024).toFixed(2)}MB) exceeds 2MB limit. Please upload a smaller image.`,
       });
     }
 
@@ -218,6 +272,7 @@ exports.register = async (req, res, next) => {
     // Create vendor - Status set to pending (requires admin approval)
     const vendor = new Vendor({
       name,
+      email: email || undefined,
       phone,
       location: {
         address: location.address,
@@ -225,11 +280,25 @@ exports.register = async (req, res, next) => {
         state: location.state,
         pincode: location.pincode,
         coordinates: {
-          lat: location.coordinates.lat,
-          lng: location.coordinates.lng,
+          lat: location.coordinates?.lat || 0,
+          lng: location.coordinates?.lng || 0,
         },
         coverageRadius: VENDOR_COVERAGE_RADIUS_KM,
       },
+      aadhaarCard: aadhaarCard ? {
+        url: aadhaarCard.url,
+        publicId: aadhaarCard.publicId,
+        format: aadhaarCard.format,
+        size: aadhaarCard.size,
+        uploadedAt: new Date(),
+      } : undefined,
+      panCard: panCard ? {
+        url: panCard.url,
+        publicId: panCard.publicId,
+        format: panCard.format,
+        size: panCard.size,
+        uploadedAt: new Date(),
+      } : undefined,
       status: 'pending', // Requires admin approval
       isActive: false, // Inactive until approved
     });
@@ -1378,6 +1447,8 @@ exports.rejectOrder = async (req, res, next) => {
         availableQuantity: 0, // Will be calculated if needed
         escalatedQuantity: item.quantity,
         reason: reason,
+        // Preserve attribute combination if present
+        attributeCombination: item.attributeCombination || item.attributes || undefined,
       })),
       originalVendorId: order.vendorId, // Keep reference to original vendor
     };
@@ -1484,13 +1555,18 @@ exports.acceptOrderPartially = async (req, res, next) => {
       .filter(item => acceptedItems.some(ai => ai.itemId && ai.itemId.toString() === item._id.toString()))
       .map(item => {
         const acceptedItem = acceptedItems.find(ai => ai.itemId && ai.itemId.toString() === item._id.toString());
-        return {
+        const itemPayload = {
           productId: item.productId,
           productName: item.productName,
           quantity: acceptedItem.quantity || item.quantity,
           unitPrice: item.unitPrice,
           totalPrice: item.unitPrice * (acceptedItem.quantity || item.quantity),
         };
+        // Preserve attribute combination if present
+        if (item.attributeCombination || item.attributes) {
+          itemPayload.attributeCombination = item.attributeCombination || item.attributes;
+        }
+        return itemPayload;
       });
 
     order.items = vendorOrderItems;
@@ -1520,13 +1596,18 @@ exports.acceptOrderPartially = async (req, res, next) => {
       .filter(item => rejectedItems.some(ri => ri.itemId && ri.itemId.toString() === item._id.toString()))
       .map(item => {
         const rejectedItem = rejectedItems.find(ri => ri.itemId && ri.itemId.toString() === item._id.toString());
-        return {
+        const itemPayload = {
           productId: item.productId,
           productName: item.productName,
           quantity: rejectedItem.quantity || item.quantity,
           unitPrice: item.unitPrice,
           totalPrice: item.unitPrice * (rejectedItem.quantity || item.quantity),
         };
+        // Preserve attribute combination if present
+        if (item.attributeCombination || item.attributes) {
+          itemPayload.attributeCombination = item.attributeCombination || item.attributes;
+        }
+        return itemPayload;
       });
 
     // Get escalation details
@@ -1534,7 +1615,7 @@ exports.acceptOrderPartially = async (req, res, next) => {
       .filter(item => rejectedItems.some(ri => ri.itemId && ri.itemId.toString() === item._id.toString()))
       .map(item => {
         const rejectedItem = rejectedItems.find(ri => ri.itemId && ri.itemId.toString() === item._id.toString());
-        return {
+        const escalationItem = {
           itemId: item._id,
           productId: item.productId,
           productName: item.productName,
@@ -1543,6 +1624,11 @@ exports.acceptOrderPartially = async (req, res, next) => {
           escalatedQuantity: rejectedItem.quantity || item.quantity,
           reason: rejectedItem.reason || notes || 'Item not available',
         };
+        // Preserve attribute combination if present
+        if (item.attributeCombination || item.attributes) {
+          escalationItem.attributeCombination = item.attributeCombination || item.attributes;
+        }
+        return escalationItem;
       });
 
     // Generate new order number for admin order
@@ -1685,7 +1771,7 @@ exports.escalateOrderPartial = async (req, res, next) => {
         const acceptedQty = requestedQty - escalatedQty;
 
         if (escalatedQty > 0) {
-          escalatedItemsDetails.push({
+          const escalationItem = {
             itemId: orderItem._id,
             productId: orderItem.productId,
             productName: orderItem.productName,
@@ -1693,21 +1779,36 @@ exports.escalateOrderPartial = async (req, res, next) => {
             availableQuantity: availableStock,
             escalatedQuantity: escalatedQty,
             reason: escalatedItem.reason || reason,
-          });
+          };
+          // Preserve attribute combination if present
+          if (orderItem.attributeCombination || orderItem.attributes) {
+            escalationItem.attributeCombination = orderItem.attributeCombination || orderItem.attributes;
+          }
+          escalatedItemsDetails.push(escalationItem);
           escalatedTotal += orderItem.unitPrice * escalatedQty;
         }
 
         if (acceptedQty > 0) {
-          acceptedItems.push({
+          const acceptedItem = {
             ...orderItem.toObject(),
             quantity: acceptedQty,
             totalPrice: orderItem.unitPrice * acceptedQty,
-          });
+          };
+          // Preserve attribute combination if present
+          if (orderItem.attributeCombination || orderItem.attributes) {
+            acceptedItem.attributeCombination = orderItem.attributeCombination || orderItem.attributes;
+          }
+          acceptedItems.push(acceptedItem);
           acceptedTotal += orderItem.unitPrice * acceptedQty;
         }
       } else {
         // Item is fully accepted
-        acceptedItems.push(orderItem.toObject());
+        const fullAcceptedItem = orderItem.toObject();
+        // Preserve attribute combination if present
+        if (orderItem.attributeCombination || orderItem.attributes) {
+          fullAcceptedItem.attributeCombination = orderItem.attributeCombination || orderItem.attributes;
+        }
+        acceptedItems.push(fullAcceptedItem);
         acceptedTotal += orderItem.totalPrice;
       }
     }
@@ -1720,14 +1821,22 @@ exports.escalateOrderPartial = async (req, res, next) => {
     order.assignedTo = 'vendor';
 
     // Create escalated order for admin
-    const escalatedOrderItems = escalatedItemsDetails.map(ei => ({
-      productId: ei.productId,
-      productName: ei.productName,
-      quantity: ei.escalatedQuantity,
-      unitPrice: order.items.find(item => item.productId.toString() === ei.productId.toString())?.unitPrice || 0,
-      totalPrice: (order.items.find(item => item.productId.toString() === ei.productId.toString())?.unitPrice || 0) * ei.escalatedQuantity,
-      status: 'pending',
-    }));
+    const escalatedOrderItems = escalatedItemsDetails.map(ei => {
+      const originalItem = order.items.find(item => item.productId.toString() === ei.productId.toString());
+      const itemPayload = {
+        productId: ei.productId,
+        productName: ei.productName,
+        quantity: ei.escalatedQuantity,
+        unitPrice: originalItem?.unitPrice || 0,
+        totalPrice: (originalItem?.unitPrice || 0) * ei.escalatedQuantity,
+        status: 'pending',
+      };
+      // Preserve attribute combination if present
+      if (ei.attributeCombination || (originalItem && (originalItem.attributeCombination || originalItem.attributes))) {
+        itemPayload.attributeCombination = ei.attributeCombination || originalItem.attributeCombination || originalItem.attributes;
+      }
+      return itemPayload;
+    });
 
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
@@ -2850,7 +2959,7 @@ exports.requestCreditPurchase = async (req, res, next) => {
       _id: { $in: productIds },
       isActive: true,
     })
-      .select('name priceToVendor displayStock stock weight')
+      .select('name priceToVendor displayStock stock weight attributeStocks')
       .lean();
 
     const productMap = products.reduce((acc, product) => {
@@ -2866,28 +2975,70 @@ exports.requestCreditPurchase = async (req, res, next) => {
         throw new Error('One of the selected products is no longer available.');
       }
 
+      // Check if product has attributes and if attributeCombination is provided
+      const hasAttributes = product.attributeStocks && 
+                           Array.isArray(product.attributeStocks) && 
+                           product.attributeStocks.length > 0;
+      const attributeCombination = item.attributeCombination || {};
+      
+      if (hasAttributes && Object.keys(attributeCombination).length === 0) {
+        throw new Error(`Product ${product.name} requires attribute selection.`);
+      }
+
+      // Find matching attributeStock if attributes are provided
+      let matchingAttributeStock = null;
+      if (hasAttributes && Object.keys(attributeCombination).length > 0) {
+        matchingAttributeStock = product.attributeStocks.find(stock => {
+          if (!stock.attributes || typeof stock.attributes !== 'object') return false
+          // Handle both Map and plain object
+          const stockAttrs = stock.attributes instanceof Map 
+            ? Object.fromEntries(stock.attributes)
+            : stock.attributes
+          return Object.keys(attributeCombination).every(key => {
+            return stockAttrs[key] === attributeCombination[key]
+          })
+        })
+        
+        if (!matchingAttributeStock) {
+          throw new Error(`Selected variant for ${product.name} is not available.`);
+        }
+      }
+
       const quantity = Number(item.quantity) || 0;
       if (quantity <= 0) {
         throw new Error('Each item must include a valid quantity.');
       }
 
-      const adminStock = product.displayStock ?? product.stock ?? 0;
+      // Use attribute-specific stock/price if available, otherwise use main product values
+      const adminStock = matchingAttributeStock
+        ? (matchingAttributeStock.displayStock || 0)
+        : (product.displayStock ?? product.stock ?? 0)
+      
       if (quantity > adminStock) {
-        throw new Error(`Requested quantity for ${product.name} exceeds admin stock.`);
+        throw new Error(`Requested quantity for ${product.name} exceeds admin stock (${adminStock}).`);
       }
 
-      const unitPrice = Number(product.priceToVendor) || 0;
+      const unitPrice = matchingAttributeStock
+        ? (matchingAttributeStock.vendorPrice || 0)
+        : (Number(product.priceToVendor) || 0)
       const totalPrice = quantity * unitPrice;
       totalAmount += totalPrice;
 
-      return {
+      const itemPayload = {
         productId: productId,
         productName: product.name,
         quantity,
         unitPrice,
         totalPrice,
-        unit: product.weight?.unit || 'kg',
+        unit: matchingAttributeStock?.stockUnit || product.weight?.unit || 'kg',
       };
+      
+      // Add attribute combination if provided
+      if (hasAttributes && Object.keys(attributeCombination).length > 0) {
+        itemPayload.attributeCombination = attributeCombination;
+      }
+
+      return itemPayload;
     });
 
     if (totalAmount < MIN_VENDOR_PURCHASE) {
@@ -3370,6 +3521,649 @@ exports.getPerformanceAnalytics = async (req, res, next) => {
           userRegionStats,
         },
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// EARNINGS CONTROLLERS
+// ============================================================================
+
+/**
+ * @desc    Get vendor earnings summary
+ * @route   GET /api/vendors/earnings
+ * @access  Private (Vendor)
+ */
+exports.getEarningsSummary = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+
+    // Calculate total earnings (lifetime)
+    const totalEarningsResult = await VendorEarning.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          status: 'processed',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: '$earnings' },
+        },
+      },
+    ]);
+
+    const totalEarnings = totalEarningsResult[0]?.totalEarnings || 0;
+
+    // Calculate pending withdrawal amount
+    const pendingWithdrawals = await WithdrawalRequest.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          status: 'pending',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalAmount: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const pendingWithdrawalAmount = pendingWithdrawals[0]?.totalAmount || 0;
+
+    // Calculate available balance (total earnings - pending withdrawals)
+    const availableBalance = totalEarnings - pendingWithdrawalAmount;
+
+    // Calculate this month's earnings
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonthEarningsResult = await VendorEarning.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          status: 'processed',
+          processedAt: { $gte: monthStart },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: '$earnings' },
+        },
+      },
+    ]);
+
+    const thisMonthEarnings = thisMonthEarningsResult[0]?.totalEarnings || 0;
+
+    // Get last withdrawal date
+    const lastWithdrawal = await WithdrawalRequest.findOne({
+      vendorId: vendor._id,
+      status: { $in: ['approved', 'completed'] },
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalEarnings: Math.round(totalEarnings * 100) / 100,
+        availableBalance: Math.round(availableBalance * 100) / 100,
+        pendingWithdrawal: Math.round(pendingWithdrawalAmount * 100) / 100,
+        thisMonthEarnings: Math.round(thisMonthEarnings * 100) / 100,
+        lastWithdrawalDate: lastWithdrawal?.createdAt || null,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get vendor earnings history
+ * @route   GET /api/vendors/earnings/history
+ * @access  Private (Vendor)
+ */
+exports.getEarningsHistory = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { page = 1, limit = 20, startDate, endDate, status } = req.query;
+
+    const query = { vendorId: vendor._id };
+
+    // Date filter
+    if (startDate || endDate) {
+      query.processedAt = {};
+      if (startDate) {
+        query.processedAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        query.processedAt.$lte = new Date(endDate);
+      }
+    }
+
+    // Status filter
+    if (status) {
+      query.status = status;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const earnings = await VendorEarning.find(query)
+      .populate('orderId', 'orderNumber totalAmount')
+      .populate('productId', 'name')
+      .sort({ processedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await VendorEarning.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        earnings,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit)),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get vendor earnings by orders
+ * @route   GET /api/vendors/earnings/orders
+ * @access  Private (Vendor)
+ */
+exports.getEarningsByOrders = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { page = 1, limit = 20 } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Group earnings by order
+    const earningsByOrder = await VendorEarning.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+        },
+      },
+      {
+        $group: {
+          _id: '$orderId',
+          totalEarnings: { $sum: '$earnings' },
+          itemCount: { $sum: 1 },
+          processedAt: { $max: '$processedAt' },
+        },
+      },
+      {
+        $sort: { processedAt: -1 },
+      },
+      {
+        $skip: skip,
+      },
+      {
+        $limit: parseInt(limit),
+      },
+      {
+        $lookup: {
+          from: 'orders',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'order',
+        },
+      },
+      {
+        $unwind: '$order',
+      },
+      {
+        $project: {
+          orderId: '$_id',
+          orderNumber: '$order.orderNumber',
+          totalEarnings: 1,
+          itemCount: 1,
+          processedAt: 1,
+          orderTotal: '$order.totalAmount',
+        },
+      },
+    ]);
+
+    const total = await VendorEarning.distinct('orderId', { vendorId: vendor._id }).then(ids => ids.length);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        earningsByOrder,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit)),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get vendor available balance
+ * @route   GET /api/vendors/balance
+ * @access  Private (Vendor)
+ */
+exports.getBalance = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+
+    // Calculate total earnings
+    const totalEarningsResult = await VendorEarning.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          status: 'processed',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: '$earnings' },
+        },
+      },
+    ]);
+
+    const totalEarnings = totalEarningsResult[0]?.totalEarnings || 0;
+
+    // Calculate pending withdrawal amount
+    const pendingWithdrawals = await WithdrawalRequest.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          status: 'pending',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalAmount: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const pendingWithdrawalAmount = pendingWithdrawals[0]?.totalAmount || 0;
+
+    // Calculate available balance
+    const availableBalance = totalEarnings - pendingWithdrawalAmount;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalEarnings: Math.round(totalEarnings * 100) / 100,
+        availableBalance: Math.round(availableBalance * 100) / 100,
+        pendingWithdrawal: Math.round(pendingWithdrawalAmount * 100) / 100,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// WITHDRAWAL REQUEST CONTROLLERS
+// ============================================================================
+
+/**
+ * @desc    Request withdrawal from earnings
+ * @route   POST /api/vendors/withdrawals/request
+ * @access  Private (Vendor)
+ */
+exports.requestWithdrawal = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { amount, bankAccountId } = req.body;
+
+    if (!amount || amount < 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid withdrawal amount is required (minimum ₹100)',
+      });
+    }
+
+    // Check if vendor has a pending withdrawal request
+    const existingPending = await WithdrawalRequest.findOne({
+      vendorId: vendor._id,
+      status: 'pending',
+    });
+
+    if (existingPending) {
+      return res.status(400).json({
+        success: false,
+        message: 'You already have a pending withdrawal request. Please wait for admin approval.',
+      });
+    }
+
+    // Calculate available balance
+    const totalEarningsResult = await VendorEarning.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          status: 'processed',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: '$earnings' },
+        },
+      },
+    ]);
+
+    const totalEarnings = totalEarningsResult[0]?.totalEarnings || 0;
+
+    const pendingWithdrawals = await WithdrawalRequest.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          status: 'pending',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalAmount: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const pendingWithdrawalAmount = pendingWithdrawals[0]?.totalAmount || 0;
+    const availableBalance = totalEarnings - pendingWithdrawalAmount;
+
+    if (amount > availableBalance) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient balance. Available: ₹${Math.round(availableBalance * 100) / 100}, Requested: ₹${amount}`,
+      });
+    }
+
+    // Verify bank account if provided
+    let bankAccount = null;
+    if (bankAccountId) {
+      bankAccount = await BankAccount.findOne({
+        _id: bankAccountId,
+        userId: vendor._id,
+        userType: 'vendor',
+      });
+
+      if (!bankAccount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bank account not found',
+        });
+      }
+    } else {
+      // Get primary bank account
+      bankAccount = await BankAccount.findOne({
+        userId: vendor._id,
+        userType: 'vendor',
+        isPrimary: true,
+      });
+
+      if (!bankAccount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please add a bank account before requesting withdrawal',
+        });
+      }
+    }
+
+    // Create withdrawal request
+    const withdrawal = await WithdrawalRequest.create({
+      userType: 'vendor',
+      vendorId: vendor._id,
+      amount,
+      availableBalance,
+      bankAccountId: bankAccount._id,
+      status: 'pending',
+    });
+
+    // Log to payment history
+    try {
+      await PaymentHistory.create({
+        activityType: 'vendor_withdrawal_requested',
+        vendorId: vendor._id,
+        withdrawalRequestId: withdrawal._id,
+        bankAccountId: bankAccount._id,
+        amount,
+        status: 'pending',
+        bankDetails: {
+          accountHolderName: bankAccount.accountHolderName,
+          accountNumber: bankAccount.accountNumber,
+          ifscCode: bankAccount.ifscCode,
+          bankName: bankAccount.bankName,
+        },
+        description: `Vendor ${vendor.name} requested withdrawal of ₹${amount}`,
+        metadata: {
+          vendorName: vendor.name,
+          vendorPhone: vendor.phone,
+          availableBalance,
+        },
+      });
+    } catch (historyError) {
+      console.error('Error logging withdrawal history:', historyError);
+      // Don't fail withdrawal if history logging fails
+    }
+
+    console.log(`✅ Withdrawal requested: ₹${amount} by vendor ${vendor.name} (${vendor.phone})`);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        withdrawal,
+      },
+      message: 'Withdrawal request submitted successfully. Awaiting admin approval.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get vendor withdrawal requests
+ * @route   GET /api/vendors/withdrawals
+ * @access  Private (Vendor)
+ */
+exports.getWithdrawals = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { page = 1, limit = 20, status } = req.query;
+
+    const query = {
+      vendorId: vendor._id,
+      userType: 'vendor',
+    };
+
+    if (status) {
+      query.status = status;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const withdrawals = await WithdrawalRequest.find(query)
+      .populate('bankAccountId')
+      .populate('reviewedBy', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await WithdrawalRequest.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        withdrawals,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit)),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// BANK ACCOUNT CONTROLLERS
+// ============================================================================
+
+/**
+ * @desc    Add bank account
+ * @route   POST /api/vendors/bank-accounts
+ * @access  Private (Vendor)
+ */
+exports.addBankAccount = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { accountHolderName, accountNumber, ifscCode, bankName, branchName, isPrimary = false } = req.body;
+
+    if (!accountHolderName || !accountNumber || !ifscCode || !bankName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Account holder name, account number, IFSC code, and bank name are required',
+      });
+    }
+
+    const bankAccount = await BankAccount.create({
+      userId: vendor._id,
+      userType: 'vendor',
+      accountHolderName,
+      accountNumber,
+      ifscCode: ifscCode.toUpperCase(),
+      bankName,
+      branchName,
+      isPrimary,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        bankAccount,
+      },
+      message: 'Bank account added successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get vendor bank accounts
+ * @route   GET /api/vendors/bank-accounts
+ * @access  Private (Vendor)
+ */
+exports.getBankAccounts = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+
+    const bankAccounts = await BankAccount.find({
+      userId: vendor._id,
+      userType: 'vendor',
+    }).sort({ isPrimary: -1, createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        bankAccounts,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update bank account
+ * @route   PUT /api/vendors/bank-accounts/:accountId
+ * @access  Private (Vendor)
+ */
+exports.updateBankAccount = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { accountId } = req.params;
+    const { accountHolderName, accountNumber, ifscCode, bankName, branchName, isPrimary } = req.body;
+
+    const bankAccount = await BankAccount.findOne({
+      _id: accountId,
+      userId: vendor._id,
+      userType: 'vendor',
+    });
+
+    if (!bankAccount) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bank account not found',
+      });
+    }
+
+    if (accountHolderName) bankAccount.accountHolderName = accountHolderName;
+    if (accountNumber) bankAccount.accountNumber = accountNumber;
+    if (ifscCode) bankAccount.ifscCode = ifscCode.toUpperCase();
+    if (bankName) bankAccount.bankName = bankName;
+    if (branchName !== undefined) bankAccount.branchName = branchName;
+    if (isPrimary !== undefined) bankAccount.isPrimary = isPrimary;
+
+    await bankAccount.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        bankAccount,
+      },
+      message: 'Bank account updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Delete bank account
+ * @route   DELETE /api/vendors/bank-accounts/:accountId
+ * @access  Private (Vendor)
+ */
+exports.deleteBankAccount = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { accountId } = req.params;
+
+    const bankAccount = await BankAccount.findOne({
+      _id: accountId,
+      userId: vendor._id,
+      userType: 'vendor',
+    });
+
+    if (!bankAccount) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bank account not found',
+      });
+    }
+
+    await BankAccount.deleteOne({ _id: accountId });
+
+    res.status(200).json({
+      success: true,
+      message: 'Bank account deleted successfully',
     });
   } catch (error) {
     next(error);

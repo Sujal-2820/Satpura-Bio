@@ -3,7 +3,7 @@ import { useSellerState } from '../../context/SellerContext'
 import { useSellerApi } from '../../hooks/useSellerApi'
 import * as sellerApi from '../../services/sellerApi'
 import { cn } from '../../../../lib/cn'
-import { WalletIcon, TrendingUpIcon, TrendingDownIcon } from '../../components/icons'
+import { WalletIcon, TrendingUpIcon, TrendingDownIcon, SparkIcon, ChartIcon, CreditIcon, BankIcon, PlusIcon, EditIcon, TrashIcon } from '../../components/icons'
 
 const FILTER_TABS = [
   { id: 'all', label: 'All' },
@@ -13,12 +13,21 @@ const FILTER_TABS = [
 
 export function WalletView({ openPanel }) {
   const { dashboard } = useSellerState()
-  const { fetchWalletData } = useSellerApi()
+  const { fetchWalletData, getCommissionSummary, getBankAccounts } = useSellerApi()
   const [activeFilter, setActiveFilter] = useState('all')
   const [selectedTransaction, setSelectedTransaction] = useState(null)
   const [showTransactionDetail, setShowTransactionDetail] = useState(false)
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [commissionSummary, setCommissionSummary] = useState({
+    totalCommission: 0,
+    thisMonthCommission: 0,
+    availableBalance: 0,
+    pendingWithdrawal: 0,
+    commissionByRate: { low: 0, high: 0 },
+    lastCommissionDate: null,
+  })
+  const [bankAccounts, setBankAccounts] = useState([])
 
   const wallet = dashboard.wallet || {}
 
@@ -37,6 +46,18 @@ export function WalletView({ openPanel }) {
       try {
         // Fetch wallet balance (stored in context)
         await fetchWalletData()
+        
+        // Fetch commission summary
+        const summaryResult = await getCommissionSummary()
+        if (summaryResult.data) {
+          setCommissionSummary(summaryResult.data)
+        }
+        
+        // Fetch bank accounts
+        const bankAccountsResult = await getBankAccounts()
+        if (bankAccountsResult.data?.bankAccounts) {
+          setBankAccounts(bankAccountsResult.data.bankAccounts)
+        }
         
         // Fetch transactions (commissions)
         const transactionsResult = await sellerApi.getWalletTransactions({ limit: 50 })
@@ -105,7 +126,7 @@ export function WalletView({ openPanel }) {
       }
     }
     fetchData()
-  }, [fetchWalletData])
+  }, [fetchWalletData, getCommissionSummary, getBankAccounts])
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -118,19 +139,19 @@ export function WalletView({ openPanel }) {
     })
   }, [transactions, activeFilter])
 
+
+  const getTransactionIcon = (type) => {
+    return type === 'commission' ? (
+      <TrendingUpIcon className="h-5 w-5" />
+    ) : (
+      <TrendingDownIcon className="h-5 w-5" />
+    )
+  }
+
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
     try {
       const date = new Date(dateString)
-      const now = new Date()
-      const diff = now - date
-      const minutes = Math.floor(diff / 60000)
-      const hours = Math.floor(diff / 3600000)
-      const days = Math.floor(diff / 86400000)
-
-      if (minutes < 1) return 'Just now'
-      if (minutes < 60) return `${minutes}m ago`
-      if (hours < 24) return `${hours}h ago`
-      if (days < 7) return `${days}d ago`
       return date.toLocaleDateString('en-IN', {
         day: 'numeric',
         month: 'short',
@@ -141,13 +162,12 @@ export function WalletView({ openPanel }) {
     }
   }
 
-  const getTransactionIcon = (type) => {
-    return type === 'commission' ? (
-      <TrendingUpIcon className="h-5 w-5" />
-    ) : (
-      <TrendingDownIcon className="h-5 w-5" />
-    )
-  }
+  const commissionMetrics = [
+    { label: 'Total Commission', value: formatCurrency(commissionSummary.totalCommission || wallet.totalEarned || 0), icon: WalletIcon, tone: 'success' },
+    { label: 'Available Balance', value: formatCurrency(commissionSummary.availableBalance || wallet.balance || 0), icon: SparkIcon, tone: 'success' },
+    { label: 'Pending Withdrawal', value: formatCurrency(commissionSummary.pendingWithdrawal || wallet.pending || 0), icon: CreditIcon, tone: 'warn' },
+    { label: 'This Month', value: formatCurrency(commissionSummary.thisMonthCommission || 0), icon: ChartIcon, tone: 'teal' },
+  ]
 
   return (
     <div className="seller-wallet space-y-6">
@@ -166,18 +186,19 @@ export function WalletView({ openPanel }) {
           <div className="seller-wallet-hero__balance">
             <div>
               <p className="seller-wallet-hero__label">Available Balance</p>
-              <p className="seller-wallet-hero__value">{formatCurrency(wallet.balance || 0)}</p>
+              <p className="seller-wallet-hero__value">{formatCurrency(commissionSummary.availableBalance || wallet.balance || 0)}</p>
             </div>
             <button
               type="button"
               onClick={() => {
-                const balance = wallet.balance || 0
+                const balance = commissionSummary.availableBalance || wallet.balance || 0
                 if (balance < 5000) {
                   // Warning will be shown in parent component
                 }
-                openPanel('request-withdrawal')
+                openPanel('request-withdrawal', { availableBalance: balance, bankAccounts })
               }}
               className="seller-wallet-hero__cta"
+              disabled={bankAccounts.length === 0}
             >
               Withdraw
             </button>
@@ -185,14 +206,123 @@ export function WalletView({ openPanel }) {
           <div className="seller-wallet-hero__stats">
             <div className="seller-wallet-stat">
               <p className="seller-wallet-stat__label">Pending</p>
-              <span className="seller-wallet-stat__value">{formatCurrency(wallet.pending || 0)}</span>
+              <span className="seller-wallet-stat__value">{formatCurrency(commissionSummary.pendingWithdrawal || wallet.pending || 0)}</span>
             </div>
             <div className="seller-wallet-stat">
               <p className="seller-wallet-stat__label">Total Earned</p>
-              <span className="seller-wallet-stat__value">{formatCurrency(wallet.totalEarned || 0)}</span>
+              <span className="seller-wallet-stat__value">{formatCurrency(commissionSummary.totalCommission || wallet.totalEarned || 0)}</span>
             </div>
           </div>
         </div>
+      </section>
+
+      {/* Commission Summary Metrics */}
+      <section id="commission-metrics" className="seller-section">
+        <div className="seller-section__header">
+          <div>
+            <h3 className="seller-section__title">Commission Summary</h3>
+          </div>
+        </div>
+        <div className="seller-wallet-metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          {commissionMetrics.map((metric) => {
+            const Icon = metric.icon
+            return (
+              <div key={metric.label} className="seller-wallet-metric-card" style={{ padding: '1rem', background: '#fff', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                  <div style={{ 
+                    padding: '0.5rem', 
+                    borderRadius: '0.375rem', 
+                    background: metric.tone === 'warn' ? '#fef3c7' : metric.tone === 'teal' ? '#d1fae5' : '#dcfce7',
+                    color: metric.tone === 'warn' ? '#d97706' : metric.tone === 'teal' ? '#059669' : '#16a34a'
+                  }}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>{metric.label}</p>
+                </div>
+                <span style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>{metric.value}</span>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* Commission Rate Breakdown */}
+      {(commissionSummary.commissionByRate?.low > 0 || commissionSummary.commissionByRate?.high > 0) && (
+        <section id="commission-breakdown" className="seller-section">
+          <div className="seller-section__header">
+            <div>
+              <h3 className="seller-section__title">Commission by Rate</h3>
+              <p className="seller-section__subtitle">Breakdown of commissions by rate tier</p>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+            <div style={{ padding: '1rem', background: '#fff', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>2% Commission (Up to ₹50,000)</p>
+              <p style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827' }}>{formatCurrency(commissionSummary.commissionByRate.low || 0)}</p>
+            </div>
+            <div style={{ padding: '1rem', background: '#fff', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>3% Commission (Above ₹50,000)</p>
+              <p style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827' }}>{formatCurrency(commissionSummary.commissionByRate.high || 0)}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Bank Account Management */}
+      <section id="bank-accounts" className="seller-section">
+        <div className="seller-section__header">
+          <div>
+            <h3 className="seller-section__title">Bank Accounts</h3>
+            <p className="seller-section__subtitle">Manage your bank accounts for withdrawals</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => openPanel('add-bank-account')}
+            className="seller-wallet-action seller-wallet-action--secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: '#10b981', color: '#fff', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}
+          >
+            <PlusIcon className="h-4 w-4" />
+            Add Account
+          </button>
+        </div>
+        {bankAccounts.length === 0 ? (
+          <div className="seller-wallet-empty">
+            <BankIcon className="seller-wallet-empty__icon" />
+            <p className="seller-wallet-empty__text">No bank accounts added yet</p>
+            <p className="seller-wallet-empty__subtext">Please add a bank account to receive withdrawals</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {bankAccounts.map((account) => (
+              <div key={account._id || account.id} style={{ padding: '1rem', background: '#fff', borderRadius: '0.5rem', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '0.75rem', background: '#f3f4f6', borderRadius: '0.375rem' }}>
+                  <BankIcon className="h-5 w-5" style={{ color: '#6b7280' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', margin: '0 0 0.25rem 0' }}>{account.accountHolderName}</p>
+                  <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.25rem 0' }}>**** {account.accountNumber?.slice(-4) || 'N/A'}</p>
+                  <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>{account.bankName} ({account.ifscCode})</p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => openPanel('edit-bank-account', { account })}
+                    style={{ padding: '0.5rem', background: '#f3f4f6', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}
+                  >
+                    <EditIcon className="h-4 w-4" style={{ color: '#6b7280' }} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openPanel('delete-bank-account', { accountId: account._id || account.id })}
+                    style={{ padding: '0.5rem', background: '#fee2e2', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}
+                  >
+                    <TrashIcon className="h-4 w-4" style={{ color: '#dc2626' }} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Filter Tabs */}
@@ -381,7 +511,30 @@ export function WalletView({ openPanel }) {
                   <div className="seller-transaction-detail__meta-item">
                     <span className="seller-transaction-detail__meta-label">Date</span>
                     <span className="seller-transaction-detail__meta-value">
-                      {formatDate(selectedTransaction.date || selectedTransaction.createdAt)}
+                      {(() => {
+                        const dateString = selectedTransaction.date || selectedTransaction.createdAt
+                        if (!dateString) return 'N/A'
+                        try {
+                          const date = new Date(dateString)
+                          const now = new Date()
+                          const diff = now - date
+                          const minutes = Math.floor(diff / 60000)
+                          const hours = Math.floor(diff / 3600000)
+                          const days = Math.floor(diff / 86400000)
+
+                          if (minutes < 1) return 'Just now'
+                          if (minutes < 60) return `${minutes}m ago`
+                          if (hours < 24) return `${hours}h ago`
+                          if (days < 7) return `${days}d ago`
+                          return date.toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })
+                        } catch {
+                          return dateString
+                        }
+                      })()}
                     </span>
                   </div>
                   <div className="seller-transaction-detail__meta-item">
@@ -398,14 +551,15 @@ export function WalletView({ openPanel }) {
       {/* Quick Actions */}
       <section id="seller-wallet-actions" className="seller-section">
         <div className="seller-wallet-actions">
-          <button
-            type="button"
-            onClick={() => openPanel('request-withdrawal')}
-            className="seller-wallet-action seller-wallet-action--primary"
-          >
-            <WalletIcon className="h-5 w-5" />
-            Request Withdrawal
-          </button>
+            <button
+              type="button"
+              onClick={() => openPanel('request-withdrawal', { availableBalance: commissionSummary.availableBalance || wallet.balance || 0, bankAccounts })}
+              className="seller-wallet-action seller-wallet-action--primary"
+              disabled={bankAccounts.length === 0}
+            >
+              <WalletIcon className="h-5 w-5" />
+              Request Withdrawal
+            </button>
           <button
             type="button"
             onClick={() => openPanel('view-performance')}

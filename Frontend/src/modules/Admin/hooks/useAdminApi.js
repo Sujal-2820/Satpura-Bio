@@ -319,6 +319,46 @@ export function useAdminApi() {
     [callApi, dispatch],
   )
 
+  // Vendor Withdrawal APIs
+  const getVendorWithdrawalRequests = useCallback((params) => callApi(adminApi.getVendorWithdrawalRequests, params), [callApi])
+
+  const approveVendorWithdrawal = useCallback(
+    (requestId, data) => {
+      return callApi(adminApi.approveVendorWithdrawal, requestId, data).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_FINANCE_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const rejectVendorWithdrawal = useCallback(
+    (requestId, rejectionData) => {
+      return callApi(adminApi.rejectVendorWithdrawal, requestId, rejectionData).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_FINANCE_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const completeVendorWithdrawal = useCallback(
+    (requestId, completionData) => {
+      return callApi(adminApi.completeVendorWithdrawal, requestId, completionData).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_FINANCE_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  // Seller Withdrawal APIs
   const approveSellerWithdrawal = useCallback(
     (requestId) => {
       return callApi(adminApi.approveSellerWithdrawal, requestId).then((result) => {
@@ -344,6 +384,10 @@ export function useAdminApi() {
   )
 
   const getSellerWithdrawalRequests = useCallback((params) => callApi(adminApi.getSellerWithdrawalRequests, params), [callApi])
+
+  // Payment History APIs
+  const getPaymentHistory = useCallback((params) => callApi(adminApi.getPaymentHistory, params), [callApi])
+  const getPaymentHistoryStats = useCallback((params) => callApi(adminApi.getPaymentHistoryStats, params), [callApi])
 
   // User Management APIs
   const getUsers = useCallback(
@@ -646,9 +690,17 @@ export function useAdminApi() {
     approveSeller,
     rejectSeller,
     deleteSeller,
+    getVendorWithdrawalRequests,
+    approveVendorWithdrawal,
+    rejectVendorWithdrawal,
+    completeVendorWithdrawal,
     approveSellerWithdrawal,
     rejectSellerWithdrawal,
     getSellerWithdrawalRequests,
+    getPaymentHistory,
+    getPaymentHistoryStats,
+    getPaymentHistory,
+    getPaymentHistoryStats,
     // Users
     getUsers,
     getUserDetails,

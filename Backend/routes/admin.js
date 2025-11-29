@@ -273,6 +273,63 @@ router.post('/sellers/withdrawals/:requestId/approve', authorizeAdmin, adminCont
  */
 router.post('/sellers/withdrawals/:requestId/reject', authorizeAdmin, adminController.rejectSellerWithdrawal);
 
+// ============================================================================
+// VENDOR WITHDRAWAL MANAGEMENT ROUTES
+// ============================================================================
+
+/**
+ * @route   GET /api/admin/vendors/withdrawals
+ * @desc    Get all vendor withdrawal requests (global, with optional filters)
+ * @access  Private (Admin)
+ */
+router.get('/vendors/withdrawals', authorizeAdmin, adminController.getAllVendorWithdrawals);
+
+/**
+ * @route   POST /api/admin/vendors/withdrawals/:requestId/approve
+ * @desc    Approve vendor withdrawal request
+ * @access  Private (Admin)
+ */
+router.post('/vendors/withdrawals/:requestId/approve', authorizeAdmin, adminController.approveVendorWithdrawal);
+
+/**
+ * @route   POST /api/admin/vendors/withdrawals/:requestId/reject
+ * @desc    Reject vendor withdrawal request
+ * @access  Private (Admin)
+ */
+router.post('/vendors/withdrawals/:requestId/reject', authorizeAdmin, adminController.rejectVendorWithdrawal);
+
+/**
+ * @route   PUT /api/admin/vendors/withdrawals/:requestId/complete
+ * @desc    Mark vendor withdrawal as completed (after payment processed)
+ * @access  Private (Admin)
+ */
+router.put('/vendors/withdrawals/:requestId/complete', authorizeAdmin, adminController.completeVendorWithdrawal);
+
+// ============================================================================
+// UNIFIED WITHDRAWAL MANAGEMENT ROUTES
+// ============================================================================
+
+/**
+ * @route   GET /api/admin/withdrawals
+ * @desc    Get all withdrawals (vendors + sellers) for admin dashboard
+ * @access  Private (Admin)
+ */
+router.get('/withdrawals', authorizeAdmin, adminController.getAllWithdrawals);
+
+/**
+ * @route   GET /api/admin/payment-history
+ * @desc    Get payment history for admin
+ * @access  Private (Admin)
+ */
+router.get('/payment-history', authorizeAdmin, adminController.getPaymentHistory);
+
+/**
+ * @route   GET /api/admin/payment-history/stats
+ * @desc    Get payment history statistics
+ * @access  Private (Admin)
+ */
+router.get('/payment-history/stats', authorizeAdmin, adminController.getPaymentHistoryStats);
+
 /**
  * @route   POST /api/admin/sellers
  * @desc    Create seller (IRA Partner)

@@ -270,13 +270,13 @@ export function useUserApi() {
   )
 
   const confirmRemainingPayment = useCallback(
-    async (orderId, paymentIntentId, paymentMethod, paymentDetails) => {
+    async (paymentData) => {
       return handleApiCall(
-        () => userApi.confirmRemainingPayment({ orderId, paymentIntentId, paymentMethod, paymentDetails }),
+        () => userApi.confirmRemainingPayment(paymentData),
         (data) => ({
           type: 'UPDATE_ORDER',
           payload: {
-            id: orderId,
+            id: paymentData.orderId,
             paymentStatus: 'fully_paid',
           },
         }),

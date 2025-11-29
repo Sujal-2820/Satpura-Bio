@@ -1,11 +1,13 @@
-import { ArrowUpRight, BarChart3, Download, PieChart } from 'lucide-react'
+import { ArrowUpRight, BarChart3, Download, PieChart, ArrowLeft, TrendingUp, Users, Building2, Package } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
 import { FilterBar } from '../components/FilterBar'
 import { Timeline } from '../components/Timeline'
 import { analyticsSummary } from '../services/adminData'
 
-export function AnalyticsPage() {
-  return (
+export function AnalyticsPage({ subRoute = null, navigate }) {
+  // Show Overview (default when subRoute is null or 'overview')
+  if (!subRoute || subRoute === 'overview') {
+    return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -100,6 +102,138 @@ export function AnalyticsPage() {
         </div>
       </section>
     </div>
-  )
+    )
+  }
+
+  // Show Sales Analytics
+  if (subRoute === 'sales') {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate('analytics/overview')}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Analytics Overview
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 8 • Reporting & Analytics</p>
+            <h2 className="text-2xl font-bold text-gray-900">Sales Analytics</h2>
+            <p className="text-sm text-gray-600">
+              Comprehensive sales performance metrics and revenue insights.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-indigo-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="flex items-center gap-3 mb-4">
+            <TrendingUp className="h-5 w-5 text-indigo-600" />
+            <h3 className="text-lg font-bold text-indigo-700">Sales Performance</h3>
+          </div>
+          <p className="text-sm text-gray-600">Sales analytics data will be displayed here.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show User Analytics
+  if (subRoute === 'users') {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate('analytics/overview')}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Analytics Overview
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 8 • Reporting & Analytics</p>
+            <h2 className="text-2xl font-bold text-gray-900">User Analytics</h2>
+            <p className="text-sm text-gray-600">
+              User engagement, growth, and behavior analytics.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-indigo-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="flex items-center gap-3 mb-4">
+            <Users className="h-5 w-5 text-indigo-600" />
+            <h3 className="text-lg font-bold text-indigo-700">User Performance</h3>
+          </div>
+          <p className="text-sm text-gray-600">User analytics data will be displayed here.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show Vendor Analytics
+  if (subRoute === 'vendors') {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate('analytics/overview')}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Analytics Overview
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 8 • Reporting & Analytics</p>
+            <h2 className="text-2xl font-bold text-gray-900">Vendor Analytics</h2>
+            <p className="text-sm text-gray-600">
+              Vendor performance, order fulfillment, and revenue metrics.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-indigo-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="flex items-center gap-3 mb-4">
+            <Building2 className="h-5 w-5 text-indigo-600" />
+            <h3 className="text-lg font-bold text-indigo-700">Vendor Performance</h3>
+          </div>
+          <p className="text-sm text-gray-600">Vendor analytics data will be displayed here.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show Order Analytics
+  if (subRoute === 'orders') {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate('analytics/overview')}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Analytics Overview
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 8 • Reporting & Analytics</p>
+            <h2 className="text-2xl font-bold text-gray-900">Order Analytics</h2>
+            <p className="text-sm text-gray-600">
+              Order trends, fulfillment rates, and delivery performance.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-indigo-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="flex items-center gap-3 mb-4">
+            <Package className="h-5 w-5 text-indigo-600" />
+            <h3 className="text-lg font-bold text-indigo-700">Order Performance</h3>
+          </div>
+          <p className="text-sm text-gray-600">Order analytics data will be displayed here.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Default fallback
+  return null
 }
 

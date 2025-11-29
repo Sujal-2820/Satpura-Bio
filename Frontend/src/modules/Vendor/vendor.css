@@ -3971,6 +3971,74 @@
   display: block;
 }
 
+/* Bank Account Form View - Mobile Responsive */
+.bank-account-form-view {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.bank-account-form-view__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(34, 94, 65, 0.12);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bank-account-form-view__header h4 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+  flex: 1;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 420px) {
+  .bank-account-form-view {
+    padding: 0;
+  }
+  
+  .bank-account-form-view__header {
+    padding: 0 0 1rem 0;
+    gap: 0.75rem;
+  }
+  
+  .bank-account-form-view__header h4 {
+    font-size: 1.1rem;
+  }
+  
+  .vendor-action-panel__input {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  
+  .vendor-action-panel__label {
+    width: 100% !important;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  .vendor-action-panel__form {
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+  
+  .vendor-action-panel__button {
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+}
+
 .vendor-action-panel__actions {
   display: flex;
   gap: 0.75rem;

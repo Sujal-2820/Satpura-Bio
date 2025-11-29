@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Settings, Truck, Package, Bell, Plus, Edit2, Trash2, AlertCircle, Recycle } from 'lucide-react'
+import { Settings, Truck, Package, Bell, Plus, Edit2, Trash2, AlertCircle, Recycle, ArrowLeft, Eye } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
-import { Modal } from '../components/Modal'
-import { LogisticsSettingsModal } from '../components/LogisticsSettingsModal'
-import { OrderEscalationModal } from '../components/OrderEscalationModal'
-import { NotificationForm } from '../components/NotificationForm'
+import { LogisticsSettingsForm } from '../components/LogisticsSettingsForm'
+import { NotificationFormFullScreen } from '../components/NotificationFormFullScreen'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
 import { useToast } from '../components/ToastNotification'
@@ -29,7 +27,7 @@ const escalationColumns = [
   { Header: 'Actions', accessor: 'actions' },
 ]
 
-export function OperationsPage() {
+export function OperationsPage({ subRoute = null, navigate }) {
   const { orders: ordersState } = useAdminState()
   const {
     getLogisticsSettings,
@@ -49,15 +47,13 @@ export function OperationsPage() {
   const [notifications, setNotifications] = useState([])
   const [escalatedOrders, setEscalatedOrders] = useState([])
   
-  // Modal states
-  const [logisticsModalOpen, setLogisticsModalOpen] = useState(false)
-  const [notificationFormOpen, setNotificationFormOpen] = useState(false)
+  // View states (replacing modals with full-screen views)
+  const [currentView, setCurrentView] = useState(null) // 'logistics', 'notification', 'escalation', 'revertEscalation'
   const [selectedNotification, setSelectedNotification] = useState(null)
-  const [escalationModalOpen, setEscalationModalOpen] = useState(false)
   const [selectedOrderForEscalation, setSelectedOrderForEscalation] = useState(null)
-  const [revertModalOpen, setRevertModalOpen] = useState(false)
   const [selectedOrderForRevert, setSelectedOrderForRevert] = useState(null)
   const [revertReason, setRevertReason] = useState('')
+  const [fulfillmentNote, setFulfillmentNote] = useState('')
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -88,9 +84,10 @@ export function OperationsPage() {
     try {
       const result = await updateLogisticsSettings(settings)
       if (result.data) {
-        setLogisticsModalOpen(false)
+        setCurrentView(null)
         fetchData()
         success('Logistics settings updated successfully!', 3000)
+        if (navigate) navigate('operations')
       } else if (result.error) {
         const errorMessage = result.error.message || 'Failed to update logistics settings'
         if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
@@ -113,10 +110,11 @@ export function OperationsPage() {
         result = await createNotification(notificationData)
       }
       if (result.data) {
-        setNotificationFormOpen(false)
+        setCurrentView(null)
         setSelectedNotification(null)
         fetchData()
         success(selectedNotification ? 'Notification updated successfully!' : 'Notification created successfully!', 3000)
+        if (navigate) navigate('operations')
       } else if (result.error) {
         const errorMessage = result.error.message || 'Failed to save notification'
         if (errorMessage.includes('validation') || errorMessage.includes('required')) {
@@ -135,8 +133,11 @@ export function OperationsPage() {
       try {
         const result = await deleteNotification(notificationId)
         if (result.data) {
+          setCurrentView(null)
+          setSelectedNotification(null)
           fetchData()
           success('Notification deleted successfully!', 3000)
+          if (navigate) navigate('operations')
         } else if (result.error) {
           const errorMessage = result.error.message || 'Failed to delete notification'
           showError(errorMessage, 5000)
@@ -151,10 +152,11 @@ export function OperationsPage() {
     try {
       const result = await fulfillOrderFromWarehouse(orderId, fulfillmentData)
       if (result.data) {
-        setEscalationModalOpen(false)
+        setCurrentView(null)
         setSelectedOrderForEscalation(null)
         fetchData()
         success('Order fulfilled from warehouse successfully!', 3000)
+        if (navigate) navigate('operations')
       } else if (result.error) {
         const errorMessage = result.error.message || 'Failed to fulfill order'
         if (errorMessage.includes('stock') || errorMessage.includes('unavailable') || errorMessage.includes('cannot')) {
@@ -177,17 +179,27 @@ export function OperationsPage() {
     try {
       const result = await revertEscalation(selectedOrderForRevert.id, { reason: revertReason.trim() })
       if (result.data) {
-        setRevertModalOpen(false)
+        setCurrentView(null)
         setSelectedOrderForRevert(null)
         setRevertReason('')
         fetchData()
         success('Escalation reverted successfully. Order assigned back to vendor.', 3000)
+        if (navigate) navigate('operations')
       } else if (result.error) {
         showError(result.error.message || 'Failed to revert escalation', 5000)
       }
     } catch (error) {
       showError(error.message || 'Failed to revert escalation', 5000)
     }
+  }
+
+  const handleBackToList = () => {
+    setCurrentView(null)
+    setSelectedNotification(null)
+    setSelectedOrderForEscalation(null)
+    setSelectedOrderForRevert(null)
+    setRevertReason('')
+    if (navigate) navigate('operations')
   }
 
   const formatCurrency = (value) => {
@@ -249,7 +261,7 @@ export function OperationsPage() {
                 type="button"
                 onClick={() => {
                   setSelectedNotification(row)
-                  setNotificationFormOpen(true)
+                  setCurrentView('notification')
                 }}
                 className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
                 title="Edit notification"
@@ -298,7 +310,7 @@ export function OperationsPage() {
               type="button"
               onClick={() => {
                 setSelectedOrderForEscalation(row)
-                setEscalationModalOpen(true)
+                setCurrentView('escalation')
               }}
               className="flex items-center gap-2 rounded-lg border border-green-300 bg-white px-3 py-2 text-sm font-bold text-green-600 transition-all hover:bg-green-50"
             >
@@ -312,6 +324,282 @@ export function OperationsPage() {
     return column
   })
 
+  // Handle sub-routes
+  useEffect(() => {
+    if (subRoute === 'notifications/add') {
+      setSelectedNotification(null)
+      setCurrentView('notification')
+    } else if (subRoute === 'delivery-timeline/update') {
+      setCurrentView('logistics')
+    } else if (subRoute === null || subRoute === '') {
+      setCurrentView(null)
+    }
+  }, [subRoute])
+
+  // Show full-screen views (replacing modals)
+  if (currentView === 'logistics') {
+    return (
+      <LogisticsSettingsForm
+        settings={logisticsSettings}
+        onSave={handleSaveLogisticsSettings}
+        onCancel={handleBackToList}
+        loading={loading}
+      />
+    )
+  }
+
+  if (currentView === 'notification') {
+    return (
+      <NotificationFormFullScreen
+        notification={selectedNotification}
+        onSave={handleSaveNotification}
+        onDelete={handleDeleteNotification}
+        onCancel={handleBackToList}
+        loading={loading}
+      />
+    )
+  }
+
+  if (currentView === 'escalation' && selectedOrderForEscalation) {
+    const order = selectedOrderForEscalation
+
+    const handleFulfill = () => {
+      handleFulfillFromWarehouse(order.id, {
+        note: fulfillmentNote.trim() || 'Order fulfilled from master warehouse',
+      })
+    }
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Operations
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 8 • Operational Controls</p>
+            <h2 className="text-2xl font-bold text-gray-900">Order Escalation - Manual Fulfillment</h2>
+            <p className="text-sm text-gray-600">
+              Fulfill escalated order from master warehouse.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="space-y-6">
+            {/* Order Info */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Package className="h-5 w-5 text-gray-600" />
+                <p className="text-sm font-bold text-gray-900">Order #{order.orderNumber || order.id}</p>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Vendor:</span>
+                  <span className="font-bold text-gray-900">{order.vendor || 'N/A'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Order Value:</span>
+                  <span className="font-bold text-gray-900">
+                    {formatCurrency(order.value || order.orderValue || 0)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Status:</span>
+                  <StatusBadge tone="warning">Vendor Not Available</StatusBadge>
+                </div>
+              </div>
+            </div>
+
+            {/* Escalation Reason */}
+            <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 flex-shrink-0 text-orange-600" />
+                <div>
+                  <p className="text-sm font-bold text-orange-900">Escalation Reason</p>
+                  <p className="mt-1 text-xs text-orange-700">
+                    {order.escalationReason || order.escalation?.escalationReason || order.notes || 'Vendor marked this order as "Not Available". You can manually fulfill this order from the master warehouse.'}
+                  </p>
+                  {order.escalation?.escalatedAt && (
+                    <p className="mt-2 text-xs text-orange-600">
+                      Escalated on: {new Date(order.escalation.escalatedAt).toLocaleString('en-IN')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Order Items */}
+            {order.items && order.items.length > 0 && (
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <p className="mb-3 text-sm font-bold text-gray-900">Order Items</p>
+                <div className="space-y-2">
+                  {order.items.map((item, index) => {
+                    const itemId = item._id || item.id || index
+                    const productName = item.productName || item.productId?.name || item.name || item.product || 'Unknown Product'
+                    const quantity = item.quantity || 1
+                    const unitPrice = item.unitPrice || item.price || item.amount || 0
+                    const totalPrice = item.totalPrice || (unitPrice * quantity)
+                    
+                    return (
+                      <div key={itemId} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-2">
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">{productName}</p>
+                          <p className="text-xs text-gray-600">Qty: {quantity} {item.unit || 'units'}</p>
+                        </div>
+                        <p className="text-sm font-bold text-gray-900">
+                          {formatCurrency(totalPrice)}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Fulfillment Note */}
+            <div>
+              <label htmlFor="fulfillmentNote" className="mb-2 block text-sm font-bold text-gray-900">
+                Fulfillment Note (Optional)
+              </label>
+              <textarea
+                id="fulfillmentNote"
+                value={fulfillmentNote}
+                onChange={(e) => setFulfillmentNote(e.target.value)}
+                placeholder="Add any notes about this fulfillment..."
+                rows={3}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+            </div>
+
+            {/* Info Box */}
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-start gap-3">
+                <Package className="h-5 w-5 flex-shrink-0 text-blue-600" />
+                <div className="text-xs text-blue-900">
+                  <p className="font-bold">Master Warehouse Fulfillment</p>
+                  <ul className="mt-2 space-y-1 list-disc list-inside">
+                    <li>Order will be fulfilled from master warehouse inventory</li>
+                    <li>Vendor will be notified of the fulfillment</li>
+                    <li>Order status will be updated to "Accepted"</li>
+                    <li>You can then update status: Dispatched → Delivered → Fully Paid (if partial payment)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleBackToList}
+                disabled={loading}
+                className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleFulfill}
+                disabled={loading}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+              >
+                <Package className="h-4 w-4" />
+                {loading ? 'Fulfilling...' : 'Fulfill from Warehouse'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === 'revertEscalation' && selectedOrderForRevert) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Operations
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 8 • Operational Controls</p>
+            <h2 className="text-2xl font-bold text-gray-900">Revert Escalation</h2>
+            <p className="text-sm text-gray-600">
+              Revert escalated order back to vendor.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <div className="space-y-4">
+            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+              <p className="text-sm font-semibold text-orange-900">Order #{selectedOrderForRevert.orderNumber}</p>
+              <p className="text-xs text-orange-700 mt-1">
+                Vendor: {selectedOrderForRevert.vendor || 'N/A'} | Value: {formatCurrency(selectedOrderForRevert.value || 0)}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Reason for Reverting <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={revertReason}
+                onChange={(e) => setRevertReason(e.target.value)}
+                placeholder="Why are you reverting this escalation back to the vendor?"
+                rows={4}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              />
+            </div>
+
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-900">
+                  This order will be assigned back to the original vendor. The vendor will receive a notification and can proceed with fulfillment.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={handleBackToList}
+                disabled={loading}
+                className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRevertEscalation}
+                disabled={loading || !revertReason.trim()}
+                className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  'Reverting...'
+                ) : (
+                  <>
+                    <Recycle className="h-4 w-4" />
+                    Revert to Vendor
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show main Operations page (default)
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -324,7 +612,10 @@ export function OperationsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setLogisticsModalOpen(true)}
+            onClick={() => {
+              if (navigate) navigate('operations/delivery-timeline/update')
+              else setCurrentView('logistics')
+            }}
             className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
           >
             <Truck className="h-4 w-4" />
@@ -333,7 +624,8 @@ export function OperationsPage() {
           <button
             onClick={() => {
               setSelectedNotification(null)
-              setNotificationFormOpen(true)
+              if (navigate) navigate('operations/notifications/add')
+              else setCurrentView('notification')
             }}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105"
           >
@@ -354,7 +646,10 @@ export function OperationsPage() {
             </div>
           </div>
           <button
-            onClick={() => setLogisticsModalOpen(true)}
+            onClick={() => {
+              if (navigate) navigate('operations/delivery-timeline/update')
+              else setCurrentView('logistics')
+            }}
             className="rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-bold text-blue-600 transition-all hover:bg-blue-50"
           >
             Configure
@@ -419,112 +714,6 @@ export function OperationsPage() {
         />
       </div>
 
-      {/* Modals */}
-      <LogisticsSettingsModal
-        isOpen={logisticsModalOpen}
-        onClose={() => setLogisticsModalOpen(false)}
-        settings={logisticsSettings}
-        onSave={handleSaveLogisticsSettings}
-        loading={loading}
-      />
-
-      <NotificationForm
-        isOpen={notificationFormOpen}
-        onClose={() => {
-          setNotificationFormOpen(false)
-          setSelectedNotification(null)
-        }}
-        notification={selectedNotification}
-        onSave={handleSaveNotification}
-        onDelete={handleDeleteNotification}
-        loading={loading}
-      />
-
-      <OrderEscalationModal
-        isOpen={escalationModalOpen}
-        onClose={() => {
-          setEscalationModalOpen(false)
-          setSelectedOrderForEscalation(null)
-        }}
-        order={selectedOrderForEscalation}
-        onFulfillFromWarehouse={handleFulfillFromWarehouse}
-        loading={loading}
-      />
-
-      {/* Revert Escalation Modal */}
-      {revertModalOpen && selectedOrderForRevert && (
-        <Modal
-          isOpen={revertModalOpen}
-          onClose={() => {
-            setRevertModalOpen(false)
-            setSelectedOrderForRevert(null)
-            setRevertReason('')
-          }}
-          title="Revert Escalation"
-          size="md"
-        >
-          <div className="space-y-4">
-            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
-              <p className="text-sm font-semibold text-orange-900">Order #{selectedOrderForRevert.orderNumber}</p>
-              <p className="text-xs text-orange-700 mt-1">
-                Vendor: {selectedOrderForRevert.vendor || 'N/A'} | Value: {formatCurrency(selectedOrderForRevert.value || 0)}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Reason for Reverting <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                value={revertReason}
-                onChange={(e) => setRevertReason(e.target.value)}
-                placeholder="Why are you reverting this escalation back to the vendor?"
-                rows={4}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-              />
-            </div>
-
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-900">
-                  This order will be assigned back to the original vendor. The vendor will receive a notification and can proceed with fulfillment.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={() => {
-                  setRevertModalOpen(false)
-                  setSelectedOrderForRevert(null)
-                  setRevertReason('')
-                }}
-                disabled={loading}
-                className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleRevertEscalation}
-                disabled={loading || !revertReason.trim()}
-                className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  'Reverting...'
-                ) : (
-                  <>
-                    <Recycle className="h-4 w-4" />
-                    Revert to Vendor
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
   )
 }

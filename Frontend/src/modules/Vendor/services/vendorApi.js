@@ -82,7 +82,7 @@ export async function requestVendorOTP(data) {
  * Register Vendor with OTP
  * POST /vendors/auth/register
  * 
- * @param {Object} data - { fullName, phone, location }
+ * @param {Object} data - { name, email, phone, location, aadhaarCard, panCard }
  * @returns {Promise<Object>} - { message, vendorId, requiresApproval, expiresIn }
  */
 export async function registerVendor(data) {
@@ -90,6 +90,7 @@ export async function registerVendor(data) {
     method: 'POST',
     body: JSON.stringify({
       name: data.fullName || data.name,
+      email: data.email,
       phone: data.phone,
       location: data.location || {
         address: data.address || '',
@@ -98,6 +99,16 @@ export async function registerVendor(data) {
         pincode: data.location?.pincode || '',
         coordinates: data.location?.coordinates || data.coordinates || { lat: data.lat, lng: data.lng },
       },
+      aadhaarCard: data.aadhaarCard ? {
+        url: data.aadhaarCard.url,
+        publicId: data.aadhaarCard.publicId,
+        format: data.aadhaarCard.format,
+      } : undefined,
+      panCard: data.panCard ? {
+        url: data.panCard.url,
+        publicId: data.panCard.publicId,
+        format: data.panCard.format,
+      } : undefined,
     }),
   })
 }
@@ -567,6 +578,140 @@ export async function getRegionAnalytics() {
   return apiRequest('/vendors/reports?type=region').catch(() => {
     // Fallback to performance analytics if region endpoint doesn't exist
     return apiRequest('/vendors/reports/analytics?period=month')
+  })
+}
+
+// ============================================================================
+// EARNINGS APIs
+// ============================================================================
+
+/**
+ * Get Vendor Earnings Summary
+ * GET /vendors/earnings
+ * 
+ * @returns {Promise<Object>} - { totalEarnings, availableBalance, pendingWithdrawal, thisMonthEarnings, lastWithdrawalDate }
+ */
+export async function getEarningsSummary() {
+  return apiRequest('/vendors/earnings')
+}
+
+/**
+ * Get Vendor Earnings History
+ * GET /vendors/earnings/history
+ * 
+ * @param {Object} params - { page, limit, startDate, endDate, status }
+ * @returns {Promise<Object>} - { earnings: Array, pagination: Object }
+ */
+export async function getEarningsHistory(params = {}) {
+  const queryParams = new URLSearchParams(params).toString()
+  return apiRequest(`/vendors/earnings/history?${queryParams}`)
+}
+
+/**
+ * Get Vendor Earnings by Orders
+ * GET /vendors/earnings/orders
+ * 
+ * @param {Object} params - { page, limit }
+ * @returns {Promise<Object>} - { earningsByOrder: Array, pagination: Object }
+ */
+export async function getEarningsByOrders(params = {}) {
+  const queryParams = new URLSearchParams(params).toString()
+  return apiRequest(`/vendors/earnings/orders?${queryParams}`)
+}
+
+/**
+ * Get Vendor Available Balance
+ * GET /vendors/balance
+ * 
+ * @returns {Promise<Object>} - { totalEarnings, availableBalance, pendingWithdrawal }
+ */
+export async function getBalance() {
+  return apiRequest('/vendors/balance')
+}
+
+// ============================================================================
+// WITHDRAWAL REQUEST APIs
+// ============================================================================
+
+/**
+ * Request Withdrawal from Earnings
+ * POST /vendors/withdrawals/request
+ * 
+ * @param {Object} data - { amount, bankAccountId }
+ * @returns {Promise<Object>} - { withdrawal: Object, message: string }
+ */
+export async function requestWithdrawal(data) {
+  return apiRequest('/vendors/withdrawals/request', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/**
+ * Get Vendor Withdrawal Requests
+ * GET /vendors/withdrawals
+ * 
+ * @param {Object} params - { page, limit, status }
+ * @returns {Promise<Object>} - { withdrawals: Array, pagination: Object }
+ */
+export async function getWithdrawals(params = {}) {
+  const queryParams = new URLSearchParams(params).toString()
+  return apiRequest(`/vendors/withdrawals?${queryParams}`)
+}
+
+// ============================================================================
+// BANK ACCOUNT APIs
+// ============================================================================
+
+/**
+ * Add Bank Account
+ * POST /vendors/bank-accounts
+ * 
+ * @param {Object} data - { accountHolderName, accountNumber, ifscCode, bankName, branchName, isPrimary }
+ * @returns {Promise<Object>} - { bankAccount: Object, message: string }
+ */
+export async function addBankAccount(data) {
+  return apiRequest('/vendors/bank-accounts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/**
+ * Get Vendor Bank Accounts
+ * GET /vendors/bank-accounts
+ * 
+ * @returns {Promise<Object>} - { bankAccounts: Array }
+ */
+export async function getBankAccounts() {
+  return apiRequest('/vendors/bank-accounts')
+}
+
+/**
+ * Update Bank Account
+ * PUT /vendors/bank-accounts/:accountId
+ * 
+ * @param {string} accountId - Bank account ID
+ * @param {Object} data - { accountHolderName, accountNumber, ifscCode, bankName, branchName, isPrimary }
+ * @returns {Promise<Object>} - { bankAccount: Object, message: string }
+ */
+export async function updateBankAccount(accountId, data) {
+  return apiRequest(`/vendors/bank-accounts/${accountId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+/**
+ * Delete Bank Account
+ * DELETE /vendors/bank-accounts/:accountId
+ * 
+ * @param {string} accountId - Bank account ID
+ * @returns {Promise<Object>} - { message: string }
+ */
+export async function deleteBankAccount(accountId) {
+  return apiRequest(`/vendors/bank-accounts/${accountId}`, {
+    method: 'DELETE',
   })
 }
 

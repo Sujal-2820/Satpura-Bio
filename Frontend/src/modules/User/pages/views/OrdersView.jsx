@@ -4,6 +4,8 @@ import { useUserApi } from '../../hooks/useUserApi'
 import { PackageIcon, TruckIcon, ClockIcon, CheckCircleIcon, CreditCardIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import { useToast } from '../../components/ToastNotification'
+import { getPrimaryImageUrl } from '../../utils/productImages'
+import { openRazorpayCheckout } from '../../../../utils/razorpay'
 
 const FILTER_TABS = [
   { id: 'all', label: 'All' },
@@ -153,35 +155,55 @@ export function OrdersView() {
         return
       }
 
-      const { paymentIntentId, clientSecret, amount } = paymentIntentResult.data
+      const { paymentIntent } = paymentIntentResult.data
+      const { razorpayOrderId, keyId, amount } = paymentIntent
 
-      // In a real app, this would integrate with Razorpay/Paytm/Stripe SDK
-      // TODO: Integrate actual payment gateway SDK here
-      
-      // Simulate payment confirmation (replace with actual gateway integration)
-      const paymentDetails = {
-        paymentIntentId,
-        clientSecret,
-        // Add actual payment gateway response here
-      }
+      // Open Razorpay Checkout for remaining payment
+      try {
+        const razorpayResponse = await openRazorpayCheckout({
+          key: keyId,
+          amount: amount,
+          currency: 'INR',
+          order_id: razorpayOrderId,
+          name: 'IRA SATHI',
+          description: `Remaining payment for Order ${order.orderNumber || order.id}`,
+          prefill: {
+            name: order.userName || '',
+            email: order.userEmail || '',
+            contact: order.userPhone || '',
+          },
+        })
 
-      const confirmResult = await confirmRemainingPayment(
-        order.id,
-        paymentIntentId,
-        'razorpay',
-        paymentDetails
-      )
+        // Confirm remaining payment with Razorpay response
+        const confirmResult = await confirmRemainingPayment({
+          orderId: order.id,
+          paymentIntentId: paymentIntent.id,
+          gatewayPaymentId: razorpayResponse.paymentId,
+          gatewayOrderId: razorpayResponse.orderId,
+          gatewaySignature: razorpayResponse.signature,
+          paymentMethod: 'razorpay',
+        })
 
-      if (confirmResult.error) {
-        showError(confirmResult.error.message || 'Payment failed')
+        if (confirmResult.error) {
+          showError(confirmResult.error.message || 'Payment failed')
+          setProcessingPayment(null)
+          return
+        }
+
+        success(`Remaining payment of ₹${amount.toLocaleString('en-IN')} completed successfully!`)
+        setProcessingPayment(null)
+        
+        // Order status will be updated via real-time notification or refresh
+      } catch (razorpayError) {
+        // Handle Razorpay errors
+        if (razorpayError.error) {
+          showError(razorpayError.error || 'Payment was cancelled or failed')
+        } else {
+          showError(razorpayError.message || 'Payment processing failed. Please try again.')
+        }
         setProcessingPayment(null)
         return
       }
-
-      success(`Remaining payment of ₹${amount.toLocaleString('en-IN')} completed successfully!`)
-      setProcessingPayment(null)
-      
-      // Order status will be updated via real-time notification or refresh
     } catch (err) {
       showError('Payment processing failed. Please try again.')
       setProcessingPayment(null)
@@ -283,7 +305,7 @@ export function OrdersView() {
                   <div key={index} className="user-orders-view__card-item">
                     <div className="user-orders-view__card-item-image">
                       <img
-                        src={orderItem.image || 'https://via.placeholder.com/60'}
+                        src={orderItem.product ? getPrimaryImageUrl(orderItem.product) : (orderItem.image || 'https://via.placeholder.com/60')}
                         alt={orderItem.name}
                         className="w-full h-full object-cover"
                       />

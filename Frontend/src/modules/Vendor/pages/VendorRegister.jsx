@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { OtpVerification } from '../../../components/auth/OtpVerification'
 import { useVendorDispatch } from '../context/VendorContext'
 import { VendorStatusMessage } from '../components/VendorStatusMessage'
+import { DocumentUpload } from '../components/DocumentUpload'
+import { GoogleMapsLocationPicker } from '../../../components/GoogleMapsLocationPicker'
 import * as vendorApi from '../services/vendorApi'
 
 export function VendorRegister({ onSuccess, onSwitchToLogin }) {
@@ -11,13 +13,11 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
   const [step, setStep] = useState('register') // 'register' | 'otp' | 'pending' | 'rejected'
   const [form, setForm] = useState({
     fullName: '',
+    email: '',
     contact: '',
-    address: '',
-    city: '',
-    state: '',
-    pincode: '',
-    latitude: '',
-    longitude: '',
+    location: null, // Will contain { address, city, state, pincode, coordinates: { lat, lng } }
+    aadhaarCard: null,
+    panCard: null,
   })
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
@@ -27,6 +27,13 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
     const { name, value } = e.target
     setForm((prev) => ({ ...prev, [name]: value }))
     setError(null)
+  }
+
+  const handleDocumentChange = (documentType) => (documentData) => {
+    setForm((prev) => ({
+      ...prev,
+      [documentType]: documentData,
+    }))
   }
 
   const handleRequestOtp = async (e) => {
@@ -51,55 +58,85 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
         setLoading(false)
         return
       }
-      if (!form.address.trim()) {
-        setError('Address is required')
+      // Validate location - coordinates are required (Google Maps provides this)
+      if (!form.location || !form.location.coordinates) {
+        setError('Please select your location using the map or live location button')
         setLoading(false)
         return
       }
-      if (!form.city.trim()) {
-        setError('City is required')
+      // Validate coordinates are valid (not 0,0)
+      if (!form.location.coordinates.lat || !form.location.coordinates.lng || 
+          form.location.coordinates.lat === 0 || form.location.coordinates.lng === 0) {
+        setError('Please select a valid location. Coordinates are required.')
         setLoading(false)
         return
       }
-      if (!form.state.trim()) {
-        setError('State is required')
+      // Address is required (Google Maps provides formatted_address)
+      if (!form.location.address || !form.location.address.trim()) {
+        setError('Please select a valid address from the location picker')
         setLoading(false)
         return
       }
-      if (!form.pincode.trim()) {
-        setError('Pincode is required')
+      // Validate documents - must be uploaded
+      if (!form.aadhaarCard?.url) {
+        setError('Please upload Aadhaar card image. Image is required and must be less than 2MB.')
         setLoading(false)
         return
       }
-      if (!form.latitude.trim() || !form.longitude.trim()) {
-        setError('Location coordinates (Latitude and Longitude) are required')
+      if (!form.panCard?.url) {
+        setError('Please upload PAN card image. Image is required and must be less than 2MB.')
         setLoading(false)
         return
       }
-      const lat = parseFloat(form.latitude)
-      const lng = parseFloat(form.longitude)
-      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        setError('Please enter valid latitude (-90 to 90) and longitude (-180 to 180)')
+
+      // Validate document formats - must be images
+      const imageFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg']
+      const aadhaarFormat = form.aadhaarCard.format?.toLowerCase()
+      const panFormat = form.panCard.format?.toLowerCase()
+      
+      if (!aadhaarFormat || !imageFormats.includes(aadhaarFormat)) {
+        setError('Aadhaar card must be an image file (JPG, PNG, GIF, etc.). PDF files are not accepted.')
+        setLoading(false)
+        return
+      }
+      if (!panFormat || !imageFormats.includes(panFormat)) {
+        setError('PAN card must be an image file (JPG, PNG, GIF, etc.). PDF files are not accepted.')
+        setLoading(false)
+        return
+      }
+
+      // Validate document sizes - must be less than 2MB
+      const maxSize = 2000000 // 2MB in bytes
+      if (form.aadhaarCard.size && form.aadhaarCard.size > maxSize) {
+        setError(`Aadhaar card image size (${(form.aadhaarCard.size / 1024 / 1024).toFixed(2)}MB) exceeds 2MB limit. Please upload a smaller image.`)
+        setLoading(false)
+        return
+      }
+      if (form.panCard.size && form.panCard.size > maxSize) {
+        setError(`PAN card image size (${(form.panCard.size / 1024 / 1024).toFixed(2)}MB) exceeds 2MB limit. Please upload a smaller image.`)
         setLoading(false)
         return
       }
 
       // Register vendor (creates vendor and sends OTP)
       const location = {
-        address: form.address,
-        city: form.city,
-        state: form.state,
-        pincode: form.pincode,
+        address: form.location.address,
+        city: form.location.city,
+        state: form.location.state,
+        pincode: form.location.pincode,
         coordinates: {
-          lat: parseFloat(form.latitude),
-          lng: parseFloat(form.longitude),
+          lat: form.location.coordinates.lat,
+          lng: form.location.coordinates.lng,
         },
       }
 
       const result = await vendorApi.registerVendor({
-        fullName: form.fullName,
+        name: form.fullName,
+        email: form.email || undefined,
         phone: form.contact,
         location: location,
+        aadhaarCard: form.aadhaarCard,
+        panCard: form.panCard,
       })
       
       if (result.success || result.data) {
@@ -287,120 +324,60 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
               />
             </div>
 
+            <div className="space-y-1.5">
+              <label htmlFor="register-email" className="text-xs font-semibold text-gray-700">
+                Email <span className="text-gray-400 text-xs">(Optional)</span>
+              </label>
+              <input
+                id="register-email"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="vendor@email.com"
+                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+              />
+            </div>
+
             <div className="border-t border-gray-200 pt-5 mt-5">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">Address & Location</h3>
               
               <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label htmlFor="register-address" className="text-xs font-semibold text-gray-700">
-                    Address <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    id="register-address"
-                    name="address"
-                    required
-                    value={form.address}
-                    onChange={handleChange}
-                    placeholder="Enter your complete address"
-                    rows={2}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all resize-none"
-                  />
-                </div>
+                <GoogleMapsLocationPicker
+                  onLocationSelect={(location) => {
+                    setForm((prev) => ({ ...prev, location }))
+                    setError(null)
+                  }}
+                  initialLocation={form.location}
+                  required={true}
+                  label="Select Your Business Location"
+                />
+              </div>
+            </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="register-city" className="text-xs font-semibold text-gray-700">
-                      City <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="register-city"
-                      name="city"
-                      type="text"
-                      required
-                      value={form.city}
-                      onChange={handleChange}
-                      placeholder="City"
-                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label htmlFor="register-state" className="text-xs font-semibold text-gray-700">
-                      State <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="register-state"
-                      name="state"
-                      type="text"
-                      required
-                      value={form.state}
-                      onChange={handleChange}
-                      placeholder="State"
-                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="register-pincode" className="text-xs font-semibold text-gray-700">
-                    Pincode <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="register-pincode"
-                    name="pincode"
-                    type="text"
-                    required
-                    value={form.pincode}
-                    onChange={handleChange}
-                    placeholder="Pincode"
-                    maxLength={6}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
-                  />
-                </div>
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
-                  <p className="text-xs font-semibold text-yellow-800 mb-2">⚠️ Temporary Location Entry</p>
-                  <p className="text-xs text-yellow-700 mb-3">
-                    For now, please manually enter your location coordinates. This will be replaced with Google Maps API in the future.
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label htmlFor="register-latitude" className="text-xs font-semibold text-gray-700">
-                        Latitude <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id="register-latitude"
-                        name="latitude"
-                        type="number"
-                        step="any"
-                        required
-                        value={form.latitude}
-                        onChange={handleChange}
-                        placeholder="e.g., 19.0760"
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label htmlFor="register-longitude" className="text-xs font-semibold text-gray-700">
-                        Longitude <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id="register-longitude"
-                        name="longitude"
-                        type="number"
-                        step="any"
-                        required
-                        value={form.longitude}
-                        onChange={handleChange}
-                        placeholder="e.g., 72.8777"
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-yellow-600 mt-2">
-                    💡 Tip: You can find your coordinates using Google Maps or any GPS app
-                  </p>
-                </div>
+            {/* Document Uploads */}
+            <div className="border-t border-gray-200 pt-5 mt-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">Verification Documents</h3>
+              <p className="text-xs text-gray-600 mb-4">
+                Please upload clear images or PDFs of your Aadhaar Card and PAN Card for verification.
+              </p>
+              
+              <div className="space-y-4">
+                <DocumentUpload
+                  label="Aadhaar Card"
+                  value={form.aadhaarCard}
+                  onChange={handleDocumentChange('aadhaarCard')}
+                  required
+                  disabled={loading}
+                />
+                
+                <DocumentUpload
+                  label="PAN Card"
+                  value={form.panCard}
+                  onChange={handleDocumentChange('panCard')}
+                  required
+                  disabled={loading}
+                />
               </div>
             </div>
 

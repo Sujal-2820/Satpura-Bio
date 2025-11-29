@@ -6,6 +6,8 @@ import { MapPinIcon, CreditCardIcon, TruckIcon, ChevronRightIcon, ChevronDownIco
 import { cn } from '../../../../lib/cn'
 import { useToast } from '../../components/ToastNotification'
 import * as userApi from '../../services/userApi'
+import { getPrimaryImageUrl } from '../../utils/productImages'
+import { openRazorpayCheckout } from '../../../../utils/razorpay'
 
 const STEPS = [
   { id: 1, label: 'Summary', icon: PackageIcon },
@@ -14,7 +16,7 @@ const STEPS = [
 ]
 
 export function CheckoutView({ onBack, onOrderPlaced }) {
-  const { cart, profile, assignedVendor } = useUserState()
+  const { cart, profile, assignedVendor, vendorAvailability } = useUserState()
   const dispatch = useUserDispatch()
   const { createOrder, createPaymentIntent, confirmPayment, loading } = useUserApi()
   const { success, error: showError } = useToast()
@@ -76,8 +78,8 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
         ...item,
         product,
         price: typeof price === 'number' && !isNaN(price) ? price : 0,
-        // Ensure image is available
-        image: item.image || (product?.images?.[0]?.url || product?.primaryImage || 'https://via.placeholder.com/300'),
+        // Ensure image is available using utility function
+        image: item.image || (product ? getPrimaryImageUrl(product) : 'https://via.placeholder.com/300'),
         // Ensure name is available
         name: item.name || product?.name || 'Unknown Product',
       }
@@ -174,6 +176,12 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
   }
 
   const handlePlaceOrder = async () => {
+    // Block order placement if no vendor available (beyond 20.3km)
+    // Allow if in buffer zone (20km to 20.3km)
+    if (!vendorAvailability?.canPlaceOrder && !vendorAvailability?.isInBufferZone) {
+      showError('No vendor available in your region. You cannot place orders at this location.')
+      return
+    }
     if (!deliveryAddress) {
       showError('Please update your delivery address in settings before placing an order')
       return
@@ -224,52 +232,68 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       const paymentAmount = pendingOrder.uiPayment?.amountDueNow ?? amountDueNow
       const paymentPlan = pendingOrder.uiPayment?.paymentPreference ?? paymentPreference
 
-      // Create payment intent
-      const paymentIntentResult = await createPaymentIntent(
-        pendingOrder.id,
-        paymentAmount,
-        paymentMethod
-      )
+      // Create payment intent (backend calculates amount from order)
+      const paymentIntentResult = await createPaymentIntent({
+        orderId: pendingOrder.id,
+        paymentMethod: paymentMethod,
+      })
 
       if (paymentIntentResult.error) {
         showError(paymentIntentResult.error.message || 'Failed to initialize payment')
         return
       }
 
-      const { paymentIntentId, clientSecret, paymentGateway } = paymentIntentResult.data
+      const { paymentIntent } = paymentIntentResult.data
+      const { razorpayOrderId, keyId, amount } = paymentIntent
 
-      // ⚠️ **DUMMY IMPLEMENTATION**: Payment Gateway Integration Pending
-      // In a real app, this would integrate with Razorpay/Paytm/Stripe SDK
-      // For now, we'll simulate payment confirmation with dummy gateway IDs
-      // TODO: Replace with actual payment gateway SDK integration
-      
-      // Generate dummy gateway payment ID (will be replaced with actual gateway response)
-      const dummyGatewayPaymentId = `dummy_payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      const dummyGatewayOrderId = `dummy_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      // Open Razorpay Checkout
+      try {
+        const razorpayResponse = await openRazorpayCheckout({
+          key: keyId,
+          amount: amount,
+          currency: 'INR',
+          order_id: razorpayOrderId,
+          name: 'IRA SATHI',
+          description: `Payment for Order ${pendingOrder.orderNumber || pendingOrder.id}`,
+          prefill: {
+            name: profile.name || '',
+            email: profile.email || '',
+            contact: profile.phone || '',
+          },
+        })
 
-      // Confirm payment with orderId and dummy gateway IDs
-      const confirmResult = await confirmPayment({
-        orderId: pendingOrder.id,
-        paymentIntentId: paymentIntentId,
-        gatewayPaymentId: dummyGatewayPaymentId, // Dummy - replace with actual gateway response
-        gatewayOrderId: dummyGatewayOrderId, // Dummy - replace with actual gateway response
-        gatewaySignature: null, // Dummy - replace with actual gateway signature
-        paymentMethod: paymentMethod,
-      })
+        // Confirm payment with Razorpay response
+        const confirmResult = await confirmPayment({
+          orderId: pendingOrder.id,
+          paymentIntentId: paymentIntent.id,
+          gatewayPaymentId: razorpayResponse.paymentId,
+          gatewayOrderId: razorpayResponse.orderId,
+          gatewaySignature: razorpayResponse.signature,
+          paymentMethod: paymentMethod,
+        })
 
-      if (confirmResult.error) {
-        showError(confirmResult.error.message || 'Payment failed')
+        if (confirmResult.error) {
+          showError(confirmResult.error.message || 'Payment failed')
+          return
+        }
+
+        success(
+          paymentPlan === 'full'
+            ? 'Order fully paid and confirmed!'
+            : 'Order placed successfully! Advance payment confirmed.'
+        )
+        onOrderPlaced?.(pendingOrder)
+        setShowPaymentConfirm(false)
+        setPendingOrder(null)
+      } catch (razorpayError) {
+        // Handle Razorpay errors
+        if (razorpayError.error) {
+          showError(razorpayError.error || 'Payment was cancelled or failed')
+        } else {
+          showError(razorpayError.message || 'Payment processing failed. Please try again.')
+        }
         return
       }
-
-      success(
-        paymentPlan === 'full'
-          ? 'Order fully paid and confirmed!'
-          : 'Order placed successfully! Advance payment confirmed.'
-      )
-      onOrderPlaced?.(pendingOrder)
-      setShowPaymentConfirm(false)
-      setPendingOrder(null)
     } catch (err) {
       console.error('Payment processing error:', err)
       showError(err.message || 'Payment processing failed. Please try again.')
@@ -641,30 +665,14 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           <h2 className="text-xl font-bold text-[#172022] mb-2">Payment Method</h2>
 
           <div className="space-y-2">
-            <label className="flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all border-[rgba(34,94,65,0.15)] bg-white hover:border-[rgba(34,94,65,0.25)]">
-              <input
-                type="radio"
-                name="payment"
-                value="razorpay"
-                checked={paymentMethod === 'razorpay'}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-4 h-4 accent-[#1b8f5b]"
-              />
+            <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-[#1b8f5b] bg-[rgba(240,245,242,0.5)]">
               <CreditCardIcon className="h-5 w-5 text-[#1b8f5b]" />
-              <span className="text-sm font-semibold text-[#172022]">Razorpay</span>
-            </label>
-            <label className="flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all border-[rgba(34,94,65,0.15)] bg-white hover:border-[rgba(34,94,65,0.25)]">
-              <input
-                type="radio"
-                name="payment"
-                value="paytm"
-                checked={paymentMethod === 'paytm'}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-4 h-4 accent-[#1b8f5b]"
-              />
-              <CreditCardIcon className="h-5 w-5 text-[#1b8f5b]" />
-              <span className="text-sm font-semibold text-[#172022]">Paytm</span>
-            </label>
+              <div className="flex-1">
+                <span className="text-sm font-semibold text-[#172022]">Razorpay</span>
+                <p className="text-xs text-[rgba(26,42,34,0.6)] mt-0.5">Secure payment gateway</p>
+              </div>
+              <CheckIcon className="h-5 w-5 text-[#1b8f5b]" />
+            </div>
           </div>
 
           {/* Final Summary */}
@@ -733,12 +741,12 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
               type="button"
               className={cn(
                 'w-full py-3.5 px-6 rounded-xl text-base font-bold transition-all',
-                !deliveryAddress
+                !deliveryAddress || (!vendorAvailability?.canPlaceOrder && !vendorAvailability?.isInBufferZone)
                   ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                   : 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white shadow-md hover:shadow-lg'
               )}
               onClick={handlePlaceOrder}
-              disabled={!deliveryAddress}
+              disabled={!deliveryAddress || (!vendorAvailability?.canPlaceOrder && !vendorAvailability?.isInBufferZone)}
             >
               Pay ₹{amountDueNow.toLocaleString('en-IN')} & Place Order
             </button>

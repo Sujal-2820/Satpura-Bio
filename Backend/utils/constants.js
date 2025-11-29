@@ -12,6 +12,8 @@ const DELIVERY_CHARGE = parseInt(process.env.DELIVERY_CHARGE) || 50;
 
 // Geographic Rules
 const VENDOR_COVERAGE_RADIUS_KM = parseInt(process.env.VENDOR_COVERAGE_RADIUS_KM) || 20;
+const VENDOR_ASSIGNMENT_BUFFER_KM = parseFloat(process.env.VENDOR_ASSIGNMENT_BUFFER_KM) || 0.3; // 300 meters buffer for order assignment
+const VENDOR_ASSIGNMENT_MAX_RADIUS_KM = VENDOR_COVERAGE_RADIUS_KM + VENDOR_ASSIGNMENT_BUFFER_KM; // 20.3km total
 
 // Delivery Policy
 const DELIVERY_TIMELINE_HOURS = parseInt(process.env.DELIVERY_TIMELINE_HOURS) || 24;
@@ -68,6 +70,8 @@ module.exports = {
   
   // Geographic
   VENDOR_COVERAGE_RADIUS_KM,
+  VENDOR_ASSIGNMENT_BUFFER_KM,
+  VENDOR_ASSIGNMENT_MAX_RADIUS_KM,
   
   // Delivery
   DELIVERY_TIMELINE_HOURS,

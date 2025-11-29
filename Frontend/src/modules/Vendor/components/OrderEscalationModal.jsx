@@ -3,6 +3,7 @@ import { AlertCircle, Package, X, CheckCircle } from 'lucide-react'
 import { cn } from '../../../lib/cn'
 import { useVendorApi } from '../hooks/useVendorApi'
 import { useToast } from '../components/ToastNotification'
+import { ProductAttributeSelector } from './ProductAttributeSelector'
 
 /**
  * Order Escalation Modal
@@ -138,25 +139,48 @@ export function OrderEscalationModal({ isOpen, onClose, order, onSuccess }) {
               <h4 className="text-sm font-semibold text-gray-900 mb-2">Items & your stock</h4>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {order.items.map((item) => {
-                  const productName = item.productId?.name || item.productName || 'Unknown product'
+                  const product = item.productId || {}
+                  const productName = product.name || item.productName || 'Unknown product'
                   const requestedQty = item.quantity || 0
                   const vendorStock = item.vendorStock ?? 0
                   const unit = item.unit || 'units'
+                  
+                  // Check if product has attributes
+                  const hasAttributes = product.attributeStocks && 
+                                       Array.isArray(product.attributeStocks) && 
+                                       product.attributeStocks.length > 0
+                  const itemAttributes = item.attributeCombination || item.attributes || {}
 
                   return (
-                    <div key={item._id || item.id} className="rounded-lg border border-gray-200 p-2">
-                      <p className="text-sm font-semibold text-gray-900">{productName}</p>
-                      <div className="mt-1 text-xs text-gray-600 flex items-center justify-between">
-                        <span>Requested: {requestedQty} {unit}</span>
-                        <span
-                          className={cn(
-                            'font-semibold',
-                            vendorStock > 0 ? 'text-green-600' : 'text-red-600'
-                          )}
-                        >
-                          Your stock: {vendorStock} {unit}
-                        </span>
+                    <div key={item._id || item.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{productName}</p>
+                        <div className="mt-1 text-xs text-gray-600 flex items-center justify-between">
+                          <span>Requested: {requestedQty} {unit}</span>
+                          <span
+                            className={cn(
+                              'font-semibold',
+                              vendorStock > 0 ? 'text-green-600' : 'text-red-600'
+                            )}
+                          >
+                            Your stock: {vendorStock} {unit}
+                          </span>
+                        </div>
                       </div>
+                      
+                      {/* Show attributes if product has them */}
+                      {hasAttributes && Object.keys(itemAttributes).length > 0 && (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-2">
+                          <p className="text-xs font-semibold text-gray-700 mb-1">Selected Variant:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {Object.entries(itemAttributes).map(([key, value]) => (
+                              <span key={key} className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                {key}: {value}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}

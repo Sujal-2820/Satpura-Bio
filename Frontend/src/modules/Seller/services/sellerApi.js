@@ -325,6 +325,98 @@ export async function getWithdrawalRequestDetails(requestId) {
   return apiRequest(`/sellers/wallet/withdrawals/${requestId}`)
 }
 
+/**
+ * Get Commission Summary
+ * GET /sellers/wallet/commissions/summary
+ * 
+ * @returns {Promise<Object>} - {
+ *   totalCommission: number,
+ *   thisMonthCommission: number,
+ *   availableBalance: number,
+ *   pendingWithdrawal: number,
+ *   commissionByRate: { low: number, high: number },
+ *   lastCommissionDate: Date
+ * }
+ */
+export async function getCommissionSummary() {
+  return apiRequest('/sellers/wallet/commissions/summary')
+}
+
+/**
+ * Get Commission History
+ * GET /sellers/wallet/commissions/history
+ * 
+ * @param {Object} params - { limit, offset, startDate, endDate, userId }
+ * @returns {Promise<Object>} - { commissions: Array, total: number }
+ */
+export async function getCommissionHistory(params = {}) {
+  const queryParams = new URLSearchParams(params).toString()
+  return apiRequest(`/sellers/wallet/commissions/history?${queryParams}`)
+}
+
+// ============================================================================
+// BANK ACCOUNT APIs
+// ============================================================================
+
+/**
+ * Add Bank Account
+ * POST /sellers/bank-accounts
+ * 
+ * @param {Object} accountData - {
+ *   accountHolderName: string,
+ *   accountNumber: string,
+ *   ifscCode: string,
+ *   bankName: string,
+ *   branchName?: string,
+ *   isPrimary?: boolean
+ * }
+ * @returns {Promise<Object>} - { bankAccount: Object }
+ */
+export async function addBankAccount(accountData) {
+  return apiRequest('/sellers/bank-accounts', {
+    method: 'POST',
+    body: JSON.stringify(accountData),
+  })
+}
+
+/**
+ * Get Bank Accounts
+ * GET /sellers/bank-accounts
+ * 
+ * @returns {Promise<Object>} - { bankAccounts: Array }
+ */
+export async function getBankAccounts() {
+  return apiRequest('/sellers/bank-accounts')
+}
+
+/**
+ * Update Bank Account
+ * PUT /sellers/bank-accounts/:accountId
+ * 
+ * @param {string} accountId - Bank account ID
+ * @param {Object} accountData - Update data
+ * @returns {Promise<Object>} - { bankAccount: Object }
+ */
+export async function updateBankAccount(accountId, accountData) {
+  return apiRequest(`/sellers/bank-accounts/${accountId}`, {
+    method: 'PUT',
+    body: JSON.stringify(accountData),
+  })
+}
+
+/**
+ * Delete Bank Account
+ * DELETE /sellers/bank-accounts/:accountId
+ * 
+ * @param {string} accountId - Bank account ID
+ * @returns {Promise<Object>} - { message: string }
+ */
+export async function deleteBankAccount(accountId) {
+  return apiRequest(`/sellers/bank-accounts/${accountId}`, {
+    method: 'DELETE',
+  })
+}
+
 // ============================================================================
 // TARGET & PERFORMANCE APIs
 // ============================================================================

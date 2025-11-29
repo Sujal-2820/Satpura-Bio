@@ -9,6 +9,8 @@ const User = require('../models/User');
 const Order = require('../models/Order');
 const Commission = require('../models/Commission');
 const WithdrawalRequest = require('../models/WithdrawalRequest');
+const BankAccount = require('../models/BankAccount');
+const PaymentHistory = require('../models/PaymentHistory');
 
 const { generateOTP, sendOTP } = require('../config/sms');
 const { generateToken } = require('../middleware/auth');
@@ -1065,12 +1067,38 @@ exports.requestWithdrawal = async (req, res, next) => {
       });
     }
 
+    // Get bank account if bankAccountId is provided
+    let bankAccount = null;
+    if (req.body.bankAccountId) {
+      bankAccount = await BankAccount.findById(req.body.bankAccountId);
+      if (!bankAccount || bankAccount.user.toString() !== seller._id.toString() || bankAccount.userType !== 'Seller') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid bank account',
+        });
+      }
+    } else {
+      // Get primary bank account
+      bankAccount = await BankAccount.findOne({
+        user: seller._id,
+        userType: 'Seller',
+        isPrimary: true,
+      });
+    }
+
     // Create withdrawal request
     const withdrawal = await WithdrawalRequest.create({
+      userType: 'seller',
       sellerId: seller._id,
       amount,
       paymentMethod,
-      paymentDetails,
+      paymentDetails: paymentDetails || (bankAccount ? {
+        accountNumber: bankAccount.accountNumber,
+        ifscCode: bankAccount.ifscCode,
+        bankName: bankAccount.bankName,
+        accountHolderName: bankAccount.accountHolderName,
+      } : undefined),
+      bankAccountId: bankAccount?._id,
       notes,
       status: 'pending',
     });
@@ -1078,6 +1106,34 @@ exports.requestWithdrawal = async (req, res, next) => {
     // Update seller wallet pending amount
     seller.wallet.pending += amount;
     await seller.save();
+
+    // Log to payment history
+    try {
+      await PaymentHistory.create({
+        activityType: 'seller_withdrawal_requested',
+        sellerId: seller._id,
+        withdrawalRequestId: withdrawal._id,
+        bankAccountId: bankAccount?._id,
+        amount,
+        status: 'pending',
+        paymentMethod: paymentMethod || 'bank_transfer',
+        bankDetails: bankAccount ? {
+          accountHolderName: bankAccount.accountHolderName,
+          accountNumber: bankAccount.accountNumber,
+          ifscCode: bankAccount.ifscCode,
+          bankName: bankAccount.bankName,
+        } : paymentDetails,
+        description: `Seller ${seller.sellerId} requested withdrawal of ₹${amount}`,
+        metadata: {
+          sellerIdCode: seller.sellerId,
+          sellerName: seller.name,
+          availableBalance: availableBalance,
+        },
+      });
+    } catch (historyError) {
+      console.error('Error logging withdrawal history:', historyError);
+      // Don't fail withdrawal if history logging fails
+    }
 
     console.log(`✅ Withdrawal requested: ₹${amount} by seller ${seller.sellerId} - ${seller.name}`);
 
@@ -2117,6 +2173,154 @@ exports.getSupportTicketDetails = async (req, res, next) => {
     res.status(404).json({
       success: false,
       message: 'Support ticket not found',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// BANK ACCOUNT CONTROLLERS
+// ============================================================================
+
+/**
+ * @desc    Add bank account
+ * @route   POST /api/sellers/bank-accounts
+ * @access  Private (Seller)
+ */
+exports.addBankAccount = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const { accountHolderName, accountNumber, ifscCode, bankName, branchName, isPrimary = false } = req.body;
+
+    if (!accountHolderName || !accountNumber || !ifscCode || !bankName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Account holder name, account number, IFSC code, and bank name are required',
+      });
+    }
+
+    const bankAccount = await BankAccount.create({
+      userId: seller._id,
+      userType: 'seller',
+      accountHolderName,
+      accountNumber,
+      ifscCode: ifscCode.toUpperCase(),
+      bankName,
+      branchName,
+      isPrimary,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        bankAccount,
+      },
+      message: 'Bank account added successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get seller bank accounts
+ * @route   GET /api/sellers/bank-accounts
+ * @access  Private (Seller)
+ */
+exports.getBankAccounts = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+
+    const bankAccounts = await BankAccount.find({
+      userId: seller._id,
+      userType: 'seller',
+    }).sort({ isPrimary: -1, createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        bankAccounts,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update bank account
+ * @route   PUT /api/sellers/bank-accounts/:accountId
+ * @access  Private (Seller)
+ */
+exports.updateBankAccount = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const { accountId } = req.params;
+    const { accountHolderName, accountNumber, ifscCode, bankName, branchName, isPrimary } = req.body;
+
+    const bankAccount = await BankAccount.findOne({
+      _id: accountId,
+      userId: seller._id,
+      userType: 'seller',
+    });
+
+    if (!bankAccount) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bank account not found',
+      });
+    }
+
+    if (accountHolderName) bankAccount.accountHolderName = accountHolderName;
+    if (accountNumber) bankAccount.accountNumber = accountNumber;
+    if (ifscCode) bankAccount.ifscCode = ifscCode.toUpperCase();
+    if (bankName) bankAccount.bankName = bankName;
+    if (branchName !== undefined) bankAccount.branchName = branchName;
+    if (isPrimary !== undefined) bankAccount.isPrimary = isPrimary;
+
+    await bankAccount.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        bankAccount,
+      },
+      message: 'Bank account updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Delete bank account
+ * @route   DELETE /api/sellers/bank-accounts/:accountId
+ * @access  Private (Seller)
+ */
+exports.deleteBankAccount = async (req, res, next) => {
+  try {
+    const seller = req.seller;
+    const { accountId } = req.params;
+
+    const bankAccount = await BankAccount.findOne({
+      _id: accountId,
+      userId: seller._id,
+      userType: 'seller',
+    });
+
+    if (!bankAccount) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bank account not found',
+      });
+    }
+
+    await BankAccount.deleteOne({ _id: accountId });
+
+    res.status(200).json({
+      success: true,
+      message: 'Bank account deleted successfully',
     });
   } catch (error) {
     next(error);

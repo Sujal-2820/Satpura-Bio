@@ -1,4 +1,4 @@
-import { Building2, CheckCircle, XCircle, FileText, MapPin, Phone, Mail, AlertTriangle } from 'lucide-react'
+import { Building2, CheckCircle, XCircle, FileText, MapPin, Phone, Mail, AlertTriangle, ExternalLink, Eye } from 'lucide-react'
 import { Modal } from './Modal'
 import { StatusBadge } from './StatusBadge'
 import { cn } from '../../../lib/cn'
@@ -148,6 +148,109 @@ export function VendorApprovalModal({ isOpen, onClose, vendor, onApprove, onReje
               <p className="text-sm text-gray-700">{vendor.businessDetails}</p>
             </div>
           )}
+        </div>
+
+        {/* Verification Documents */}
+        <div className="space-y-4">
+          <h4 className="text-sm font-bold text-gray-900">Verification Documents</h4>
+          
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Aadhaar Card */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-gray-400" />
+                  <p className="text-xs font-semibold text-gray-700">Aadhaar Card</p>
+                </div>
+                {vendor.aadhaarCard?.url ? (
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-red-600" />
+                )}
+              </div>
+              {vendor.aadhaarCard?.url ? (
+                <div className="space-y-2">
+                  {vendor.aadhaarCard.format === 'pdf' ? (
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <FileText className="h-4 w-4 text-red-600" />
+                      <span>PDF Document</span>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg overflow-hidden border border-gray-300 bg-white">
+                      <img 
+                        src={vendor.aadhaarCard.url} 
+                        alt="Aadhaar Card"
+                        className="w-full h-auto max-h-32 object-contain"
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                        }}
+                      />
+                    </div>
+                  )}
+                  <a
+                    href={vendor.aadhaarCard.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold"
+                  >
+                    <Eye className="h-3 w-3" />
+                    View Document
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              ) : (
+                <p className="text-xs text-red-600">Not uploaded</p>
+              )}
+            </div>
+
+            {/* PAN Card */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-gray-400" />
+                  <p className="text-xs font-semibold text-gray-700">PAN Card</p>
+                </div>
+                {vendor.panCard?.url ? (
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-red-600" />
+                )}
+              </div>
+              {vendor.panCard?.url ? (
+                <div className="space-y-2">
+                  {vendor.panCard.format === 'pdf' ? (
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <FileText className="h-4 w-4 text-red-600" />
+                      <span>PDF Document</span>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg overflow-hidden border border-gray-300 bg-white">
+                      <img 
+                        src={vendor.panCard.url} 
+                        alt="PAN Card"
+                        className="w-full h-auto max-h-32 object-contain"
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                        }}
+                      />
+                    </div>
+                  )}
+                  <a
+                    href={vendor.panCard.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold"
+                  >
+                    <Eye className="h-3 w-3" />
+                    View Document
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              ) : (
+                <p className="text-xs text-red-600">Not uploaded</p>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Action Buttons */}

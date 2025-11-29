@@ -124,8 +124,8 @@ export function OrderEscalationModal({ isOpen, onClose, order, onFulfillFromWare
               <ul className="mt-2 space-y-1 list-disc list-inside">
                 <li>Order will be fulfilled from master warehouse inventory</li>
                 <li>Vendor will be notified of the fulfillment</li>
-                <li>Order status will be updated to "Processing"</li>
-                <li>Logistics will be assigned automatically</li>
+                <li>Order status will be updated to "Accepted"</li>
+                <li>You can then update status: Dispatched → Delivered → Fully Paid (if partial payment)</li>
               </ul>
             </div>
           </div>

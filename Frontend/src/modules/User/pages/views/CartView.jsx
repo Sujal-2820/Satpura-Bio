@@ -4,6 +4,7 @@ import { MIN_ORDER_VALUE } from '../../services/userData'
 import { PlusIcon, MinusIcon, TrashIcon, TruckIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import * as userApi from '../../services/userApi'
+import { getPrimaryImageUrl } from '../../utils/productImages'
 
 export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }) {
   const { cart } = useUserState()
@@ -109,13 +110,12 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
             className="flex gap-3 p-4 rounded-2xl border border-[rgba(34,94,65,0.16)] bg-gradient-to-br from-white to-[rgba(239,246,240,0.92)] shadow-[0_20px_42px_-30px_rgba(16,44,30,0.36)]"
           >
             <div className="flex-shrink-0 w-20 h-20 rounded-2xl overflow-hidden bg-gray-100">
-              {item.image ? (
-                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
-                  No image
-                </div>
-              )}
+              {(() => {
+                const productImage = item.product ? getPrimaryImageUrl(item.product) : (item.image || 'https://via.placeholder.com/400')
+                return (
+                  <img src={productImage} alt={item.name || item.product?.name || 'Product'} className="w-full h-full object-cover" />
+                )
+              })()}
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-semibold text-[#172022] mb-1 line-clamp-2">{item.name}</h3>
@@ -197,7 +197,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
             {suggestedProducts.map((product) => (
               <div key={product._id || product.id} className="user-cart-suggested__card">
                 <div className="user-cart-suggested__image-wrapper">
-                  <img src={product.images?.[0]?.url || product.primaryImage || product.image || 'https://via.placeholder.com/300'} alt={product.name} className="user-cart-suggested__image" />
+                  <img src={getPrimaryImageUrl(product)} alt={product.name} className="user-cart-suggested__image" />
                 </div>
                 <div className="user-cart-suggested__content">
                   <h4 className="user-cart-suggested__title">{product.name}</h4>

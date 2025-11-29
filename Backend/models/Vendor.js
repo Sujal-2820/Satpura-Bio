@@ -139,6 +139,49 @@ const vendorSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin',
   },
+  // Verification documents (images only, max 2MB)
+  aadhaarCard: {
+    url: {
+      type: String,
+      trim: true,
+    },
+    publicId: {
+      type: String,
+      trim: true,
+    },
+    format: {
+      type: String,
+      enum: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'],
+    },
+    size: {
+      type: Number, // File size in bytes
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  panCard: {
+    url: {
+      type: String,
+      trim: true,
+    },
+    publicId: {
+      type: String,
+      trim: true,
+    },
+    format: {
+      type: String,
+      enum: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'],
+    },
+    size: {
+      type: Number, // File size in bytes
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
 }, {
   timestamps: true,
 });

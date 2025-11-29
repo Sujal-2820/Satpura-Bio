@@ -40,7 +40,7 @@ const REGIONS = ['All', 'West', 'North', 'South', 'Central', 'North East', 'East
 const ORDER_STATUSES = ['All', 'Processing', 'Awaiting Dispatch', 'Completed', 'Cancelled']
 const ORDER_TYPES = ['All', 'User', 'Vendor']
 
-export function OrdersPage() {
+export function OrdersPage({ subRoute = null, navigate }) {
   const { orders: ordersState, vendors } = useAdminState()
   const {
     getOrders,
@@ -57,6 +57,7 @@ export function OrdersPage() {
   const { success, error: showError, warning: showWarning } = useToast()
 
   const [ordersList, setOrdersList] = useState([])
+  const [allOrdersList, setAllOrdersList] = useState([])
   const [availableVendors, setAvailableVendors] = useState([])
   const [commissionsList, setCommissionsList] = useState([])
   const [showCommissions, setShowCommissions] = useState(false)
@@ -133,12 +134,40 @@ export function OrdersPage() {
     const result = await getOrders(params)
     if (result.data?.orders) {
       const formatted = result.data.orders.map(formatOrderForDisplay)
-      setOrdersList(formatted)
+      setAllOrdersList(formatted)
     } else {
       // Fallback to mock data
-      setOrdersList(mockOrders.map(formatOrderForDisplay))
+      const formatted = mockOrders.map(formatOrderForDisplay)
+      setAllOrdersList(formatted)
     }
   }, [getOrders, filters])
+
+  // Filter orders based on subRoute
+  useEffect(() => {
+    if (subRoute === 'escalated') {
+      setOrdersList(allOrdersList.filter((o) => {
+        const originalOrder = ordersState.data?.orders?.find((ord) => ord.id === o.id) || o
+        return originalOrder.escalated || originalOrder.assignedTo === 'admin'
+      }))
+    } else if (subRoute === 'processing') {
+      // Processing orders: accepted but not delivered
+      setOrdersList(allOrdersList.filter((o) => {
+        const status = (o.status || '').toLowerCase()
+        return (status === 'processing' || status === 'accepted' || status === 'awaiting dispatch' || status === 'dispatched') && 
+               status !== 'delivered' && status !== 'completed' && status !== 'fully_paid'
+      }))
+    } else if (subRoute === 'completed') {
+      // Completed: delivered and fully paid
+      setOrdersList(allOrdersList.filter((o) => {
+        const originalOrder = ordersState.data?.orders?.find((ord) => ord.id === o.id) || o
+        const status = (o.status || '').toLowerCase()
+        const isPaid = o.isPaid || originalOrder.paymentStatus === 'fully_paid'
+        return (status === 'delivered' || status === 'completed') && isPaid
+      }))
+    } else {
+      setOrdersList(allOrdersList)
+    }
+  }, [subRoute, allOrdersList, ordersState.data?.orders])
 
   // Fetch vendors for reassignment
   const fetchVendors = useCallback(async () => {
@@ -217,6 +246,7 @@ export function OrdersPage() {
     setSelectedPaymentStatus('')
     setStatusUpdateNotes('')
     setIsRevert(false)
+    if (navigate) navigate('orders')
   }
 
   const handleReassignSubmit = async (orderId, reassignData) => {
@@ -298,11 +328,43 @@ export function OrdersPage() {
     try {
       const result = await fulfillOrderFromWarehouse(orderId, fulfillmentData)
       if (result.data) {
-        setCurrentView(null)
-        setSelectedOrderForEscalation(null)
-        setFulfillmentNote('')
-        fetchOrders()
-        success('Order fulfilled from warehouse successfully!', 3000)
+        // After successful fulfill, automatically open status update interface
+        // Fetch updated order details to get the new status
+        try {
+          const orderDetailsResult = await getOrderDetails(orderId)
+          if (orderDetailsResult.data?.order) {
+            const updatedOrder = orderDetailsResult.data.order
+            // Set the fulfilled order for status update
+            setSelectedOrderForStatusUpdate(updatedOrder)
+            // Initialize status update form
+            const currentStatus = (updatedOrder?.status || '').toLowerCase()
+            const normalizedCurrentStatus = normalizeOrderStatus(currentStatus)
+            const nextStatus = getNextStatus(updatedOrder)
+            setSelectedStatus(nextStatus || normalizedCurrentStatus)
+            setIsRevert(false)
+            setSelectedPaymentStatus('')
+            setStatusUpdateNotes('')
+            // Switch to status update view
+            setCurrentView('statusUpdate')
+            setFulfillmentNote('')
+            success('Order fulfilled from warehouse successfully! Status set to Accepted. You can now update the order status.', 4000)
+          } else {
+            // Fallback: just close escalation view and refresh
+            setCurrentView(null)
+            setSelectedOrderForEscalation(null)
+            setFulfillmentNote('')
+            fetchOrders()
+            success('Order fulfilled from warehouse successfully!', 3000)
+          }
+        } catch (detailsError) {
+          // If fetching order details fails, still show success and refresh
+          console.error('Failed to fetch order details after fulfill:', detailsError)
+          setCurrentView(null)
+          setSelectedOrderForEscalation(null)
+          setFulfillmentNote('')
+          fetchOrders()
+          success('Order fulfilled from warehouse successfully! Please refresh to see updated status.', 3000)
+        }
       } else if (result.error) {
         const errorMessage = result.error.message || 'Failed to fulfill order'
         showError(errorMessage, 5000)
@@ -1149,8 +1211,8 @@ export function OrdersPage() {
                 <ul className="mt-2 space-y-1 list-disc list-inside">
                   <li>Order will be fulfilled from master warehouse inventory</li>
                   <li>Vendor will be notified of the fulfillment</li>
-                  <li>Order status will be updated to "Processing"</li>
-                  <li>Logistics will be assigned automatically</li>
+                  <li>Order status will be updated to "Accepted"</li>
+                  <li>You can then update status: Dispatched → Delivered → Fully Paid (if partial payment)</li>
                 </ul>
               </div>
             </div>
@@ -1310,6 +1372,10 @@ export function OrdersPage() {
       { value: 'fully_paid', label: 'Mark Payment as Done', description: 'Mark order payment as fully paid' },
     ]
 
+    // Get payment preference from order
+    const paymentPreference = order?.paymentPreference || 'partial'
+    const isFullPayment = paymentPreference === 'full'
+
     const normalizeStatusForDisplay = (status) => {
       const normalized = (status || '').toLowerCase()
       if (normalized === 'fully_paid') return 'delivered'
@@ -1366,7 +1432,11 @@ export function OrdersPage() {
     }
 
     const availableStatusOptions = getAvailableStatusOptions()
-    const showPaymentOption = currentStatus === 'delivered' && !isPaid
+    // Show payment option only if:
+    // 1. Order is delivered
+    // 2. Payment is not already fully paid
+    // 3. Payment preference is partial (not full payment)
+    const showPaymentOption = currentStatus === 'delivered' && !isPaid && !isFullPayment
 
     // Remove the initialization logic from render - it's now in handleOpenStatusUpdateModal
 
@@ -1402,6 +1472,12 @@ export function OrdersPage() {
                       {isPaid ? 'Paid' : currentPaymentStatus === 'partial_paid' ? 'Partial Paid' : 'Pending'}
                     </span>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Payment Type:</span>
+                    <span className="font-bold text-gray-900 capitalize">
+                      {isFullPayment ? 'Full Payment (100%)' : 'Partial Payment (30% advance, 70% after delivery)'}
+                    </span>
+                  </div>
                   {order.value && (
                     <div className="flex items-center justify-between">
                       <span className="text-gray-600">Order Value:</span>
@@ -1433,7 +1509,8 @@ export function OrdersPage() {
             )}
 
             {/* Status Selection */}
-            {!isPaid && (
+            {/* Show status selection if order is not fully paid OR if we're in grace period */}
+            {(!isPaid || isInStatusUpdateGracePeriod) && (
               <div>
                 <label htmlFor="status" className="mb-2 block text-sm font-bold text-gray-900">
                   Order Status <span className="text-red-500">*</span>
@@ -1534,14 +1611,28 @@ export function OrdersPage() {
     )
   }
 
+  const getPageTitle = () => {
+    if (subRoute === 'escalated') return 'Escalated Orders'
+    if (subRoute === 'processing') return 'Processing Orders'
+    if (subRoute === 'completed') return 'Completed Orders'
+    return 'Unified Order Control'
+  }
+
+  const getPageDescription = () => {
+    if (subRoute === 'escalated') return 'View and manage orders that have been escalated and require admin attention.'
+    if (subRoute === 'processing') return 'View and manage orders that are accepted but not yet delivered.'
+    if (subRoute === 'completed') return 'View all completed orders that have been delivered and fully paid.'
+    return 'Track user + vendor orders, monitor payment collections, and reassign logistics within a single viewport.'
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 6 • Order & Payment Management</p>
-          <h2 className="text-2xl font-bold text-gray-900">Unified Order Control</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{getPageTitle()}</h2>
           <p className="text-sm text-gray-600">
-            Track user + vendor orders, monitor payment collections, and reassign logistics within a single viewport.
+            {getPageDescription()}
           </p>
         </div>
         <button className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(239,68,68,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(239,68,68,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]">

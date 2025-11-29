@@ -194,6 +194,68 @@ export function useSellerApi() {
     [handleApiCall],
   )
 
+  // Commission APIs
+  const getCommissionSummary = useCallback(async () => {
+    return handleApiCall(
+      sellerApi.getCommissionSummary,
+      (data) => ({ type: 'SET_COMMISSION_SUMMARY', payload: data }),
+      'Failed to fetch commission summary',
+    )
+  }, [handleApiCall])
+
+  const getCommissionHistory = useCallback(
+    async (params = {}) => {
+      return handleApiCall(
+        () => sellerApi.getCommissionHistory(params),
+        null,
+        'Failed to fetch commission history',
+      )
+    },
+    [handleApiCall],
+  )
+
+  // Bank Account APIs
+  const addBankAccount = useCallback(
+    async (accountData) => {
+      return handleApiCall(
+        () => sellerApi.addBankAccount(accountData),
+        null,
+        'Failed to add bank account',
+      )
+    },
+    [handleApiCall],
+  )
+
+  const getBankAccounts = useCallback(async () => {
+    return handleApiCall(
+      sellerApi.getBankAccounts,
+      (data) => ({ type: 'SET_BANK_ACCOUNTS', payload: data.bankAccounts || [] }),
+      'Failed to fetch bank accounts',
+    )
+  }, [handleApiCall])
+
+  const updateBankAccount = useCallback(
+    async (accountId, accountData) => {
+      return handleApiCall(
+        () => sellerApi.updateBankAccount(accountId, accountData),
+        null,
+        'Failed to update bank account',
+      )
+    },
+    [handleApiCall],
+  )
+
+  const deleteBankAccount = useCallback(
+    async (accountId) => {
+      return handleApiCall(
+        () => sellerApi.deleteBankAccount(accountId),
+        null,
+        'Failed to delete bank account',
+      )
+    },
+    [handleApiCall],
+  )
+
   return {
     loading,
     error,
@@ -208,6 +270,12 @@ export function useSellerApi() {
     markNotificationRead,
     markAllNotificationsRead,
     reportIssue,
+    getCommissionSummary,
+    getCommissionHistory,
+    addBankAccount,
+    getBankAccounts,
+    updateBankAccount,
+    deleteBankAccount,
   }
 }
 

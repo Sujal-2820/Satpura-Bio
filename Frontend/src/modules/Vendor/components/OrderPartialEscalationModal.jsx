@@ -237,18 +237,25 @@ export function OrderPartialEscalationModal({ isOpen, onClose, order, escalation
               const itemId = (item._id || item.id)?.toString()
               if (!itemId) return null
               
+              const product = item.productId || {}
               const selection = selectedItems[itemId] || { accept: true, quantity: item.quantity }
               const escalatedQty = escalatedQuantities[itemId] || 0
               const requestedQty = item.quantity || 0
               const vendorStock = item.vendorStock ?? 0
               const unit = item.unit || 'units'
+              
+              // Check if product has attributes
+              const hasAttributes = product.attributeStocks && 
+                                   Array.isArray(product.attributeStocks) && 
+                                   product.attributeStocks.length > 0
+              const itemAttributes = item.attributeCombination || item.attributes || {}
 
               return (
                 <div key={itemId} className="rounded-lg border border-gray-200 p-3 space-y-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900">
-                        {item.productId?.name || item.productName || 'Unknown Product'}
+                        {product.name || item.productName || 'Unknown Product'}
                       </p>
                       <div className="text-xs text-gray-600 flex flex-col gap-0.5">
                         <span>Requested: {requestedQty} {unit}</span>
@@ -261,6 +268,20 @@ export function OrderPartialEscalationModal({ isOpen, onClose, order, escalation
                           Your stock: {vendorStock} {unit}
                         </span>
                       </div>
+                      
+                      {/* Show attributes if product has them */}
+                      {hasAttributes && Object.keys(itemAttributes).length > 0 && (
+                        <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50/50 p-2">
+                          <p className="text-xs font-semibold text-gray-700 mb-1">Selected Variant:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {Object.entries(itemAttributes).map(([key, value]) => (
+                              <span key={key} className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                {key}: {value}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

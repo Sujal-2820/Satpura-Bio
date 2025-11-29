@@ -2,6 +2,7 @@ import { Wallet, CheckCircle, XCircle, IndianRupee, Calendar, User } from 'lucid
 import { Modal } from './Modal'
 import { StatusBadge } from './StatusBadge'
 import { cn } from '../../../lib/cn'
+import { getMaskedBankDetails } from '../../../utils/maskSensitiveData'
 
 export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, onReject, loading }) {
   if (!request) return null
@@ -141,22 +142,34 @@ export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, on
             </p>
           </div>
 
-          {request.bankDetails && (
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <p className="mb-2 text-xs font-bold text-gray-500">Bank Account Details</p>
-              <div className="space-y-1 text-sm text-gray-700">
-                {request.bankDetails.accountNumber && (
-                  <p>Account: {request.bankDetails.accountNumber}</p>
-                )}
-                {request.bankDetails.ifsc && (
-                  <p>IFSC: {request.bankDetails.ifsc}</p>
-                )}
-                {request.bankDetails.bankName && (
-                  <p>Bank: {request.bankDetails.bankName}</p>
-                )}
+          {request.bankDetails && (() => {
+            const maskedDetails = getMaskedBankDetails({
+              ...request.bankDetails,
+              ifscCode: request.bankDetails.ifsc || request.bankDetails.ifscCode,
+            })
+            return (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="mb-2 text-xs font-bold text-gray-500">Bank Account Details (Masked for Privacy)</p>
+                <div className="space-y-1 text-sm text-gray-700">
+                  {maskedDetails.accountHolderName && (
+                    <p>Account Holder: {maskedDetails.accountHolderName}</p>
+                  )}
+                  {maskedDetails.accountNumber && (
+                    <p>Account: {maskedDetails.accountNumber}</p>
+                  )}
+                  {maskedDetails.ifscCode && (
+                    <p>IFSC: {maskedDetails.ifscCode}</p>
+                  )}
+                  {maskedDetails.bankName && (
+                    <p>Bank: {maskedDetails.bankName}</p>
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-gray-500 italic">
+                  Note: Account details are masked for security. Full details are available in payment history for processed transactions.
+                </p>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {request.reason && (
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">

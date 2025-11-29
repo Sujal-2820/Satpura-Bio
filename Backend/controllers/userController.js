@@ -17,8 +17,11 @@ const Commission = require('../models/Commission');
 
 const { generateOTP, sendOTP } = require('../config/sms');
 const { generateToken } = require('../middleware/auth');
-const { OTP_EXPIRY_MINUTES, MIN_ORDER_VALUE, ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE, DELIVERY_CHARGE, VENDOR_COVERAGE_RADIUS_KM, ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS, IRA_PARTNER_COMMISSION_THRESHOLD, IRA_PARTNER_COMMISSION_RATE_LOW, IRA_PARTNER_COMMISSION_RATE_HIGH } = require('../utils/constants');
+const { OTP_EXPIRY_MINUTES, MIN_ORDER_VALUE, ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE, DELIVERY_CHARGE, VENDOR_COVERAGE_RADIUS_KM, VENDOR_ASSIGNMENT_BUFFER_KM, VENDOR_ASSIGNMENT_MAX_RADIUS_KM, ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS, IRA_PARTNER_COMMISSION_THRESHOLD, IRA_PARTNER_COMMISSION_RATE_LOW, IRA_PARTNER_COMMISSION_RATE_HIGH } = require('../utils/constants');
 const { checkPhoneExists, checkPhoneInRole } = require('../utils/phoneValidation');
+const { processOrderEarnings } = require('../services/earningsService');
+const PaymentHistory = require('../models/PaymentHistory');
+const razorpayService = require('../services/razorpayService');
 
 /**
  * @desc    Request OTP for user
@@ -262,11 +265,10 @@ exports.register = async (req, res, next) => {
       });
     }
 
-    // Assign vendor based on location (20km radius)
-    // ⚠️ TEMPORARY: Manual location entry - will be replaced with Google Maps API
-    // Assign vendor based on location (coordinates or city)
+    // Assign vendor based on location using STRICT coordinates-only matching (20km + 300m buffer)
+    // Coordinates are mandatory for vendor assignment
     let assignedVendor = null;
-    if (user.location && (user.location.coordinates || user.location.city)) {
+    if (user.location && user.location.coordinates && user.location.coordinates.lat && user.location.coordinates.lng) {
       try {
         const { vendor, distance, method } = await findVendorByLocation(user.location);
         
@@ -274,15 +276,17 @@ exports.register = async (req, res, next) => {
           assignedVendor = vendor._id;
           user.assignedVendor = vendor._id;
           await user.save();
-          const distanceText = distance ? `${distance.toFixed(2)} km away` : `same city (${user.location.city})`;
+          const distanceText = distance ? `${distance.toFixed(2)} km away` : 'unknown distance';
           console.log(`📍 Vendor assigned to user ${user.phone}: ${vendor.name} (${distanceText}, method: ${method})`);
         } else {
-          console.log(`⚠️ No vendor found for user ${user.phone} (${user.location.city || 'no location'}). Orders will be handled by admin.`);
+          console.log(`⚠️ No vendor found within ${VENDOR_ASSIGNMENT_MAX_RADIUS_KM}km for user ${user.phone}. Orders will be handled by admin.`);
         }
       } catch (geoError) {
         console.warn('Vendor assignment failed during registration:', geoError);
-        // Don't fail registration if vendor assignment fails
+        // Don't fail registration if vendor assignment fails - user can still register
       }
+    } else {
+      console.log(`⚠️ User ${user.phone} registered without coordinates. Vendor assignment skipped. Orders will be handled by admin.`);
     }
 
     // Generate JWT token
@@ -467,6 +471,46 @@ exports.getProfile = async (req, res, next) => {
     // Populate seller if linked
     await user.populate('seller', 'sellerId name phone area');
 
+    // Check vendor availability if user has coordinates
+    let vendorAvailability = {
+      vendorAvailable: false,
+      canPlaceOrder: false,
+      isInBufferZone: false,
+      assignedVendor: null,
+      distance: null,
+    };
+
+    if (user.location && user.location.coordinates && user.location.coordinates.lat && user.location.coordinates.lng) {
+      try {
+        const { vendor, distance, method } = await findVendorByLocation(user.location);
+        
+        if (vendor) {
+          vendorAvailability = {
+            vendorAvailable: true,
+            canPlaceOrder: true,
+            isInBufferZone: method === 'coordinates_buffer', // Within 20km to 20.3km buffer
+            assignedVendor: {
+              id: vendor._id,
+              name: vendor.name,
+            },
+            distance: distance ? parseFloat(distance.toFixed(2)) : null,
+          };
+        } else {
+          // No vendor found - user cannot place orders
+          vendorAvailability = {
+            vendorAvailable: false,
+            canPlaceOrder: false,
+            isInBufferZone: false,
+            assignedVendor: null,
+            distance: distance ? parseFloat(distance.toFixed(2)) : null,
+          };
+        }
+      } catch (error) {
+        console.error('Error checking vendor availability in getProfile:', error);
+        // Keep default values (vendorAvailable: false)
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -486,6 +530,7 @@ exports.getProfile = async (req, res, next) => {
           language: user.language,
           createdAt: user.createdAt,
         },
+        vendorAvailability: vendorAvailability,
       },
     });
   } catch (error) {
@@ -749,6 +794,33 @@ exports.getProductDetails = async (req, res, next) => {
       });
     }
 
+    // Convert attributeStocks Map to plain objects for JSON response
+    let attributeStocksArray = [];
+    if (product.attributeStocks && Array.isArray(product.attributeStocks) && product.attributeStocks.length > 0) {
+      attributeStocksArray = product.attributeStocks.map(stock => {
+        // Convert attributes Map to plain object
+        const attributesObj = {};
+        if (stock.attributes instanceof Map) {
+          stock.attributes.forEach((value, key) => {
+            attributesObj[key] = value;
+          });
+        } else if (typeof stock.attributes === 'object') {
+          Object.assign(attributesObj, stock.attributes);
+        }
+        
+        return {
+          attributes: attributesObj,
+          actualStock: stock.actualStock,
+          displayStock: stock.displayStock,
+          stockUnit: stock.stockUnit,
+          vendorPrice: stock.vendorPrice,
+          userPrice: stock.userPrice,
+          batchNumber: stock.batchNumber,
+          expiry: stock.expiry,
+        };
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -758,7 +830,11 @@ exports.getProductDetails = async (req, res, next) => {
           description: product.description,
           category: product.category,
           priceToUser: product.priceToUser,
+          priceToVendor: product.priceToVendor,
+          actualStock: product.actualStock,
+          displayStock: product.displayStock,
           stock: product.stock,
+          stockUnit: product.weight?.unit || 'kg',
           images: product.images,
           sku: product.sku,
           tags: product.tags,
@@ -767,6 +843,7 @@ exports.getProductDetails = async (req, res, next) => {
           weight: product.weight,
           primaryImage: product.primaryImage,
           isInStock: product.isInStock(),
+          attributeStocks: attributeStocksArray.length > 0 ? attributeStocksArray : undefined,
         },
       },
     });
@@ -1258,25 +1335,43 @@ exports.getAssignedVendor = async (req, res, next) => {
     const userId = req.user.userId;
     const { location } = req.body;
 
-    // Validate location - must have at least city or coordinates
-    if (!location || (!location.coordinates && !location.city)) {
+    // STRICT REQUIREMENT: Coordinates are mandatory
+    if (!location || !location.coordinates || !location.coordinates.lat || !location.coordinates.lng) {
       return res.status(400).json({
         success: false,
-        message: 'Location with coordinates (lat, lng) or city is required',
+        message: 'Location with coordinates (lat, lng) is required for vendor assignment',
       });
     }
 
-    // Find vendor using helper function (coordinates first, then city fallback)
+    // Find vendor using STRICT coordinates-only matching (20km + 300m buffer)
     const { vendor, distance, method } = await findVendorByLocation(location);
+
+    // Determine vendor availability status
+    let vendorAvailable = false;
+    let isInBufferZone = false;
+    let canPlaceOrder = false;
+    
+    if (vendor) {
+      vendorAvailable = true;
+      isInBufferZone = method === 'coordinates_buffer'; // Within 20km to 20.3km
+      canPlaceOrder = true; // Can place order if vendor found (even in buffer zone)
+    } else {
+      vendorAvailable = false;
+      canPlaceOrder = false; // Cannot place order if no vendor found
+    }
 
     if (!vendor) {
       return res.status(404).json({
         success: false,
-        message: 'No vendor found for this location. Order will be handled by admin.',
+        message: `No vendor found within ${VENDOR_ASSIGNMENT_MAX_RADIUS_KM}km of your location.`,
         data: {
           vendor: null,
           assignedTo: 'admin',
           method: method,
+          nearestDistance: distance || null,
+          vendorAvailable: false,
+          canPlaceOrder: false,
+          isInBufferZone: false,
         },
       });
     }
@@ -1301,7 +1396,11 @@ exports.getAssignedVendor = async (req, res, next) => {
           phone: vendor.phone,
           location: vendor.location,
         },
-        distance: distance ? distance.toFixed(2) : null, // in km (null if city-based)
+        distance: distance ? distance.toFixed(2) : null, // in km
+        method: method,
+        vendorAvailable: true,
+        canPlaceOrder: true,
+        isInBufferZone: isInBufferZone,
         assignedTo: 'vendor',
         method: method, // 'coordinates' or 'city'
       },
@@ -1387,163 +1486,77 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
 }
 
 /**
- * Find vendor by location
- * Priority: 1) Coordinates within 20km radius, 2) Same city matching
- * @param {Object} location - { coordinates: { lat, lng }, city, state, pincode }
+ * Find vendor by location using STRICT coordinates-only matching
+ * Uses 20km radius with +300m buffer (20.3km total) for order assignment
+ * @param {Object} location - { coordinates: { lat, lng }, address, city, state, pincode }
  * @returns {Promise<Object>} - { vendor: Vendor|null, distance: number|null, method: string }
  */
 async function findVendorByLocation(location) {
   try {
-    // Get all active approved vendors
-    const allVendors = await Vendor.find({
+    // STRICT REQUIREMENT: Coordinates are mandatory
+    if (!location?.coordinates?.lat || !location?.coordinates?.lng) {
+      console.log(`⚠️ No coordinates provided for location. Coordinates are required for vendor assignment.`);
+      return { vendor: null, distance: null, method: 'no_coordinates' };
+    }
+
+    const { lat, lng } = location.coordinates;
+
+    // Get all active approved vendors with coordinates
+    const vendorsWithCoords = await Vendor.find({
       status: 'approved',
       isActive: true,
+      'banInfo.isBanned': false,
+      'location.coordinates.lat': { $exists: true, $ne: null },
+      'location.coordinates.lng': { $exists: true, $ne: null },
     });
 
-    if (allVendors.length === 0) {
-      return { vendor: null, distance: null, method: 'none' };
+    if (vendorsWithCoords.length === 0) {
+      console.log(`⚠️ No active vendors with coordinates found in database`);
+      return { vendor: null, distance: null, method: 'no_vendors' };
     }
 
-    // Method 1: Try coordinates-based matching (20km radius) WITH STRICT REGION CHECK
-    // Even if coordinates are close, vendor must be in the same region (city + state)
-    if (location?.coordinates?.lat && location?.coordinates?.lng) {
-      const { lat, lng } = location.coordinates;
-      
-      // Filter vendors with coordinates AND same region (if region info is available)
-      let vendorsWithCoords = allVendors.filter(
-        v => v.location?.coordinates?.lat && v.location?.coordinates?.lng
+    // Calculate distance to all vendors and find nearest within 20.3km (20km + 300m buffer)
+    let nearestVendor = null;
+    let minDistance = VENDOR_ASSIGNMENT_MAX_RADIUS_KM; // 20.3km (20km + 300m buffer)
+
+    for (const v of vendorsWithCoords) {
+      const distance = calculateDistance(
+        lat,
+        lng,
+        v.location.coordinates.lat,
+        v.location.coordinates.lng
       );
-      
-      // STRICT REGION CHECK: If order has city and state, only consider vendors in same region
-      if (location?.city && location?.state) {
-        const cityNormalized = location.city.trim().toLowerCase();
-        const stateNormalized = location.state.trim().toLowerCase();
-        
-        vendorsWithCoords = vendorsWithCoords.filter(v => {
-          const vendorCity = v.location?.city?.trim().toLowerCase();
-          const vendorState = v.location?.state?.trim().toLowerCase();
-          return vendorCity === cityNormalized && vendorState === stateNormalized;
-        });
-        
-        console.log(`🔍 Coordinates-based search with STRICT REGION filter: ${location.city}, ${location.state}`);
-        console.log(`   Vendors in same region with coordinates: ${vendorsWithCoords.length}`);
-      }
 
-      if (vendorsWithCoords.length > 0) {
-        let nearestVendor = null;
-        let minDistance = VENDOR_COVERAGE_RADIUS_KM; // 20km
-
-        for (const v of vendorsWithCoords) {
-          const distance = calculateDistance(
-            lat,
-            lng,
-            v.location.coordinates.lat,
-            v.location.coordinates.lng
-          );
-          if (distance < minDistance) {
-            minDistance = distance;
-            nearestVendor = v;
-          }
-        }
-
-        if (nearestVendor) {
-          console.log(`✅ Vendor found by coordinates (within same region): ${nearestVendor.name} (${minDistance.toFixed(2)} km away)`);
-          console.log(`   Vendor region: ${nearestVendor.location.city}, ${nearestVendor.location.state}`);
-          console.log(`   Order region: ${location.city}, ${location.state}`);
-          return { vendor: nearestVendor, distance: minDistance, method: 'coordinates' };
-        } else {
-          console.log(`⚠️ No vendor found within ${VENDOR_COVERAGE_RADIUS_KM}km in the same region`);
-        }
-      } else {
-        if (location?.city && location?.state) {
-          console.log(`⚠️ No vendors with coordinates found in region: ${location.city}, ${location.state}`);
-        }
+      // Find the nearest vendor within the extended radius (20.3km)
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestVendor = v;
       }
     }
 
-    // Method 2: STRICT REGION-BASED MATCHING (city + state) - Primary method for region assignment
-    // This ensures orders are strictly assigned to vendors in the same region
-    if (location?.city && location?.state) {
-      const cityNormalized = location.city.trim().toLowerCase();
-      const stateNormalized = location.state.trim().toLowerCase();
-      
-      console.log(`🔍 STRICT REGION MATCHING: Searching for vendors in region: "${location.city}, ${location.state}"`);
-      console.log(`   Normalized: city="${cityNormalized}", state="${stateNormalized}"`);
-      console.log(`   Total active vendors in database: ${allVendors.length}`);
-      
-      // Find vendors in the EXACT same region (city + state)
-      const vendorsInRegion = allVendors.filter(v => {
-        const vendorCity = v.location?.city?.trim().toLowerCase();
-        const vendorState = v.location?.state?.trim().toLowerCase();
-        const cityMatch = vendorCity === cityNormalized;
-        const stateMatch = vendorState === stateNormalized;
-        const matches = cityMatch && stateMatch;
-        
-        if (!matches) {
-          if (vendorCity && vendorState) {
-            console.log(`   - Vendor "${v.name}" is in "${v.location.city}, ${v.location.state}" (normalized: "${vendorCity}, ${vendorState}") - NO MATCH`);
-          } else {
-            console.log(`   - Vendor "${v.name}" has incomplete location data - NO MATCH`);
-          }
-        }
-        return matches;
-      });
+    if (nearestVendor) {
+      const isWithinStrictRadius = minDistance <= VENDOR_COVERAGE_RADIUS_KM; // Within 20km
+      const isWithinBuffer = minDistance <= VENDOR_ASSIGNMENT_MAX_RADIUS_KM; // Within 20.3km
 
-      console.log(`   Found ${vendorsInRegion.length} vendor(s) in same region (${location.city}, ${location.state})`);
-
-      if (vendorsInRegion.length > 0) {
-        // If multiple vendors in same region, pick the first one
-        // TODO: In future, can add logic to pick based on other factors (load, rating, etc.)
-        const selectedVendor = vendorsInRegion[0];
-        console.log(`✅ Vendor found by STRICT REGION matching: ${selectedVendor.name} (ID: ${selectedVendor._id})`);
-        console.log(`   Vendor region: ${selectedVendor.location.city}, ${selectedVendor.location.state}`);
-        console.log(`   Order region: ${location.city}, ${location.state}`);
-        return { vendor: selectedVendor, distance: null, method: 'region' };
-      } else {
-        const availableRegions = allVendors
-          .map(v => v.location?.city && v.location?.state ? `${v.location.city}, ${v.location.state}` : null)
-          .filter(Boolean)
-          .join(' | ') || 'None';
-        console.log(`⚠️ No vendors found in region "${location.city}, ${location.state}"`);
-        console.log(`   Available vendor regions in database: ${availableRegions}`);
-      }
-    }
-    
-    // Method 3: Fallback to city-only matching (if state is not provided)
-    // This is less strict but needed for backward compatibility
-    if (location?.city && !location?.state) {
-      const cityNormalized = location.city.trim().toLowerCase();
-      
-      console.log(`🔍 FALLBACK: Searching for vendors in city only (state not provided): "${location.city}"`);
-      console.log(`   Total active vendors: ${allVendors.length}`);
-      
-      // Find vendors in the same city
-      const vendorsInCity = allVendors.filter(v => {
-        const vendorCity = v.location?.city?.trim().toLowerCase();
-        const matches = vendorCity === cityNormalized;
-        if (!matches && vendorCity) {
-          console.log(`   - Vendor "${v.name}" is in "${v.location.city}" (normalized: "${vendorCity}") - NO MATCH`);
-        }
-        return matches;
-      });
-
-      console.log(`   Found ${vendorsInCity.length} vendor(s) in same city`);
-
-      if (vendorsInCity.length > 0) {
-        const selectedVendor = vendorsInCity[0];
-        console.log(`✅ Vendor found by city matching (fallback): ${selectedVendor.name} (ID: ${selectedVendor._id}, city: ${location.city})`);
-        return { vendor: selectedVendor, distance: null, method: 'city' };
-      } else {
-        console.log(`⚠️ No vendors found in city "${location.city}". Available vendor cities:`, 
-          allVendors.map(v => v.location?.city).filter(Boolean).join(', ') || 'None');
+      if (isWithinStrictRadius) {
+        console.log(`✅ Vendor found by coordinates (within ${VENDOR_COVERAGE_RADIUS_KM}km): ${nearestVendor.name} (${minDistance.toFixed(2)} km away)`);
+        return { vendor: nearestVendor, distance: minDistance, method: 'coordinates' };
+      } else if (isWithinBuffer) {
+        // User is within 300m buffer (20km to 20.3km) - auto-assign nearest vendor
+        console.log(`✅ Vendor found by coordinates (within ${VENDOR_ASSIGNMENT_MAX_RADIUS_KM}km buffer): ${nearestVendor.name} (${minDistance.toFixed(2)} km away)`);
+        console.log(`   📍 User is ${(minDistance - VENDOR_COVERAGE_RADIUS_KM).toFixed(2)}km beyond ${VENDOR_COVERAGE_RADIUS_KM}km radius, but within ${VENDOR_ASSIGNMENT_BUFFER_KM}km buffer - auto-assigning`);
+        return { vendor: nearestVendor, distance: minDistance, method: 'coordinates_buffer' };
       }
     }
 
-    // No vendor found
-    console.log(`⚠️ No vendor found for location: ${location?.city || 'Unknown'}`);
-    return { vendor: null, distance: null, method: 'none' };
+    // No vendor found within 20.3km
+    console.log(`⚠️ No vendor found within ${VENDOR_ASSIGNMENT_MAX_RADIUS_KM}km radius`);
+    if (nearestVendor) {
+      console.log(`   Nearest vendor: ${nearestVendor.name} is ${minDistance.toFixed(2)}km away (beyond ${VENDOR_ASSIGNMENT_MAX_RADIUS_KM}km limit)`);
+    }
+    return { vendor: null, distance: minDistance < Infinity ? minDistance : null, method: 'out_of_range' };
   } catch (error) {
-    console.error('Error finding vendor by location:', error);
+    console.error('❌ Error in findVendorByLocation:', error);
     return { vendor: null, distance: null, method: 'error' };
   }
 }
@@ -1583,52 +1596,70 @@ exports.createOrder = async (req, res, next) => {
       });
     }
 
-    if (!user.location || !user.location.city || !user.location.state || !user.location.pincode) {
+    // STRICT REQUIREMENT: Coordinates are mandatory for vendor assignment
+    if (!user.location || !user.location.coordinates || !user.location.coordinates.lat || !user.location.coordinates.lng) {
       return res.status(400).json({
         success: false,
-        message: 'Delivery address is required. Please update your delivery address in settings.',
+        message: 'Delivery address with coordinates is required. Please update your delivery address with location coordinates in settings.',
       });
     }
 
     const deliveryAddress = {
       name: user.name || 'Home',
       address: user.location.address || '',
-      city: user.location.city,
-      state: user.location.state,
-      pincode: user.location.pincode,
+      city: user.location.city || '',
+      state: user.location.state || '',
+      pincode: user.location.pincode || '',
       phone: user.phone || '',
-      coordinates: user.location.coordinates,
+      coordinates: {
+        lat: user.location.coordinates.lat,
+        lng: user.location.coordinates.lng,
+      },
     };
 
-    // Assign vendor based on location (coordinates or city)
+    // Assign vendor based on STRICT coordinates-only matching (20km + 300m buffer)
     let vendorId = null;
     let assignedTo = 'admin';
     
     console.log(`🔍 Attempting vendor assignment for order. Delivery address:`, {
       city: deliveryAddress?.city,
       state: deliveryAddress?.state,
-      hasCoordinates: !!(deliveryAddress?.coordinates?.lat && deliveryAddress?.coordinates?.lng)
+      coordinates: deliveryAddress?.coordinates
     });
     
-    if (deliveryAddress && (deliveryAddress.coordinates || deliveryAddress.city)) {
-      try {
-        const { vendor, distance, method } = await findVendorByLocation(deliveryAddress);
-        
-        if (vendor) {
-          vendorId = vendor._id;
-            assignedTo = 'vendor';
-          const distanceText = distance ? `${distance.toFixed(2)} km` : `same city (${deliveryAddress.city})`;
-          console.log(`✅ Order assigned to vendor: ${vendor.name} (ID: ${vendor._id}, ${distanceText}, method: ${method})`);
-          console.log(`📍 Vendor location: ${vendor.location?.city || 'N/A'}, ${vendor.location?.state || 'N/A'}`);
+    try {
+      const { vendor, distance, method } = await findVendorByLocation(deliveryAddress);
+      
+      if (vendor) {
+        vendorId = vendor._id;
+        assignedTo = 'vendor';
+        const distanceText = distance ? `${distance.toFixed(2)} km` : 'unknown distance';
+        console.log(`✅ Order assigned to vendor: ${vendor.name} (ID: ${vendor._id}, ${distanceText}, method: ${method})`);
+        console.log(`📍 Vendor location: ${vendor.location?.city || 'N/A'}, ${vendor.location?.state || 'N/A'}`);
         } else {
-          console.log(`⚠️ No vendor found for delivery address (${deliveryAddress.city || 'no location'}). Order assigned to admin.`);
-          }
-        } catch (geoError) {
-        console.warn('❌ Vendor assignment failed, assigning to admin:', geoError);
-          // Fallback: assign to admin if vendor assignment fails
+          console.log(`⚠️ No vendor found within ${VENDOR_ASSIGNMENT_MAX_RADIUS_KM}km for delivery address. Order cannot be placed.`);
+          // BLOCK order creation if no vendor found (beyond 20.3km)
+          return res.status(400).json({
+            success: false,
+            message: `No vendor available within ${VENDOR_ASSIGNMENT_MAX_RADIUS_KM}km of your location. You cannot place orders at this location.`,
+            data: {
+              vendorAvailable: false,
+              canPlaceOrder: false,
+              nearestDistance: distance || null,
+            },
+          });
         }
-    } else {
-      console.log(`⚠️ Delivery address missing or incomplete. Order assigned to admin.`);
+    } catch (geoError) {
+      console.warn('❌ Vendor assignment failed:', geoError);
+      // BLOCK order creation if vendor assignment fails
+      return res.status(400).json({
+        success: false,
+        message: `Failed to assign vendor. You cannot place orders at this location.`,
+        data: {
+          vendorAvailable: false,
+          canPlaceOrder: false,
+        },
+      });
     }
     
     console.log(`📦 Order will be created with vendorId: ${vendorId || 'null'}, assignedTo: ${assignedTo}`);
@@ -2118,26 +2149,45 @@ exports.createPaymentIntent = async (req, res, next) => {
     // Calculate payment amount
     const amount = order.upfrontAmount; // 30% or 100% based on payment preference
 
-    // ⚠️ **DUMMY IMPLEMENTATION**: Payment Gateway Integration Pending
-    // TODO: Replace with actual payment gateway SDK (Razorpay/Paytm/Stripe)
-    // For now, create a mock payment intent
-    const paymentIntent = {
-      id: `pi_dummy_${Date.now()}`,
-      orderId: order._id.toString(),
-      amount,
-      currency: 'INR',
-      paymentMethod,
-      status: 'created',
-      clientSecret: `dummy_client_secret_${Date.now()}`,
-    };
+    // Create Razorpay order
+    try {
+      const razorpayOrder = await razorpayService.createOrder({
+        amount: amount,
+        currency: 'INR',
+        receipt: `receipt_${order.orderNumber}_${Date.now()}`,
+        notes: {
+          orderId: order._id.toString(),
+          orderNumber: order.orderNumber,
+          userId: userId.toString(),
+          paymentType: order.paymentPreference === 'full' ? 'full' : 'advance',
+        },
+      });
 
-    res.status(200).json({
-      success: true,
-      data: {
-        paymentIntent,
-        message: 'Payment intent created (DUMMY - Replace with actual gateway SDK)',
-      },
-    });
+      res.status(200).json({
+        success: true,
+        data: {
+          paymentIntent: {
+            id: razorpayOrder.id,
+            orderId: order._id.toString(),
+            amount: amount,
+            currency: 'INR',
+            paymentMethod,
+            status: razorpayOrder.status,
+            razorpayOrderId: razorpayOrder.id,
+            keyId: process.env.RAZORPAY_KEY_ID, // Frontend needs this for Razorpay Checkout
+          },
+          message: razorpayService.isTestMode() 
+            ? 'Payment intent created (Test Mode)' 
+            : 'Payment intent created successfully',
+        },
+      });
+    } catch (error) {
+      console.error('Error creating Razorpay order:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to create payment order',
+      });
+    }
   } catch (error) {
     next(error);
   }
@@ -2176,14 +2226,59 @@ exports.confirmPayment = async (req, res, next) => {
       });
     }
 
-    // ⚠️ **DUMMY IMPLEMENTATION**: Payment Gateway Integration Pending
-    // TODO: Integrate Razorpay SDK and verify payment with actual gateway
-    // For now, we bypass payment gateway verification and generate dummy IDs
-    // FLAG: Replace with actual Razorpay payment verification in future
-    
-    // Generate dummy gateway IDs if not provided (bypassing payment gateway for now)
-    const finalGatewayPaymentId = gatewayPaymentId || `dummy_payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const finalGatewayOrderId = gatewayOrderId || `dummy_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Validate required Razorpay payment details
+    if (!gatewayPaymentId || !gatewayOrderId || !gatewaySignature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment verification details are required (paymentId, orderId, signature)',
+      });
+    }
+
+    // Verify Razorpay payment signature
+    const isSignatureValid = razorpayService.verifyPaymentSignature(
+      gatewayOrderId,
+      gatewayPaymentId,
+      gatewaySignature
+    );
+
+    if (!isSignatureValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment signature. Payment verification failed.',
+      });
+    }
+
+    // Fetch payment details from Razorpay (optional, for additional verification)
+    let razorpayPayment = null;
+    try {
+      razorpayPayment = await razorpayService.fetchPayment(gatewayPaymentId);
+      
+      // Verify payment amount matches order amount
+      const paymentAmountInRupees = razorpayPayment.amount / 100;
+      if (Math.abs(paymentAmountInRupees - order.upfrontAmount) > 0.01) {
+        return res.status(400).json({
+          success: false,
+          message: `Payment amount mismatch. Expected ₹${order.upfrontAmount}, received ₹${paymentAmountInRupees}`,
+        });
+      }
+
+      // Verify payment status
+      if (razorpayPayment.status !== 'captured' && razorpayPayment.status !== 'authorized') {
+        return res.status(400).json({
+          success: false,
+          message: `Payment not successful. Status: ${razorpayPayment.status}`,
+        });
+      }
+    } catch (paymentError) {
+      // In test mode, allow payment even if fetch fails
+      if (!razorpayService.isTestMode()) {
+        console.error('Error fetching Razorpay payment:', paymentError);
+        return res.status(400).json({
+          success: false,
+          message: 'Failed to verify payment with gateway',
+        });
+      }
+    }
     
     // Generate payment ID explicitly (pre-save hook will also generate, but this ensures it's set)
     const date = new Date();
@@ -2207,13 +2302,41 @@ exports.confirmPayment = async (req, res, next) => {
       amount: order.upfrontAmount,
       paymentMethod,
       status: order.paymentPreference === 'full' ? PAYMENT_STATUS.FULLY_PAID : PAYMENT_STATUS.PARTIAL_PAID,
-      gatewayPaymentId: finalGatewayPaymentId, // Dummy - FLAG: Replace with actual Razorpay payment ID in future
-      gatewayOrderId: finalGatewayOrderId, // Dummy - FLAG: Replace with actual Razorpay order ID in future
-      gatewaySignature: gatewaySignature || null, // Dummy - FLAG: Replace with actual Razorpay signature in future
+      gatewayPaymentId: gatewayPaymentId, // Razorpay payment ID
+      gatewayOrderId: gatewayOrderId, // Razorpay order ID
+      gatewaySignature: gatewaySignature, // Razorpay signature for verification
+      gatewayResponse: razorpayPayment ? {
+        status: razorpayPayment.status,
+        method: razorpayPayment.method,
+        description: razorpayPayment.description,
+        created_at: razorpayPayment.created_at,
+      } : null,
       paidAt: new Date(),
     });
 
     await payment.save();
+
+    // Log payment to history
+    try {
+      await PaymentHistory.create({
+        activityType: order.paymentPreference === 'full' ? 'user_payment_advance' : 'user_payment_advance',
+        userId: userId,
+        orderId: order._id,
+        paymentId: payment._id,
+        amount: payment.amount,
+        paymentMethod: paymentMethod,
+        status: 'completed',
+        description: `User paid ${order.paymentPreference === 'full' ? 'full' : 'advance'} payment of ₹${payment.amount} for order ${order.orderNumber}`,
+        metadata: {
+          orderNumber: order.orderNumber,
+          paymentType: payment.paymentType,
+          paymentId: generatedPaymentId,
+        },
+      });
+    } catch (historyError) {
+      console.error('Error logging payment history:', historyError);
+      // Don't fail payment if history logging fails
+    }
 
     // Update order payment status
     if (order.paymentPreference === 'full') {
@@ -2238,68 +2361,13 @@ exports.confirmPayment = async (req, res, next) => {
     
     await order.save();
 
-    // Create commission for seller (IRA Partner) if order is fully paid and has seller
-    if (order.paymentStatus === PAYMENT_STATUS.FULLY_PAID && order.seller && order.sellerId) {
+    // Process earnings (vendor earnings and seller commission) when order is fully paid
+    if (order.paymentStatus === PAYMENT_STATUS.FULLY_PAID) {
       try {
-        const seller = await Seller.findById(order.seller);
-        if (seller) {
-          const now = new Date();
-          const month = now.getMonth() + 1;
-          const year = now.getFullYear();
-
-          // Calculate user's cumulative purchases for this month (excluding this order)
-          const userOrdersThisMonth = await Order.find({
-            userId: order.userId,
-            sellerId: order.sellerId,
-            paymentStatus: PAYMENT_STATUS.FULLY_PAID,
-            _id: { $ne: order._id },
-            createdAt: {
-              $gte: new Date(year, month - 1, 1),
-              $lt: new Date(year, month, 1),
-            },
-          });
-
-          const cumulativePurchaseAmount = userOrdersThisMonth.reduce((sum, o) => sum + o.totalAmount, 0);
-          const newCumulativePurchaseAmount = cumulativePurchaseAmount + order.totalAmount;
-
-          // Determine commission rate based on monthly purchases
-          // 3% if >= 50000, 2% if < 50000
-          const commissionRate = newCumulativePurchaseAmount < IRA_PARTNER_COMMISSION_THRESHOLD
-            ? IRA_PARTNER_COMMISSION_RATE_LOW
-            : IRA_PARTNER_COMMISSION_RATE_HIGH;
-
-          // Calculate commission amount
-          const commissionAmount = (order.totalAmount * commissionRate) / 100;
-
-          // Create commission record
-          const commission = new Commission({
-            sellerId: seller._id,
-            sellerIdCode: seller.sellerId,
-            userId: order.userId,
-            orderId: order._id,
-            month,
-            year,
-            orderAmount: order.totalAmount,
-            cumulativePurchaseAmount,
-            newCumulativePurchaseAmount,
-            commissionRate,
-            commissionAmount: Math.round(commissionAmount * 100) / 100,
-            status: 'credited',
-            creditedAt: new Date(),
-            notes: `Commission for order ${order.orderNumber}`,
-          });
-
-          await commission.save();
-
-          // Update seller wallet
-          seller.wallet.balance = (seller.wallet.balance || 0) + commissionAmount;
-          await seller.save();
-
-          console.log(`💰 Commission credited: ₹${commissionAmount} to seller ${seller.sellerId} for order ${order.orderNumber}`);
-        }
-      } catch (commissionError) {
-        console.error('Error creating commission:', commissionError);
-        // Don't fail the payment confirmation if commission creation fails
+        await processOrderEarnings(order);
+      } catch (earningsError) {
+        console.error('Error processing order earnings:', earningsError);
+        // Don't fail the payment confirmation if earnings processing fails
       }
     }
 
@@ -2319,7 +2387,9 @@ exports.confirmPayment = async (req, res, next) => {
           orderNumber: order.orderNumber,
           paymentStatus: order.paymentStatus,
         },
-        message: 'Payment confirmed successfully (DUMMY - Replace with actual gateway verification)',
+        message: razorpayService.isTestMode() 
+          ? 'Payment confirmed successfully (Test Mode)' 
+          : 'Payment confirmed successfully',
       },
     });
   } catch (error) {
@@ -2377,25 +2447,45 @@ exports.createRemainingPaymentIntent = async (req, res, next) => {
     // Calculate remaining amount
     const amount = order.remainingAmount; // 70%
 
-    // ⚠️ **DUMMY IMPLEMENTATION**: Payment Gateway Integration Pending
-    // TODO: Replace with actual payment gateway SDK (Razorpay/Paytm/Stripe)
-    const paymentIntent = {
-      id: `pi_dummy_remaining_${Date.now()}`,
-      orderId: order._id.toString(),
-      amount,
-      currency: 'INR',
-      paymentMethod,
-      status: 'created',
-      clientSecret: `dummy_client_secret_remaining_${Date.now()}`,
-    };
+    // Create Razorpay order for remaining payment
+    try {
+      const razorpayOrder = await razorpayService.createOrder({
+        amount: amount,
+        currency: 'INR',
+        receipt: `receipt_${order.orderNumber}_remaining_${Date.now()}`,
+        notes: {
+          orderId: order._id.toString(),
+          orderNumber: order.orderNumber,
+          userId: userId.toString(),
+          paymentType: 'remaining',
+        },
+      });
 
-    res.status(200).json({
-      success: true,
-      data: {
-        paymentIntent,
-        message: 'Remaining payment intent created (DUMMY - Replace with actual gateway SDK)',
-      },
-    });
+      res.status(200).json({
+        success: true,
+        data: {
+          paymentIntent: {
+            id: razorpayOrder.id,
+            orderId: order._id.toString(),
+            amount: amount,
+            currency: 'INR',
+            paymentMethod,
+            status: razorpayOrder.status,
+            razorpayOrderId: razorpayOrder.id,
+            keyId: process.env.RAZORPAY_KEY_ID, // Frontend needs this for Razorpay Checkout
+          },
+          message: razorpayService.isTestMode() 
+            ? 'Remaining payment intent created (Test Mode)' 
+            : 'Remaining payment intent created successfully',
+        },
+      });
+    } catch (error) {
+      console.error('Error creating Razorpay order for remaining payment:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to create remaining payment order',
+      });
+    }
   } catch (error) {
     next(error);
   }
@@ -2440,14 +2530,59 @@ exports.confirmRemainingPayment = async (req, res, next) => {
       });
     }
 
-    // ⚠️ **DUMMY IMPLEMENTATION**: Payment Gateway Integration Pending
-    // TODO: Integrate Razorpay SDK and verify payment with actual gateway
-    // For now, we bypass payment gateway verification and generate dummy IDs
-    // FLAG: Replace with actual Razorpay payment verification in future
-    
-    // Generate dummy gateway IDs if not provided (bypassing payment gateway for now)
-    const finalGatewayPaymentId = gatewayPaymentId || `dummy_payment_remaining_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const finalGatewayOrderId = gatewayOrderId || `dummy_order_remaining_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Validate required Razorpay payment details
+    if (!gatewayPaymentId || !gatewayOrderId || !gatewaySignature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment verification details are required (paymentId, orderId, signature)',
+      });
+    }
+
+    // Verify Razorpay payment signature
+    const isSignatureValid = razorpayService.verifyPaymentSignature(
+      gatewayOrderId,
+      gatewayPaymentId,
+      gatewaySignature
+    );
+
+    if (!isSignatureValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment signature. Payment verification failed.',
+      });
+    }
+
+    // Fetch payment details from Razorpay (optional, for additional verification)
+    let razorpayPayment = null;
+    try {
+      razorpayPayment = await razorpayService.fetchPayment(gatewayPaymentId);
+      
+      // Verify payment amount matches order remaining amount
+      const paymentAmountInRupees = razorpayPayment.amount / 100;
+      if (Math.abs(paymentAmountInRupees - order.remainingAmount) > 0.01) {
+        return res.status(400).json({
+          success: false,
+          message: `Payment amount mismatch. Expected ₹${order.remainingAmount}, received ₹${paymentAmountInRupees}`,
+        });
+      }
+
+      // Verify payment status
+      if (razorpayPayment.status !== 'captured' && razorpayPayment.status !== 'authorized') {
+        return res.status(400).json({
+          success: false,
+          message: `Payment not successful. Status: ${razorpayPayment.status}`,
+        });
+      }
+    } catch (paymentError) {
+      // In test mode, allow payment even if fetch fails
+      if (!razorpayService.isTestMode()) {
+        console.error('Error fetching Razorpay payment:', paymentError);
+        return res.status(400).json({
+          success: false,
+          message: 'Failed to verify payment with gateway',
+        });
+      }
+    }
     
     // Generate payment ID explicitly (pre-save hook will also generate, but this ensures it's set)
     const date = new Date();
@@ -2471,80 +2606,53 @@ exports.confirmRemainingPayment = async (req, res, next) => {
       amount: order.remainingAmount,
       paymentMethod,
       status: PAYMENT_STATUS.FULLY_PAID,
-      gatewayPaymentId: finalGatewayPaymentId, // Dummy - FLAG: Replace with actual Razorpay payment ID in future
-      gatewayOrderId: finalGatewayOrderId, // Dummy - FLAG: Replace with actual Razorpay order ID in future
-      gatewaySignature: gatewaySignature || null, // Dummy - FLAG: Replace with actual Razorpay signature in future
+      gatewayPaymentId: gatewayPaymentId, // Razorpay payment ID
+      gatewayOrderId: gatewayOrderId, // Razorpay order ID
+      gatewaySignature: gatewaySignature, // Razorpay signature for verification
+      gatewayResponse: razorpayPayment ? {
+        status: razorpayPayment.status,
+        method: razorpayPayment.method,
+        description: razorpayPayment.description,
+        created_at: razorpayPayment.created_at,
+      } : null,
       paidAt: new Date(),
     });
 
     await payment.save();
 
+    // Log payment to history
+    try {
+      await PaymentHistory.create({
+        activityType: 'user_payment_remaining',
+        userId: userId,
+        orderId: order._id,
+        paymentId: payment._id,
+        amount: payment.amount,
+        paymentMethod: paymentMethod,
+        status: 'completed',
+        description: `User paid remaining payment of ₹${payment.amount} for order ${order.orderNumber}`,
+        metadata: {
+          orderNumber: order.orderNumber,
+          paymentType: payment.paymentType,
+          paymentId: payment.paymentId,
+        },
+      });
+    } catch (historyError) {
+      console.error('Error logging payment history:', historyError);
+      // Don't fail payment if history logging fails
+    }
+
     // Update order payment status
     order.paymentStatus = PAYMENT_STATUS.FULLY_PAID;
     await order.save();
 
-    // Create commission for seller (IRA Partner) if order has seller
-    if (order.seller && order.sellerId) {
+    // Process earnings (vendor earnings and seller commission) when order is fully paid
+    if (order.paymentStatus === PAYMENT_STATUS.FULLY_PAID) {
       try {
-        const seller = await Seller.findById(order.seller);
-        if (seller) {
-          const now = new Date();
-          const month = now.getMonth() + 1;
-          const year = now.getFullYear();
-
-          // Calculate user's cumulative purchases for this month (excluding this order)
-          const userOrdersThisMonth = await Order.find({
-            userId: order.userId,
-            sellerId: order.sellerId,
-            paymentStatus: PAYMENT_STATUS.FULLY_PAID,
-            _id: { $ne: order._id },
-            createdAt: {
-              $gte: new Date(year, month - 1, 1),
-              $lt: new Date(year, month, 1),
-            },
-          });
-
-          const cumulativePurchaseAmount = userOrdersThisMonth.reduce((sum, o) => sum + o.totalAmount, 0);
-          const newCumulativePurchaseAmount = cumulativePurchaseAmount + order.totalAmount;
-
-          // Determine commission rate based on monthly purchases
-          // 3% if >= 50000, 2% if < 50000
-          const commissionRate = newCumulativePurchaseAmount < IRA_PARTNER_COMMISSION_THRESHOLD
-            ? IRA_PARTNER_COMMISSION_RATE_LOW
-            : IRA_PARTNER_COMMISSION_RATE_HIGH;
-
-          // Calculate commission amount
-          const commissionAmount = (order.totalAmount * commissionRate) / 100;
-
-          // Create commission record
-          const commission = new Commission({
-            sellerId: seller._id,
-            sellerIdCode: seller.sellerId,
-            userId: order.userId,
-            orderId: order._id,
-            month,
-            year,
-            orderAmount: order.totalAmount,
-            cumulativePurchaseAmount,
-            newCumulativePurchaseAmount,
-            commissionRate,
-            commissionAmount: Math.round(commissionAmount * 100) / 100,
-            status: 'credited',
-            creditedAt: new Date(),
-            notes: `Commission for order ${order.orderNumber}`,
-          });
-
-          await commission.save();
-
-          // Update seller wallet
-          seller.wallet.balance = (seller.wallet.balance || 0) + commissionAmount;
-          await seller.save();
-
-          console.log(`💰 Commission credited: ₹${commissionAmount} to seller ${seller.sellerId} for order ${order.orderNumber}`);
-        }
-      } catch (commissionError) {
-        console.error('Error creating commission:', commissionError);
-        // Don't fail the payment confirmation if commission creation fails
+        await processOrderEarnings(order);
+      } catch (earningsError) {
+        console.error('Error processing order earnings:', earningsError);
+        // Don't fail the payment confirmation if earnings processing fails
       }
     }
 
@@ -2564,7 +2672,9 @@ exports.confirmRemainingPayment = async (req, res, next) => {
           orderNumber: order.orderNumber,
           paymentStatus: order.paymentStatus,
         },
-        message: 'Remaining payment confirmed successfully (DUMMY - Replace with actual gateway verification)',
+        message: razorpayService.isTestMode() 
+          ? 'Remaining payment confirmed successfully (Test Mode)' 
+          : 'Remaining payment confirmed successfully',
       },
     });
   } catch (error) {

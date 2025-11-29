@@ -130,6 +130,52 @@ const productSchema = new mongoose.Schema({
     of: String,
     // Flexible key-value pairs for product specs
   },
+  // Stock quantities per attribute combination
+  attributeStocks: [{
+    attributes: {
+      type: Map,
+      of: String,
+      // Attribute key-value pairs (e.g., { npkRatio: '19:19:19', form: 'Granular' })
+    },
+    actualStock: {
+      type: Number,
+      required: true,
+      min: [0, 'Actual stock cannot be negative'],
+      default: 0,
+    },
+    displayStock: {
+      type: Number,
+      required: true,
+      min: [0, 'Display stock cannot be negative'],
+      default: 0,
+    },
+    stockUnit: {
+      type: String,
+      enum: ['kg', 'L', 'bags', 'units'],
+      default: 'kg',
+    },
+    vendorPrice: {
+      type: Number,
+      required: true,
+      min: [0, 'Vendor price cannot be negative'],
+      // Price to vendor for this specific attribute combination
+    },
+    userPrice: {
+      type: Number,
+      required: true,
+      min: [0, 'User price cannot be negative'],
+      // Price to user for this specific attribute combination
+    },
+    batchNumber: {
+      type: String,
+      trim: true,
+      // Optional batch number for this specific attribute combination
+    },
+    expiry: {
+      type: Date,
+      // Optional expiry date for this specific attribute combination
+    },
+  }],
 }, {
   timestamps: true,
 });

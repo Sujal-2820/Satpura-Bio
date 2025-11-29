@@ -1404,6 +1404,156 @@ export async function rejectSellerWithdrawal(requestId, rejectionData) {
 }
 
 /**
+ * Transform backend vendor withdrawal request to frontend format
+ */
+function transformVendorWithdrawalRequest(backendWithdrawal) {
+  return {
+    id: backendWithdrawal._id?.toString() || backendWithdrawal.id,
+    requestId: backendWithdrawal._id?.toString() || backendWithdrawal.id,
+    vendorId: backendWithdrawal.vendorId?.toString() || backendWithdrawal.vendorId,
+    vendor: backendWithdrawal.vendorId?.name || backendWithdrawal.vendor?.name || backendWithdrawal.vendorName || '',
+    vendorName: backendWithdrawal.vendorId?.name || backendWithdrawal.vendor?.name || backendWithdrawal.vendorName || '',
+    amount: backendWithdrawal.amount || 0,
+    date: backendWithdrawal.createdAt ? new Date(backendWithdrawal.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    status: backendWithdrawal.status || 'pending',
+    reason: backendWithdrawal.rejectionReason || backendWithdrawal.reason || '',
+    bankDetails: backendWithdrawal.paymentDetails || backendWithdrawal.bankAccountId || {},
+    userType: 'vendor',
+    ...backendWithdrawal,
+  }
+}
+
+/**
+ * Get Vendor Withdrawal Requests
+ * GET /admin/vendors/withdrawals
+ * 
+ * @param {Object} params - { 
+ *   status?: 'pending' | 'approved' | 'rejected' | 'completed', 
+ *   vendorId?: string, 
+ *   page?: number, 
+ *   limit?: number,
+ *   search?: string,
+ *   sortBy?: string,
+ *   sortOrder?: 'asc' | 'desc'
+ * }
+ * @returns {Promise<Object>} - { withdrawals: Array, total: number, pagination?: Object }
+ */
+export async function getVendorWithdrawalRequests(params = {}) {
+  try {
+    const queryParams = new URLSearchParams()
+    
+    if (params.status) queryParams.append('status', params.status)
+    if (params.page) queryParams.append('page', params.page)
+    if (params.limit) queryParams.append('limit', params.limit)
+    if (params.search) queryParams.append('search', params.search)
+    if (params.sortBy) queryParams.append('sortBy', params.sortBy)
+    if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder)
+    if (params.vendorId) queryParams.append('vendorId', params.vendorId)
+
+    const queryString = queryParams.toString()
+    const endpoint = `/admin/vendors/withdrawals${queryString ? `?${queryString}` : ''}`
+    const response = await apiRequest(endpoint)
+
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: {
+          withdrawals: response.data.withdrawals?.map(transformVendorWithdrawalRequest) || [],
+          total: response.data.pagination?.totalItems || response.data.withdrawals?.length || 0,
+          pagination: response.data.pagination,
+        },
+      }
+    }
+
+    return response
+  } catch (error) {
+    throw error
+  }
+}
+
+/**
+ * Approve Vendor Withdrawal
+ * POST /admin/vendors/withdrawals/:requestId/approve
+ * 
+ * @param {string} requestId - Withdrawal request ID
+ * @param {Object} data - Optional approval data (notes, etc.)
+ * @returns {Promise<Object>} - { message: string, withdrawal: Object, vendor: Object }
+ */
+export async function approveVendorWithdrawal(requestId, data = {}) {
+  const response = await apiRequest(`/admin/vendors/withdrawals/${requestId}/approve`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+
+  if (response.success && response.data) {
+    return {
+      success: true,
+      data: {
+        withdrawal: response.data.withdrawal ? transformVendorWithdrawalRequest(response.data.withdrawal) : undefined,
+        vendor: response.data.vendor,
+        message: response.data.message || 'Withdrawal approved successfully',
+      },
+    }
+  }
+
+  return response
+}
+
+/**
+ * Reject Vendor Withdrawal
+ * POST /admin/vendors/withdrawals/:requestId/reject
+ * 
+ * @param {string} requestId - Withdrawal request ID
+ * @param {Object} rejectionData - { reason: string, notes?: string }
+ * @returns {Promise<Object>} - { message: string, withdrawal: Object }
+ */
+export async function rejectVendorWithdrawal(requestId, rejectionData) {
+  const response = await apiRequest(`/admin/vendors/withdrawals/${requestId}/reject`, {
+    method: 'POST',
+    body: JSON.stringify(rejectionData),
+  })
+
+  if (response.success && response.data) {
+    return {
+      success: true,
+      data: {
+        withdrawal: response.data.withdrawal ? transformVendorWithdrawalRequest(response.data.withdrawal) : undefined,
+        message: response.data.message || 'Withdrawal request rejected',
+      },
+    }
+  }
+
+  return response
+}
+
+/**
+ * Complete Vendor Withdrawal
+ * PUT /admin/vendors/withdrawals/:requestId/complete
+ * 
+ * @param {string} requestId - Withdrawal request ID
+ * @param {Object} completionData - { paymentReference: string, paymentDate: Date, notes?: string }
+ * @returns {Promise<Object>} - { message: string, withdrawal: Object }
+ */
+export async function completeVendorWithdrawal(requestId, completionData) {
+  const response = await apiRequest(`/admin/vendors/withdrawals/${requestId}/complete`, {
+    method: 'PUT',
+    body: JSON.stringify(completionData),
+  })
+
+  if (response.success && response.data) {
+    return {
+      success: true,
+      data: {
+        withdrawal: response.data.withdrawal ? transformVendorWithdrawalRequest(response.data.withdrawal) : undefined,
+        message: response.data.message || 'Withdrawal marked as completed',
+      },
+    }
+  }
+
+  return response
+}
+
+/**
  * Get Seller Withdrawal Requests
  * GET /admin/sellers/withdrawals (global) or GET /admin/sellers/:sellerId/withdrawals (seller-specific)
  * 
@@ -1448,6 +1598,84 @@ export async function getSellerWithdrawalRequests(params = {}) {
         },
       }
     }
+
+    return response
+  } catch (error) {
+    throw error
+  }
+}
+
+// ============================================================================
+// PAYMENT HISTORY APIs
+// ============================================================================
+
+/**
+ * Get Payment History
+ * GET /admin/payment-history
+ * 
+ * @param {Object} params - {
+ *   activityType?: string,
+ *   userId?: string,
+ *   vendorId?: string,
+ *   sellerId?: string,
+ *   orderId?: string,
+ *   startDate?: string,
+ *   endDate?: string,
+ *   status?: string,
+ *   page?: number,
+ *   limit?: number,
+ *   search?: string
+ * }
+ * @returns {Promise<Object>} - { history: Array, pagination: Object, summary: Array }
+ */
+export async function getPaymentHistory(params = {}) {
+  try {
+    const queryParams = new URLSearchParams()
+    
+    if (params.activityType) queryParams.append('activityType', params.activityType)
+    if (params.userId) queryParams.append('userId', params.userId)
+    if (params.vendorId) queryParams.append('vendorId', params.vendorId)
+    if (params.sellerId) queryParams.append('sellerId', params.sellerId)
+    if (params.orderId) queryParams.append('orderId', params.orderId)
+    if (params.startDate) queryParams.append('startDate', params.startDate)
+    if (params.endDate) queryParams.append('endDate', params.endDate)
+    if (params.status) queryParams.append('status', params.status)
+    if (params.page) queryParams.append('page', params.page)
+    if (params.limit) queryParams.append('limit', params.limit)
+    if (params.search) queryParams.append('search', params.search)
+
+    const queryString = queryParams.toString()
+    const response = await apiRequest(`/admin/payment-history${queryString ? `?${queryString}` : ''}`)
+
+    return response
+  } catch (error) {
+    throw error
+  }
+}
+
+/**
+ * Get Payment History Statistics
+ * GET /admin/payment-history/stats
+ * 
+ * @param {Object} params - { startDate?: string, endDate?: string }
+ * @returns {Promise<Object>} - {
+ *   totalUserPayments: number,
+ *   totalVendorEarnings: number,
+ *   totalSellerCommissions: number,
+ *   totalVendorWithdrawals: number,
+ *   totalSellerWithdrawals: number,
+ *   totalActivities: number
+ * }
+ */
+export async function getPaymentHistoryStats(params = {}) {
+  try {
+    const queryParams = new URLSearchParams()
+    
+    if (params.startDate) queryParams.append('startDate', params.startDate)
+    if (params.endDate) queryParams.append('endDate', params.endDate)
+
+    const queryString = queryParams.toString()
+    const response = await apiRequest(`/admin/payment-history/stats${queryString ? `?${queryString}` : ''}`)
 
     return response
   } catch (error) {

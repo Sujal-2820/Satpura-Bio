@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { DocumentUpload } from '../../components/DocumentUpload'
+import { registerVendor } from '../../services/vendorApi'
 
 export function VendorRegistration({ onBack, onRegistered }) {
   const [form, setForm] = useState({
@@ -10,21 +12,76 @@ export function VendorRegistration({ onBack, onRegistered }) {
     city: '',
     state: '',
     pincode: '',
-    document: null,
+    aadhaarCard: null,
+    panCard: null,
   })
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
 
   const handleChange = (event) => {
-    const { name, value, files } = event.target
+    const { name, value } = event.target
     setForm((prev) => ({
       ...prev,
-      [name]: files ? files[0] : value,
+      [name]: value,
     }))
   }
 
-  const handleSubmit = (event) => {
+  const handleDocumentChange = (documentType) => (documentData) => {
+    setForm((prev) => ({
+      ...prev,
+      [documentType]: documentData,
+    }))
+  }
+
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    // Future API request placeholder
-    onRegistered?.(form)
+    setError(null)
+
+    // Validate required documents
+    if (!form.aadhaarCard?.url) {
+      setError('Please upload Aadhaar card document')
+      return
+    }
+    if (!form.panCard?.url) {
+      setError('Please upload PAN card document')
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      // Prepare location data
+      const location = {
+        address: `${form.addressLine1}${form.addressLine2 ? `, ${form.addressLine2}` : ''}`,
+        city: form.city,
+        state: form.state,
+        pincode: form.pincode,
+        coordinates: {
+          lat: 0, // Will be set by backend or geocoding
+          lng: 0,
+        },
+      }
+
+      // Call registration API
+      const result = await registerVendor({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        location,
+        aadhaarCard: form.aadhaarCard,
+        panCard: form.panCard,
+      })
+
+      if (result.success || result.data) {
+        onRegistered?.(form)
+      } else {
+        setError(result.error?.message || 'Registration failed. Please try again.')
+      }
+    } catch (err) {
+      setError(err.message || 'Registration failed. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -162,26 +219,37 @@ export function VendorRegistration({ onBack, onRegistered }) {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-muted-foreground" htmlFor="document">
-              Aadhaar (PDF or Image)
-            </label>
-            <input
-              id="document"
-              name="document"
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
+          {/* Document Uploads */}
+          <div className="space-y-4">
+            <DocumentUpload
+              label="Aadhaar Card"
+              value={form.aadhaarCard}
+              onChange={handleDocumentChange('aadhaarCard')}
               required
-              onChange={handleChange}
-              className="w-full rounded-2xl border border-dashed border-muted/60 bg-white/70 px-4 py-4 text-xs text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-brand-soft file:px-4 file:py-2 file:text-sm file:font-semibold file:text-brand"
+              disabled={submitting}
+            />
+            
+            <DocumentUpload
+              label="PAN Card"
+              value={form.panCard}
+              onChange={handleDocumentChange('panCard')}
+              required
+              disabled={submitting}
             />
           </div>
 
+          {error && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
-            className="w-full rounded-full bg-brand px-6 py-3 text-sm font-semibold text-brand-foreground shadow-card"
+            disabled={submitting}
+            className="w-full rounded-full bg-brand px-6 py-3 text-sm font-semibold text-brand-foreground shadow-card disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Submit Registration
+            {submitting ? 'Submitting...' : 'Submit Registration'}
           </button>
         </form>
 

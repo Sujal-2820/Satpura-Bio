@@ -9,6 +9,7 @@ import { useAdminApi } from '../hooks/useAdminApi'
 import { useToast } from '../components/ToastNotification'
 import { sellers as mockSellers } from '../services/adminData'
 import { cn } from '../../../lib/cn'
+import { getMaskedBankDetails } from '../../../utils/maskSensitiveData'
 
 const columns = [
   { Header: 'IRA Partner', accessor: 'name' },
@@ -23,7 +24,7 @@ const columns = [
   { Header: 'Actions', accessor: 'actions' },
 ]
 
-export function SellersPage() {
+export function SellersPage({ subRoute = null, navigate }) {
   const { sellers: sellersState } = useAdminState()
   const {
     getSellers,
@@ -40,6 +41,7 @@ export function SellersPage() {
   const { success, error: showError, warning: showWarning } = useToast()
 
   const [sellersList, setSellersList] = useState([])
+  const [allSellersList, setAllSellersList] = useState([])
   const [withdrawalRequests, setWithdrawalRequests] = useState([])
   
   // View states (replacing modals with full-screen views)
@@ -91,12 +93,32 @@ export function SellersPage() {
     const result = await getSellers()
     if (result.data?.sellers) {
       const formatted = result.data.sellers.map(formatSellerForDisplay)
-      setSellersList(formatted)
+      setAllSellersList(formatted)
     } else {
       // Fallback to mock data
-      setSellersList(mockSellers.map(formatSellerForDisplay))
+      const formatted = mockSellers.map(formatSellerForDisplay)
+      setAllSellersList(formatted)
     }
   }, [getSellers])
+
+  // Filter sellers based on subRoute
+  useEffect(() => {
+    if (subRoute === 'active') {
+      // Active IRA Partners: those with sales and commissions
+      setSellersList(allSellersList.filter((s) => {
+        const sales = typeof s.totalSales === 'number' ? s.totalSales : parseFloat(s.sales?.replace(/[₹,\sL]/g, '') || '0') * 100000
+        return sales > 0 && (s.status === 'approved' || s.status === 'On Track' || s.status === 'on_track')
+      }))
+    } else if (subRoute === 'inactive') {
+      // Inactive IRA Partners: those not getting sales and commissions
+      setSellersList(allSellersList.filter((s) => {
+        const sales = typeof s.totalSales === 'number' ? s.totalSales : parseFloat(s.sales?.replace(/[₹,\sL]/g, '') || '0') * 100000
+        return sales === 0 || (s.status !== 'approved' && s.status !== 'On Track' && s.status !== 'on_track')
+      }))
+    } else {
+      setSellersList(allSellersList)
+    }
+  }, [subRoute, allSellersList])
 
   // Fetch withdrawal requests
   const fetchWithdrawalRequests = useCallback(async () => {
@@ -144,6 +166,7 @@ export function SellersPage() {
     setSelectedSellerForAction(null)
     setRejectReason('')
     setWithdrawalRejectReason(null)
+    if (navigate) navigate('sellers')
   }
 
   const handleDeleteSeller = async (sellerId) => {
@@ -719,22 +742,34 @@ export function SellersPage() {
               </p>
             </div>
 
-            {request.bankDetails && (
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <p className="mb-2 text-xs font-bold text-gray-500">Bank Account Details</p>
-                <div className="space-y-1 text-sm text-gray-700">
-                  {request.bankDetails.accountNumber && (
-                    <p>Account: {request.bankDetails.accountNumber}</p>
-                  )}
-                  {request.bankDetails.ifsc && (
-                    <p>IFSC: {request.bankDetails.ifsc}</p>
-                  )}
-                  {request.bankDetails.bankName && (
-                    <p>Bank: {request.bankDetails.bankName}</p>
-                  )}
+            {request.bankDetails && (() => {
+              const maskedDetails = getMaskedBankDetails({
+                ...request.bankDetails,
+                ifscCode: request.bankDetails.ifsc || request.bankDetails.ifscCode,
+              })
+              return (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="mb-2 text-xs font-bold text-gray-500">Bank Account Details (Masked for Privacy)</p>
+                  <div className="space-y-1 text-sm text-gray-700">
+                    {maskedDetails.accountHolderName && (
+                      <p>Account Holder: {maskedDetails.accountHolderName}</p>
+                    )}
+                    {maskedDetails.accountNumber && (
+                      <p>Account: {maskedDetails.accountNumber}</p>
+                    )}
+                    {maskedDetails.ifscCode && (
+                      <p>IFSC: {maskedDetails.ifscCode}</p>
+                    )}
+                    {maskedDetails.bankName && (
+                      <p>Bank: {maskedDetails.bankName}</p>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500 italic">
+                    Note: Account details are masked for security. Full details are available in payment history for processed transactions.
+                  </p>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {request.reason && (
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -962,14 +997,26 @@ export function SellersPage() {
     )
   }
 
+  const getPageTitle = () => {
+    if (subRoute === 'active') return 'Active IRA Partners'
+    if (subRoute === 'inactive') return 'Inactive IRA Partners'
+    return 'Sales Network HQ'
+  }
+
+  const getPageDescription = () => {
+    if (subRoute === 'active') return 'View and manage IRA Partners who are actively getting sales and commissions.'
+    if (subRoute === 'inactive') return 'View and manage IRA Partners who are not getting sales and commissions.'
+    return 'Incentivise performance, track targets, and manage wallet payouts with clarity.'
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 4 • IRA Partner Management</p>
-          <h2 className="text-2xl font-bold text-gray-900">Sales Network HQ</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{getPageTitle()}</h2>
           <p className="text-sm text-gray-600">
-            Incentivise performance, track targets, and manage wallet payouts with clarity.
+            {getPageDescription()}
           </p>
         </div>
         <div className="flex gap-2">

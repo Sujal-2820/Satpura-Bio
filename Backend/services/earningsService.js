@@ -1,0 +1,232 @@
+/**
+ * Earnings Service
+ * 
+ * Handles calculation and processing of vendor earnings and seller commissions
+ * Triggered when orders are completed and fully paid
+ */
+
+const VendorEarning = require('../models/VendorEarning');
+const Commission = require('../models/Commission');
+const PaymentHistory = require('../models/PaymentHistory');
+const Order = require('../models/Order');
+const Product = require('../models/Product');
+const Vendor = require('../models/Vendor');
+const Seller = require('../models/Seller');
+const { PAYMENT_STATUS, ORDER_STATUS, IRA_PARTNER_COMMISSION_THRESHOLD, IRA_PARTNER_COMMISSION_RATE_LOW, IRA_PARTNER_COMMISSION_RATE_HIGH } = require('../utils/constants');
+
+/**
+ * Calculate and create vendor earnings for an order
+ * @param {Object} order - Order document
+ * @returns {Promise<Array>} Array of created VendorEarning documents
+ */
+async function calculateVendorEarnings(order) {
+  try {
+    // Only calculate earnings for orders with vendors and fully paid
+    if (!order.vendorId || order.paymentStatus !== PAYMENT_STATUS.FULLY_PAID) {
+      return [];
+    }
+
+    const vendor = await Vendor.findById(order.vendorId);
+    if (!vendor) {
+      console.warn(`⚠️ Vendor not found for order ${order.orderNumber}`);
+      return [];
+    }
+
+    const earnings = [];
+
+    // Calculate earnings for each order item
+    for (const item of order.items) {
+      // Get product to get vendor price
+      const product = await Product.findById(item.productId);
+      if (!product) {
+        console.warn(`⚠️ Product not found for item in order ${order.orderNumber}`);
+        continue;
+      }
+
+      const userPrice = item.unitPrice; // Price user paid
+      const vendorPrice = product.priceToVendor; // Price vendor paid to admin
+      const quantity = item.quantity;
+
+      // Calculate earnings: (User Price - Vendor Price) × Quantity
+      const earningsPerItem = (userPrice - vendorPrice) * quantity;
+
+      if (earningsPerItem > 0) {
+        const earning = new VendorEarning({
+          vendorId: vendor._id,
+          orderId: order._id,
+          productId: product._id,
+          productName: item.productName || product.name,
+          quantity,
+          userPrice,
+          vendorPrice,
+          earnings: Math.round(earningsPerItem * 100) / 100, // Round to 2 decimal places
+          status: 'processed',
+          processedAt: new Date(),
+          notes: `Earnings from order ${order.orderNumber}`,
+        });
+
+        await earning.save();
+        earnings.push(earning);
+
+        // Log to payment history
+        await PaymentHistory.create({
+          activityType: 'vendor_earning_credited',
+          vendorId: vendor._id,
+          orderId: order._id,
+          vendorEarningId: earning._id,
+          amount: earning.earnings,
+          status: 'credited',
+          description: `Vendor earning of ₹${earning.earnings} credited for order ${order.orderNumber} item ${product.name}`,
+          metadata: {
+            orderNumber: order.orderNumber,
+            productName: product.name,
+            quantity: earning.quantity,
+            userPrice: earning.userPrice,
+            vendorPrice: earning.vendorPrice,
+          },
+        });
+
+        console.log(`💰 Vendor earning created: ₹${earningsPerItem} for vendor ${vendor.name} from order ${order.orderNumber}`);
+      }
+    }
+
+    return earnings;
+  } catch (error) {
+    console.error('Error calculating vendor earnings:', error);
+    throw error;
+  }
+}
+
+/**
+ * Calculate and create seller commission for an order
+ * This function is already implemented in userController, but we'll keep it here for consistency
+ * @param {Object} order - Order document
+ * @returns {Promise<Object|null>} Created Commission document or null
+ */
+async function calculateSellerCommission(order) {
+  try {
+    // Only calculate commission for orders with sellers and fully paid
+    if (!order.seller || !order.sellerId || order.paymentStatus !== PAYMENT_STATUS.FULLY_PAID) {
+      return null;
+    }
+
+    const seller = await Seller.findById(order.seller);
+    if (!seller) {
+      console.warn(`⚠️ Seller not found for order ${order.orderNumber}`);
+      return null;
+    }
+
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    // Calculate user's cumulative purchases for this month (excluding this order)
+    const userOrdersThisMonth = await Order.find({
+      userId: order.userId,
+      sellerId: order.sellerId,
+      paymentStatus: PAYMENT_STATUS.FULLY_PAID,
+      _id: { $ne: order._id },
+      createdAt: {
+        $gte: new Date(year, month - 1, 1),
+        $lt: new Date(year, month, 1),
+      },
+    });
+
+    const cumulativePurchaseAmount = userOrdersThisMonth.reduce((sum, o) => sum + o.totalAmount, 0);
+    const newCumulativePurchaseAmount = cumulativePurchaseAmount + order.totalAmount;
+
+    // Determine commission rate based on monthly purchases
+    // 3% if >= 50000, 2% if < 50000
+    const commissionRate = newCumulativePurchaseAmount < IRA_PARTNER_COMMISSION_THRESHOLD
+      ? IRA_PARTNER_COMMISSION_RATE_LOW
+      : IRA_PARTNER_COMMISSION_RATE_HIGH;
+
+    // Calculate commission amount
+    const commissionAmount = (order.totalAmount * commissionRate) / 100;
+
+    // Create commission record
+    const commission = new Commission({
+      sellerId: seller._id,
+      sellerIdCode: seller.sellerId,
+      userId: order.userId,
+      orderId: order._id,
+      month,
+      year,
+      orderAmount: order.totalAmount,
+      cumulativePurchaseAmount,
+      newCumulativePurchaseAmount,
+      commissionRate,
+      commissionAmount: Math.round(commissionAmount * 100) / 100,
+      status: 'credited',
+      creditedAt: new Date(),
+      notes: `Commission for order ${order.orderNumber}`,
+    });
+
+    await commission.save();
+
+    // Update seller wallet
+    seller.wallet.balance = (seller.wallet.balance || 0) + commissionAmount;
+    await seller.save();
+
+    // Log to payment history
+    await PaymentHistory.create({
+      activityType: 'seller_commission_credited',
+      sellerId: seller._id,
+      userId: order.userId,
+      orderId: order._id,
+      commissionId: commission._id,
+      amount: commission.commissionAmount,
+      status: 'credited',
+      description: `Seller commission of ₹${commission.commissionAmount} credited for order ${order.orderNumber}`,
+      metadata: {
+        orderNumber: order.orderNumber,
+        commissionRate: commission.commissionRate,
+        newCumulativePurchaseAmount: commission.newCumulativePurchaseAmount,
+      },
+    });
+
+    console.log(`💰 Commission credited: ₹${commissionAmount} to seller ${seller.sellerId} for order ${order.orderNumber}`);
+
+    return commission;
+  } catch (error) {
+    console.error('Error calculating seller commission:', error);
+    throw error;
+  }
+}
+
+/**
+ * Process earnings for a completed order
+ * Called when order is fully paid
+ * @param {Object} order - Order document
+ * @returns {Promise<Object>} Object with vendorEarnings and commission
+ */
+async function processOrderEarnings(order) {
+  try {
+    const results = {
+      vendorEarnings: [],
+      commission: null,
+    };
+
+    // Calculate vendor earnings
+    if (order.vendorId) {
+      results.vendorEarnings = await calculateVendorEarnings(order);
+    }
+
+    // Calculate seller commission
+    if (order.seller && order.sellerId) {
+      results.commission = await calculateSellerCommission(order);
+    }
+
+    return results;
+  } catch (error) {
+    console.error('Error processing order earnings:', error);
+    throw error;
+  }
+}
+
+module.exports = {
+  calculateVendorEarnings,
+  calculateSellerCommission,
+  processOrderEarnings,
+};
+

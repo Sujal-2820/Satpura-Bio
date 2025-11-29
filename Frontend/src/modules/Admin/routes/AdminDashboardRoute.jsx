@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { AdminProvider } from '../context/AdminContext'
 import { ToastProvider } from '../components/ToastNotification'
 import { AdminLayout } from '../components/AdminLayout'
@@ -12,6 +12,9 @@ import { OrdersPage } from '../pages/Orders'
 import { FinancePage } from '../pages/Finance'
 import { OperationsPage } from '../pages/Operations'
 import { AnalyticsPage } from '../pages/Analytics'
+import { VendorWithdrawalsPage } from '../pages/VendorWithdrawals'
+import { SellerWithdrawalsPage } from '../pages/SellerWithdrawals'
+import { PaymentHistoryPage } from '../pages/PaymentHistory'
 
 const routeConfig = [
   { id: 'dashboard', element: DashboardPage },
@@ -23,25 +26,51 @@ const routeConfig = [
   { id: 'finance', element: FinancePage },
   { id: 'operations', element: OperationsPage },
   { id: 'analytics', element: AnalyticsPage },
+  { id: 'vendor-withdrawals', element: VendorWithdrawalsPage },
+  { id: 'seller-withdrawals', element: SellerWithdrawalsPage },
+  { id: 'payment-history', element: PaymentHistoryPage },
 ]
+
+function AdminDashboardContent({ activeRoute, setActiveRoute, onExit }) {
+  const { pageId, subRoute } = useMemo(() => {
+    // Parse route like 'products/add' into pageId='products' and subRoute='add'
+    const parts = activeRoute.split('/')
+    return {
+      pageId: parts[0],
+      subRoute: parts.slice(1).join('/') || null,
+    }
+  }, [activeRoute])
+
+  const ActivePageComponent = useMemo(() => {
+    const match = routeConfig.find((route) => route.id === pageId)
+    return match?.element ?? DashboardPage
+  }, [pageId])
+
+  const navigate = useCallback((route) => {
+    setActiveRoute(route)
+  }, [setActiveRoute])
+
+  return (
+    <AdminLayout
+      sidebar={(props) => <Sidebar active={activeRoute} onNavigate={setActiveRoute} {...props} />}
+      onExit={onExit}
+    >
+      <ActivePageComponent subRoute={subRoute} navigate={navigate} />
+    </AdminLayout>
+  )
+}
 
 export function AdminDashboardRoute({ onExit }) {
   const [activeRoute, setActiveRoute] = useState('dashboard')
 
-  const ActivePage = useMemo(() => {
-    const match = routeConfig.find((route) => route.id === activeRoute)
-    return match?.element ?? DashboardPage
-  }, [activeRoute])
-
   return (
     <AdminProvider>
       <ToastProvider>
-        <AdminLayout
-          sidebar={(props) => <Sidebar active={activeRoute} onNavigate={setActiveRoute} {...props} />}
-          onExit={onExit}
-        >
-          <ActivePage />
-        </AdminLayout>
+        <AdminDashboardContent 
+          activeRoute={activeRoute} 
+          setActiveRoute={setActiveRoute} 
+          onExit={onExit} 
+        />
       </ToastProvider>
     </AdminProvider>
   )

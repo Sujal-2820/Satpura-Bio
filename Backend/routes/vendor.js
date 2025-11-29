@@ -257,6 +257,92 @@ router.get('/reports', authorizeVendor, vendorController.getReports);
 // VENDOR-ADMIN MESSAGING ROUTES
 // ============================================================================
 
+// ============================================================================
+// EARNINGS ROUTES
+// ============================================================================
+
+/**
+ * @route   GET /api/vendors/earnings
+ * @desc    Get vendor earnings summary
+ * @access  Private (Vendor)
+ */
+router.get('/earnings', authorizeVendor, vendorController.getEarningsSummary);
+
+/**
+ * @route   GET /api/vendors/earnings/history
+ * @desc    Get vendor earnings history
+ * @access  Private (Vendor)
+ */
+router.get('/earnings/history', authorizeVendor, vendorController.getEarningsHistory);
+
+/**
+ * @route   GET /api/vendors/earnings/orders
+ * @desc    Get vendor earnings by orders
+ * @access  Private (Vendor)
+ */
+router.get('/earnings/orders', authorizeVendor, vendorController.getEarningsByOrders);
+
+/**
+ * @route   GET /api/vendors/balance
+ * @desc    Get vendor available balance
+ * @access  Private (Vendor)
+ */
+router.get('/balance', authorizeVendor, vendorController.getBalance);
+
+// ============================================================================
+// WITHDRAWAL REQUEST ROUTES
+// ============================================================================
+
+/**
+ * @route   POST /api/vendors/withdrawals/request
+ * @desc    Request withdrawal from earnings
+ * @access  Private (Vendor)
+ */
+router.post('/withdrawals/request', authorizeVendor, vendorController.requestWithdrawal);
+
+/**
+ * @route   GET /api/vendors/withdrawals
+ * @desc    Get vendor withdrawal requests
+ * @access  Private (Vendor)
+ */
+router.get('/withdrawals', authorizeVendor, vendorController.getWithdrawals);
+
+// ============================================================================
+// BANK ACCOUNT ROUTES
+// ============================================================================
+
+/**
+ * @route   POST /api/vendors/bank-accounts
+ * @desc    Add bank account
+ * @access  Private (Vendor)
+ */
+router.post('/bank-accounts', authorizeVendor, vendorController.addBankAccount);
+
+/**
+ * @route   GET /api/vendors/bank-accounts
+ * @desc    Get vendor bank accounts
+ * @access  Private (Vendor)
+ */
+router.get('/bank-accounts', authorizeVendor, vendorController.getBankAccounts);
+
+/**
+ * @route   PUT /api/vendors/bank-accounts/:accountId
+ * @desc    Update bank account
+ * @access  Private (Vendor)
+ */
+router.put('/bank-accounts/:accountId', authorizeVendor, vendorController.updateBankAccount);
+
+/**
+ * @route   DELETE /api/vendors/bank-accounts/:accountId
+ * @desc    Delete bank account
+ * @access  Private (Vendor)
+ */
+router.delete('/bank-accounts/:accountId', authorizeVendor, vendorController.deleteBankAccount);
+
+// ============================================================================
+// MESSAGES ROUTES
+// ============================================================================
+
 /**
  * @route   POST /api/vendors/messages
  * @desc    Create message from vendor to admin

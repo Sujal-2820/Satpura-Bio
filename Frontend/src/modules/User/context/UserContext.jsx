@@ -26,6 +26,11 @@ const initialState = {
   favourites: [],
   notifications: [],
   assignedVendor: null, // Vendor assigned based on location (20km radius)
+  vendorAvailability: {
+    vendorAvailable: false,
+    canPlaceOrder: false,
+    isInBufferZone: false, // Within 300m buffer (20km to 20.3km) - no warning shown
+  },
   realtimeConnected: false,
 }
 
@@ -54,13 +59,25 @@ function reducer(state, action) {
         ...state,
         assignedVendor: action.payload,
       }
+    case 'SET_VENDOR_AVAILABILITY':
+      return {
+        ...state,
+        vendorAvailability: action.payload,
+      }
     case 'SET_REALTIME_CONNECTED':
       return {
         ...state,
         realtimeConnected: action.payload,
       }
     case 'AUTH_LOGOUT':
-      return { ...state, authenticated: false, profile: initialState.profile, cart: [] }
+      return { 
+        ...state, 
+        authenticated: false, 
+        profile: initialState.profile, 
+        cart: [],
+        vendorAvailability: initialState.vendorAvailability,
+        assignedVendor: null,
+      }
     case 'ADD_TO_CART':
       const existingItem = state.cart.find((item) => item.productId === action.payload.productId)
       if (existingItem) {

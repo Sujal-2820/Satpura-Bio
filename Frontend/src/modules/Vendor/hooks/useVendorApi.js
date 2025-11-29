@@ -51,7 +51,8 @@ export function useVendorApi() {
   const fetchDashboardData = useCallback(() => {
     return callApi(vendorApi.fetchDashboardData).then((result) => {
       if (result.data) {
-        dispatch({ type: 'SET_DASHBOARD_OVERVIEW', payload: result.data })
+        // Backend returns { data: { overview: {...} } }, so extract overview
+        dispatch({ type: 'SET_DASHBOARD_OVERVIEW', payload: result.data.overview || result.data })
       }
       return result
     })
@@ -193,6 +194,40 @@ export function useVendorApi() {
 
   const getCreditHistory = useCallback((params) => callApi(vendorApi.getCreditHistory, params), [callApi])
 
+  // Earnings APIs
+  const getEarningsSummary = useCallback(() => callApi(vendorApi.getEarningsSummary), [callApi])
+
+  const getEarningsHistory = useCallback((params) => callApi(vendorApi.getEarningsHistory, params), [callApi])
+
+  const getEarningsByOrders = useCallback((params) => callApi(vendorApi.getEarningsByOrders, params), [callApi])
+
+  const getBalance = useCallback(() => callApi(vendorApi.getBalance), [callApi])
+
+  // Withdrawal Request APIs
+  const requestWithdrawal = useCallback(
+    (withdrawalData) => {
+      return callApi(vendorApi.requestWithdrawal, withdrawalData).then((result) => {
+        if (result.data) {
+          // Refresh earnings summary after withdrawal request
+          getEarningsSummary()
+        }
+        return result
+      })
+    },
+    [callApi, getEarningsSummary],
+  )
+
+  const getWithdrawals = useCallback((params) => callApi(vendorApi.getWithdrawals, params), [callApi])
+
+  // Bank Account APIs
+  const addBankAccount = useCallback((data) => callApi(vendorApi.addBankAccount, data), [callApi])
+
+  const getBankAccounts = useCallback(() => callApi(vendorApi.getBankAccounts), [callApi])
+
+  const updateBankAccount = useCallback((accountId, data) => callApi(vendorApi.updateBankAccount, accountId, data), [callApi])
+
+  const deleteBankAccount = useCallback((accountId) => callApi(vendorApi.deleteBankAccount, accountId), [callApi])
+
   // Reports APIs
   const getReports = useCallback((params) => callApi(vendorApi.getReports, params), [callApi])
 
@@ -234,6 +269,19 @@ export function useVendorApi() {
     getCreditPurchases,
     getCreditPurchaseDetails,
     getCreditHistory,
+    // Earnings
+    getEarningsSummary,
+    getEarningsHistory,
+    getEarningsByOrders,
+    getBalance,
+    // Withdrawals
+    requestWithdrawal,
+    getWithdrawals,
+    // Bank Accounts
+    addBankAccount,
+    getBankAccounts,
+    updateBankAccount,
+    deleteBankAccount,
     // Reports
     getReports,
     getPerformanceAnalytics,

@@ -131,6 +131,8 @@ export function SellerDashboard({ onLogout }) {
     }
   }, [searchOpen])
 
+  const [panelData, setPanelData] = useState({})
+
   const handlePanelAction = (actionType, data) => {
     switch (actionType) {
       case 'share-seller-id':
@@ -139,13 +141,23 @@ export function SellerDashboard({ onLogout }) {
         break
       case 'request-withdrawal':
         const wallet = dashboard.wallet || {}
-        const balance = typeof wallet.balance === 'number' ? wallet.balance : parseFloat((wallet.balance || '0').toString().replace(/[₹,\s]/g, '')) || 0
+        const balance = data?.availableBalance !== undefined 
+          ? data.availableBalance 
+          : (typeof wallet.balance === 'number' ? wallet.balance : parseFloat((wallet.balance || '0').toString().replace(/[₹,\s]/g, '')) || 0)
         if (balance < 5000) {
           warning('Minimum withdrawal amount is ₹5,000')
         } else {
+          setPanelData(data || {})
           setPanelMounted(true)
           requestAnimationFrame(() => setActivePanel('request-withdrawal'))
         }
+        break
+      case 'add-bank-account':
+      case 'edit-bank-account':
+      case 'delete-bank-account':
+        setPanelData(data || {})
+        setPanelMounted(true)
+        requestAnimationFrame(() => setActivePanel(actionType))
         break
       case 'view-performance':
         setActiveTab('performance')
@@ -403,6 +415,8 @@ export function SellerDashboard({ onLogout }) {
               isOpen={activePanel === 'request-withdrawal'}
               onClose={closePanel}
               onSuccess={handleWithdrawalSuccess}
+              availableBalance={panelData.availableBalance}
+              bankAccounts={panelData.bankAccounts || []}
             />
           )}
           {activePanel === 'share-seller-id' && (

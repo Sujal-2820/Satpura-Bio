@@ -342,5 +342,37 @@ router.get('/support/tickets', authorizeSeller, sellerController.getSupportTicke
  */
 router.get('/support/tickets/:ticketId', authorizeSeller, sellerController.getSupportTicketDetails);
 
+// ============================================================================
+// BANK ACCOUNT ROUTES
+// ============================================================================
+
+/**
+ * @route   POST /api/sellers/bank-accounts
+ * @desc    Add bank account
+ * @access  Private (Seller)
+ */
+router.post('/bank-accounts', authorizeSeller, sellerController.addBankAccount);
+
+/**
+ * @route   GET /api/sellers/bank-accounts
+ * @desc    Get seller bank accounts
+ * @access  Private (Seller)
+ */
+router.get('/bank-accounts', authorizeSeller, sellerController.getBankAccounts);
+
+/**
+ * @route   PUT /api/sellers/bank-accounts/:accountId
+ * @desc    Update bank account
+ * @access  Private (Seller)
+ */
+router.put('/bank-accounts/:accountId', authorizeSeller, sellerController.updateBankAccount);
+
+/**
+ * @route   DELETE /api/sellers/bank-accounts/:accountId
+ * @desc    Delete bank account
+ * @access  Private (Seller)
+ */
+router.delete('/bank-accounts/:accountId', authorizeSeller, sellerController.deleteBankAccount);
+
 module.exports = router;
 

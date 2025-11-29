@@ -23,6 +23,9 @@ import { ButtonActionPanel } from '../../components/ButtonActionPanel'
 import { useToast, ToastContainer } from '../../components/ToastNotification'
 import { OrderEscalationModal } from '../../components/OrderEscalationModal'
 import { OrderPartialEscalationModal } from '../../components/OrderPartialEscalationModal'
+import { ConfirmationModal } from '../../components/ConfirmationModal'
+import { ProductAttributeSelector } from '../../components/ProductAttributeSelector'
+import { BankAccountForm } from '../../components/BankAccountForm'
 
 const NAV_ITEMS = [
   {
@@ -50,6 +53,12 @@ const NAV_ITEMS = [
     icon: CreditIcon,
   },
   {
+    id: 'earnings',
+    label: 'Earnings',
+    description: 'Earnings, balance, withdrawals',
+    icon: WalletIcon,
+  },
+  {
     id: 'reports',
     label: 'Summary',
     description: 'Weekly / monthly summary',
@@ -60,7 +69,7 @@ const NAV_ITEMS = [
 export function VendorDashboard({ onLogout }) {
   const { profile, dashboard } = useVendorState()
   const dispatch = useVendorDispatch()
-  const { acceptOrder, confirmOrderAcceptance, cancelOrderAcceptance, acceptOrderPartially, rejectOrder, updateInventoryStock, requestCreditPurchase, updateOrderStatus, fetchProfile, fetchDashboardData, getOrders } = useVendorApi()
+  const { acceptOrder, confirmOrderAcceptance, cancelOrderAcceptance, acceptOrderPartially, rejectOrder, updateInventoryStock, requestCreditPurchase, updateOrderStatus, fetchProfile, fetchDashboardData, getOrders, requestWithdrawal, getEarningsSummary, getBankAccounts } = useVendorApi()
   const [activeTab, setActiveTab] = useState('overview')
   const [showAllOrders, setShowAllOrders] = useState(false)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
@@ -74,6 +83,11 @@ export function VendorDashboard({ onLogout }) {
   const [partialEscalationModalOpen, setPartialEscalationModalOpen] = useState(false)
   const [selectedOrderForEscalation, setSelectedOrderForEscalation] = useState(null)
   const [escalationType, setEscalationType] = useState('items') // 'items' or 'quantities'
+  
+  // Confirmation modal states
+  const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
+  const [confirmationData, setConfirmationData] = useState(null)
+  const [confirmationLoading, setConfirmationLoading] = useState(false)
   
   // Fetch vendor profile and dashboard data on mount (only if authenticated or has token)
   useEffect(() => {
@@ -443,6 +457,7 @@ export function VendorDashboard({ onLogout }) {
             />
           )}
           {activeTab === 'credit' && <CreditView openPanel={openPanel} />}
+          {activeTab === 'earnings' && <EarningsView openPanel={openPanel} />}
           {activeTab === 'reports' && <ReportsView />}
         </section>
       </MobileShell>
@@ -694,6 +709,47 @@ export function VendorDashboard({ onLogout }) {
                   error(result.error.message || 'Failed to submit purchase request')
                 }
               }
+              // Withdrawal request actions
+              else if (buttonId === 'request-withdrawal' && data.amount) {
+                const withdrawalAmount = parseFloat(data.amount)
+                const availableBalance = data.availableBalance || 0
+                
+                // Validate amount
+                if (withdrawalAmount < 100) {
+                  error('Minimum withdrawal amount is ₹100')
+                  return
+                }
+                
+                if (withdrawalAmount > availableBalance) {
+                  error(`Insufficient balance. Available: ₹${Math.round(availableBalance).toLocaleString('en-IN')}, Requested: ₹${withdrawalAmount.toLocaleString('en-IN')}`)
+                  return
+                }
+                
+                // Get bank account details for confirmation
+                let bankAccountDetails = null
+                if (data.bankAccountId && data.bankAccounts) {
+                  const selectedAccount = data.bankAccounts.find(acc => (acc._id || acc.id) === data.bankAccountId)
+                  if (selectedAccount) {
+                    bankAccountDetails = {
+                      'Account Holder': selectedAccount.accountHolderName || 'N/A',
+                      'Account Number': `****${(selectedAccount.accountNumber || '').slice(-4)}`,
+                      'IFSC Code': selectedAccount.ifscCode || 'N/A',
+                      'Bank Name': selectedAccount.bankName || 'N/A',
+                    }
+                  }
+                }
+                
+                // Show confirmation modal
+                setConfirmationData({
+                  type: 'withdrawal',
+                  amount: withdrawalAmount,
+                  availableBalance,
+                  bankAccountId: data.bankAccountId,
+                  bankAccountDetails,
+                })
+                setConfirmationModalOpen(true)
+                closePanel() // Close the action panel
+              }
               // Admin request actions
               else if (type === 'update' && data.type === 'admin_request') {
                 // Simulate sending request to admin (this would be a separate API endpoint)
@@ -714,6 +770,52 @@ export function VendorDashboard({ onLogout }) {
           }}
         />
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmationModalOpen}
+        onClose={() => {
+          setConfirmationModalOpen(false)
+          setConfirmationData(null)
+        }}
+        onConfirm={async () => {
+          if (!confirmationData) return
+          
+          setConfirmationLoading(true)
+          try {
+            if (confirmationData.type === 'withdrawal') {
+              const withdrawalData = {
+                amount: confirmationData.amount,
+                bankAccountId: confirmationData.bankAccountId || undefined,
+              }
+              const result = await requestWithdrawal(withdrawalData)
+              if (result.data) {
+                success('Withdrawal request submitted successfully. Awaiting admin approval.')
+                setConfirmationModalOpen(false)
+                setConfirmationData(null)
+                // Refresh earnings summary
+                if (activeTab === 'earnings') {
+                  getEarningsSummary()
+                }
+              } else if (result.error) {
+                error(result.error.message || 'Failed to submit withdrawal request')
+              }
+            }
+          } catch (err) {
+            error(err.message || 'An unexpected error occurred')
+          } finally {
+            setConfirmationLoading(false)
+          }
+        }}
+        title="Confirm Withdrawal Request"
+        message="Please verify all bank account details and withdrawal amount before proceeding. Once submitted, this request will be sent to admin for approval."
+        details={confirmationData ? {
+          'Withdrawal Amount': `₹${confirmationData.amount.toLocaleString('en-IN')}`,
+          'Available Balance': `₹${Math.round(confirmationData.availableBalance).toLocaleString('en-IN')}`,
+          ...(confirmationData.bankAccountDetails || {}),
+        } : null}
+        loading={confirmationLoading}
+      />
 
       {/* Escalation Modals */}
       <OrderEscalationModal
@@ -984,8 +1086,8 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
           </button>
         </div>
         <div className="overview-activity__list">
-          {displayTransactions.length > 0 ? displayTransactions.map((item) => (
-            <div key={item.name} className="overview-activity__item">
+          {displayTransactions.length > 0 ? displayTransactions.map((item, index) => (
+            <div key={item.orderId || `${item.name}-${index}`} className="overview-activity__item">
               <div className="overview-activity__avatar">{item.avatar}</div>
               <div className="overview-activity__details">
                 <div className="overview-activity__row">
@@ -1039,7 +1141,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
             </div>
             <div className="vendor-activity-sheet__body">
               {displayTransactions.length > 0 ? displayTransactions.map((item, index) => (
-                <div key={`${item.name}-${index}`} className="overview-activity__item">
+                <div key={item.orderId || `${item.name}-${index}`} className="overview-activity__item">
                   <div className="overview-activity__avatar">{item.avatar}</div>
                   <div className="overview-activity__details">
                     <div className="overview-activity__row">
@@ -1151,6 +1253,8 @@ function InventoryView({ openPanel }) {
   const [orderNotes, setOrderNotes] = useState('')
   const [orderError, setOrderError] = useState('')
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false)
+  const [selectedProductAttributes, setSelectedProductAttributes] = useState({}) // For single product ordering
+  const [selectedProductAttributeStock, setSelectedProductAttributeStock] = useState(null)
   const [showOrderRequestScreen, setShowOrderRequestScreen] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState([]) // Array of {productId, quantity}
   const [orderRequestForm, setOrderRequestForm] = useState({
@@ -1198,6 +1302,8 @@ function InventoryView({ openPanel }) {
     setConfirmProductName('')
     setOrderNotes('')
     setOrderError('')
+    setSelectedProductAttributes({})
+    setSelectedProductAttributeStock(null)
   }, [selectedProduct?.id])
 
   const resetOrderRequestForm = () => {
@@ -1295,8 +1401,24 @@ function InventoryView({ openPanel }) {
 
   const handleOrderSubmit = async () => {
     if (!selectedProduct) return
-    const adminStock = selectedProduct.adminStock ?? selectedProduct.displayStock ?? selectedProduct.stock ?? 0
-    const pricePerUnit = selectedProduct.pricePerUnit || selectedProduct.priceToVendor || 0
+    
+    // Check if product has attributes and if they're selected
+    const hasAttributes = selectedProduct.attributeStocks && 
+                         Array.isArray(selectedProduct.attributeStocks) && 
+                         selectedProduct.attributeStocks.length > 0
+    
+    if (hasAttributes && Object.keys(selectedProductAttributes).length === 0) {
+      setOrderError('Please select a variant before ordering.')
+      return
+    }
+    
+    // Use attribute-specific stock/price if available, otherwise use main product values
+    const adminStock = selectedProductAttributeStock 
+      ? (selectedProductAttributeStock.displayStock || 0)
+      : (selectedProduct.adminStock ?? selectedProduct.displayStock ?? selectedProduct.stock ?? 0)
+    const pricePerUnit = selectedProductAttributeStock
+      ? (selectedProductAttributeStock.vendorPrice || 0)
+      : (selectedProduct.pricePerUnit || selectedProduct.priceToVendor || 0)
     const quantityNumber = parseFloat(orderQuantity)
     const orderTotal = quantityNumber * pricePerUnit
     const creditRemaining = dashboard.credit?.remaining || 0
@@ -1326,15 +1448,20 @@ function InventoryView({ openPanel }) {
 
     setIsSubmittingOrder(true)
     try {
+      const itemPayload = {
+        productId: selectedProduct.id || selectedProduct._id,
+        productName: selectedProduct.name,
+        quantity: quantityNumber,
+        pricePerUnit,
+      }
+      
+      // Add attribute combination if product has attributes
+      if (hasAttributes && Object.keys(selectedProductAttributes).length > 0) {
+        itemPayload.attributeCombination = selectedProductAttributes
+      }
+
       const payload = {
-        items: [
-          {
-            productId: selectedProduct.id || selectedProduct._id,
-            productName: selectedProduct.name,
-            quantity: quantityNumber,
-            pricePerUnit,
-          },
-        ],
+        items: [itemPayload],
         notes: orderNotes ? orderNotes.trim() : undefined,
       }
 
@@ -1381,28 +1508,51 @@ function InventoryView({ openPanel }) {
         return
       }
 
+      // Check if product has attributes and if they're selected
+      const hasAttributes = product.attributeStocks && 
+                           Array.isArray(product.attributeStocks) && 
+                           product.attributeStocks.length > 0
+      
+      if (hasAttributes && (!selected.attributes || Object.keys(selected.attributes).length === 0)) {
+        setOrderRequestError(`Please select a variant for ${product.name}.`)
+        return
+      }
+
       const quantityNumber = parseFloat(selected.quantity)
       if (!quantityNumber || quantityNumber <= 0) {
         setOrderRequestError(`Enter a valid quantity for ${product.name}.`)
         return
       }
 
-      const adminStock = product.adminStock ?? product.displayStock ?? product.stock ?? 0
+      // Use attribute-specific stock/price if available, otherwise use main product values
+      const adminStock = selected.attributeStock
+        ? (selected.attributeStock.displayStock || 0)
+        : (product.adminStock ?? product.displayStock ?? product.stock ?? 0)
+      
       if (quantityNumber > adminStock) {
         setOrderRequestError(`Requested quantity for ${product.name} exceeds admin stock (${adminStock}).`)
         return
       }
 
-      const pricePerUnit = product.pricePerUnit || product.priceToVendor || 0
+      const pricePerUnit = selected.attributeStock
+        ? (selected.attributeStock.vendorPrice || 0)
+        : (product.pricePerUnit || product.priceToVendor || 0)
       const itemTotal = quantityNumber * pricePerUnit
       totalAmount += itemTotal
 
-      purchaseItems.push({
+      const itemPayload = {
         productId: product.id || product._id,
         productName: product.name,
         quantity: quantityNumber,
         pricePerUnit,
-      })
+      }
+      
+      // Add attribute combination if product has attributes
+      if (hasAttributes && selected.attributes && Object.keys(selected.attributes).length > 0) {
+        itemPayload.attributeCombination = selected.attributes
+      }
+
+      purchaseItems.push(itemPayload)
     }
 
     if (totalAmount < MIN_PURCHASE_VALUE) {
@@ -1552,13 +1702,24 @@ function InventoryView({ openPanel }) {
   }
 
   if (selectedProduct) {
-    const adminStock = selectedProduct.adminStock ?? selectedProduct.displayStock ?? selectedProduct.stock ?? 0
+    // Use attribute-specific values if available, otherwise use main product values
+    const adminStock = selectedProductAttributeStock 
+      ? (selectedProductAttributeStock.displayStock || 0)
+      : (selectedProduct.adminStock ?? selectedProduct.displayStock ?? selectedProduct.stock ?? 0)
     const vendorStock = selectedProduct.vendorStock ?? 0
     const vendorStockStatus = getVendorStockStatus(vendorStock)
     const ordersCount = selectedProduct.vendorOrdersCount ?? 0
-    const pricePerUnit = selectedProduct.pricePerUnit || selectedProduct.priceToVendor || 0
+    const pricePerUnit = selectedProductAttributeStock
+      ? (selectedProductAttributeStock.vendorPrice || 0)
+      : (selectedProduct.pricePerUnit || selectedProduct.priceToVendor || 0)
     const quantityNumber = parseFloat(orderQuantity) || 0
     const orderTotal = quantityNumber * pricePerUnit
+    
+    // Check if product has attributes and if they're selected
+    const hasAttributes = selectedProduct.attributeStocks && 
+                         Array.isArray(selectedProduct.attributeStocks) && 
+                         selectedProduct.attributeStocks.length > 0
+    const attributesSelected = hasAttributes ? Object.keys(selectedProductAttributes).length > 0 : true
     const creditInfo = dashboard.credit || {}
     const creditRemaining = creditInfo.remaining || 0
     const creditLimit = creditInfo.limit || 0
@@ -1571,6 +1732,7 @@ function InventoryView({ openPanel }) {
       orderTotal >= MIN_PURCHASE_VALUE &&
       orderTotal <= creditRemaining &&
       confirmMatches &&
+      attributesSelected &&
       !isSubmittingOrder
 
     return (
@@ -1654,9 +1816,9 @@ function InventoryView({ openPanel }) {
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <p className="text-xs text-gray-600">Price per {selectedProduct.unit || 'kg'}</p>
+                <p className="text-xs text-gray-600">Price per {selectedProductAttributeStock?.stockUnit || selectedProduct.unit || 'kg'}</p>
                 <p className="text-lg font-bold text-purple-600">
-                  ₹{selectedProduct.pricePerUnit || selectedProduct.priceToVendor || 0}
+                  ₹{pricePerUnit.toLocaleString('en-IN')}
                 </p>
               </div>
               
@@ -1695,7 +1857,7 @@ function InventoryView({ openPanel }) {
                   <p className={cn('text-sm font-bold', orderTotal >= MIN_PURCHASE_VALUE ? 'text-gray-900' : 'text-red-600')}>
                     ₹{orderTotal.toLocaleString('en-IN')}
                   </p>
-                  <p className="text-[11px] text-gray-500 mt-1">Price ₹{pricePerUnit.toLocaleString('en-IN')} per {selectedProduct.unit || 'kg'}</p>
+                  <p className="text-[11px] text-gray-500 mt-1">Price ₹{pricePerUnit.toLocaleString('en-IN')} per {selectedProductAttributeStock?.stockUnit || selectedProduct.unit || 'kg'}</p>
                 </div>
                 <div className="rounded-lg border border-white bg-white/70 p-3">
                   <p className="text-xs text-gray-600">Credits after request</p>
@@ -1707,23 +1869,39 @@ function InventoryView({ openPanel }) {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold text-gray-700">
-                    Quantity to order ({selectedProduct.unit || 'kg'})
-                  </label>
-                  <input
-                    type="number"
-                    value={orderQuantity}
-                    onChange={(e) => setOrderQuantity(e.target.value)}
-                    min="1"
-                    max={adminStock}
-                    placeholder="Enter quantity"
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-                  />
-                  <p className="mt-1 text-[11px] text-gray-500">
-                    Admin has {adminStock} {selectedProduct.unit || 'kg'} available.
-                  </p>
-                </div>
+              {/* Attribute Selection - Only show if product has attributes */}
+              {selectedProduct.attributeStocks && 
+               Array.isArray(selectedProduct.attributeStocks) && 
+               selectedProduct.attributeStocks.length > 0 && (
+                <ProductAttributeSelector
+                  product={selectedProduct}
+                  selectedAttributes={selectedProductAttributes}
+                  onAttributesChange={(attributes, attributeStock) => {
+                    setSelectedProductAttributes(attributes)
+                    setSelectedProductAttributeStock(attributeStock)
+                    // Reset quantity when variant changes
+                    setOrderQuantity('')
+                  }}
+                />
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-gray-700">
+                  Quantity to order ({selectedProductAttributeStock?.stockUnit || selectedProduct.unit || 'kg'})
+                </label>
+                <input
+                  type="number"
+                  value={orderQuantity}
+                  onChange={(e) => setOrderQuantity(e.target.value)}
+                  min="1"
+                  max={adminStock}
+                  placeholder="Enter quantity"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                />
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Admin has {adminStock} {selectedProductAttributeStock?.stockUnit || selectedProduct.unit || 'kg'} available.
+                </p>
+              </div>
                 <div>
                   <label className="text-xs font-semibold text-gray-700">
                     Type product name to confirm
@@ -1995,20 +2173,57 @@ function InventoryView({ openPanel }) {
                       (p) => (p.id || p._id)?.toString() === selected.productId
                     )
                     if (!product) return null
-                    const adminStock = product.adminStock ?? product.displayStock ?? product.stock ?? 0
+                    
+                    // Check if product has attributes
+                    const hasAttributes = product.attributeStocks && 
+                                         Array.isArray(product.attributeStocks) && 
+                                         product.attributeStocks.length > 0
+                    
+                    // Use attribute-specific stock/price if available, otherwise use main product values
+                    const adminStock = selected.attributeStock
+                      ? (selected.attributeStock.displayStock || 0)
+                      : (product.adminStock ?? product.displayStock ?? product.stock ?? 0)
+                    const pricePerUnit = selected.attributeStock
+                      ? (selected.attributeStock.vendorPrice || 0)
+                      : (product.pricePerUnit || product.priceToVendor || 0)
+                    const stockUnit = selected.attributeStock?.stockUnit || product.unit || 'kg'
                     const quantity = parseFloat(selected.quantity) || 0
                     
                     return (
                       <div
                         key={selected.productId}
-                        className="flex items-center gap-4 rounded-lg border border-purple-200 bg-white p-4"
+                        className="space-y-3 rounded-lg border border-purple-200 bg-white p-4"
                       >
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-gray-900">{product.name}</p>
-                          <p className="text-xs text-gray-500">
-                            Available: {adminStock} {product.unit || 'kg'} • ₹{product.pricePerUnit || product.priceToVendor || 0}/{product.unit || 'kg'}
-                          </p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-gray-900">{product.name}</p>
+                            <p className="text-xs text-gray-500">
+                              Available: {adminStock} {stockUnit} • ₹{pricePerUnit.toLocaleString('en-IN')}/{stockUnit}
+                            </p>
+                          </div>
                         </div>
+                        
+                        {/* Attribute Selection - Only show if product has attributes */}
+                        {hasAttributes && (
+                          <ProductAttributeSelector
+                            product={product}
+                            selectedAttributes={selected.attributes || {}}
+                            onAttributesChange={(attributes, attributeStock) => {
+                              setSelectedProducts(prev => prev.map(p => 
+                                p.productId === selected.productId
+                                  ? { ...p, attributes, attributeStock }
+                                  : p
+                              ))
+                              // Reset quantity when variant changes
+                              setSelectedProducts(prev => prev.map(p => 
+                                p.productId === selected.productId
+                                  ? { ...p, quantity: '' }
+                                  : p
+                              ))
+                            }}
+                          />
+                        )}
+                        
                         <div className="flex items-center gap-2">
                           <input
                             type="number"
@@ -2019,7 +2234,7 @@ function InventoryView({ openPanel }) {
                             placeholder="Qty"
                             className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
                           />
-                          <span className="text-xs text-gray-600">{product.unit || 'kg'}</span>
+                          <span className="text-xs text-gray-600">{stockUnit}</span>
                           <button
                             type="button"
                             onClick={() => handleRemoveProduct(selected.productId)}
@@ -2541,7 +2756,8 @@ function InventoryView({ openPanel }) {
 function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationModal, onShowAllOrders, onViewOrderDetails }) {
   const { dashboard } = useVendorState()
   const dispatch = useVendorDispatch()
-  const { getOrders, getOrderDetails } = useVendorApi()
+  const { getOrders, getOrderDetails, updateOrderStatus, fetchDashboardData } = useVendorApi()
+  const { success, error } = useToast()
   const [selectedFilter, setSelectedFilter] = useState('all')
   const [ordersData, setOrdersData] = useState(null)
 
@@ -2637,8 +2853,8 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
     })
   }
   
-  // Map filtered orders for display
-  const orders = filteredOrders.map((order) => {
+  // Helper function to map order to display format
+  const mapOrderToDisplay = (order) => {
     const isFullyPaid = order.paymentStatus === 'fully_paid'
     const isDelivered = order.status === 'delivered'
     
@@ -2677,9 +2893,27 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
       deliveryAddress: order.deliveryAddress || {},
       createdAt: order.createdAt,
       statusUpdateGracePeriod: order.statusUpdateGracePeriod || null,
+      acceptanceGracePeriod: order.acceptanceGracePeriod || null,
       next: nextMessage,
     }
-  })
+  }
+
+  // Map filtered orders for display (for main orders list)
+  const orders = filteredOrders.map(mapOrderToDisplay)
+  
+  // Get 3 most recent orders for tracker section (regardless of status)
+  // Keep original order objects but sort by date
+  const recentOrdersForTrackerRaw = backendOrders
+    .slice()
+    .sort((a, b) => {
+      const dateA = new Date(a.createdAt || a.updatedAt || 0)
+      const dateB = new Date(b.createdAt || b.updatedAt || 0)
+      return dateB - dateA // Descending order (most recent first)
+    })
+    .slice(0, 3)
+  
+  // Map to display format for tracker
+  const recentOrdersForTracker = recentOrdersForTrackerRaw.map(mapOrderToDisplay)
 
   const filterChips = [
     { id: 'all', label: 'All orders', value: totalOrders },
@@ -2848,36 +3082,30 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
 
       <section id="orders-tracker" className="orders-section">
         <div className="overview-section__header">
-                <div>
+          <div>
             <h3 className="overview-section__title">Orders</h3>
-                </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            {onShowAllOrders && (
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {onShowAllOrders && backendOrders.length > 0 && (
               <button 
                 type="button" 
                 className="orders-section__cta" 
                 onClick={onShowAllOrders}
-                style={{ 
-                  fontSize: '14px', 
-                  fontWeight: '500',
-                  color: '#3B82F6',
-                  textDecoration: 'underline',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '0'
-                }}
               >
-                SEE ALL
+                See All
               </button>
             )}
             <button type="button" className="orders-section__cta" onClick={() => openPanel('view-sla-policy')}>
               View delivery policy
             </button>
           </div>
-              </div>
+        </div>
         <div className="orders-list">
-          {orders.length > 0 ? orders.map((order) => {
+          {backendOrders.length > 0 ? recentOrdersForTrackerRaw.map((originalOrder, index) => {
+            // Map to display format for this order
+            const orderDisplay = recentOrdersForTracker[index]
+            const order = originalOrder // Use original order for all status/grace period checks
+            
             const normalizedStatus = normalizeStatus(order.status)
             // Check if order is in acceptance grace period
             const isInGracePeriod = order.acceptanceGracePeriod?.isActive
@@ -2896,7 +3124,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
             const workflowCompleted = isPartialPayment ? normalizedStatus === 'fully_paid' : normalizedStatus === 'delivered'
             const canShowStatusUpdate = !showAvailabilityActions && !isInStatusUpdateGracePeriod && !isInGracePeriod && !workflowCompleted && normalizedStatus !== 'awaiting'
             const nextMessage =
-              order.next ||
+              orderDisplay.next ||
               (isInGracePeriod
                 ? `Confirm or escalate within ${timeRemaining} minutes`
                 : isInStatusUpdateGracePeriod
@@ -2914,23 +3142,23 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                             : 'Update order status')
 
             return (
-            <article key={order.id} className="orders-card">
+            <article key={orderDisplay.id} className="orders-card">
               <header className="orders-card__header">
                 <div className="orders-card__identity">
                   <span className="orders-card__icon">
                     <TruckIcon className="h-5 w-5" />
                   </span>
                   <div className="orders-card__details">
-                    <p className="orders-card__name">{order.farmer}</p>
-                    <p className="orders-card__value">{order.value}</p>
+                    <p className="orders-card__name">{orderDisplay.farmer}</p>
+                    <p className="orders-card__value">{orderDisplay.value}</p>
               </div>
             </div>
                 <div className="orders-card__status">
                   <span className={cn(
                     'orders-card__payment',
-                    order.paymentStatus === 'fully_paid' && 'is-paid'
+                    paymentStatus === 'fully_paid' && 'is-paid'
                   )}>
-                    {order.payment}
+                    {orderDisplay.payment}
                   </span>
                   <span className="orders-card__stage-label">
                     {normalizedStatus === 'awaiting'
@@ -2952,12 +3180,12 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                   <span className="orders-card__next-value">{nextMessage}</span>
                 </div>
               <div className="orders-card__stages">
-              {STAGES.map((stage, index) => (
+              {STAGES.map((stage, stageIdx) => (
                   <div
                     key={stage}
-                    className={cn('orders-card__stage', index <= stageIndex(order.status) && 'is-active')}
+                    className={cn('orders-card__stage', stageIdx <= stageIndex(order.status) && 'is-active')}
                   >
-                    <span className="orders-card__stage-index">{index + 1}</span>
+                    <span className="orders-card__stage-index">{stageIdx + 1}</span>
                     <span className="orders-card__stage-text">{stage}</span>
                 </div>
               ))}
@@ -2979,14 +3207,14 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                     <button
                       type="button"
                       className="orders-card__action is-primary"
-                      onClick={() => openPanel('confirm-acceptance', { orderId: order.id })}
+                      onClick={() => openPanel('confirm-acceptance', { orderId: orderDisplay.id })}
                     >
                       Confirm Acceptance
                     </button>
                     <button
                       type="button"
                       className="orders-card__action is-secondary"
-                      onClick={() => openPanel('cancel-acceptance', { orderId: order.id })}
+                      onClick={() => openPanel('cancel-acceptance', { orderId: orderDisplay.id })}
                     >
                       Cancel & Escalate
                     </button>
@@ -3014,7 +3242,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                         className="orders-card__action is-primary"
                         onClick={() =>
                           openPanel('update-order-status', {
-                            orderId: order.id,
+                            orderId: orderDisplay.id,
                             status: normalizedStatus,
                           })
                         }
@@ -3029,7 +3257,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                           type="button"
                           className="orders-card__action is-primary"
                           onClick={async () => {
-                            const result = await updateOrderStatus(order.id, { finalizeGracePeriod: true })
+                            const result = await updateOrderStatus(orderDisplay.id, { finalizeGracePeriod: true })
                             if (result.data) {
                               success(result.data.message || 'Status update confirmed successfully!')
                               getOrders().then((result) => {
@@ -3051,7 +3279,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                             className="orders-card__action is-secondary"
                             onClick={() =>
                               openPanel('update-order-status', {
-                                orderId: order.id,
+                                orderId: orderDisplay.id,
                                 status: previousStatus,
                                 revert: true,
                               })
@@ -3083,7 +3311,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                         <button
                           type="button"
                           className="orders-card__action is-primary"
-                          onClick={() => openPanel('order-available', { orderId: order.id })}
+                          onClick={() => openPanel('order-available', { orderId: orderDisplay.id })}
                         >
                           Accept Order
                         </button>
@@ -3091,7 +3319,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                           type="button"
                           className="orders-card__action is-secondary"
                           onClick={async () => {
-                            const details = await getOrderDetails(order.id)
+                            const details = await getOrderDetails(orderDisplay.id)
                             if (details.data?.order) {
                               onOpenEscalationModal?.(details.data.order)
                             }
@@ -3103,7 +3331,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                           type="button"
                           className="orders-card__action is-secondary"
                           onClick={async () => {
-                            const details = await getOrderDetails(order.id)
+                            const details = await getOrderDetails(orderDisplay.id)
                             if (details.data?.order) {
                               onOpenPartialEscalationModal?.(details.data.order, 'items')
                             }
@@ -3115,7 +3343,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                           type="button"
                           className="orders-card__action is-secondary"
                           onClick={async () => {
-                            const details = await getOrderDetails(order.id)
+                            const details = await getOrderDetails(orderDisplay.id)
                             if (details.data?.order) {
                               onOpenPartialEscalationModal?.(details.data.order, 'quantities')
                             }
@@ -3135,7 +3363,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                   className="orders-card__action is-secondary"
                   style={{ width: '100%', justifyContent: 'center' }}
                   onClick={async () => {
-                    const details = await getOrderDetails(order.id)
+                    const details = await getOrderDetails(orderDisplay.id)
                     if (details.data?.order) {
                       onViewOrderDetails?.(details.data.order)
                     }
@@ -4004,7 +4232,7 @@ function CreditView({ openPanel }) {
     used: creditUsed > 0 ? `₹${(creditUsed / 100000).toFixed(1)}L` : '₹0',
     remaining: creditRemaining > 0 ? `₹${(creditRemaining / 100000).toFixed(1)}L` : '₹0',
     penalty: penalty === 0 ? 'No penalty' : `₹${penalty.toLocaleString('en-IN')}`,
-    due: creditData.dueDate ? new Date(creditData.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set',
+    due: creditInfo.dueDate || dashboard.overview?.credit?.dueDate ? new Date(creditInfo.dueDate || dashboard.overview?.credit?.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set',
   }
 
   const usedPercent = creditLimit > 0
@@ -4180,20 +4408,29 @@ function ReportsView() {
   const dispatch = useVendorDispatch()
   const { getReports } = useVendorApi()
 
+  const [activeTab, setActiveTab] = useState('revenue')
+  const [timePeriod, setTimePeriod] = useState('week')
+
   useEffect(() => {
-    getReports({ period: 'week' }).then((result) => {
+    // Convert timePeriod to days for backend
+    const periodMap = {
+      'week': '7',
+      'month': '30',
+      'year': '365',
+      'all': '3650', // ~10 years for "all time"
+    }
+    const periodDays = periodMap[timePeriod] || '30'
+    
+    getReports({ period: periodDays }).then((result) => {
       if (result.data) {
         dispatch({ type: 'SET_REPORTS_DATA', payload: result.data })
       }
     })
-  }, [getReports, dispatch])
+  }, [getReports, dispatch, timePeriod])
   // Remove static topVendors - this is vendor-specific data, not needed here
   // If needed in future, can be fetched from backend analytics
 
   const reportIcons = [ChartIcon, WalletIcon, CreditIcon, HomeIcon]
-
-  const [activeTab, setActiveTab] = useState('revenue')
-  const [timePeriod, setTimePeriod] = useState('week')
 
   const tabs = [
     { id: 'revenue', label: 'Earnings Summary' },
@@ -4215,24 +4452,27 @@ function ReportsView() {
   // Transform backend reports data to chart format
   const getRevenueData = (period) => {
     // Use real data from backend if available
-    if (reportsData?.dailyTrends && Array.isArray(reportsData.dailyTrends)) {
-      const trends = reportsData.dailyTrends
-        return {
-        labels: trends.map(t => {
-          // Format date labels based on period
-          const date = new Date(t._id)
-          if (period === 'week') return date.toLocaleDateString('en-US', { weekday: 'short' })
-          if (period === 'month') return `Week ${Math.ceil(date.getDate() / 7)}`
-          if (period === 'year') return `Q${Math.ceil((date.getMonth() + 1) / 3)}`
-          return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+    // Backend returns orders.breakdown grouped by status, we can use that for trends
+    if (reportsData?.orders?.breakdown && Array.isArray(reportsData.orders.breakdown)) {
+      const breakdown = reportsData.orders.breakdown
+      return {
+        labels: breakdown.map((_, index) => {
+          // Generate labels based on period
+          if (period === 'week') {
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+            return days[index % 7] || `Day ${index + 1}`
+          }
+          if (period === 'month') return `Week ${index + 1}`
+          if (period === 'year') return `Q${index + 1}`
+          return `Period ${index + 1}`
         }),
-        revenue: trends.map(t => (t.sales || 0) / 100000), // Convert to Lakhs
-        orders: trends.map(t => t.count || 0),
-        }
+        revenue: breakdown.map(b => (b.totalAmount || 0) / 100000), // Convert to Lakhs
+        orders: breakdown.map(b => b.count || 0),
+      }
     }
     
     // Fallback to empty data if no backend data
-        return {
+    return {
       labels: [],
       revenue: [],
       orders: [],
@@ -4241,11 +4481,11 @@ function ReportsView() {
 
   const chartData = getRevenueData(timePeriod)
   
-  // Get sales data from backend
-  const salesData = reportsData?.sales || {}
-  const totalSales = salesData.totalSales || 0
-  const orderCount = salesData.orderCount || 0
-  const averageOrderValue = salesData.averageOrderValue || 0
+  // Get revenue data from backend (backend returns 'revenue', not 'sales')
+  const revenueData = reportsData?.revenue || {}
+  const totalSales = revenueData.totalRevenue || 0
+  const orderCount = revenueData.orderCount || 0
+  const averageOrderValue = revenueData.averageOrderValue || 0
   const maxValue = Math.max(...chartData.revenue, ...chartData.orders)
   const yAxisSteps = 5
   const yAxisLabels = Array.from({ length: yAxisSteps + 1 }, (_, i) => {
@@ -4692,6 +4932,416 @@ function ReportsView() {
       </section>
 
       {/* Top sellers section removed - not relevant for vendor's own dashboard */}
+    </div>
+  )
+}
+
+function EarningsView({ openPanel }) {
+  const dispatch = useVendorDispatch()
+  const { getEarningsSummary, getEarningsHistory, getEarningsByOrders, getWithdrawals, getBankAccounts } = useVendorApi()
+  const { toasts, dismissToast, success, error } = useToast()
+  const [earningsData, setEarningsData] = useState(null)
+  const [earningsHistory, setEarningsHistory] = useState([])
+  const [earningsByOrders, setEarningsByOrders] = useState([])
+  const [withdrawals, setWithdrawals] = useState([])
+  const [bankAccounts, setBankAccounts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [historyPage, setHistoryPage] = useState(1)
+  const [ordersPage, setOrdersPage] = useState(1)
+  const [activeSection, setActiveSection] = useState('summary') // 'summary', 'history', 'orders', 'withdrawals'
+  const [showBankAccountForm, setShowBankAccountForm] = useState(false)
+  const bankAccountFormRef = useRef(null)
+
+  useEffect(() => {
+    loadEarningsData()
+    loadBankAccounts()
+  }, [])
+
+  // Scroll to form when it opens
+  useEffect(() => {
+    if (showBankAccountForm && bankAccountFormRef.current) {
+      setTimeout(() => {
+        bankAccountFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+    }
+  }, [showBankAccountForm])
+
+  const loadEarningsData = async () => {
+    setLoading(true)
+    try {
+      const [summaryResult, historyResult, ordersResult, withdrawalsResult] = await Promise.all([
+        getEarningsSummary(),
+        getEarningsHistory({ page: historyPage, limit: 10 }),
+        getEarningsByOrders({ page: ordersPage, limit: 10 }),
+        getWithdrawals({ page: 1, limit: 10 }),
+      ])
+
+      if (summaryResult.data) setEarningsData(summaryResult.data)
+      if (historyResult.data?.earnings) setEarningsHistory(historyResult.data.earnings)
+      if (ordersResult.data?.earningsByOrder) setEarningsByOrders(ordersResult.data.earningsByOrder)
+      if (withdrawalsResult.data?.withdrawals) setWithdrawals(withdrawalsResult.data.withdrawals)
+    } catch (err) {
+      error('Failed to load earnings data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadBankAccounts = async () => {
+    const result = await getBankAccounts()
+    if (result.data?.bankAccounts) {
+      setBankAccounts(result.data.bankAccounts)
+    }
+  }
+
+  const formatCurrency = (amount) => {
+    if (!amount) return '₹0'
+    return `₹${Math.round(amount).toLocaleString('en-IN')}`
+  }
+
+  const formatDate = (date) => {
+    if (!date) return 'N/A'
+    return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+
+  if (loading && !earningsData) {
+    return (
+      <div className="earnings-view space-y-6">
+        <div className="credit-status-card">
+          <div className="credit-status-card__main">
+            <p>Loading earnings data...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const summary = earningsData || {
+    totalEarnings: 0,
+    availableBalance: 0,
+    pendingWithdrawal: 0,
+    thisMonthEarnings: 0,
+    lastWithdrawalDate: null,
+  }
+
+  const earningsMetrics = [
+    { label: 'Total Earnings', value: formatCurrency(summary.totalEarnings), icon: WalletIcon, tone: 'success' },
+    { label: 'Available Balance', value: formatCurrency(summary.availableBalance), icon: SparkIcon, tone: 'success' },
+    { label: 'Pending Withdrawal', value: formatCurrency(summary.pendingWithdrawal), icon: CreditIcon, tone: 'warn' },
+    { label: 'This Month', value: formatCurrency(summary.thisMonthEarnings), icon: ChartIcon, tone: 'teal' },
+  ]
+
+  return (
+    <div className="earnings-view space-y-6">
+      {/* Earnings Summary Section */}
+      <section id="earnings-summary" className="credit-status-section">
+        <div className="credit-status-card">
+          <div className="credit-status-card__main">
+            <div className="credit-status-card__progress-wrapper">
+              <div className="credit-status-card__progress-ring">
+                <svg className="credit-status-card__progress-svg" viewBox="0 0 120 120">
+                  <circle
+                    className="credit-status-card__progress-bg"
+                    cx="60"
+                    cy="60"
+                    r="54"
+                    fill="none"
+                    strokeWidth="8"
+                  />
+                  <circle
+                    className="credit-status-card__progress-fill"
+                    cx="60"
+                    cy="60"
+                    r="54"
+                    fill="none"
+                    strokeWidth="8"
+                    strokeDasharray={`${2 * Math.PI * 54}`}
+                    strokeDashoffset={`${2 * Math.PI * 54 * (1 - (summary.availableBalance / Math.max(summary.totalEarnings, 1)))}`}
+                    transform="rotate(-90 60 60)"
+                  />
+                </svg>
+                <div className="credit-status-card__progress-content">
+                  <span className="credit-status-card__progress-percent">
+                    {summary.totalEarnings > 0
+                      ? Math.round((summary.availableBalance / summary.totalEarnings) * 100)
+                      : 0}%
+                  </span>
+                  <span className="credit-status-card__progress-label">Available</span>
+                </div>
+              </div>
+              <div className="credit-status-card__details">
+                <div className="credit-status-card__amount">
+                  <span className="credit-status-card__amount-value">{formatCurrency(summary.totalEarnings)}</span>
+                  <span className="credit-status-card__amount-label">Total Earnings</span>
+                </div>
+                <div className="credit-status-card__quick-info">
+                  <div className="credit-status-card__info-item">
+                    <span className="credit-status-card__info-label">Available</span>
+                    <span className="credit-status-card__info-value">{formatCurrency(summary.availableBalance)}</span>
+                  </div>
+                  <div className="credit-status-card__info-item">
+                    <span className="credit-status-card__info-label">Pending</span>
+                    <span className="credit-status-card__info-value">{formatCurrency(summary.pendingWithdrawal)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="credit-status-card__footer">
+            <div className="credit-status-card__status-badge">
+              <span className="credit-status-card__status-text">
+                {summary.lastWithdrawalDate
+                  ? `Last withdrawal: ${formatDate(summary.lastWithdrawalDate)}`
+                  : 'No withdrawals yet'}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="credit-status-card__action"
+              onClick={() => {
+                if (bankAccounts.length === 0) {
+                  error('Please add a bank account before requesting withdrawal')
+                  return
+                }
+                
+                // Prepare bank account options for the select field
+                const bankAccountOptions = bankAccounts.map((account) => ({
+                  value: account._id || account.id,
+                  label: `${account.accountHolderName} - ${account.bankName} (${account.accountNumber.slice(-4)})${account.isPrimary ? ' - Primary' : ''}`,
+                }))
+                
+                // Set default to primary account if available
+                const primaryAccount = bankAccounts.find((acc) => acc.isPrimary)
+                const defaultBankAccountId = primaryAccount?._id || primaryAccount?.id || bankAccounts[0]?._id || bankAccounts[0]?.id
+                
+                // Update the field options dynamically
+                openPanel('request-withdrawal', {
+                  availableBalance: summary.availableBalance,
+                  bankAccountOptions,
+                  bankAccountId: defaultBankAccountId,
+                })
+              }}
+              disabled={summary.availableBalance < 100 || bankAccounts.length === 0}
+            >
+              Request Withdrawal
+            </button>
+          </div>
+          {bankAccounts.length === 0 && (
+            <div style={{ marginTop: '1rem', padding: '1rem', background: '#fef3c7', borderRadius: '0.5rem', fontSize: '0.875rem', color: '#92400e' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <p style={{ margin: 0 }}>
+                  <strong>No bank account added.</strong> Please add a bank account to request withdrawals.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowBankAccountForm(true)}
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.5rem',
+                    background: '#1b8f5b',
+                    color: 'white',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = '#157a4d'}
+                  onMouseLeave={(e) => e.target.style.background = '#1b8f5b'}
+                >
+                  Add Bank Account
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Earnings Metrics Grid */}
+      <section id="earnings-metrics" className="credit-section">
+        <div className="overview-section__header">
+          <div>
+            <h3 className="overview-section__title">Earnings Summary</h3>
+          </div>
+        </div>
+        <div className="credit-metric-grid">
+          {earningsMetrics.map((metric) => {
+            const Icon = metric.icon
+            return (
+              <div key={metric.label} className="credit-metric-card">
+                <span
+                  className={cn(
+                    'credit-metric-icon',
+                    metric.tone === 'warn' ? 'is-warn' : metric.tone === 'teal' ? 'is-teal' : 'is-success',
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div className="credit-metric-body">
+                  <p>{metric.label}</p>
+                  <span>{metric.value}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* Navigation Tabs */}
+      <section id="earnings-tabs" className="credit-section">
+        <div className="overview-section__header">
+          <div>
+            <h3 className="overview-section__title">Earnings Details</h3>
+          </div>
+        </div>
+        <div className="credit-action-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+          <button
+            type="button"
+            className={cn('credit-action-card', activeSection === 'history' && 'is-active')}
+            onClick={() => setActiveSection('history')}
+          >
+            <header>
+              <span className="credit-action-card__icon">
+                <ReportIcon className="h-5 w-5" />
+              </span>
+              <h4 className="credit-action-card__title">History</h4>
+            </header>
+          </button>
+          <button
+            type="button"
+            className={cn('credit-action-card', activeSection === 'orders' && 'is-active')}
+            onClick={() => setActiveSection('orders')}
+          >
+            <header>
+              <span className="credit-action-card__icon">
+                <CartIcon className="h-5 w-5" />
+              </span>
+              <h4 className="credit-action-card__title">By Orders</h4>
+            </header>
+          </button>
+        </div>
+      </section>
+
+      {/* Earnings History */}
+      {activeSection === 'history' && (
+        <section id="earnings-history" className="credit-section">
+          <div className="overview-section__header">
+            <div>
+              <h3 className="overview-section__title">Earnings History</h3>
+            </div>
+          </div>
+          {earningsHistory.length === 0 ? (
+            <div className="credit-usage-card">
+              <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No earnings history yet</p>
+            </div>
+          ) : (
+            <div className="credit-usage-card">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {earningsHistory.map((earning) => (
+                  <div
+                    key={earning._id || earning.id}
+                    style={{
+                      padding: '1rem',
+                      borderBottom: '1px solid #e5e7eb',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div>
+                      <p style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                        {earning.productName || 'Product'}
+                      </p>
+                      <p style={{ fontSize: '0.875rem', color: '#666' }}>
+                        Order: {earning.orderId?.orderNumber || 'N/A'} • Qty: {earning.quantity}
+                      </p>
+                      <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
+                        {formatDate(earning.processedAt)}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontWeight: '600', color: '#10b981' }}>{formatCurrency(earning.earnings)}</p>
+                      <p style={{ fontSize: '0.75rem', color: '#666' }}>
+                        {formatCurrency(earning.userPrice - earning.vendorPrice)} per unit
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Earnings by Orders */}
+      {activeSection === 'orders' && (
+        <section id="earnings-orders" className="credit-section">
+          <div className="overview-section__header">
+            <div>
+              <h3 className="overview-section__title">Earnings by Orders</h3>
+            </div>
+          </div>
+          {earningsByOrders.length === 0 ? (
+            <div className="credit-usage-card">
+              <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No earnings from orders yet</p>
+            </div>
+          ) : (
+            <div className="credit-usage-card">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {earningsByOrders.map((orderEarning) => (
+                  <div
+                    key={orderEarning.orderId}
+                    style={{
+                      padding: '1rem',
+                      borderBottom: '1px solid #e5e7eb',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div>
+                      <p style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                        {orderEarning.orderNumber || 'Order'}
+                      </p>
+                      <p style={{ fontSize: '0.875rem', color: '#666' }}>
+                        {orderEarning.itemCount} item{orderEarning.itemCount !== 1 ? 's' : ''}
+                      </p>
+                      <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
+                        {formatDate(orderEarning.processedAt)}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontWeight: '600', color: '#10b981' }}>
+                        {formatCurrency(orderEarning.totalEarnings)}
+                      </p>
+                      <p style={{ fontSize: '0.75rem', color: '#666' }}>
+                        Order: {formatCurrency(orderEarning.orderTotal)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+      
+      {/* Bank Account Form */}
+      {showBankAccountForm ? (
+        <div ref={bankAccountFormRef}>
+          <BankAccountForm
+            isOpen={showBankAccountForm}
+            onClose={() => setShowBankAccountForm(false)}
+            onSuccess={async (bankAccount) => {
+              success('Bank account added successfully!')
+              // Reload bank accounts
+              await loadBankAccounts()
+              setShowBankAccountForm(false)
+            }}
+          />
+        </div>
+      ) : null}
     </div>
   )
 }

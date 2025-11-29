@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Layers3, MapPin, ToggleRight, Edit2, Trash2, ArrowLeft } from 'lucide-react'
+import { Layers3, MapPin, ToggleRight, Edit2, Trash2, ArrowLeft, Package } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { FilterBar } from '../components/FilterBar'
 import { ProductForm } from '../components/ProductForm'
+import { ProductAttributesModal } from '../components/ProductAttributesModal'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
 import { useToast } from '../components/ToastNotification'
@@ -22,14 +23,16 @@ const columns = [
   { Header: 'Actions', accessor: 'actions' },
 ]
 
-export function ProductsPage() {
+export function ProductsPage({ subRoute = null, navigate }) {
   const { products } = useAdminState()
   const { getProducts, createProduct, updateProduct, deleteProduct, toggleProductVisibility, loading } = useAdminApi()
   const { success, error: showError, warning: showWarning } = useToast()
   
-  const [showForm, setShowForm] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [productsList, setProductsList] = useState([])
+  const [allProductsList, setAllProductsList] = useState([])
+  const [showAttributesModal, setShowAttributesModal] = useState(false)
+  const [selectedProductForAttributes, setSelectedProductForAttributes] = useState(null)
 
   const regionColors = [
     { border: 'border-green-200', bg: 'bg-gradient-to-br from-green-50 to-green-100/50', text: 'text-green-700', progress: 'bg-gradient-to-r from-green-500 to-green-600' },
@@ -89,12 +92,24 @@ export function ProductsPage() {
     const result = await getProducts()
     if (result.data?.products) {
       const formatted = result.data.products.map(formatProductForDisplay)
-      setProductsList(formatted)
+      setAllProductsList(formatted)
     } else {
       // Fallback to mock data
-      setProductsList(productInventory.map(formatProductForDisplay))
+      const formatted = productInventory.map(formatProductForDisplay)
+      setAllProductsList(formatted)
     }
   }, [getProducts])
+
+  // Filter products based on subRoute
+  useEffect(() => {
+    if (subRoute === 'active') {
+      setProductsList(allProductsList.filter((p) => p.visibility === 'Active' || p.isActive !== false))
+    } else if (subRoute === 'inactive') {
+      setProductsList(allProductsList.filter((p) => p.visibility === 'Inactive' || p.isActive === false))
+    } else {
+      setProductsList(allProductsList)
+    }
+  }, [subRoute, allProductsList])
 
   useEffect(() => {
     fetchProducts()
@@ -107,16 +122,10 @@ export function ProductsPage() {
     }
   }, [products.updated, fetchProducts])
 
-  const handleAddProduct = () => {
-    setSelectedProduct(null)
-    setShowForm(true)
-  }
-
   const handleEditProduct = (product) => {
     // Find original product data (before formatting)
     const originalProduct = products.data?.products?.find((p) => p.id === product.id) || product
     setSelectedProduct(originalProduct)
-    setShowForm(true)
   }
 
   const handleDeleteProduct = async (productId) => {
@@ -165,7 +174,6 @@ export function ProductsPage() {
         // Update existing product
         const result = await updateProduct(selectedProduct.id, formData)
         if (result.data) {
-          setShowForm(false)
           setSelectedProduct(null)
           fetchProducts()
           success('Product updated successfully!', 3000)
@@ -181,7 +189,6 @@ export function ProductsPage() {
         // Create new product
         const result = await createProduct(formData)
         if (result.data) {
-          setShowForm(false)
           fetchProducts()
           success('Product created successfully!', 3000)
         } else if (result.error) {
@@ -198,12 +205,38 @@ export function ProductsPage() {
     }
   }
 
-  const handleBackToList = () => {
-    setShowForm(false)
-    setSelectedProduct(null)
-  }
-
   const tableColumns = columns.map((column) => {
+    if (column.accessor === 'name') {
+      return {
+        ...column,
+        Cell: (row) => {
+          const originalProduct = products.data?.products?.find((p) => p.id === row.id) || row
+          const hasAttributes = originalProduct.attributeStocks && 
+                               Array.isArray(originalProduct.attributeStocks) && 
+                               originalProduct.attributeStocks.length > 0
+          
+          return (
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-gray-900">{row.name}</span>
+              {hasAttributes && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedProductForAttributes(originalProduct)
+                    setShowAttributesModal(true)
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 transition-all hover:border-blue-500 hover:bg-blue-100"
+                  title={`View ${originalProduct.attributeStocks.length} attribute variant(s)`}
+                >
+                  <Package className="h-3 w-3" />
+                  {originalProduct.attributeStocks.length} variant{originalProduct.attributeStocks.length > 1 ? 's' : ''}
+                </button>
+              )}
+            </div>
+          )
+        },
+      }
+    }
     if (column.accessor === 'visibility') {
       return {
         ...column,
@@ -230,8 +263,26 @@ export function ProductsPage() {
         ...column,
         Cell: (row) => {
           const originalProduct = products.data?.products?.find((p) => p.id === row.id) || row
+          // Check if product has attributes
+          const hasAttributes = originalProduct.attributeStocks && 
+                               Array.isArray(originalProduct.attributeStocks) && 
+                               originalProduct.attributeStocks.length > 0
+          
           return (
             <div className="flex items-center gap-2">
+              {hasAttributes && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedProductForAttributes(originalProduct)
+                    setShowAttributesModal(true)
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-300 bg-blue-50 text-blue-700 transition-all hover:border-blue-500 hover:bg-blue-100"
+                  title="View attributes"
+                >
+                  <Package className="h-4 w-4" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => handleEditProduct(originalProduct)}
@@ -256,15 +307,18 @@ export function ProductsPage() {
     return column
   })
 
-  // Show full-screen form view
-  if (showForm) {
+  // Show full-screen form view when subRoute is 'add' or when editing
+  if (subRoute === 'add' || selectedProduct) {
     return (
       <div className="space-y-6">
         {/* Header with Back Button */}
         <div>
           <button
             type="button"
-            onClick={handleBackToList}
+            onClick={() => {
+              setSelectedProduct(null)
+              if (navigate) navigate('products')
+            }}
             className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -288,7 +342,10 @@ export function ProductsPage() {
           <ProductForm
             product={selectedProduct}
             onSubmit={handleFormSubmit}
-            onCancel={handleBackToList}
+            onCancel={() => {
+              setSelectedProduct(null)
+              if (navigate) navigate('products')
+            }}
             loading={loading}
           />
         </div>
@@ -297,23 +354,28 @@ export function ProductsPage() {
   }
 
   // Show products list view
+  const getPageTitle = () => {
+    if (subRoute === 'active') return 'Active Products'
+    if (subRoute === 'inactive') return 'Inactive Products'
+    return 'Central Catalogue Control'
+  }
+
+  const getPageDescription = () => {
+    if (subRoute === 'active') return 'View and manage all active products in the catalogue.'
+    if (subRoute === 'inactive') return 'View and manage all inactive products in the catalogue.'
+    return 'Manage pricing, stock distribution, and regional visibility with batch-level precision.'
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 2 • Master Product Management</p>
-          <h2 className="text-2xl font-bold text-gray-900">Central Catalogue Control</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{getPageTitle()}</h2>
           <p className="text-sm text-gray-600">
-            Manage pricing, stock distribution, and regional visibility with batch-level precision.
+            {getPageDescription()}
           </p>
         </div>
-        <button
-          onClick={handleAddProduct}
-          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(168,85,247,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(168,85,247,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]"
-        >
-          <Layers3 className="h-4 w-4" />
-          Add Product
-        </button>
       </div>
 
       <FilterBar
@@ -328,6 +390,16 @@ export function ProductsPage() {
         columns={tableColumns}
         rows={productsList}
         emptyState="No products found in the catalogue"
+      />
+
+      {/* Attributes Modal */}
+      <ProductAttributesModal
+        isOpen={showAttributesModal}
+        onClose={() => {
+          setShowAttributesModal(false)
+          setSelectedProductForAttributes(null)
+        }}
+        product={selectedProductForAttributes}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">

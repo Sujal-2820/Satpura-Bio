@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Calendar, Package, IndianRupee, Eye, EyeOff, Tag, X } from 'lucide-react'
+import { Calendar, Package, IndianRupee, Eye, EyeOff, Tag, X, Layers } from 'lucide-react'
 import { cn } from '../../../lib/cn'
+import { ImageUpload } from './ImageUpload'
+import { AttributeStockForm } from './AttributeStockForm'
 
 const STOCK_UNITS = ['kg', 'L', 'bags', 'units']
 
@@ -99,10 +101,13 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     batchNumber: '',
     tags: [],
     attributes: {},
+    images: [], // Array of image objects {url, publicId, isPrimary, order}
+    attributeStocks: [], // Array of stock entries per attribute combination
   })
 
   const [tagInput, setTagInput] = useState('')
   const [errors, setErrors] = useState({})
+  const [showAttributeStockForm, setShowAttributeStockForm] = useState(false)
 
   useEffect(() => {
     if (product) {
@@ -201,6 +206,17 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
         }
       }
 
+      // Parse images
+      let productImages = []
+      if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+        productImages = product.images.map((img, index) => ({
+          url: img.url || (typeof img === 'string' ? img : ''),
+          publicId: img.publicId || '',
+          isPrimary: img.isPrimary === true || (index === 0 && img.isPrimary !== false),
+          order: img.order !== undefined ? img.order : index,
+        }))
+      }
+
       setFormData({
         name: product.name || '',
         category: product.category || 'npk',
@@ -215,6 +231,30 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
         batchNumber: product.batchNumber || '',
         tags: product.tags && Array.isArray(product.tags) ? product.tags : [],
         attributes: attributes,
+        images: productImages,
+        attributeStocks: product.attributeStocks && Array.isArray(product.attributeStocks) 
+          ? product.attributeStocks.map((stock, index) => {
+              // Convert attributes Map to plain object if needed
+              let attributesObj = {}
+              if (stock.attributes) {
+                if (stock.attributes instanceof Map) {
+                  stock.attributes.forEach((value, key) => {
+                    attributesObj[key] = value
+                  })
+                } else if (typeof stock.attributes === 'object') {
+                  attributesObj = stock.attributes
+                }
+              }
+              
+              return {
+                ...stock,
+                attributes: attributesObj,
+                vendorPrice: stock.vendorPrice != null ? String(stock.vendorPrice) : '',
+                userPrice: stock.userPrice != null ? String(stock.userPrice) : '',
+                id: stock.id || stock._id || Date.now() + index, // Ensure each has an ID
+              }
+            })
+          : [],
       })
     }
   }, [product])
@@ -285,14 +325,38 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       newErrors.description = 'Product description is required'
     }
 
-    if (!formData.actualStock || parseFloat(formData.actualStock) < 0) {
-      newErrors.actualStock = 'Actual quantity is required and cannot be negative'
-    }
-    if (!formData.displayStock || parseFloat(formData.displayStock) < 0) {
-      newErrors.displayStock = 'Display quantity is required and cannot be negative'
-    }
-    if (parseFloat(formData.displayStock) > parseFloat(formData.actualStock)) {
-      newErrors.displayStock = 'Display quantity cannot exceed actual quantity'
+    // Only validate main stock and price fields if no attributeStocks are configured
+    if (!formData.attributeStocks || formData.attributeStocks.length === 0) {
+      if (!formData.actualStock || parseFloat(formData.actualStock) < 0) {
+        newErrors.actualStock = 'Actual quantity is required and cannot be negative'
+      }
+      if (!formData.displayStock || parseFloat(formData.displayStock) < 0) {
+        newErrors.displayStock = 'Display quantity is required and cannot be negative'
+      }
+      if (parseFloat(formData.displayStock) > parseFloat(formData.actualStock)) {
+        newErrors.displayStock = 'Display quantity cannot exceed actual quantity'
+      }
+
+      if (!formData.vendorPrice || parseFloat(formData.vendorPrice) <= 0) {
+        newErrors.vendorPrice = 'Vendor price must be greater than 0'
+      }
+
+      if (!formData.userPrice || parseFloat(formData.userPrice) <= 0) {
+        newErrors.userPrice = 'User price must be greater than 0'
+      }
+
+      if (parseFloat(formData.userPrice) <= parseFloat(formData.vendorPrice)) {
+        newErrors.userPrice = 'User price must be greater than vendor price'
+      }
+
+      if (!formData.expiry) {
+        newErrors.expiry = 'Expiry date is required'
+      }
+    } else {
+      // Validate that at least one attributeStock entry exists
+      if (formData.attributeStocks.length === 0) {
+        newErrors.attributeStocks = 'At least one stock entry with attributes is required'
+      }
     }
 
     if (!formData.vendorPrice || parseFloat(formData.vendorPrice) <= 0) {
@@ -319,9 +383,13 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     e.preventDefault()
     if (!validate()) return
 
-    // Ensure prices are valid numbers (validation already checked they're > 0)
-    const vendorPrice = parseFloat(formData.vendorPrice)
-    const userPrice = parseFloat(formData.userPrice)
+    // Ensure prices are valid numbers (only if not using attributeStocks)
+    const vendorPrice = (!formData.attributeStocks || formData.attributeStocks.length === 0) 
+      ? parseFloat(formData.vendorPrice) 
+      : 0
+    const userPrice = (!formData.attributeStocks || formData.attributeStocks.length === 0) 
+      ? parseFloat(formData.userPrice) 
+      : 0
 
     // Build specifications object from attributes (only include non-empty values)
     const specifications = {}
@@ -332,23 +400,82 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       }
     })
 
+    // Calculate total stock and prices from attributeStocks if they exist, otherwise use main fields
+    let actualStockValue = 0
+    let displayStockValue = 0
+    let vendorPriceValue = 0
+    let userPriceValue = 0
+    let expiryValue = ''
+    let batchNumberValue = ''
+    
+    if (formData.attributeStocks && formData.attributeStocks.length > 0) {
+      // Sum up all attributeStocks
+      actualStockValue = formData.attributeStocks.reduce((sum, stock) => sum + (parseFloat(stock.actualStock) || 0), 0)
+      displayStockValue = formData.attributeStocks.reduce((sum, stock) => sum + (parseFloat(stock.displayStock) || 0), 0)
+      
+      // Calculate weighted average prices based on stock quantities
+      let totalStock = 0
+      let weightedVendorPrice = 0
+      let weightedUserPrice = 0
+      
+      formData.attributeStocks.forEach(stock => {
+        const stockQty = parseFloat(stock.displayStock) || 0
+        totalStock += stockQty
+        weightedVendorPrice += (parseFloat(stock.vendorPrice) || 0) * stockQty
+        weightedUserPrice += (parseFloat(stock.userPrice) || 0) * stockQty
+      })
+      
+      if (totalStock > 0) {
+        vendorPriceValue = weightedVendorPrice / totalStock
+        userPriceValue = weightedUserPrice / totalStock
+      }
+      
+      // Use first entry's expiry and batchNumber as defaults (or leave empty)
+      const firstEntry = formData.attributeStocks[0]
+      expiryValue = firstEntry.expiry || ''
+      batchNumberValue = firstEntry.batchNumber || ''
+    } else {
+      // Use main fields
+      actualStockValue = parseFloat(formData.actualStock) || 0
+      displayStockValue = parseFloat(formData.displayStock) || 0
+      vendorPriceValue = !isNaN(vendorPrice) && vendorPrice > 0 ? vendorPrice : 0
+      userPriceValue = !isNaN(userPrice) && userPrice > 0 ? userPrice : 0
+      expiryValue = formData.expiry
+      batchNumberValue = formData.batchNumber || ''
+    }
+
     const submitData = {
       name: formData.name.trim(),
       category: formData.category,
       description: formData.description.trim(),
-      actualStock: parseFloat(formData.actualStock) || 0,
-      displayStock: parseFloat(formData.displayStock) || 0,
+      actualStock: actualStockValue,
+      displayStock: displayStockValue,
       stockUnit: formData.stockUnit,
-      priceToVendor: !isNaN(vendorPrice) && vendorPrice > 0 ? vendorPrice : undefined,
-      priceToUser: !isNaN(userPrice) && userPrice > 0 ? userPrice : undefined,
-      expiry: formData.expiry,
+      priceToVendor: vendorPriceValue > 0 ? vendorPriceValue : undefined,
+      priceToUser: userPriceValue > 0 ? userPriceValue : undefined,
+      ...(expiryValue && { expiry: expiryValue }),
       isActive: formData.visibility === 'active',
-      ...(formData.batchNumber && { batchNumber: formData.batchNumber.trim() }),
+      ...(batchNumberValue && { batchNumber: batchNumberValue.trim() }),
       tags: formData.tags.filter((tag) => tag.trim() !== ''),
       ...(Object.keys(specifications).length > 0 && { specifications }),
+      ...(formData.images && formData.images.length > 0 && { images: formData.images }),
+      ...(formData.attributeStocks && formData.attributeStocks.length > 0 && { 
+        attributeStocks: formData.attributeStocks.map(({ id, ...stock }) => stock) // Remove temporary IDs
+      }),
     }
 
     onSubmit(submitData)
+  }
+
+  // Handle attribute stock form save
+  const handleAttributeStockSave = (stocks) => {
+    setFormData((prev) => ({
+      ...prev,
+      attributeStocks: stocks.map((stock, index) => ({
+        ...stock,
+        id: stock.id || Date.now() + index, // Ensure each has an ID
+      })),
+    }))
   }
 
   return (
@@ -423,88 +550,101 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
         {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description}</p>}
       </div>
 
-      {/* Stock Quantity & Unit */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="actualStock" className="mb-2 block text-sm font-bold text-gray-900">
-            Actual Quantity <span className="text-red-500">*</span>
-            <span className="text-xs font-normal text-gray-500 ml-2">(Internal/Admin use)</span>
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              id="actualStock"
-              name="actualStock"
-              value={formData.actualStock}
-              onChange={handleChange}
-              placeholder="0"
-              min="0"
-              step="0.01"
-              className={cn(
-                'flex-1 rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2',
-                errors.actualStock
-                  ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                  : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
-              )}
-            />
-            <select
-              name="stockUnit"
-              value={formData.stockUnit}
-              onChange={handleChange}
-              className="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm font-semibold text-gray-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-            >
-              {STOCK_UNITS.map((unit) => (
-                <option key={unit} value={unit}>
-                  {unit}
-                </option>
-              ))}
-            </select>
-          </div>
-          {errors.actualStock && <p className="mt-1 text-xs text-red-600">{errors.actualStock}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="displayStock" className="mb-2 block text-sm font-bold text-gray-900">
-            Quantity to Show to Vendors <span className="text-red-500">*</span>
-            <span className="text-xs font-normal text-gray-500 ml-2">(Visible to vendors)</span>
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              id="displayStock"
-              name="displayStock"
-              value={formData.displayStock}
-              onChange={handleChange}
-              placeholder="0"
-              min="0"
-              step="0.01"
-              className={cn(
-                'flex-1 rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2',
-                errors.displayStock
-                  ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                  : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
-              )}
-            />
-            <select
-              value={formData.stockUnit}
-              disabled
-              className="rounded-xl border border-gray-300 bg-gray-100 px-3 py-3 text-sm font-semibold text-gray-500 cursor-not-allowed"
-            >
-              {STOCK_UNITS.map((unit) => (
-                <option key={unit} value={unit}>
-                  {unit}
-                </option>
-              ))}
-            </select>
-          </div>
-          {errors.displayStock && <p className="mt-1 text-xs text-red-600">{errors.displayStock}</p>}
-          {formData.displayStock && parseFloat(formData.displayStock) > parseFloat(formData.actualStock || 0) && (
-            <p className="mt-1 text-xs text-yellow-600">⚠️ Display quantity exceeds actual quantity</p>
-          )}
-        </div>
+      {/* Product Images */}
+      <div>
+        <ImageUpload
+          images={formData.images || []}
+          onChange={(images) => setFormData((prev) => ({ ...prev, images }))}
+          maxImages={4}
+          disabled={loading}
+        />
       </div>
 
-      {/* Expiry Date */}
+      {/* Stock Quantity & Unit - Only show if no attributeStocks are configured */}
+      {(!formData.attributeStocks || formData.attributeStocks.length === 0) && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="actualStock" className="mb-2 block text-sm font-bold text-gray-900">
+              Actual Quantity <span className="text-red-500">*</span>
+              <span className="text-xs font-normal text-gray-500 ml-2">(Internal/Admin use)</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                id="actualStock"
+                name="actualStock"
+                value={formData.actualStock}
+                onChange={handleChange}
+                placeholder="0"
+                min="0"
+                step="0.01"
+                className={cn(
+                  'flex-1 rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2',
+                  errors.actualStock
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
+                    : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
+                )}
+              />
+              <select
+                name="stockUnit"
+                value={formData.stockUnit}
+                onChange={handleChange}
+                className="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm font-semibold text-gray-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              >
+                {STOCK_UNITS.map((unit) => (
+                  <option key={unit} value={unit}>
+                    {unit}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {errors.actualStock && <p className="mt-1 text-xs text-red-600">{errors.actualStock}</p>}
+          </div>
+
+          <div>
+            <label htmlFor="displayStock" className="mb-2 block text-sm font-bold text-gray-900">
+              Quantity to Show to Vendors <span className="text-red-500">*</span>
+              <span className="text-xs font-normal text-gray-500 ml-2">(Visible to vendors)</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                id="displayStock"
+                name="displayStock"
+                value={formData.displayStock}
+                onChange={handleChange}
+                placeholder="0"
+                min="0"
+                step="0.01"
+                className={cn(
+                  'flex-1 rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2',
+                  errors.displayStock
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
+                    : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
+                )}
+              />
+              <select
+                value={formData.stockUnit}
+                disabled
+                className="rounded-xl border border-gray-300 bg-gray-100 px-3 py-3 text-sm font-semibold text-gray-500 cursor-not-allowed"
+              >
+                {STOCK_UNITS.map((unit) => (
+                  <option key={unit} value={unit}>
+                    {unit}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {errors.displayStock && <p className="mt-1 text-xs text-red-600">{errors.displayStock}</p>}
+            {formData.displayStock && parseFloat(formData.displayStock) > parseFloat(formData.actualStock || 0) && (
+              <p className="mt-1 text-xs text-yellow-600">⚠️ Display quantity exceeds actual quantity</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Expiry Date - Only show if no attributeStocks are configured */}
+      {(!formData.attributeStocks || formData.attributeStocks.length === 0) && (
         <div>
           <label htmlFor="expiry" className="mb-2 block text-sm font-bold text-gray-900">
             Expiry Date / Batch <span className="text-red-500">*</span>
@@ -526,116 +666,151 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
             />
           </div>
           {errors.expiry && <p className="mt-1 text-xs text-red-600">{errors.expiry}</p>}
-      </div>
+        </div>
+      )}
 
-      {/* Batch Number (Optional) */}
-      <div>
-        <label htmlFor="batchNumber" className="mb-2 block text-sm font-bold text-gray-900">
-          Batch Number <span className="text-xs font-normal text-gray-500">(Optional)</span>
-        </label>
-        <input
-          type="text"
-          id="batchNumber"
-          name="batchNumber"
-          value={formData.batchNumber}
-          onChange={handleChange}
-          placeholder="e.g., BATCH-2024-001"
-          className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-        />
-      </div>
-
-      {/* Pricing */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* Batch Number (Optional) - Only show if no attributeStocks are configured */}
+      {(!formData.attributeStocks || formData.attributeStocks.length === 0) && (
         <div>
-          <label htmlFor="vendorPrice" className="mb-2 block text-sm font-bold text-gray-900">
-            <IndianRupee className="mr-1 inline h-4 w-4" />
-            Vendor Price <span className="text-red-500">*</span>
+          <label htmlFor="batchNumber" className="mb-2 block text-sm font-bold text-gray-900">
+            Batch Number <span className="text-xs font-normal text-gray-500">(Optional)</span>
           </label>
           <input
-            type="number"
-            id="vendorPrice"
-            name="vendorPrice"
-            value={formData.vendorPrice}
+            type="text"
+            id="batchNumber"
+            name="batchNumber"
+            value={formData.batchNumber}
             onChange={handleChange}
-            placeholder="0.00"
-            min="0"
-            step="0.01"
-            className={cn(
-              'w-full rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2',
-              errors.vendorPrice
-                ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
-            )}
+            placeholder="e.g., BATCH-2024-001"
+            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
           />
-          {errors.vendorPrice && <p className="mt-1 text-xs text-red-600">{errors.vendorPrice}</p>}
         </div>
+      )}
 
-        <div>
-          <label htmlFor="userPrice" className="mb-2 block text-sm font-bold text-gray-900">
-            <IndianRupee className="mr-1 inline h-4 w-4" />
-            User Price <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            id="userPrice"
-            name="userPrice"
-            value={formData.userPrice}
-            onChange={handleChange}
-            placeholder="0.00"
-            min="0"
-            step="0.01"
-            className={cn(
-              'w-full rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2',
-              errors.userPrice
-                ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
-            )}
-          />
-          {errors.userPrice && <p className="mt-1 text-xs text-red-600">{errors.userPrice}</p>}
-        </div>
-      </div>
+      {/* Pricing - Only show if no attributeStocks are configured */}
+      {(!formData.attributeStocks || formData.attributeStocks.length === 0) && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="vendorPrice" className="mb-2 block text-sm font-bold text-gray-900">
+              <IndianRupee className="mr-1 inline h-4 w-4" />
+              Vendor Price <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              id="vendorPrice"
+              name="vendorPrice"
+              value={formData.vendorPrice}
+              onChange={handleChange}
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+              className={cn(
+                'w-full rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2',
+                errors.vendorPrice
+                  ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
+                  : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
+              )}
+            />
+            {errors.vendorPrice && <p className="mt-1 text-xs text-red-600">{errors.vendorPrice}</p>}
+          </div>
 
-      {/* Category-Specific Attributes */}
-      {CATEGORY_ATTRIBUTES[formData.category] && CATEGORY_ATTRIBUTES[formData.category].length > 0 && (
-        <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 p-5">
-          <h3 className="mb-4 text-lg font-bold text-blue-700">Category-Specific Attributes</h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {CATEGORY_ATTRIBUTES[formData.category].map((attr) => (
-              <div key={attr.key}>
-                <label htmlFor={attr.key} className="mb-2 block text-sm font-bold text-gray-900">
-                  {attr.label}
-                  {attr.required && <span className="text-red-500 ml-1">*</span>}
-                </label>
-                {attr.type === 'select' ? (
-                  <select
-                    id={attr.key}
-                    name={attr.key}
-                    value={formData.attributes[attr.key] || ''}
-                    onChange={(e) => handleAttributeChange(attr.key, e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                  >
-                    <option value="">Select {attr.label}</option>
-                    {attr.options.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type={attr.type}
-                    id={attr.key}
-                    name={attr.key}
-                    value={formData.attributes[attr.key] || ''}
-                    onChange={(e) => handleAttributeChange(attr.key, e.target.value)}
-                    placeholder={attr.placeholder}
-                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                  />
-                )}
-              </div>
-            ))}
+          <div>
+            <label htmlFor="userPrice" className="mb-2 block text-sm font-bold text-gray-900">
+              <IndianRupee className="mr-1 inline h-4 w-4" />
+              User Price <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              id="userPrice"
+              name="userPrice"
+              value={formData.userPrice}
+              onChange={handleChange}
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+              className={cn(
+                'w-full rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2',
+                errors.userPrice
+                  ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
+                  : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
+              )}
+            />
+            {errors.userPrice && <p className="mt-1 text-xs text-red-600">{errors.userPrice}</p>}
           </div>
         </div>
+      )}
+
+      {/* Category-Specific Attributes - Stock Management */}
+      {CATEGORY_ATTRIBUTES[formData.category] && CATEGORY_ATTRIBUTES[formData.category].length > 0 && (
+        <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-blue-700">Category-Specific Attributes</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Manage stock quantities for different attribute combinations
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAttributeStockForm(!showAttributeStockForm)}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 px-4 py-2 text-sm font-bold text-white shadow-[0_4px_15px_rgba(168,85,247,0.3)] transition-all hover:shadow-[0_6px_20px_rgba(168,85,247,0.4)]"
+            >
+              <Layers className="h-4 w-4" />
+              {showAttributeStockForm ? 'Close Stock Manager' : 'Manage Stock by Attributes'}
+              {formData.attributeStocks && formData.attributeStocks.length > 0 && (
+                <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-xs">
+                  {formData.attributeStocks.length}
+                </span>
+              )}
+            </button>
+          </div>
+          
+          {/* Display existing attribute stocks summary when form is closed */}
+          {!showAttributeStockForm && formData.attributeStocks && formData.attributeStocks.length > 0 && (
+            <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4">
+              <p className="text-sm font-semibold text-purple-700 mb-2">
+                Stock Entries Configured: {formData.attributeStocks.length}
+              </p>
+              <div className="space-y-2">
+                {formData.attributeStocks.slice(0, 3).map((stock, index) => {
+                  const attributeSummary = Object.entries(stock.attributes || {})
+                    .filter(([_, value]) => value && value !== '')
+                    .map(([key, value]) => {
+                      const attr = CATEGORY_ATTRIBUTES[formData.category]?.find(a => a.key === key)
+                      return attr ? `${attr.label}: ${value}` : `${key}: ${value}`
+                    })
+                    .join(', ')
+                  
+                  return (
+                    <div key={stock.id || index} className="text-xs text-gray-600 bg-white rounded-lg px-3 py-2">
+                      <span className="font-semibold">Entry #{index + 1}:</span> {attributeSummary || 'No attributes'} 
+                      {' - '}
+                      <span className="font-semibold">Stock:</span> {stock.displayStock || 0} {stock.stockUnit || formData.stockUnit}
+                    </div>
+                  )
+                })}
+                {formData.attributeStocks.length > 3 && (
+                  <p className="text-xs text-gray-500 italic">
+                    + {formData.attributeStocks.length - 3} more entries...
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Attribute Stock Form - Inline Dropdown */}
+      {showAttributeStockForm && (
+        <AttributeStockForm
+          isOpen={showAttributeStockForm}
+          onClose={() => setShowAttributeStockForm(false)}
+          category={formData.category}
+          categoryAttributes={CATEGORY_ATTRIBUTES[formData.category] || []}
+          attributeStocks={formData.attributeStocks || []}
+          onSave={handleAttributeStockSave}
+          stockUnit={formData.stockUnit}
+        />
       )}
 
       {/* Tags */}

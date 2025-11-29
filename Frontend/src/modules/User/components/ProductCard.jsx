@@ -1,9 +1,11 @@
 import { cn } from '../../../lib/cn'
 import { StarIcon, HeartIcon } from './icons'
+import { getPrimaryImageUrl } from '../utils/productImages'
 
 export function ProductCard({ product, onAddToCart, onWishlist, onNavigate, className }) {
   const inStock = product.stock > 0
   const stockStatus = product.stock > 10 ? 'In Stock' : product.stock > 0 ? 'Low Stock' : 'Out of Stock'
+  const productImage = getPrimaryImageUrl(product)
 
   return (
     <div
@@ -15,7 +17,7 @@ export function ProductCard({ product, onAddToCart, onWishlist, onNavigate, clas
       onClick={() => onNavigate?.(product.id)}
     >
       <div className="relative w-full aspect-[5/4] overflow-hidden bg-gray-100">
-        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+        <img src={productImage} alt={product.name} className="w-full h-full object-cover" />
         <button
           type="button"
           className="absolute top-2 right-2 flex items-center justify-center w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm shadow-md transition-colors hover:bg-white"

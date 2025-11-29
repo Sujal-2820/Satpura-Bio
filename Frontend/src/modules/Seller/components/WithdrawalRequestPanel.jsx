@@ -1,26 +1,46 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSellerState } from '../context/SellerContext'
 import { useSellerApi } from '../hooks/useSellerApi'
 import { sellerSnapshot } from '../services/sellerData'
 import { cn } from '../../../lib/cn'
 import { WalletIcon, CloseIcon } from './icons'
 import { useToast } from './ToastNotification'
+import { ConfirmationModal } from './ConfirmationModal'
 
-export function WithdrawalRequestPanel({ isOpen, onClose, onSuccess }) {
+export function WithdrawalRequestPanel({ isOpen, onClose, onSuccess, availableBalance: propBalance, bankAccounts: propBankAccounts = [] }) {
   const { dashboard } = useSellerState()
-  const { requestWithdrawal, loading } = useSellerApi()
+  const { requestWithdrawal, loading, getBankAccounts } = useSellerApi()
   const { success, error: showError } = useToast()
   const [amount, setAmount] = useState('')
-  const [accountNumber, setAccountNumber] = useState('')
-  const [ifscCode, setIfscCode] = useState('')
-  const [accountName, setAccountName] = useState('')
+  const [bankAccountId, setBankAccountId] = useState('')
+  const [bankAccounts, setBankAccounts] = useState(propBankAccounts)
   const [errors, setErrors] = useState({})
+  const [showConfirmation, setShowConfirmation] = useState(false)
+  const [pendingWithdrawalData, setPendingWithdrawalData] = useState(null)
 
   const wallet = dashboard?.wallet || sellerSnapshot.wallet
-  const availableBalance = typeof wallet.balance === 'number' 
-    ? wallet.balance 
-    : parseFloat(wallet.balance?.replace(/[₹,\s]/g, '') || '0')
+  const availableBalance = propBalance !== undefined 
+    ? propBalance 
+    : (typeof wallet.balance === 'number' 
+      ? wallet.balance 
+      : parseFloat(wallet.balance?.replace(/[₹,\s]/g, '') || '0'))
   const minWithdrawal = 5000
+
+  // Fetch bank accounts if not provided
+  useEffect(() => {
+    if (isOpen && bankAccounts.length === 0) {
+      getBankAccounts().then((result) => {
+        if (result.data?.bankAccounts) {
+          setBankAccounts(result.data.bankAccounts)
+          // Auto-select primary account
+          const primary = result.data.bankAccounts.find(acc => acc.isPrimary)
+          if (primary) {
+            setBankAccountId(primary._id || primary.id)
+          }
+        }
+      })
+    }
+  }, [isOpen, getBankAccounts, bankAccounts.length])
 
   const validateForm = () => {
     const newErrors = {}
@@ -28,19 +48,11 @@ export function WithdrawalRequestPanel({ isOpen, onClose, onSuccess }) {
     if (!amount || parseFloat(amount) < minWithdrawal) {
       newErrors.amount = `Minimum withdrawal amount is ₹${minWithdrawal.toLocaleString('en-IN')}`
     } else if (parseFloat(amount) > availableBalance) {
-      newErrors.amount = 'Amount exceeds available balance'
+      newErrors.amount = `Amount exceeds available balance (₹${Math.round(availableBalance).toLocaleString('en-IN')})`
     }
 
-    if (!accountNumber || accountNumber.length < 9) {
-      newErrors.accountNumber = 'Valid account number is required'
-    }
-
-    if (!ifscCode || ifscCode.length !== 11) {
-      newErrors.ifscCode = 'Valid IFSC code is required (11 characters)'
-    }
-
-    if (!accountName || accountName.length < 3) {
-      newErrors.accountName = 'Account holder name is required'
+    if (!bankAccountId) {
+      newErrors.bankAccountId = 'Please select a bank account'
     }
 
     setErrors(newErrors)
@@ -51,29 +63,54 @@ export function WithdrawalRequestPanel({ isOpen, onClose, onSuccess }) {
     e.preventDefault()
     if (!validateForm()) return
 
-    const withdrawalData = {
-      amount: parseFloat(amount),
-      accountNumber,
-      ifscCode,
-      accountName,
-    }
-
-    const result = await requestWithdrawal(withdrawalData)
-    
-    if (result.error) {
-      showError(result.error.message || 'Failed to submit withdrawal request')
+    if (bankAccounts.length === 0) {
+      showError('Please add a bank account first')
       return
     }
 
-    success(`Withdrawal request of ₹${parseFloat(amount).toLocaleString('en-IN')} submitted successfully!`)
-    onSuccess?.(withdrawalData)
+    const withdrawalData = {
+      amount: parseFloat(amount),
+      bankAccountId,
+    }
+
+    // Get bank account details for confirmation
+    const selectedAccount = bankAccounts.find(acc => (acc._id || acc.id) === bankAccountId)
+    const bankAccountDetails = selectedAccount ? {
+      'Account Holder': selectedAccount.accountHolderName || 'N/A',
+      'Account Number': `****${(selectedAccount.accountNumber || '').slice(-4)}`,
+      'IFSC Code': selectedAccount.ifscCode || 'N/A',
+      'Bank Name': selectedAccount.bankName || 'N/A',
+    } : null
+
+    // Show confirmation modal
+    setPendingWithdrawalData({
+      ...withdrawalData,
+      bankAccountDetails,
+    })
+    setShowConfirmation(true)
+  }
+
+  const handleConfirmWithdrawal = async () => {
+    if (!pendingWithdrawalData) return
+
+    const result = await requestWithdrawal(pendingWithdrawalData)
+    
+    if (result.error) {
+      showError(result.error.message || 'Failed to submit withdrawal request')
+      setShowConfirmation(false)
+      setPendingWithdrawalData(null)
+      return
+    }
+
+    success(`Withdrawal request of ₹${pendingWithdrawalData.amount.toLocaleString('en-IN')} submitted successfully!`)
+    onSuccess?.(pendingWithdrawalData)
     
     // Reset form
     setAmount('')
-    setAccountNumber('')
-    setIfscCode('')
-    setAccountName('')
+    setBankAccountId('')
     setErrors({})
+    setShowConfirmation(false)
+    setPendingWithdrawalData(null)
     onClose()
   }
 
@@ -143,61 +180,51 @@ export function WithdrawalRequestPanel({ isOpen, onClose, onSuccess }) {
 
           <div className="seller-panel__field">
             <label className="seller-panel__label">
-              Account Holder Name <span className="seller-panel__required">*</span>
+              Bank Account <span className="seller-panel__required">*</span>
             </label>
-            <input
-              type="text"
-              value={accountName}
-              onChange={(e) => {
-                setAccountName(e.target.value)
-                if (errors.accountName) {
-                  setErrors((prev) => ({ ...prev, accountName: null }))
-                }
-              }}
-              placeholder="Enter account holder name"
-              className={cn('seller-panel__input', errors.accountName && 'is-error')}
-            />
-            {errors.accountName && <span className="seller-panel__error">{errors.accountName}</span>}
-          </div>
-
-          <div className="seller-panel__field">
-            <label className="seller-panel__label">
-              Account Number <span className="seller-panel__required">*</span>
-            </label>
-            <input
-              type="text"
-              value={accountNumber}
-              onChange={(e) => {
-                setAccountNumber(e.target.value.replace(/\D/g, ''))
-                if (errors.accountNumber) {
-                  setErrors((prev) => ({ ...prev, accountNumber: null }))
-                }
-              }}
-              placeholder="Enter account number"
-              maxLength={18}
-              className={cn('seller-panel__input', errors.accountNumber && 'is-error')}
-            />
-            {errors.accountNumber && <span className="seller-panel__error">{errors.accountNumber}</span>}
-          </div>
-
-          <div className="seller-panel__field">
-            <label className="seller-panel__label">
-              IFSC Code <span className="seller-panel__required">*</span>
-            </label>
-            <input
-              type="text"
-              value={ifscCode}
-              onChange={(e) => {
-                setIfscCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))
-                if (errors.ifscCode) {
-                  setErrors((prev) => ({ ...prev, ifscCode: null }))
-                }
-              }}
-              placeholder="Enter IFSC code"
-              maxLength={11}
-              className={cn('seller-panel__input', errors.ifscCode && 'is-error')}
-            />
-            {errors.ifscCode && <span className="seller-panel__error">{errors.ifscCode}</span>}
+            {bankAccounts.length === 0 ? (
+              <>
+                <div className="seller-panel__info-box" style={{ marginBottom: '0.5rem' }}>
+                  <p className="seller-panel__info-text">
+                    No bank accounts added. Please add a bank account first.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose()
+                    // Trigger add bank account panel (will be handled by parent)
+                    setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent('seller-open-panel', { detail: { panel: 'add-bank-account' } }))
+                    }, 300)
+                  }}
+                  className="seller-panel__button seller-panel__button--secondary"
+                  style={{ width: '100%' }}
+                >
+                  Add Bank Account
+                </button>
+              </>
+            ) : (
+              <select
+                value={bankAccountId}
+                onChange={(e) => {
+                  setBankAccountId(e.target.value)
+                  if (errors.bankAccountId) {
+                    setErrors((prev) => ({ ...prev, bankAccountId: null }))
+                  }
+                }}
+                className={cn('seller-panel__input', errors.bankAccountId && 'is-error')}
+              >
+                <option value="">Select bank account</option>
+                {bankAccounts.map((account) => (
+                  <option key={account._id || account.id} value={account._id || account.id}>
+                    {account.accountHolderName} - {account.bankName} (****{account.accountNumber?.slice(-4) || 'N/A'})
+                    {account.isPrimary ? ' (Primary)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+            {errors.bankAccountId && <span className="seller-panel__error">{errors.bankAccountId}</span>}
           </div>
 
           <div className="seller-panel__info-box">
@@ -221,6 +248,24 @@ export function WithdrawalRequestPanel({ isOpen, onClose, onSuccess }) {
           </div>
         </form>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmation}
+        onClose={() => {
+          setShowConfirmation(false)
+          setPendingWithdrawalData(null)
+        }}
+        onConfirm={handleConfirmWithdrawal}
+        title="Confirm Withdrawal Request"
+        message="Please verify all bank account details and withdrawal amount before proceeding. Once submitted, this request will be sent to admin for approval."
+        details={pendingWithdrawalData ? {
+          'Withdrawal Amount': `₹${pendingWithdrawalData.amount.toLocaleString('en-IN')}`,
+          'Available Balance': `₹${Math.round(availableBalance).toLocaleString('en-IN')}`,
+          ...(pendingWithdrawalData.bankAccountDetails || {}),
+        } : null}
+        loading={loading}
+      />
     </div>
   )
 }

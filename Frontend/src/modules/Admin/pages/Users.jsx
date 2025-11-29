@@ -21,7 +21,7 @@ const columns = [
   { Header: 'Actions', accessor: 'actions' },
 ]
 
-export function UsersPage() {
+export function UsersPage({ subRoute = null, navigate }) {
   const { users: usersState } = useAdminState()
   const {
     getUsers,
@@ -34,6 +34,7 @@ export function UsersPage() {
   const { success, error: showError, warning: showWarning } = useToast()
 
   const [usersList, setUsersList] = useState([])
+  const [allUsersList, setAllUsersList] = useState([])
   
   // View states (replacing modals with full-screen views)
   const [currentView, setCurrentView] = useState(null) // 'userDetail', 'supportTickets', 'blockUser', 'deactivateUser', 'activateUser'
@@ -51,12 +52,23 @@ export function UsersPage() {
   const fetchUsers = useCallback(async () => {
     const result = await getUsers()
     if (result.data?.users) {
-      setUsersList(result.data.users)
+      setAllUsersList(result.data.users)
     } else {
       // Fallback to mock data
-      setUsersList(mockUsers)
+      setAllUsersList(mockUsers)
     }
   }, [getUsers])
+
+  // Filter users based on subRoute
+  useEffect(() => {
+    if (subRoute === 'active') {
+      setUsersList(allUsersList.filter((u) => u.status === 'Active' || u.status === 'active'))
+    } else if (subRoute === 'inactive') {
+      setUsersList(allUsersList.filter((u) => u.status === 'Inactive' || u.status === 'inactive' || u.status === 'Blocked' || u.status === 'blocked'))
+    } else {
+      setUsersList(allUsersList)
+    }
+  }, [subRoute, allUsersList])
 
   // Fetch user details
   const fetchUserDetails = useCallback(async (userId) => {
@@ -134,6 +146,7 @@ export function UsersPage() {
     setDeactivateReason('')
     setSelectedTicket(null)
     setReplyText('')
+    if (navigate) navigate('users')
   }
 
   const handleBlockUser = async (userId, reasonData) => {
@@ -863,14 +876,26 @@ export function UsersPage() {
     )
   }
 
+  const getPageTitle = () => {
+    if (subRoute === 'active') return 'Active Users'
+    if (subRoute === 'inactive') return 'Inactive Users'
+    return 'User Trust & Compliance'
+  }
+
+  const getPageDescription = () => {
+    if (subRoute === 'active') return 'View and manage all active user accounts.'
+    if (subRoute === 'inactive') return 'View and manage all inactive or blocked user accounts.'
+    return 'Monitor orders, payments, and support escalations. Disable risky accounts with a single action.'
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 5 • User Management</p>
-          <h2 className="text-2xl font-bold text-gray-900">User Trust & Compliance</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{getPageTitle()}</h2>
           <p className="text-sm text-gray-600">
-            Monitor orders, payments, and support escalations. Disable risky accounts with a single action.
+            {getPageDescription()}
           </p>
         </div>
         <div className="flex items-center gap-2">

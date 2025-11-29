@@ -19,6 +19,7 @@ import { AccountView } from './views/AccountView'
 import { FavouritesView } from './views/FavouritesView'
 import { CategoryProductsView } from './views/CategoryProductsView'
 import { OrdersView } from './views/OrdersView'
+import { VendorAvailabilityWarning } from '../components/VendorAvailabilityWarning'
 import '../user.css'
 
 const NAV_ITEMS = [
@@ -88,6 +89,22 @@ function UserDashboardContent({ onLogout }) {
                 location: userData.location || null,
               },
             })
+            
+            // Set vendor availability status from profile
+            if (result.data?.vendorAvailability) {
+              dispatch({
+                type: 'SET_VENDOR_AVAILABILITY',
+                payload: result.data.vendorAvailability,
+              })
+              
+              // Set assigned vendor if available
+              if (result.data.vendorAvailability.assignedVendor) {
+                dispatch({
+                  type: 'SET_ASSIGNED_VENDOR',
+                  payload: result.data.vendorAvailability.assignedVendor,
+                })
+              }
+            }
           }
         } catch (error) {
           console.error('Error fetching user profile:', error)
@@ -515,6 +532,7 @@ function UserDashboardContent({ onLogout }) {
 
   return (
     <>
+      <VendorAvailabilityWarning />
       <MobileShell
         title={activeTab === 'home' ? `Hello ${profile.name.split(' ')[0]}` : null}
         subtitle={profile.location?.city ? `${profile.location.city}, ${profile.location.state}` : null}

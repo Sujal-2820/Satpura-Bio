@@ -80,8 +80,10 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
       if (field.min !== undefined && numValue < field.min) {
         return `${field.label} must be at least ${field.min}`
       }
-      if (field.max !== undefined && numValue > field.max) {
-        return `${field.label} must be at most ${field.max}`
+      // Check max from field or from data (for dynamic max like availableBalance)
+      const maxValue = field.max !== undefined ? field.max : (data?.availableBalance && field.name === 'amount' ? data.availableBalance : undefined)
+      if (maxValue !== undefined && numValue > maxValue) {
+        return `${field.label} must be at most ₹${Math.round(maxValue).toLocaleString('en-IN')}`
       }
     }
     if (field.type === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
@@ -273,8 +275,12 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                   />
                 ) : field.type === 'select' ? (
                   (() => {
+                    // Get options from field or from additionalData (for dynamic options like bank accounts)
+                    let filteredOptions = data.bankAccountOptions && field.name === 'bankAccountId' 
+                      ? data.bankAccountOptions 
+                      : field.options || []
+                    
                     // For status field, filter to only show current and next status
-                    let filteredOptions = field.options || []
                     if (field.name === 'status' && orderInfo) {
                       const normalizeStatus = (status) => {
                         if (!status) return 'awaiting'
@@ -403,19 +409,26 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                     )}
                   </div>
                 ) : (
-                  <input
-                    type={field.type}
-                    className={cn(
-                      'vendor-action-panel__input',
-                      formErrors[field.name] && 'is-error',
+                  <>
+                    <input
+                      type={field.type}
+                      className={cn(
+                        'vendor-action-panel__input',
+                        formErrors[field.name] && 'is-error',
+                      )}
+                      value={formData[field.name] || field.value || ''}
+                      onChange={(e) => handleFormChange(field.name, e.target.value)}
+                      placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+                      min={field.min}
+                      max={field.max !== undefined ? field.max : (data?.availableBalance && field.name === 'amount' ? data.availableBalance : undefined)}
+                      required={field.required}
+                    />
+                    {field.name === 'amount' && data?.availableBalance && (
+                      <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                        Available balance: ₹{Math.round(data.availableBalance).toLocaleString('en-IN')}
+                      </p>
                     )}
-                    value={formData[field.name] || field.value || ''}
-                    onChange={(e) => handleFormChange(field.name, e.target.value)}
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                    min={field.min}
-                    max={field.max}
-                    required={field.required}
-                  />
+                  </>
                 )}
                 {formErrors[field.name] && (
                   <span className="vendor-action-panel__error">{formErrors[field.name]}</span>
