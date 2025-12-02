@@ -87,6 +87,7 @@ const links = [
     suboptions: [
       { id: 'finance/overview', label: 'Overview' },
       { id: 'finance/penalties', label: 'Penalties' },
+      { id: 'repayments', label: 'Repayments' },
     ]
   },
   { 

@@ -85,8 +85,12 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
       if (field.min !== undefined && numValue < field.min) {
         return `${field.label} must be at least ${field.min}`
       }
-      // Check max from field or from data (for dynamic max like availableBalance)
-      const maxValue = field.max !== undefined ? field.max : (data?.availableBalance && field.name === 'amount' ? data.availableBalance : undefined)
+      // Check max from field or from data (for dynamic max like availableBalance or creditUsed)
+      const maxValue = field.max !== undefined ? field.max : (
+        data?.availableBalance && field.name === 'amount' ? data.availableBalance : 
+        buttonId === 'repay-credit' && data?.creditUsed && field.name === 'amount' ? data.creditUsed : 
+        undefined
+      )
       if (maxValue !== undefined && numValue > maxValue) {
         return `${field.label} must be at most ₹${Math.round(maxValue).toLocaleString('en-IN')}`
       }
@@ -202,6 +206,20 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
         if (!submissionData.bankAccountId && data.bankAccountId) {
           submissionData.bankAccountId = data.bankAccountId
         }
+      }
+      // For repayment requests, include bankAccounts and credit information
+      if (buttonId === 'repay-credit') {
+        submissionData.creditUsed = data.creditUsed
+        submissionData.creditLimit = data.creditLimit
+        submissionData.bankAccounts = data.bankAccounts || []
+        // Ensure bankAccountId is included
+        if (!submissionData.bankAccountId && data.bankAccountId) {
+          submissionData.bankAccountId = data.bankAccountId
+        }
+        // For repayment, let the handler manage the flow (payment intent, Razorpay, etc.)
+        // Don't close panel or show success message here - handler will do that
+        onAction?.({ type: 'update', data: submissionData, buttonId })
+        return // Don't close panel or show default success for repayment
       }
       // Simulate API call
       onAction?.({ type: 'update', data: submissionData, buttonId })
@@ -455,16 +473,34 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                             return
                           }
                         }
+                        // For repayment amount, automatically cap to creditUsed
+                        if (field.name === 'amount' && buttonId === 'repay-credit' && data?.creditUsed) {
+                          const numValue = parseFloat(value)
+                          if (!isNaN(numValue) && numValue > data.creditUsed) {
+                            // Automatically set to maximum (creditUsed)
+                            handleFormChange(field.name, data.creditUsed.toString())
+                            return
+                          }
+                        }
                         handleFormChange(field.name, value)
                       }}
                       placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
                       min={field.min}
-                      max={field.max !== undefined ? field.max : (data?.availableBalance && field.name === 'amount' ? data.availableBalance : undefined)}
+                      max={field.max !== undefined ? field.max : (
+                        data?.availableBalance && field.name === 'amount' ? data.availableBalance : 
+                        buttonId === 'repay-credit' && data?.creditUsed && field.name === 'amount' ? data.creditUsed : 
+                        undefined
+                      )}
                       required={field.required}
                     />
                     {field.name === 'amount' && data?.availableBalance && (
                       <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
                         Available balance: ₹{Math.round(data.availableBalance).toLocaleString('en-IN')}
+                      </p>
+                    )}
+                    {field.name === 'amount' && buttonId === 'repay-credit' && data?.creditUsed && (
+                      <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                        Maximum: ₹{Math.round(data.creditUsed).toLocaleString('en-IN')} (Outstanding credit)
                       </p>
                     )}
                   </>
@@ -479,7 +515,10 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                 Cancel
               </button>
               <button type="button" onClick={handleSubmit} className="vendor-action-panel__button is-primary">
-                {data.type === 'admin_request' ? 'Send Request' : 'Update'}
+                {data.type === 'admin_request' ? 'Send Request' : 
+                 buttonId === 'repay-credit' && formData.amount ? 
+                   `Pay ₹${parseFloat(formData.amount) > 0 ? Math.round(parseFloat(formData.amount)).toLocaleString('en-IN') : '0'}` : 
+                 'Update'}
               </button>
             </div>
           </div>
@@ -604,19 +643,26 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
 // Information Display Content Component
 function InformationDisplayContent({ data, buttonId }) {
   const { dashboard } = useVendorState()
-  const { getCreditInfo, getWithdrawals, getInventoryStats } = useVendorApi()
+  const { getCreditInfo, getWithdrawals, getInventoryStats, getRepaymentHistory } = useVendorApi()
   const [creditData, setCreditData] = useState(null)
   const [withdrawalsData, setWithdrawalsData] = useState(null)
   const [inventoryStatsData, setInventoryStatsData] = useState(null)
+  const [repaymentHistory, setRepaymentHistory] = useState([])
   const [loading, setLoading] = useState(false)
 
   // Fetch real data when modal opens
   useEffect(() => {
     if (data.type === 'credit_info' || data.type === 'credit_details') {
       setLoading(true)
-      getCreditInfo().then((result) => {
-        if (result.data) {
-          setCreditData(result.data)
+      Promise.all([
+        getCreditInfo(),
+        getRepaymentHistory({ page: 1, limit: 10, status: 'completed' })
+      ]).then(([creditResult, repaymentResult]) => {
+        if (creditResult.data) {
+          setCreditData(creditResult.data)
+        }
+        if (repaymentResult.data?.repayments) {
+          setRepaymentHistory(repaymentResult.data.repayments)
         }
         setLoading(false)
       }).catch(() => setLoading(false))
@@ -646,9 +692,7 @@ function InformationDisplayContent({ data, buttonId }) {
         // Use real credit data from backend or dashboard
         const creditInfo = creditData?.credit || dashboard?.credit?.credit || {}
         const creditStatus = creditData?.status || dashboard?.credit?.status || {}
-        const creditLimit = dashboard?.overview?.credit?.limit || creditData?.credit?.limit || 0
         const creditUsed = creditInfo.used || dashboard?.overview?.credit?.used || 0
-        const creditRemaining = dashboard?.overview?.credit?.remaining || (creditLimit - creditUsed)
         const penalty = creditStatus.penalty || dashboard?.overview?.credit?.penalty || 0
         const dueDate = creditInfo.dueDate || dashboard?.overview?.credit?.dueDate
         
@@ -666,32 +710,89 @@ function InformationDisplayContent({ data, buttonId }) {
           return <div className="vendor-info-display"><p>Loading credit information...</p></div>
         }
 
+        // Calculate total repaid and repayment count
+        const totalRepaid = repaymentHistory.reduce((sum, r) => sum + (r.amount || 0), 0)
+        const repaymentCount = repaymentHistory.filter(r => r.status === 'completed').length
+        
+        // Get last repayment date
+        const lastRepayment = repaymentHistory
+          .filter(r => r.status === 'completed')
+          .sort((a, b) => {
+            const dateA = new Date(a.paidAt || a.transactionDate || a.createdAt || 0)
+            const dateB = new Date(b.paidAt || b.transactionDate || b.createdAt || 0)
+            return dateB - dateA
+          })[0]
+        
         return (
           <div className="vendor-info-display">
             <div className="vendor-info-display__section">
               <h5 className="vendor-info-display__section-title">Credit Summary</h5>
               <div className="vendor-info-display__metrics">
                 <div className="vendor-info-display__metric">
-                  <span className="vendor-info-display__metric-label">Total Limit</span>
-                  <span className="vendor-info-display__metric-value">{formatCredit(creditLimit)}</span>
-                </div>
-                <div className="vendor-info-display__metric">
-                  <span className="vendor-info-display__metric-label">Used</span>
+                  <span className="vendor-info-display__metric-label">Outstanding Credit</span>
                   <span className="vendor-info-display__metric-value">{formatCredit(creditUsed)}</span>
                 </div>
                 <div className="vendor-info-display__metric">
-                  <span className="vendor-info-display__metric-label">Remaining</span>
-                  <span className="vendor-info-display__metric-value">{formatCredit(creditRemaining)}</span>
+                  <span className="vendor-info-display__metric-label">To Repay</span>
+                  <span className="vendor-info-display__metric-value">{formatCredit(creditUsed)}</span>
                 </div>
+                {totalRepaid > 0 && (
+                  <div className="vendor-info-display__metric">
+                    <span className="vendor-info-display__metric-label">Total Repaid</span>
+                    <span className="vendor-info-display__metric-value">{formatCredit(totalRepaid)}</span>
+                  </div>
+                )}
+                {repaymentCount > 0 && (
+                  <div className="vendor-info-display__metric">
+                    <span className="vendor-info-display__metric-label">Repayment Count</span>
+                    <span className="vendor-info-display__metric-value">{repaymentCount}</span>
+                  </div>
+                )}
                 <div className="vendor-info-display__metric">
                   <span className="vendor-info-display__metric-label">Due Date</span>
                   <span className="vendor-info-display__metric-value">{formatDate(dueDate)}</span>
                 </div>
+                {lastRepayment && (
+                  <div className="vendor-info-display__metric">
+                    <span className="vendor-info-display__metric-label">Last Repayment</span>
+                    <span className="vendor-info-display__metric-value">{formatDate(lastRepayment.paidAt || lastRepayment.transactionDate || lastRepayment.createdAt)}</span>
+                  </div>
+                )}
               </div>
               <div className="vendor-info-display__status">
                 <span className="vendor-info-display__status-badge">{penalty === 0 ? 'No penalty' : `₹${penalty.toLocaleString('en-IN')}`}</span>
               </div>
             </div>
+            
+            {repaymentHistory.length > 0 && (
+              <div className="vendor-info-display__section">
+                <h5 className="vendor-info-display__section-title">Recent Repayments</h5>
+                <div className="vendor-info-display__list">
+                  {repaymentHistory.slice(0, 5).map((repayment, index) => {
+                    const repaymentDate = repayment.paidAt || repayment.transactionDate || repayment.createdAt
+                    return (
+                      <div key={repayment._id || repayment.id || index} className="vendor-info-display__item">
+                        <div className="vendor-info-display__item-content">
+                          <span className="vendor-info-display__item-label">
+                            {repayment.repaymentId || `Repayment #${(repayment._id || repayment.id).toString().slice(-6)}`}
+                          </span>
+                          <span className="vendor-info-display__item-value">-₹{(repayment.amount || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="vendor-info-display__item-meta">
+                          <span>{repayment.status === 'completed' ? 'Completed' : repayment.status}</span>
+                          <span>{formatDate(repaymentDate)}</span>
+                          {repayment.penaltyAmount > 0 && (
+                            <span className="text-xs text-red-600">
+                              (Penalty: ₹{repayment.penaltyAmount.toLocaleString('en-IN')})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )
 

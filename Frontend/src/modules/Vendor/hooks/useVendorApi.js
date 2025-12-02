@@ -194,6 +194,52 @@ export function useVendorApi() {
 
   const getCreditHistory = useCallback((params) => callApi(vendorApi.getCreditHistory, params), [callApi])
 
+  // Credit Repayment APIs
+  const createRepaymentIntent = useCallback(
+    (repaymentData) => {
+      return callApi(vendorApi.createRepaymentIntent, repaymentData).then((result) => {
+        if (result.data) {
+          // Repayment intent created successfully
+        }
+        return result
+      })
+    },
+    [callApi],
+  )
+
+  const confirmRepayment = useCallback(
+    (confirmationData) => {
+      return callApi(vendorApi.confirmRepayment, confirmationData).then((result) => {
+        if (result.data) {
+          // Update credit balance after successful repayment
+          dispatch({ 
+            type: 'UPDATE_CREDIT_BALANCE', 
+            payload: { 
+              isIncrement: false, 
+              amount: result.data.repayment?.amount || 0,
+              creditUsed: result.data.vendor?.creditUsed || 0,
+            } 
+          })
+          // Refresh dashboard data to get updated credit info
+          fetchDashboardData()
+        }
+        return result
+      })
+    },
+    [callApi, dispatch, fetchDashboardData],
+  )
+
+  const getRepaymentHistory = useCallback((params) => callApi(vendorApi.getRepaymentHistory, params), [callApi])
+
+  // Notification APIs
+  const getNotifications = useCallback((params) => callApi(vendorApi.getNotifications, params), [callApi])
+
+  const markNotificationAsRead = useCallback((notificationId) => callApi(vendorApi.markNotificationAsRead, notificationId), [callApi])
+
+  const markAllNotificationsAsRead = useCallback(() => callApi(vendorApi.markAllNotificationsAsRead), [callApi])
+
+  const deleteNotification = useCallback((notificationId) => callApi(vendorApi.deleteNotification, notificationId), [callApi])
+
   // Earnings APIs
   const getEarningsSummary = useCallback(() => callApi(vendorApi.getEarningsSummary), [callApi])
 
@@ -269,6 +315,10 @@ export function useVendorApi() {
     getCreditPurchases,
     getCreditPurchaseDetails,
     getCreditHistory,
+    // Credit Repayment
+    createRepaymentIntent,
+    confirmRepayment,
+    getRepaymentHistory,
     // Earnings
     getEarningsSummary,
     getEarningsHistory,
@@ -286,6 +336,11 @@ export function useVendorApi() {
     getReports,
     getPerformanceAnalytics,
     getRegionAnalytics,
+    // Notifications
+    getNotifications,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    deleteNotification,
   }
 }
 

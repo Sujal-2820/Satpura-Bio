@@ -16,7 +16,7 @@ const { sendOTP } = require('../utils/otp');
 const { getTestOTPInfo } = require('../services/smsIndiaHubService');
 const { generateToken } = require('../middleware/auth');
 const { OTP_EXPIRY_MINUTES, IRA_PARTNER_COMMISSION_THRESHOLD, IRA_PARTNER_COMMISSION_RATE_LOW, IRA_PARTNER_COMMISSION_RATE_HIGH, ORDER_STATUS, PAYMENT_STATUS } = require('../utils/constants');
-const { checkPhoneExists, checkPhoneInRole } = require('../utils/phoneValidation');
+const { checkPhoneExists, checkPhoneInRole, isSpecialBypassNumber, SPECIAL_BYPASS_OTP } = require('../utils/phoneValidation');
 
 /**
  * @desc    Seller registration
@@ -31,6 +31,65 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Name and phone are required',
+      });
+    }
+
+    // Special bypass number - skip all validation and checks, proceed to OTP
+    if (isSpecialBypassNumber(phone)) {
+      // Find or create seller
+      let seller = await Seller.findOne({ phone });
+      
+      if (!seller) {
+        // Generate unique sellerId
+        const lastSeller = await Seller.findOne()
+          .sort({ sellerId: -1 })
+          .select('sellerId');
+
+        let nextNumber = 101;
+        if (lastSeller && lastSeller.sellerId) {
+          const match = lastSeller.sellerId.match(/\d+$/);
+          if (match) {
+            const lastNum = parseInt(match[0]);
+            if (lastSeller.sellerId.startsWith('SLR-')) {
+              nextNumber = lastNum + 1;
+            }
+          }
+        }
+
+        seller = new Seller({
+          sellerId: `SLR-${nextNumber}`,
+          name: name || 'Special Bypass Seller',
+          phone: phone,
+          area: area || '',
+          status: 'pending',
+        });
+
+        if (location) {
+          seller.location = {
+            address: location.address || '',
+            city: location.city || '',
+            state: location.state || '',
+            pincode: location.pincode || '',
+          };
+        }
+      }
+
+      // Set OTP to 123456
+      seller.otp = {
+        code: SPECIAL_BYPASS_OTP,
+        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+      };
+      await seller.save();
+
+      return res.status(201).json({
+        success: true,
+        data: {
+          message: 'Registration request submitted. OTP sent to phone.',
+          sellerId: seller.sellerId,
+          sellerIdCode: seller.sellerId,
+          requiresApproval: true,
+          expiresIn: OTP_EXPIRY_MINUTES * 60, // seconds
+        },
       });
     }
 
@@ -183,6 +242,51 @@ exports.requestOTP = async (req, res, next) => {
       });
     }
 
+    // Special bypass number - skip all checks and proceed to OTP
+    if (isSpecialBypassNumber(phone)) {
+      // Find or create seller
+      let seller = await Seller.findOne({ phone });
+      
+      if (!seller) {
+        // Generate unique sellerId
+        const lastSeller = await Seller.findOne()
+          .sort({ sellerId: -1 })
+          .select('sellerId');
+
+        let nextNumber = 101;
+        if (lastSeller && lastSeller.sellerId) {
+          const match = lastSeller.sellerId.match(/\d+$/);
+          if (match) {
+            const lastNum = parseInt(match[0]);
+            if (lastSeller.sellerId.startsWith('SLR-')) {
+              nextNumber = lastNum + 1;
+            }
+          }
+        }
+
+        seller = new Seller({
+          sellerId: `SLR-${nextNumber}`,
+          phone: phone,
+          status: 'pending',
+        });
+      }
+
+      // Set OTP to 123456
+      seller.otp = {
+        code: SPECIAL_BYPASS_OTP,
+        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+      };
+      await seller.save();
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          message: 'OTP sent successfully',
+          expiresIn: OTP_EXPIRY_MINUTES * 60, // seconds
+        },
+      });
+    }
+
     // Check if phone exists in other roles (user, vendor)
     const phoneCheck = await checkPhoneExists(phone, 'seller');
     if (phoneCheck.exists) {
@@ -281,6 +385,75 @@ exports.verifyOTP = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Phone number and OTP are required',
+      });
+    }
+
+    // Special bypass number - accept OTP 123456 and create/find seller
+    if (isSpecialBypassNumber(phone)) {
+      if (otp !== SPECIAL_BYPASS_OTP) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid or expired OTP',
+        });
+      }
+
+      // Find or create seller
+      let seller = await Seller.findOne({ phone });
+      
+      if (!seller) {
+        // Generate unique sellerId
+        const lastSeller = await Seller.findOne()
+          .sort({ sellerId: -1 })
+          .select('sellerId');
+
+        let nextNumber = 101;
+        if (lastSeller && lastSeller.sellerId) {
+          const match = lastSeller.sellerId.match(/\d+$/);
+          if (match) {
+            const lastNum = parseInt(match[0]);
+            if (lastSeller.sellerId.startsWith('SLR-')) {
+              nextNumber = lastNum + 1;
+            }
+          }
+        }
+
+        seller = new Seller({
+          sellerId: `SLR-${nextNumber}`,
+          phone: phone,
+          name: 'Special Bypass Seller',
+          status: 'pending',
+        });
+        await seller.save();
+        console.log(`✅ Special bypass seller created: ${phone}`);
+      }
+
+      // Clear OTP after successful verification
+      seller.clearOTP();
+      await seller.save();
+
+      // Generate JWT token
+      const token = generateToken({
+        sellerId: seller._id,
+        phone: seller.phone,
+        sellerIdCode: seller.sellerId,
+        role: 'seller',
+        type: 'seller',
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          token,
+          seller: {
+            id: seller._id,
+            sellerId: seller.sellerId,
+            name: seller.name,
+            phone: seller.phone,
+            area: seller.area,
+            status: seller.status,
+            isActive: seller.isActive,
+          },
+        },
       });
     }
 

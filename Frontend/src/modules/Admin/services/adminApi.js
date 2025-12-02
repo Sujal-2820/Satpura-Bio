@@ -3105,6 +3105,113 @@ export async function getVendorCreditHistory(vendorId, params = {}) {
   }
 }
 
+/**
+ * Get All Vendor Credit Repayments
+ * GET /admin/finance/repayments
+ * 
+ * @param {Object} params - { 
+ *   page?: number, 
+ *   limit?: number,
+ *   status?: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled',
+ *   vendorId?: string,
+ *   startDate?: string,
+ *   endDate?: string
+ * }
+ * @returns {Promise<Object>} - { repayments: Array, summary: Object, pagination: Object }
+ */
+export async function getRepayments(params = {}) {
+  try {
+    const queryParams = new URLSearchParams()
+    if (params.page) queryParams.append('page', params.page)
+    if (params.limit) queryParams.append('limit', params.limit)
+    if (params.status) queryParams.append('status', params.status)
+    if (params.vendorId) queryParams.append('vendorId', params.vendorId)
+    if (params.startDate) queryParams.append('startDate', params.startDate)
+    if (params.endDate) queryParams.append('endDate', params.endDate)
+
+    const queryString = queryParams.toString()
+    const response = await apiRequest(`/admin/finance/repayments${queryString ? `?${queryString}` : ''}`)
+    
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: {
+          repayments: response.data.repayments || [],
+          summary: response.data.summary || {},
+          statusBreakdown: response.data.statusBreakdown || [],
+          pagination: response.data.pagination || {},
+        },
+      }
+    }
+    
+    return response
+  } catch (error) {
+    throw error
+  }
+}
+
+/**
+ * Get Repayment Details
+ * GET /admin/finance/repayments/:repaymentId
+ * 
+ * @param {string} repaymentId - Repayment ID
+ * @returns {Promise<Object>} - { repayment: Object }
+ */
+export async function getRepaymentDetails(repaymentId) {
+  try {
+    const response = await apiRequest(`/admin/finance/repayments/${repaymentId}`)
+    
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: {
+          repayment: response.data.repayment || {},
+        },
+      }
+    }
+    
+    return response
+  } catch (error) {
+    throw error
+  }
+}
+
+/**
+ * Get Vendor Repayments
+ * GET /admin/finance/vendors/:vendorId/repayments
+ * 
+ * @param {string} vendorId - Vendor ID
+ * @param {Object} params - { page?: number, limit?: number, status?: string }
+ * @returns {Promise<Object>} - { vendor: Object, repayments: Array, summary: Object, pagination: Object }
+ */
+export async function getVendorRepayments(vendorId, params = {}) {
+  try {
+    const queryParams = new URLSearchParams()
+    if (params.page) queryParams.append('page', params.page)
+    if (params.limit) queryParams.append('limit', params.limit)
+    if (params.status) queryParams.append('status', params.status)
+
+    const queryString = queryParams.toString()
+    const response = await apiRequest(`/admin/finance/vendors/${vendorId}/repayments${queryString ? `?${queryString}` : ''}`)
+    
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: {
+          vendor: response.data.vendor || {},
+          repayments: response.data.repayments || [],
+          summary: response.data.summary || {},
+          pagination: response.data.pagination || {},
+        },
+      }
+    }
+    
+    return response
+  } catch (error) {
+    throw error
+  }
+}
+
 // ============================================================================
 // ANALYTICS & REPORTS APIs
 // ============================================================================

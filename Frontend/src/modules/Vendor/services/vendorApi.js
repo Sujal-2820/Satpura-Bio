@@ -538,6 +538,37 @@ export async function getCreditHistory(params = {}) {
   return apiRequest(`/vendors/credit/history?${queryParams}`)
 }
 
+/**
+ * Create Repayment Payment Intent
+ * POST /vendors/credit/repayment/create-intent
+ */
+export async function createRepaymentIntent(repaymentData) {
+  return apiRequest('/vendors/credit/repayment/create-intent', {
+    method: 'POST',
+    body: JSON.stringify(repaymentData),
+  })
+}
+
+/**
+ * Confirm Repayment
+ * POST /vendors/credit/repayment/confirm
+ */
+export async function confirmRepayment(confirmationData) {
+  return apiRequest('/vendors/credit/repayment/confirm', {
+    method: 'POST',
+    body: JSON.stringify(confirmationData),
+  })
+}
+
+/**
+ * Get Repayment History
+ * GET /vendors/credit/repayment/history
+ */
+export async function getRepaymentHistory(params = {}) {
+  const queryParams = new URLSearchParams(params).toString()
+  return apiRequest(`/vendors/credit/repayment/history?${queryParams}`)
+}
+
 // ============================================================================
 // REPORTS & ANALYTICS APIs
 // ============================================================================
@@ -716,80 +747,64 @@ export async function deleteBankAccount(accountId) {
 }
 
 // ============================================================================
-// REAL-TIME NOTIFICATIONS
+// NOTIFICATIONS
 // ============================================================================
 
 /**
- * Initialize Real-time Connection
- * Sets up WebSocket or polling connection for real-time updates
+ * Get Vendor Notifications
+ * GET /vendors/notifications
  * 
- * @param {Function} onNotification - Callback function for notifications
- * @returns {Function} - Cleanup function
+ * @param {Object} params - { page, limit, read, type }
+ * @returns {Promise<Object>} - { notifications: Array, pagination: Object, unreadCount: number }
  */
-export function initializeRealtimeConnection(onNotification) {
-  // Simulate real-time connection
-  const interval = setInterval(() => {
-    // Simulate various notification types
-    const notifications = [
-      {
-        type: 'order_assigned',
-        title: 'New Order Received',
-        message: 'You have a new order from Anand Kumar (₹48,600)',
-        timestamp: new Date().toISOString(),
-        data: { orderId: 'ord-1', customerName: 'Anand Kumar', amount: 48600 },
-      },
-      {
-        type: 'order_status_changed',
-        title: 'Order Status Updated',
-        message: 'Order #ord-2 has been updated to Processing',
-        timestamp: new Date().toISOString(),
-        data: { orderId: 'ord-2', status: 'processing' },
-      },
-      {
-        type: 'credit_purchase_approved',
-        title: 'Purchase Request Approved',
-        message: 'Your credit purchase request has been approved by Admin',
-        timestamp: new Date().toISOString(),
-        data: { requestId: 'CR-123', amount: 50000 },
-      },
-      {
-        type: 'credit_purchase_rejected',
-        title: 'Purchase Request Rejected',
-        message: 'Your credit purchase request has been rejected. Please contact Admin.',
-        timestamp: new Date().toISOString(),
-        data: { requestId: 'CR-124', reason: 'Insufficient credit limit' },
-      },
-      {
-        type: 'credit_due_reminder',
-        title: 'Credit Payment Due',
-        message: 'Your credit payment of ₹1.2L is due in 8 days',
-        timestamp: new Date().toISOString(),
-        data: { dueDate: '2025-12-08', amount: 120000 },
-      },
-      {
-        type: 'inventory_low_alert',
-        title: 'Low Stock Alert',
-        message: 'Micro Nutrients stock is running low (210 kg remaining)',
-        timestamp: new Date().toISOString(),
-        data: { itemId: 'inv-3', itemName: 'Micro Nutrients', stock: 210 },
-      },
-      {
-        type: 'admin_announcement',
-        title: 'Admin Announcement',
-        message: 'New product catalog updated. Check inventory section for details.',
-        timestamp: new Date().toISOString(),
-        data: {},
-      },
-    ]
+export async function getNotifications(params = {}) {
+  const queryParams = new URLSearchParams()
+  if (params.page) queryParams.append('page', params.page)
+  if (params.limit) queryParams.append('limit', params.limit)
+  if (params.read !== undefined) queryParams.append('read', params.read)
+  if (params.type) queryParams.append('type', params.type)
 
-    // Randomly send notifications (simulate real-time behavior)
-    if (Math.random() < 0.1) {
-      const notification = notifications[Math.floor(Math.random() * notifications.length)]
-      onNotification(notification)
-    }
-  }, 10000) // Check every 10 seconds
+  return apiRequest(`/vendors/notifications${queryParams.toString() ? `?${queryParams.toString()}` : ''}`, {
+    method: 'GET',
+  })
+}
 
-  return () => clearInterval(interval)
+/**
+ * Mark Notification as Read
+ * PATCH /vendors/notifications/:notificationId/read
+ * 
+ * @param {string} notificationId - Notification ID
+ * @returns {Promise<Object>} - { notification: Object }
+ */
+export async function markNotificationAsRead(notificationId) {
+  return apiRequest(`/vendors/notifications/${notificationId}/read`, {
+    method: 'PATCH',
+  })
+}
+
+/**
+ * Mark All Notifications as Read
+ * PATCH /vendors/notifications/read-all
+ * 
+ * @returns {Promise<Object>} - { updatedCount: number }
+ */
+export async function markAllNotificationsAsRead() {
+  return apiRequest('/vendors/notifications/read-all', {
+    method: 'PATCH',
+  })
+}
+
+/**
+ * Delete Notification
+ * DELETE /vendors/notifications/:notificationId
+ * 
+ * @param {string} notificationId - Notification ID
+ * @returns {Promise<Object>} - { message: string }
+ */
+export async function deleteNotification(notificationId) {
+  return apiRequest(`/vendors/notifications/${notificationId}`, {
+    method: 'DELETE',
+  })
 }
 
 /**

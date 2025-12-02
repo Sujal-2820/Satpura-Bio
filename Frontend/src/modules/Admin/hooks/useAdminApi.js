@@ -573,6 +573,13 @@ export function useAdminApi() {
 
   const getVendorCreditHistory = useCallback((vendorId, params) => callApi(adminApi.getVendorCreditHistory, vendorId, params), [callApi])
 
+  // Credit Repayment APIs
+  const getRepayments = useCallback((params) => callApi(adminApi.getRepayments, params), [callApi])
+
+  const getRepaymentDetails = useCallback((repaymentId) => callApi(adminApi.getRepaymentDetails, repaymentId), [callApi])
+
+  const getVendorRepayments = useCallback((vendorId, params) => callApi(adminApi.getVendorRepayments, vendorId, params), [callApi])
+
   // Operations & Controls APIs
   const getLogisticsSettings = useCallback(() => callApi(adminApi.getLogisticsSettings), [callApi])
 
@@ -752,6 +759,10 @@ export function useAdminApi() {
     updateGlobalParameters,
     applyVendorPenalty,
     getVendorCreditHistory,
+    // Credit Repayments
+    getRepayments,
+    getRepaymentDetails,
+    getVendorRepayments,
     // Operations
     getLogisticsSettings,
     updateLogisticsSettings,

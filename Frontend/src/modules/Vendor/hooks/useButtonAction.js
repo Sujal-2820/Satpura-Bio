@@ -293,6 +293,17 @@ export const BUTTON_CONFIGS = {
       ],
     },
   },
+  'repay-credit': {
+    intent: BUTTON_INTENT.UPDATION,
+    title: 'Repay Credit',
+    data: {
+      type: 'credit_repayment',
+      fields: [
+        { name: 'amount', label: 'Repayment Amount', value: '', type: 'number', required: true, min: 1, placeholder: 'Enter amount to repay' },
+        { name: 'bankAccountId', label: 'Bank Account', value: '', type: 'select', required: true, placeholder: 'Select bank account' },
+      ],
+    },
+  },
   'request-withdrawal': {
     intent: BUTTON_INTENT.UPDATION,
     title: 'Request Withdrawal',

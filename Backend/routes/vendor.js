@@ -231,6 +231,27 @@ router.get('/credit/history', authorizeVendor, vendorController.getCreditHistory
  */
 router.get('/credit', authorizeVendor, vendorController.getCreditInfo);
 
+/**
+ * @route   POST /api/vendors/credit/repayment/create-intent
+ * @desc    Create repayment payment intent (Razorpay)
+ * @access  Private (Vendor)
+ */
+router.post('/credit/repayment/create-intent', authorizeVendor, vendorController.createRepaymentIntent);
+
+/**
+ * @route   POST /api/vendors/credit/repayment/confirm
+ * @desc    Confirm repayment after Razorpay payment
+ * @access  Private (Vendor)
+ */
+router.post('/credit/repayment/confirm', authorizeVendor, vendorController.confirmRepayment);
+
+/**
+ * @route   GET /api/vendors/credit/repayment/history
+ * @desc    Get repayment history
+ * @access  Private (Vendor)
+ */
+router.get('/credit/repayment/history', authorizeVendor, vendorController.getRepaymentHistory);
+
 // ============================================================================
 // REPORTS & ANALYTICS ROUTES
 // ============================================================================
@@ -363,6 +384,38 @@ router.get('/messages', authorizeVendor, vendorAdminMessageController.getVendorM
  * @access  Private (Vendor)
  */
 router.get('/messages/:messageId', authorizeVendor, vendorAdminMessageController.getVendorMessageDetails);
+
+// ============================================================================
+// NOTIFICATION ROUTES
+// ============================================================================
+
+/**
+ * @route   GET /api/vendors/notifications
+ * @desc    Get vendor notifications
+ * @access  Private (Vendor)
+ */
+router.get('/notifications', authorizeVendor, vendorController.getNotifications);
+
+/**
+ * @route   PATCH /api/vendors/notifications/:notificationId/read
+ * @desc    Mark notification as read
+ * @access  Private (Vendor)
+ */
+router.patch('/notifications/:notificationId/read', authorizeVendor, vendorController.markNotificationAsRead);
+
+/**
+ * @route   PATCH /api/vendors/notifications/read-all
+ * @desc    Mark all notifications as read
+ * @access  Private (Vendor)
+ */
+router.patch('/notifications/read-all', authorizeVendor, vendorController.markAllNotificationsAsRead);
+
+/**
+ * @route   DELETE /api/vendors/notifications/:notificationId
+ * @desc    Delete notification
+ * @access  Private (Vendor)
+ */
+router.delete('/notifications/:notificationId', authorizeVendor, vendorController.deleteNotification);
 
 module.exports = router;
 

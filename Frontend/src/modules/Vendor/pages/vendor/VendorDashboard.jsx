@@ -27,6 +27,7 @@ import { ConfirmationModal } from '../../components/ConfirmationModal'
 import { ProductAttributeSelector } from '../../components/ProductAttributeSelector'
 import { BankAccountForm } from '../../components/BankAccountForm'
 import { NotificationPanel } from '../../components/NotificationPanel'
+import { openRazorpayCheckout } from '../../../../utils/razorpay'
 
 const NAV_ITEMS = [
   {
@@ -49,8 +50,8 @@ const NAV_ITEMS = [
   },
   {
     id: 'credit',
-    label: 'Loan Status',
-    description: 'Loan limit, fines, payment',
+    label: 'Credit Status',
+    description: 'Credit limit, fines, payment',
     icon: CreditIcon,
   },
   {
@@ -70,7 +71,7 @@ const NAV_ITEMS = [
 export function VendorDashboard({ onLogout }) {
   const { profile, dashboard, notifications } = useVendorState()
   const dispatch = useVendorDispatch()
-  const { acceptOrder, confirmOrderAcceptance, cancelOrderAcceptance, acceptOrderPartially, rejectOrder, updateInventoryStock, requestCreditPurchase, updateOrderStatus, fetchProfile, fetchDashboardData, getOrders, requestWithdrawal, getEarningsSummary, getBankAccounts } = useVendorApi()
+  const { acceptOrder, confirmOrderAcceptance, cancelOrderAcceptance, acceptOrderPartially, rejectOrder, updateInventoryStock, requestCreditPurchase, updateOrderStatus, fetchProfile, fetchDashboardData, getOrders, requestWithdrawal, getEarningsSummary, getBankAccounts, createRepaymentIntent, confirmRepayment, getCreditInfo, getNotifications, markNotificationAsRead, markAllNotificationsAsRead } = useVendorApi()
   const [activeTab, setActiveTab] = useState('overview')
   const [showAllOrders, setShowAllOrders] = useState(false)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
@@ -98,6 +99,7 @@ export function VendorDashboard({ onLogout }) {
     const token = localStorage.getItem('vendor_token')
     if (!token) {
       // No token, redirect to login
+      dispatch({ type: 'AUTH_LOGOUT' })
       if (onLogout) {
         onLogout()
       }
@@ -125,6 +127,7 @@ export function VendorDashboard({ onLogout }) {
           } else if (profileResult.error?.status === 401) {
             // Token expired or invalid, redirect to login
             localStorage.removeItem('vendor_token')
+            dispatch({ type: 'AUTH_LOGOUT' })
             if (onLogout) {
               onLogout()
             }
@@ -137,6 +140,7 @@ export function VendorDashboard({ onLogout }) {
         if (dashboardResult.error?.status === 401) {
           // Token expired or invalid, redirect to login
           localStorage.removeItem('vendor_token')
+          dispatch({ type: 'AUTH_LOGOUT' })
           if (onLogout) {
             onLogout()
           }
@@ -145,6 +149,7 @@ export function VendorDashboard({ onLogout }) {
         console.error('Failed to load vendor data:', err)
         if (err.error?.status === 401) {
           localStorage.removeItem('vendor_token')
+          dispatch({ type: 'AUTH_LOGOUT' })
           if (onLogout) {
             onLogout()
           }
@@ -208,7 +213,7 @@ export function VendorDashboard({ onLogout }) {
         {
           id: 'search-inventory-restock',
           label: 'Need to order more',
-          keywords: ['inventory', 'restock', 'order', 'loan', 'stock'],
+          keywords: ['inventory', 'restock', 'order', 'credit', 'stock'],
           tab: 'inventory',
           targetId: 'inventory-restock',
         },
@@ -235,15 +240,15 @@ export function VendorDashboard({ onLogout }) {
         },
         {
           id: 'search-credit-summary',
-          label: 'Loan summary & usage',
-          keywords: ['credit', 'loan', 'limit', 'usage', 'fine'],
+          label: 'Credit summary & usage',
+          keywords: ['credit', 'limit', 'usage', 'fine'],
           tab: 'credit',
           targetId: 'credit-summary',
         },
         {
           id: 'search-credit-penalty',
           label: 'Fine timeline',
-          keywords: ['credit', 'loan', 'penalty', 'fine', 'timeline', 'payment'],
+          keywords: ['credit', 'penalty', 'fine', 'timeline', 'payment'],
           tab: 'credit',
           targetId: 'credit-penalty',
         },
@@ -343,15 +348,51 @@ export function VendorDashboard({ onLogout }) {
     setNotificationPanelOpen(false)
   }
 
+  // Fetch notifications from backend
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const result = await getNotifications({ page: 1, limit: 50 })
+      if (result.data?.notifications) {
+        dispatch({ type: 'SET_NOTIFICATIONS', payload: result.data.notifications })
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err)
+    }
+  }, [getNotifications, dispatch])
+
+  // Fetch notifications on mount and periodically
+  useEffect(() => {
+    fetchNotifications()
+    
+    // Refresh notifications every 30 seconds
+    const interval = setInterval(() => {
+      fetchNotifications()
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [fetchNotifications])
+
   // Mark notification as read
-  const handleMarkNotificationAsRead = useCallback((notificationId) => {
-    dispatch({ type: 'MARK_NOTIFICATION_READ', payload: { id: notificationId } })
-  }, [dispatch])
+  const handleMarkNotificationAsRead = useCallback(async (notificationId) => {
+    try {
+      await markNotificationAsRead(notificationId)
+      dispatch({ type: 'MARK_NOTIFICATION_READ', payload: { id: notificationId } })
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err)
+    }
+  }, [markNotificationAsRead, dispatch])
 
   // Mark all notifications as read
-  const handleMarkAllNotificationsAsRead = useCallback(() => {
-    dispatch({ type: 'MARK_ALL_NOTIFICATIONS_READ' })
-  }, [dispatch])
+  const handleMarkAllNotificationsAsRead = useCallback(async () => {
+    try {
+      await markAllNotificationsAsRead()
+      dispatch({ type: 'MARK_ALL_NOTIFICATIONS_READ' })
+      // Refresh notifications after marking all as read
+      fetchNotifications()
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err)
+    }
+  }, [markAllNotificationsAsRead, dispatch, fetchNotifications])
 
   const buildMenuItems = (close) => [
     ...NAV_ITEMS.map((item) => ({
@@ -864,6 +905,153 @@ export function VendorDashboard({ onLogout }) {
                 setConfirmationModalOpen(true)
                 closePanel() // Close the action panel
               }
+              // Credit repayment actions
+              else if (buttonId === 'repay-credit' && data.amount) {
+                const repaymentAmount = parseFloat(data.amount)
+                const creditUsed = data.creditUsed || 0
+                
+                // Validate amount
+                if (repaymentAmount < 1) {
+                  error('Minimum repayment amount is ₹1')
+                  return
+                }
+                
+                if (repaymentAmount > creditUsed) {
+                  error(`Repayment amount cannot exceed outstanding credit. Outstanding: ₹${Math.round(creditUsed).toLocaleString('en-IN')}, Requested: ₹${repaymentAmount.toLocaleString('en-IN')}`)
+                  return
+                }
+                
+                // Validate bank account
+                if (!data.bankAccountId) {
+                  error('Please select a bank account for repayment')
+                  return
+                }
+                
+                // Get bank account details for confirmation
+                let bankAccountDetails = null
+                if (data.bankAccountId && data.bankAccounts) {
+                  const selectedAccount = data.bankAccounts.find(acc => (acc._id || acc.id) === data.bankAccountId)
+                  if (selectedAccount) {
+                    bankAccountDetails = {
+                      'Account Holder': selectedAccount.accountHolderName || 'N/A',
+                      'Account Number': `****${(selectedAccount.accountNumber || '').slice(-4)}`,
+                      'IFSC Code': selectedAccount.ifscCode || 'N/A',
+                      'Bank Name': selectedAccount.bankName || 'N/A',
+                    }
+                  }
+                }
+                
+                // Create payment intent and open Razorpay directly
+                try {
+                  closePanel() // Close the action panel first
+                  
+                  console.log('[VendorDashboard] Creating repayment intent with data:', {
+                    amount: repaymentAmount,
+                    bankAccountId: data.bankAccountId,
+                    creditUsed: creditUsed,
+                  })
+                  
+                  const intentResult = await createRepaymentIntent({
+                    amount: repaymentAmount,
+                    bankAccountId: data.bankAccountId,
+                  })
+                  
+                  console.log('[VendorDashboard] Repayment intent result:', intentResult)
+                  
+                  if (intentResult.error) {
+                    console.error('[VendorDashboard] Repayment intent error:', intentResult.error)
+                    error(intentResult.error.message || 'Failed to create payment intent')
+                    return
+                  }
+                  
+                  const repaymentData = intentResult.data?.repayment
+                  const razorpayData = intentResult.data?.razorpay
+                  
+                  if (!repaymentData || !razorpayData) {
+                    error('Invalid payment intent response')
+                    return
+                  }
+                  
+                  // Open Razorpay checkout directly
+                  const isTestMode = razorpayData.orderId?.startsWith('order_test_')
+                  
+                  if (isTestMode) {
+                    // Test mode: Simulate payment
+                    console.log('⚠️ Test mode: Simulating payment...')
+                    
+                    const simulatedPaymentResponse = {
+                      paymentId: `pay_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                      orderId: razorpayData.orderId,
+                      signature: `sig_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    }
+
+                    // Confirm repayment with simulated payment
+                    const confirmResult = await confirmRepayment({
+                      repaymentId: repaymentData.id,
+                      razorpayPaymentId: simulatedPaymentResponse.paymentId,
+                      razorpayOrderId: simulatedPaymentResponse.orderId,
+                      razorpaySignature: simulatedPaymentResponse.signature,
+                    })
+                    
+                    if (confirmResult.data) {
+                      success(`Repayment of ₹${repaymentAmount.toLocaleString('en-IN')} completed successfully!`)
+                      getCreditInfo()
+                      fetchDashboardData()
+                      // Trigger repayment history refresh
+                      window.dispatchEvent(new Event('repayment-success'))
+                      if (activeTab !== 'credit') {
+                        setActiveTab('credit')
+                      }
+                    } else if (confirmResult.error) {
+                      error(confirmResult.error.message || 'Failed to confirm repayment')
+                    }
+                  } else {
+                    // Production mode: Open Razorpay checkout
+                    try {
+                      const paymentResponse = await openRazorpayCheckout({
+                        key: razorpayData.key,
+                        amount: razorpayData.amount / 100, // Convert from paise to rupees
+                        currency: razorpayData.currency || 'INR',
+                        order_id: razorpayData.orderId,
+                        name: 'IRA SATHI',
+                        description: `Credit Repayment - ₹${repaymentAmount.toLocaleString('en-IN')}`,
+                        prefill: {
+                          name: profile?.name || '',
+                          email: profile?.email || '',
+                          contact: profile?.phone || '',
+                        },
+                      })
+                      
+                      if (paymentResponse.success) {
+                        // Confirm repayment after successful payment
+                        const confirmResult = await confirmRepayment({
+                          repaymentId: repaymentData.id,
+                          razorpayPaymentId: paymentResponse.paymentId,
+                          razorpayOrderId: paymentResponse.orderId,
+                          razorpaySignature: paymentResponse.signature,
+                        })
+                        
+                        if (confirmResult.data) {
+                          success(`Repayment of ₹${repaymentAmount.toLocaleString('en-IN')} completed successfully!`)
+                          getCreditInfo()
+                          fetchDashboardData()
+                          // Trigger repayment history refresh
+                          window.dispatchEvent(new Event('repayment-success'))
+                          if (activeTab !== 'credit') {
+                            setActiveTab('credit')
+                          }
+                        } else if (confirmResult.error) {
+                          error(confirmResult.error.message || 'Failed to confirm repayment')
+                        }
+                      }
+                    } catch (paymentErr) {
+                      error(paymentErr.error || paymentErr.message || 'Payment was cancelled or failed')
+                    }
+                  }
+                } catch (err) {
+                  error(err.message || 'Failed to initialize repayment')
+                }
+              }
               // Admin request actions
               else if (type === 'update' && data.type === 'admin_request') {
                 // Simulate sending request to admin (this would be a separate API endpoint)
@@ -892,7 +1080,7 @@ export function VendorDashboard({ onLogout }) {
           setConfirmationModalOpen(false)
           setConfirmationData(null)
         }}
-        onConfirm={async () => {
+          onConfirm={async () => {
           if (!confirmationData) return
           
           setConfirmationLoading(true)
@@ -917,6 +1105,69 @@ export function VendorDashboard({ onLogout }) {
               } else if (result.error) {
                 error(result.error.message || 'Failed to submit withdrawal request')
               }
+            } else if (confirmationData.type === 'repayment') {
+              // Handle repayment with Razorpay checkout
+              try {
+                // Check if test mode (simulated payment)
+                const isTestMode = confirmationData.razorpayOrderId?.startsWith('order_test_')
+                
+                let paymentResponse = null
+                
+                if (isTestMode) {
+                  // Simulate payment in test mode
+                  console.log('⚠️ Test mode: Simulating payment...')
+                  paymentResponse = {
+                    success: true,
+                    paymentId: `pay_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    orderId: confirmationData.razorpayOrderId,
+                    signature: `sig_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                  }
+                } else {
+                  // Open Razorpay checkout
+                  paymentResponse = await openRazorpayCheckout({
+                    key: confirmationData.razorpayKey,
+                    amount: confirmationData.razorpayAmount / 100, // Convert from paise to rupees
+                    currency: 'INR',
+                    order_id: confirmationData.razorpayOrderId,
+                    name: 'IRA SATHI',
+                    description: `Credit Repayment - ₹${confirmationData.amount.toLocaleString('en-IN')}`,
+                    prefill: {
+                      name: profile?.name || '',
+                      email: profile?.email || '',
+                      contact: profile?.phone || '',
+                    },
+                  })
+                }
+                
+                if (paymentResponse.success) {
+                  // Confirm repayment with payment details
+                  const confirmResult = await confirmRepayment({
+                    repaymentId: confirmationData.repaymentId,
+                    razorpayPaymentId: paymentResponse.paymentId,
+                    razorpayOrderId: paymentResponse.orderId,
+                    razorpaySignature: paymentResponse.signature,
+                  })
+                  
+                  if (confirmResult.data) {
+                    success(`Repayment of ₹${confirmationData.amount.toLocaleString('en-IN')} completed successfully!`)
+                    setConfirmationModalOpen(false)
+                    setConfirmationData(null)
+                    // Refresh credit info and dashboard
+                    getCreditInfo()
+                    fetchDashboardData()
+                    // Navigate to credit tab if not already there
+                    if (activeTab !== 'credit') {
+                      setActiveTab('credit')
+                    }
+                  } else if (confirmResult.error) {
+                    error(confirmResult.error.message || 'Failed to confirm repayment')
+                  }
+                } else {
+                  error(paymentResponse.error || 'Payment was cancelled or failed')
+                }
+              } catch (paymentErr) {
+                error(paymentErr.error || paymentErr.message || 'Payment failed. Please try again.')
+              }
             }
           } catch (err) {
             error(err.message || 'An unexpected error occurred')
@@ -924,13 +1175,22 @@ export function VendorDashboard({ onLogout }) {
             setConfirmationLoading(false)
           }
         }}
-        title="Confirm Withdrawal Request"
-        message="Please verify all bank account details and withdrawal amount before proceeding. Once submitted, this request will be sent to admin for approval."
-        details={confirmationData ? {
+        title={confirmationData?.type === 'repayment' ? 'Confirm Repayment' : 'Confirm Withdrawal Request'}
+        message={confirmationData?.type === 'repayment' 
+          ? 'Please verify all repayment details before proceeding. Payment will be processed via Razorpay.'
+          : 'Please verify all bank account details and withdrawal amount before proceeding. Once submitted, this request will be sent to admin for approval.'}
+        details={confirmationData ? (confirmationData.type === 'repayment' ? {
+          'Repayment Amount': `₹${confirmationData.amount.toLocaleString('en-IN')}`,
+          'Penalty Amount': confirmationData.penaltyAmount > 0 ? `₹${confirmationData.penaltyAmount.toLocaleString('en-IN')}` : '₹0',
+          'Total Amount': `₹${confirmationData.totalAmount.toLocaleString('en-IN')}`,
+          'Outstanding Credit (Before)': `₹${confirmationData.creditUsedBefore.toLocaleString('en-IN')}`,
+          'Outstanding Credit (After)': `₹${confirmationData.creditUsedAfter.toLocaleString('en-IN')}`,
+          ...(confirmationData.bankAccountDetails || {}),
+        } : {
           'Withdrawal Amount': `₹${confirmationData.amount.toLocaleString('en-IN')}`,
           'Available Balance': `₹${Math.round(confirmationData.availableBalance).toLocaleString('en-IN')}`,
           ...(confirmationData.bankAccountDetails || {}),
-        } : null}
+        }) : null}
         loading={confirmationLoading}
       />
 
@@ -1014,10 +1274,12 @@ export function VendorDashboard({ onLogout }) {
 
 function OverviewView({ onNavigate, welcomeName, openPanel }) {
   const { profile, dashboard } = useVendorState()
-  const { fetchDashboardData, getWithdrawals } = useVendorApi()
+  const { fetchDashboardData, getWithdrawals, getRepaymentHistory, getEarningsSummary } = useVendorApi()
   const servicesRef = useRef(null)
   const [servicePage, setServicePage] = useState(0)
   const [recentWithdrawals, setRecentWithdrawals] = useState([])
+  const [recentRepayments, setRecentRepayments] = useState([])
+  const [availableBalance, setAvailableBalance] = useState(0)
 
   // Fetch dashboard data on mount
   useEffect(() => {
@@ -1026,7 +1288,16 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
         // Data is stored in context via the API hook
       }
     })
-  }, [fetchDashboardData])
+    
+    // Fetch available balance from earnings
+    getEarningsSummary().then((result) => {
+      if (result.data?.availableBalance) {
+        setAvailableBalance(result.data.availableBalance)
+      }
+    }).catch(() => {
+      // Silently fail - earnings data is optional
+    })
+  }, [fetchDashboardData, getEarningsSummary])
 
   const services = [
     { label: 'Stock', note: 'Reorder stock', tone: 'success', target: 'inventory', icon: BoxIcon, action: null },
@@ -1053,6 +1324,31 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
     }
     loadRecentWithdrawals()
   }, [getWithdrawals])
+
+  // Fetch recent repayments for activity
+  const loadRecentRepayments = useCallback(async () => {
+    try {
+      const result = await getRepaymentHistory({ page: 1, limit: 5, status: 'completed' })
+      if (result.data?.repayments) {
+        setRecentRepayments(result.data.repayments)
+      }
+    } catch (err) {
+      // Silently fail - repayments are optional for activity
+    }
+  }, [getRepaymentHistory])
+
+  useEffect(() => {
+    loadRecentRepayments()
+    
+    // Listen for repayment success to refresh
+    const handleRepaymentSuccess = () => {
+      loadRecentRepayments()
+    }
+    window.addEventListener('repayment-success', handleRepaymentSuccess)
+    return () => {
+      window.removeEventListener('repayment-success', handleRepaymentSuccess)
+    }
+  }, [loadRecentRepayments])
 
   // Use data from context or fallback to snapshot
   const overviewData = dashboard.overview || {}
@@ -1090,8 +1386,24 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
     }
   })
   
+  // Transform recent repayments to activity format
+  const repaymentTransactions = recentRepayments.map((repayment) => {
+    return {
+      name: 'Credit Repayment',
+      action: `Repayment ${repayment.status === 'completed' ? 'Completed' : repayment.status === 'pending' ? 'Pending' : repayment.status}`,
+      amount: `-₹${(repayment.amount || 0).toLocaleString('en-IN')}`,
+      status: repayment.status === 'completed' ? 'Completed' : repayment.status === 'pending' ? 'Pending' : repayment.status,
+      avatar: 'RP',
+      repaymentId: repayment._id || repayment.id,
+      repaymentNumber: repayment.repaymentId,
+      type: 'repayment',
+      date: repayment.paidAt || repayment.transactionDate || repayment.createdAt,
+      penaltyAmount: repayment.penaltyAmount || 0,
+    }
+  })
+  
   // Combine and sort by date (most recent first)
-  const allTransactions = [...orderTransactions, ...withdrawalTransactions].sort((a, b) => {
+  const allTransactions = [...orderTransactions, ...withdrawalTransactions, ...repaymentTransactions].sort((a, b) => {
     const dateA = a.date ? new Date(a.date).getTime() : 0
     const dateB = b.date ? new Date(b.date).getTime() : 0
     return dateB - dateA
@@ -1100,9 +1412,14 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
   // If no transactions, use empty array (don't show dummy data)
   const displayTransactions = allTransactions.length > 0 ? allTransactions.slice(0, 4) : []
 
-  const walletBalance = overviewData.credit?.remaining
-    ? `₹${(overviewData.credit.remaining / 100000).toFixed(1)}L`
-    : '₹0'
+  // Format available balance from earnings
+  const formatAvailableBalance = (balance) => {
+    if (!balance || balance === 0) return '₹0'
+    if (balance >= 100000) return `₹${(balance / 100000).toFixed(1)}L`
+    return `₹${Math.round(balance).toLocaleString('en-IN')}`
+  }
+  
+  const walletBalance = formatAvailableBalance(availableBalance)
 
   const quickActions = [
     {
@@ -1122,7 +1439,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
       action: 'update-inventory-batch',
     },
     {
-      label: 'Request loan order',
+      label: 'Request credit order',
       description: 'Request stock from admin',
       target: 'credit',
       icon: CreditIcon,
@@ -1176,7 +1493,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
               <p className="overview-hero__value">{walletBalance}</p>
             </div>
             <button type="button" onClick={() => openPanel('check-credit')} className="overview-hero__cta">
-              Check loan
+              Check credit
             </button>
           </div>
           <div className="overview-hero__stats">
@@ -1241,11 +1558,13 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
         </div>
         <div className="overview-activity__list">
           {displayTransactions.length > 0 ? displayTransactions.map((item, index) => (
-            <div key={item.orderId || item.withdrawalId || `${item.name}-${index}`} className="overview-activity__item">
+            <div key={item.orderId || item.withdrawalId || item.repaymentId || `${item.name}-${index}`} className="overview-activity__item">
               <div className="overview-activity__avatar">{item.avatar}</div>
               <div className="overview-activity__details">
                 <div className="overview-activity__row">
-                  <span className="overview-activity__name">{item.name}</span>
+                  <span className="overview-activity__name">
+                    {item.type === 'repayment' && item.repaymentNumber ? item.repaymentNumber : item.name}
+                  </span>
                   <span
                     className={cn(
                       'overview-activity__amount',
@@ -1258,6 +1577,11 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
                 <div className="overview-activity__meta">
                   <span>{item.action}</span>
                   <span>{item.status}</span>
+                  {item.type === 'repayment' && item.penaltyAmount > 0 && (
+                    <span className="text-xs text-red-600">
+                      (Penalty: ₹{item.penaltyAmount.toLocaleString('en-IN')})
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -2771,7 +3095,7 @@ function InventoryView({ openPanel, onNavigate }) {
             <div>
               <p className="text-sm font-semibold text-surface-foreground">Need to order more</p>
               <p className="text-xs text-muted-foreground">
-                {lowStockItems.length} product{lowStockItems.length > 1 ? 's' : ''} running low. Submit a loan request to avoid stockout.
+                {lowStockItems.length} product{lowStockItems.length > 1 ? 's' : ''} running low. Submit a credit request to avoid stockout.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -4241,7 +4565,19 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
 function CreditView({ openPanel }) {
   const { dashboard } = useVendorState()
   const dispatch = useVendorDispatch()
-  const { getCreditInfo } = useVendorApi()
+  const { getCreditInfo, getBankAccounts, getRepaymentHistory } = useVendorApi()
+  const [bankAccounts, setBankAccounts] = useState([])
+  const [repaymentHistory, setRepaymentHistory] = useState([])
+  const [repaymentRefreshKey, setRepaymentRefreshKey] = useState(0)
+
+  // Refresh repayment history function
+  const refreshRepaymentHistory = useCallback(() => {
+    getRepaymentHistory({ page: 1, limit: 10 }).then((result) => {
+      if (result.data?.repayments) {
+        setRepaymentHistory(result.data.repayments)
+      }
+    })
+  }, [getRepaymentHistory])
 
   useEffect(() => {
     getCreditInfo().then((result) => {
@@ -4249,43 +4585,100 @@ function CreditView({ openPanel }) {
         dispatch({ type: 'SET_CREDIT_DATA', payload: result.data })
       }
     })
-  }, [getCreditInfo, dispatch])
+    
+    // Fetch bank accounts for repayment
+    getBankAccounts().then((result) => {
+      if (result.data?.bankAccounts) {
+        setBankAccounts(result.data.bankAccounts)
+      }
+    })
+    
+    // Fetch repayment history
+    refreshRepaymentHistory()
+  }, [getCreditInfo, getBankAccounts, refreshRepaymentHistory, dispatch, repaymentRefreshKey])
+
+  // Listen for repayment success event to refresh history
+  useEffect(() => {
+    const handleRepaymentSuccess = () => {
+      setRepaymentRefreshKey(prev => prev + 1)
+    }
+    
+    window.addEventListener('repayment-success', handleRepaymentSuccess)
+    return () => {
+      window.removeEventListener('repayment-success', handleRepaymentSuccess)
+    }
+  }, [])
 
   // Use real credit data from backend
   // Backend getCreditInfo returns: { credit: { used, totalUnpaid, unpaidCount, dueDate, repaymentDays, penaltyRate }, status: { isOverdue, daysOverdue, daysUntilDue, penalty, status, hasUnpaidCredits } }
-  // Dashboard overview also includes credit info with limit
+  // Dashboard overview also includes credit info
   const creditData = dashboard.credit || {}
   const creditInfo = creditData.credit || {}
   const creditStatus = creditData.status || {}
   
-  // Get credit limit from dashboard overview (which includes limit) or fallback to calculating from used
-  const creditLimit = dashboard.overview?.credit?.limit || 0
   const creditUsed = creditInfo.used || dashboard.overview?.credit?.used || 0
-  const creditRemaining = dashboard.overview?.credit?.remaining || (creditLimit - creditUsed)
   const penalty = creditStatus.penalty || dashboard.overview?.credit?.penalty || 0
   
+  // Calculate total repaid from repayment history
+  const totalRepaid = repaymentHistory
+    .filter(r => r.status === 'completed')
+    .reduce((sum, r) => sum + (r.amount || 0), 0)
+  
+  // Get last repayment date
+  const lastRepayment = repaymentHistory
+    .filter(r => r.status === 'completed')
+    .sort((a, b) => {
+      const dateA = new Date(a.paidAt || a.transactionDate || a.createdAt || 0)
+      const dateB = new Date(b.paidAt || b.transactionDate || b.createdAt || 0)
+      return dateB - dateA
+    })[0]
+  
+  // Calculate repayment count
+  const repaymentCount = repaymentHistory.filter(r => r.status === 'completed').length
+  
+  // Format currency helper
+  const formatCurrency = (amount) => {
+    if (amount === 0) return '₹0'
+    if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`
+    return `₹${Math.round(amount).toLocaleString('en-IN')}`
+  }
+  
   const credit = {
-    limit: creditLimit > 0 ? `₹${(creditLimit / 100000).toFixed(1)}L` : '₹0',
-    used: creditUsed > 0 ? `₹${(creditUsed / 100000).toFixed(1)}L` : '₹0',
-    remaining: creditRemaining > 0 ? `₹${(creditRemaining / 100000).toFixed(1)}L` : '₹0',
+    outstanding: creditUsed > 0 ? formatCurrency(creditUsed) : '₹0',
+    repaid: totalRepaid > 0 ? formatCurrency(totalRepaid) : '₹0',
     penalty: penalty === 0 ? 'No penalty' : `₹${penalty.toLocaleString('en-IN')}`,
     due: creditInfo.dueDate || dashboard.overview?.credit?.dueDate ? new Date(creditInfo.dueDate || dashboard.overview?.credit?.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set',
+    lastRepaymentDate: lastRepayment ? new Date(lastRepayment.paidAt || lastRepayment.transactionDate || lastRepayment.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Never',
   }
 
-  const usedPercent = creditLimit > 0
-    ? Math.min(Math.round((creditUsed / creditLimit) * 100), 100)
-    : 0
-
   const creditMetrics = [
-    { label: 'Loan limit', value: credit.limit, icon: CreditIcon, tone: 'success' },
-    { label: 'Remaining', value: credit.remaining, icon: WalletIcon, tone: 'success' },
-    { label: 'Due date', value: credit.due, icon: ReportIcon, tone: 'teal' },
+    { label: 'Outstanding Credit', value: credit.outstanding, icon: CreditIcon, tone: 'success' },
+    { label: totalRepaid > 0 ? 'Total Repaid' : 'To Repay', value: totalRepaid > 0 ? credit.repaid : credit.outstanding, icon: WalletIcon, tone: 'success' },
+    { label: repaymentCount > 0 ? 'Last Repayment' : 'Due Date', value: repaymentCount > 0 ? credit.lastRepaymentDate : credit.due, icon: repaymentCount > 0 ? WalletIcon : ReportIcon, tone: repaymentCount > 0 ? 'success' : 'teal' },
   ]
 
+  // Get penalty rate for display
+  const penaltyRate = creditInfo.penaltyRate || creditStatus.penaltyRate || dashboard?.overview?.credit?.penaltyRate || 2
+  
   const penaltyTimeline = [
-    { period: 'Day 0-5', description: 'Free time with reminders sent automatically.', tone: 'success' },
-    { period: 'Day 6-10', description: 'Fine added, finance team notified.', tone: 'warn' },
-    { period: 'Day 11+', description: 'New loan blocked until payment done.', tone: 'critical' },
+    { 
+      period: 'Days 0-5', 
+      title: 'Grace Period',
+      description: 'No penalties applied. Automated reminders will be sent.',
+      tone: 'success' 
+    },
+    { 
+      period: 'Days 6-10', 
+      title: 'Penalty Period',
+      description: `${penaltyRate}% daily penalty applied. Finance team notified.`,
+      tone: 'warn' 
+    },
+    { 
+      period: 'Days 11+', 
+      title: 'Restrictions Active',
+      description: 'New credit orders blocked. Daily penalties continue until repayment.',
+      tone: 'critical' 
+    },
   ]
 
   return (
@@ -4294,52 +4687,31 @@ function CreditView({ openPanel }) {
       <section id="credit-status" className="credit-status-section">
         <div className="credit-status-card">
           <div className="credit-status-card__main">
-            <div className="credit-status-card__progress-wrapper">
-              <div className="credit-status-card__progress-ring">
-                <svg className="credit-status-card__progress-svg" viewBox="0 0 120 120">
-                  <circle
-                    className="credit-status-card__progress-bg"
-                    cx="60"
-                    cy="60"
-                    r="54"
-                    fill="none"
-                    strokeWidth="8"
-                  />
-                  <circle
-                    className="credit-status-card__progress-fill"
-                    cx="60"
-                    cy="60"
-                    r="54"
-                    fill="none"
-                    strokeWidth="8"
-                    strokeDasharray={`${2 * Math.PI * 54}`}
-                    strokeDashoffset={`${2 * Math.PI * 54 * (1 - usedPercent / 100)}`}
-                    transform="rotate(-90 60 60)"
-                  />
-                </svg>
-                <div className="credit-status-card__progress-content">
-                  <span className="credit-status-card__progress-percent">{usedPercent}%</span>
-                  <span className="credit-status-card__progress-label">Used</span>
-            </div>
-          </div>
               <div className="credit-status-card__details">
                 <div className="credit-status-card__amount">
-                  <span className="credit-status-card__amount-value">{credit.used}</span>
-                  <span className="credit-status-card__amount-label">Loan Used</span>
+                  <span className="credit-status-card__amount-value">{credit.outstanding}</span>
+                  <span className="credit-status-card__amount-label">Outstanding Credit</span>
             </div>
                 <div className="credit-status-card__quick-info">
                   <div className="credit-status-card__info-item">
-                    <span className="credit-status-card__info-label">Available</span>
-                    <span className="credit-status-card__info-value">{credit.remaining}</span>
-            </div>
-                  <div className="credit-status-card__info-item">
-                    <span className="credit-status-card__info-label">Total loan limit</span>
-                    <span className="credit-status-card__info-value">{credit.limit}</span>
-            </div>
+                    <span className="credit-status-card__info-label">To Repay</span>
+                    <span className="credit-status-card__info-value">{credit.outstanding}</span>
+                  </div>
+                  {totalRepaid > 0 && (
+                    <div className="credit-status-card__info-item">
+                      <span className="credit-status-card__info-label">Total Repaid</span>
+                      <span className="credit-status-card__info-value">{credit.repaid}</span>
+                    </div>
+                  )}
+                  {repaymentCount > 0 && (
+                    <div className="credit-status-card__info-item">
+                      <span className="credit-status-card__info-label">Repayments</span>
+                      <span className="credit-status-card__info-value">{repaymentCount}</span>
+                    </div>
+                  )}
             </div>
           </div>
         </div>
-          </div>
           <div className="credit-status-card__footer">
             <div className="credit-status-card__status-badge">
               <span className="credit-status-card__status-text">{credit.penalty === 'No penalty' ? 'No fine' : credit.penalty}</span>
@@ -4354,7 +4726,7 @@ function CreditView({ openPanel }) {
       <section id="credit-summary" className="credit-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Loan summary</h3>
+            <h3 className="overview-section__title">Credit Summary</h3>
           </div>
         </div>
         <div className="credit-metric-grid">
@@ -4378,24 +4750,59 @@ function CreditView({ openPanel }) {
       <section id="credit-actions" className="credit-section">
         <div className="overview-section__header">
             <div>
-            <h3 className="overview-section__title">Loan management</h3>
+            <h3 className="overview-section__title">Credit management</h3>
           </div>
         </div>
         <div className="credit-action-grid">
-          <div className="credit-action-card">
-            <header>
-              <span className="credit-action-card__icon">
-                <WalletIcon className="h-5 w-5" />
-              </span>
-              <h4 className="credit-action-card__title">Need to reorder?</h4>
-            </header>
-            <p className="credit-action-card__body">
-                Minimum order amount ₹50,000. Loan order requests go to Admin for approval before stock updates.
+          {creditUsed > 0 && (
+            <div className="credit-action-card">
+              <header>
+                <span className="credit-action-card__icon">
+                  <CreditIcon className="h-5 w-5" />
+                </span>
+                <h4 className="credit-action-card__title">Repay Credit</h4>
+              </header>
+              <p className="credit-action-card__body">
+                Repay your outstanding credit to avoid penalties. Ensure you have added bank account details before proceeding.
               </p>
-            <button type="button" className="credit-action-card__cta" onClick={() => openPanel('place-credit-purchase')}>
-              Request loan order
-            </button>
-          </div>
+              <button 
+                type="button" 
+                className="credit-action-card__cta" 
+                onClick={async () => {
+                  // Refresh credit info to get latest creditUsed value
+                  const latestCreditResult = await getCreditInfo()
+                  const latestCreditUsed = latestCreditResult.data?.credit?.used || creditUsed
+                  
+                  if (bankAccounts.length === 0) {
+                    openPanel('repay-credit', { 
+                      creditUsed: latestCreditUsed, 
+                      error: 'Please add a bank account before making repayment',
+                    })
+                    return
+                  }
+                  
+                  // Prepare bank account options for the select field
+                  const bankAccountOptions = bankAccounts.map((account) => ({
+                    value: account._id || account.id,
+                    label: `${account.accountHolderName} - ${account.bankName} (${account.accountNumber.slice(-4)})${account.isPrimary ? ' - Primary' : ''}`,
+                  }))
+                  
+                  // Set default to primary account if available
+                  const primaryAccount = bankAccounts.find((acc) => acc.isPrimary)
+                  const defaultBankAccountId = primaryAccount?._id || primaryAccount?.id || bankAccounts[0]?._id || bankAccounts[0]?.id
+                  
+                  openPanel('repay-credit', { 
+                    creditUsed: latestCreditUsed, 
+                    bankAccountOptions,
+                    bankAccountId: defaultBankAccountId,
+                    bankAccounts: bankAccounts, // Pass full bank accounts array
+                  })
+                }}
+              >
+                Repay Now
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -4417,12 +4824,59 @@ function CreditView({ openPanel }) {
               <div className="credit-timeline-item__marker" />
               <div className="credit-timeline-item__content">
                 <span className="credit-timeline-item__period">{item.period}</span>
+                {item.title && <h5 className="credit-timeline-item__title" style={{ fontSize: '0.875rem', fontWeight: '600', marginTop: '0.25rem', marginBottom: '0.25rem' }}>{item.title}</h5>}
                 <p className="credit-timeline-item__description">{item.description}</p>
               </div>
             </div>
           ))}
         </div>
       </section>
+
+      {/* Recent Repayments Section */}
+      {repaymentHistory.length > 0 && (
+        <section id="credit-repayments" className="credit-section">
+          <div className="overview-section__header">
+            <div>
+              <h3 className="overview-section__title">Recent repayments</h3>
+            </div>
+          </div>
+          <div className="overview-activity__list">
+            {repaymentHistory.slice(0, 5).map((repayment) => {
+              const repaymentDate = repayment.paidAt || repayment.createdAt || repayment.transactionDate
+              const formattedDate = repaymentDate 
+                ? new Date(repaymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                : 'N/A'
+              
+              return (
+                <div key={repayment.id || repayment._id} className="overview-activity__item">
+                  <div className="overview-activity__avatar">RP</div>
+                  <div className="overview-activity__details">
+                    <div className="overview-activity__row">
+                      <span className="overview-activity__name">
+                        {repayment.repaymentId || `Repayment #${(repayment.id || repayment._id).toString().slice(-6)}`}
+                      </span>
+                      <span className="overview-activity__amount is-positive">
+                        -₹{(repayment.amount || 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    <div className="overview-activity__meta">
+                      <span>
+                        {repayment.status === 'completed' ? 'Completed' : repayment.status === 'pending' ? 'Pending' : repayment.status}
+                      </span>
+                      <span>{formattedDate}</span>
+                      {repayment.penaltyAmount > 0 && (
+                        <span className="text-xs text-red-600">
+                          (Penalty: ₹{repayment.penaltyAmount.toLocaleString('en-IN')})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
@@ -4945,9 +5399,9 @@ function ReportsView() {
                   <div className="reports-insight-card">
                     <div className="reports-insight-card__icon is-info">💡</div>
                     <div className="reports-insight-card__content">
-                      <h5 className="reports-insight-card__title">Loan usage</h5>
+                      <h5 className="reports-insight-card__title">Credit usage</h5>
                       <p className="reports-insight-card__description">
-                        Your loan usage is good at 68%. You can safely increase number of orders by 25% without risk.
+                        Your credit usage is good at 68%. You can safely increase number of orders by 25% without risk.
                       </p>
                     </div>
                   </div>

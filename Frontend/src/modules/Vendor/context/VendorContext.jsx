@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useReducer, useEffect, useState } from 'react'
-import { initializeRealtimeConnection, handleRealtimeNotification, getVendorProfile } from '../services/vendorApi'
+import { getVendorProfile } from '../services/vendorApi'
 
 const initialState = {
   language: 'en',
@@ -256,6 +256,11 @@ function reducer(state, action) {
         ...state,
         notifications: state.notifications.map((notif) => ({ ...notif, read: true })),
       }
+    case 'SET_NOTIFICATIONS':
+      return {
+        ...state,
+        notifications: action.payload || [],
+      }
     case 'SET_REALTIME_CONNECTED':
       return {
         ...state,
@@ -313,22 +318,6 @@ export function VendorProvider({ children }) {
     
     initializeVendor()
   }, [state.authenticated]) // Run when authenticated state changes
-  
-  // Initialize real-time connection when authenticated
-  useEffect(() => {
-    if (state.authenticated && state.profile.id) {
-      const cleanup = initializeRealtimeConnection((notification) => {
-        handleRealtimeNotification(notification, dispatch, showToast)
-      })
-      
-      dispatch({ type: 'SET_REALTIME_CONNECTED', payload: true })
-      
-      return () => {
-        cleanup()
-        dispatch({ type: 'SET_REALTIME_CONNECTED', payload: false })
-      }
-    }
-  }, [state.authenticated, state.profile.id, dispatch])
   
   const value = useMemo(() => ({ ...state, [VENDOR_CONTEXT_SYMBOL]: true }), [state])
   const dispatchWithSymbol = useMemo(() => {

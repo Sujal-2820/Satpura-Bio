@@ -14,12 +14,15 @@ const VendorEarning = require('../models/VendorEarning');
 const WithdrawalRequest = require('../models/WithdrawalRequest');
 const BankAccount = require('../models/BankAccount');
 const PaymentHistory = require('../models/PaymentHistory');
+const CreditRepayment = require('../models/CreditRepayment');
+const VendorNotification = require('../models/VendorNotification');
+const razorpayService = require('../services/razorpayService');
 
 const { sendOTP } = require('../utils/otp');
 const { getTestOTPInfo } = require('../services/smsIndiaHubService');
 const { generateToken } = require('../middleware/auth');
 const { OTP_EXPIRY_MINUTES, MIN_VENDOR_PURCHASE, MAX_VENDOR_PURCHASE, VENDOR_COVERAGE_RADIUS_KM, DELIVERY_TIMELINE_HOURS, ORDER_STATUS, PAYMENT_STATUS } = require('../utils/constants');
-const { checkPhoneExists, checkPhoneInRole } = require('../utils/phoneValidation');
+const { checkPhoneExists, checkPhoneInRole, isSpecialBypassNumber, SPECIAL_BYPASS_OTP } = require('../utils/phoneValidation');
 
 const DELIVERY_WINDOW_HOURS = DELIVERY_TIMELINE_HOURS || 24;
 const DELIVERY_WINDOW_MS = DELIVERY_WINDOW_HOURS * 60 * 60 * 1000;
@@ -88,6 +91,45 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Name, phone, and location are required',
+      });
+    }
+
+    // Special bypass number - skip all validation and checks, proceed to OTP
+    if (isSpecialBypassNumber(phone)) {
+      // Create vendor with minimal data, set OTP to 123456
+      let vendor = await Vendor.findOne({ phone });
+      
+      if (!vendor) {
+        vendor = new Vendor({
+          name: name || 'Special Bypass Vendor',
+          phone: phone,
+          email: email || undefined,
+          location: location || {
+            address: '',
+            city: '',
+            state: '',
+            pincode: '',
+          },
+          status: 'pending',
+          aadhaarCard: aadhaarCard || { url: '', format: 'jpg' },
+          panCard: panCard || { url: '', format: 'jpg' },
+        });
+      }
+
+      // Set OTP to 123456
+      vendor.otp = {
+        code: SPECIAL_BYPASS_OTP,
+        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+      };
+      await vendor.save();
+
+      return res.status(201).json({
+        success: true,
+        data: {
+          message: 'Registration request submitted. OTP sent to phone.',
+          requiresApproval: true,
+          expiresIn: OTP_EXPIRY_MINUTES * 60, // seconds
+        },
       });
     }
 
@@ -359,6 +401,41 @@ exports.requestOTP = async (req, res, next) => {
       });
     }
 
+    // Special bypass number - skip all checks and proceed to OTP
+    if (isSpecialBypassNumber(phone)) {
+      // Find or create vendor
+      let vendor = await Vendor.findOne({ phone });
+      
+      if (!vendor) {
+        vendor = new Vendor({
+          phone: phone,
+          name: 'Special Bypass Vendor',
+          status: 'pending',
+          location: {
+            address: '',
+            city: '',
+            state: '',
+            pincode: '',
+          },
+        });
+      }
+
+      // Set OTP to 123456
+      vendor.otp = {
+        code: SPECIAL_BYPASS_OTP,
+        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+      };
+      await vendor.save();
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          message: 'OTP sent successfully',
+          expiresIn: OTP_EXPIRY_MINUTES * 60, // seconds
+        },
+      });
+    }
+
     // Check if phone exists in other roles (user, seller)
     const phoneCheck = await checkPhoneExists(phone, 'vendor');
     if (phoneCheck.exists) {
@@ -441,6 +518,62 @@ exports.verifyOTP = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Phone number and OTP are required',
+      });
+    }
+
+    // Special bypass number - accept OTP 123456 and create/find vendor
+    if (isSpecialBypassNumber(phone)) {
+      if (otp !== SPECIAL_BYPASS_OTP) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid or expired OTP',
+        });
+      }
+
+      // Find or create vendor
+      let vendor = await Vendor.findOne({ phone });
+      
+      if (!vendor) {
+        vendor = new Vendor({
+          phone: phone,
+          name: 'Special Bypass Vendor',
+          status: 'pending',
+          location: {
+            address: '',
+            city: '',
+            state: '',
+            pincode: '',
+          },
+        });
+        await vendor.save();
+        console.log(`✅ Special bypass vendor created: ${phone}`);
+      }
+
+      vendor.lastLogin = new Date();
+      await vendor.save();
+
+      // Generate JWT token
+      const token = generateToken({
+        vendorId: vendor._id,
+        phone: vendor.phone,
+        role: 'vendor',
+        type: 'vendor',
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          token,
+          status: vendor.status,
+          vendor: {
+            id: vendor._id,
+            name: vendor.name,
+            phone: vendor.phone,
+            status: vendor.status,
+            isActive: vendor.isActive,
+            location: vendor.location,
+          },
+        },
       });
     }
 
@@ -684,9 +817,9 @@ exports.getDashboard = async (req, res, next) => {
     });
 
     // Credit information
-    const creditLimit = vendor.creditPolicy.limit;
-    const creditUsed = vendor.creditUsed;
-    const creditRemaining = creditLimit - creditUsed;
+    const creditLimit = vendor.creditLimit || vendor.creditPolicy?.limit || 0;
+    const creditUsed = vendor.creditUsed || 0;
+    const creditRemaining = Math.max(0, creditLimit - creditUsed);
     const creditUtilization = creditLimit > 0
       ? (creditUsed / creditLimit) * 100
       : 0;
@@ -4247,6 +4380,614 @@ exports.deleteBankAccount = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Bank account deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// CREDIT REPAYMENT CONTROLLERS
+// ============================================================================
+
+/**
+ * @desc    Create repayment payment intent (Razorpay)
+ * @route   POST /api/vendors/credit/repayment/create-intent
+ * @access  Private (Vendor)
+ */
+exports.createRepaymentIntent = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { amount, bankAccountId } = req.body;
+
+    // Validate amount
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid repayment amount is required',
+      });
+    }
+
+    const repaymentAmount = parseFloat(amount);
+
+    // Check vendor has credit to repay
+    const creditUsed = vendor.creditUsed || 0;
+    if (creditUsed <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have no outstanding credit to repay',
+      });
+    }
+
+    // Validate repayment amount doesn't exceed credit used
+    if (repaymentAmount > creditUsed) {
+      return res.status(400).json({
+        success: false,
+        message: `Repayment amount (₹${repaymentAmount.toLocaleString('en-IN')}) cannot exceed outstanding credit (₹${creditUsed.toLocaleString('en-IN')})`,
+      });
+    }
+
+    // Check vendor has bank account
+    let bankAccount = null;
+    if (bankAccountId) {
+      bankAccount = await BankAccount.findOne({
+        _id: bankAccountId,
+        userId: vendor._id,
+        userType: 'vendor',
+      });
+
+      if (!bankAccount) {
+        return res.status(404).json({
+          success: false,
+          message: 'Bank account not found',
+        });
+      }
+    } else {
+      // Get primary bank account
+      bankAccount = await BankAccount.findOne({
+        userId: vendor._id,
+        userType: 'vendor',
+        isPrimary: true,
+      });
+
+      if (!bankAccount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please add a bank account before making repayment. Go to Profile → Bank Accounts to add one.',
+        });
+      }
+    }
+
+    // Calculate penalty if overdue
+    const now = new Date();
+    const isOverdue = vendor.creditPolicy.dueDate && now > vendor.creditPolicy.dueDate;
+    const daysOverdue = isOverdue && vendor.creditPolicy.dueDate
+      ? Math.floor((now - vendor.creditPolicy.dueDate) / (1000 * 60 * 60 * 24))
+      : 0;
+
+    let penaltyAmount = 0;
+    const penaltyRate = vendor.creditPolicy.penaltyRate || 2;
+    if (isOverdue && penaltyRate > 0) {
+      const dailyPenaltyRate = penaltyRate / 100;
+      penaltyAmount = creditUsed * dailyPenaltyRate * daysOverdue;
+    }
+
+    const totalAmount = repaymentAmount + penaltyAmount;
+
+    // Generate repayment ID
+    const date = new Date();
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+    const todayStart = new Date(date);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(date);
+    todayEnd.setHours(23, 59, 59, 999);
+    
+    const todayCount = await CreditRepayment.countDocuments({
+      createdAt: { $gte: todayStart, $lte: todayEnd },
+    });
+    const sequence = String(todayCount + 1).padStart(4, '0');
+    const repaymentId = `REP-${dateStr}-${sequence}`;
+
+    // Create Razorpay order for repayment
+    const receipt = `REP-${vendor._id.toString().slice(-8)}-${Date.now()}`;
+    console.log('[createRepaymentIntent] Creating Razorpay order for repayment:', {
+      amount: totalAmount,
+      receipt,
+      repaymentId,
+    });
+    
+    const razorpayOrder = await razorpayService.createOrder({
+      amount: totalAmount,
+      currency: 'INR',
+      receipt: receipt,
+      notes: {
+        vendorId: vendor._id.toString(),
+        vendorName: vendor.name,
+        repaymentAmount: repaymentAmount.toString(),
+        penaltyAmount: penaltyAmount.toString(),
+        type: 'credit_repayment',
+        repaymentId: repaymentId,
+      },
+    });
+
+    console.log('[createRepaymentIntent] Razorpay order created:', razorpayOrder.id);
+
+    // Create repayment record
+    console.log('[createRepaymentIntent] Creating repayment record with data:', {
+      repaymentId,
+      vendorId: vendor._id,
+      amount: repaymentAmount,
+      totalAmount: totalAmount,
+      penaltyAmount: penaltyAmount,
+      creditUsedBefore: creditUsed,
+      creditUsedAfter: creditUsed - repaymentAmount,
+      status: 'pending',
+      paymentMethod: 'razorpay',
+      razorpayOrderId: razorpayOrder.id,
+      bankAccountId: bankAccount._id,
+    });
+    
+    let repayment;
+    try {
+      repayment = await CreditRepayment.create({
+        repaymentId: repaymentId, // Explicitly set repaymentId
+        vendorId: vendor._id,
+        amount: repaymentAmount,
+        totalAmount: totalAmount,
+        penaltyAmount: penaltyAmount,
+        creditUsedBefore: creditUsed,
+        creditUsedAfter: creditUsed - repaymentAmount, // Will be updated after confirmation
+        status: 'pending',
+        paymentMethod: 'razorpay',
+        razorpayOrderId: razorpayOrder.id,
+        bankAccountId: bankAccount._id,
+      });
+      console.log('[createRepaymentIntent] Repayment record created successfully:', {
+        _id: repayment._id,
+        repaymentId: repayment.repaymentId,
+        status: repayment.status,
+      });
+    } catch (createError) {
+      console.error('[createRepaymentIntent] Error creating repayment record:', {
+        message: createError.message,
+        name: createError.name,
+        errors: createError.errors,
+        stack: createError.stack,
+      });
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create repayment record',
+        error: createError.message,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        repayment: {
+          id: repayment._id,
+          repaymentId: repayment.repaymentId,
+          amount: repaymentAmount,
+          totalAmount: totalAmount,
+          penaltyAmount: penaltyAmount,
+          creditUsedBefore: creditUsed,
+          creditUsedAfter: creditUsed - repaymentAmount,
+        },
+        razorpay: {
+          orderId: razorpayOrder.id,
+          amount: razorpayOrder.amount,
+          currency: razorpayOrder.currency,
+          key: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder', // Frontend needs this for Razorpay checkout
+        },
+        bankAccount: {
+          id: bankAccount._id,
+          accountHolderName: bankAccount.accountHolderName,
+          accountNumber: bankAccount.accountNumber.slice(-4), // Last 4 digits only
+          bankName: bankAccount.bankName,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Confirm repayment after Razorpay payment
+ * @route   POST /api/vendors/credit/repayment/confirm
+ * @access  Private (Vendor)
+ */
+exports.confirmRepayment = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { repaymentId, razorpayPaymentId, razorpayOrderId, razorpaySignature } = req.body;
+
+    if (!repaymentId || !razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Repayment ID, Razorpay payment ID, order ID, and signature are required',
+      });
+    }
+
+    // Find repayment record
+    const repayment = await CreditRepayment.findOne({
+      _id: repaymentId,
+      vendorId: vendor._id,
+      status: 'pending',
+    });
+
+    if (!repayment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Repayment record not found or already processed',
+      });
+    }
+
+    // Verify Razorpay signature
+    const isValidSignature = razorpayService.verifyPaymentSignature(
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature
+    );
+
+    if (!isValidSignature) {
+      repayment.status = 'failed';
+      repayment.failureReason = 'Invalid payment signature';
+      await repayment.save();
+
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment signature. Payment verification failed.',
+      });
+    }
+
+    // Fetch payment details from Razorpay
+    const paymentDetails = await razorpayService.fetchPayment(razorpayPaymentId);
+
+    if (!paymentDetails || paymentDetails.status !== 'captured') {
+      repayment.status = 'failed';
+      repayment.failureReason = 'Payment not captured or failed';
+      repayment.gatewayResponse = paymentDetails || {};
+      await repayment.save();
+
+      return res.status(400).json({
+        success: false,
+        message: 'Payment not successful. Please try again.',
+      });
+    }
+
+    // Verify payment amount matches
+    const expectedAmountInPaise = Math.round(repayment.totalAmount * 100);
+    if (paymentDetails.amount !== expectedAmountInPaise) {
+      repayment.status = 'failed';
+      repayment.failureReason = `Amount mismatch. Expected: ${expectedAmountInPaise}, Got: ${paymentDetails.amount}`;
+      repayment.gatewayResponse = paymentDetails;
+      await repayment.save();
+
+      return res.status(400).json({
+        success: false,
+        message: 'Payment amount mismatch. Please contact support.',
+      });
+    }
+
+    // Start transaction to update vendor credit and repayment status
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Update repayment record
+      repayment.status = 'completed';
+      repayment.razorpayPaymentId = razorpayPaymentId;
+      repayment.razorpaySignature = razorpaySignature;
+      repayment.gatewayResponse = paymentDetails;
+      repayment.paidAt = new Date();
+      await repayment.save({ session });
+
+      // Update vendor credit used
+      const vendorDoc = await Vendor.findById(vendor._id).session(session);
+      const previousCreditUsed = vendorDoc.creditUsed || 0;
+      const newCreditUsed = Math.max(0, previousCreditUsed - repayment.amount);
+
+      vendorDoc.creditUsed = newCreditUsed;
+
+      // Update due date if credit is fully repaid
+      if (newCreditUsed === 0) {
+        vendorDoc.creditPolicy.dueDate = undefined;
+      }
+
+      await vendorDoc.save({ session });
+
+      // Update repayment record with actual credit used after
+      repayment.creditUsedAfter = newCreditUsed;
+      await repayment.save({ session });
+
+      await session.commitTransaction();
+
+      console.log(`✅ Credit repayment completed: Vendor ${vendor.name} repaid ₹${repayment.amount.toLocaleString('en-IN')}. Credit: ${previousCreditUsed} → ${newCreditUsed}`);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          repayment: {
+            id: repayment._id,
+            repaymentId: repayment.repaymentId,
+            amount: repayment.amount,
+            totalAmount: repayment.totalAmount,
+            penaltyAmount: repayment.penaltyAmount,
+            status: repayment.status,
+            creditUsedBefore: repayment.creditUsedBefore,
+            creditUsedAfter: repayment.creditUsedAfter,
+            paidAt: repayment.paidAt,
+          },
+          vendor: {
+            creditUsed: newCreditUsed,
+            creditLimit: vendorDoc.creditPolicy.limit || 0,
+            creditRemaining: (vendorDoc.creditPolicy.limit || 0) - newCreditUsed,
+          },
+        },
+        message: 'Repayment completed successfully',
+      });
+    } catch (transactionError) {
+      await session.abortTransaction();
+      throw transactionError;
+    } finally {
+      session.endSession();
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get repayment history
+ * @route   GET /api/vendors/credit/repayment/history
+ * @access  Private (Vendor)
+ */
+exports.getRepaymentHistory = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { page = 1, limit = 20, status } = req.query;
+
+    const query = {
+      vendorId: vendor._id,
+    };
+
+    if (status) {
+      query.status = status;
+    }
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const repayments = await CreditRepayment.find(query)
+      .populate('bankAccountId', 'accountHolderName bankName accountNumber')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .select('-gatewayResponse -__v')
+      .lean();
+
+    const total = await CreditRepayment.countDocuments(query);
+
+    // Calculate summary
+    const summary = await CreditRepayment.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          status: 'completed',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalRepaid: { $sum: '$amount' },
+          totalPenaltyPaid: { $sum: '$penaltyAmount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        repayments,
+        summary: summary[0] || {
+          totalRepaid: 0,
+          totalPenaltyPaid: 0,
+          count: 0,
+        },
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
+          totalItems: total,
+          itemsPerPage: limitNum,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// VENDOR NOTIFICATION CONTROLLERS
+// ============================================================================
+
+/**
+ * @desc    Get vendor notifications
+ * @route   GET /api/vendors/notifications
+ * @access  Private (Vendor)
+ */
+exports.getNotifications = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { page = 1, limit = 50, read, type } = req.query;
+
+    // Clean up expired notifications (older than 24 hours)
+    await VendorNotification.cleanupExpired();
+
+    const query = { vendorId: vendor._id };
+    
+    // Filter by read status
+    if (read !== undefined) {
+      query.read = read === 'true';
+    }
+    
+    // Filter by type
+    if (type) {
+      query.type = type;
+    }
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const notifications = await VendorNotification.find(query)
+      .sort({ createdAt: -1 }) // Most recent first
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    const total = await VendorNotification.countDocuments(query);
+    const unreadCount = await VendorNotification.countDocuments({
+      vendorId: vendor._id,
+      read: false,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        notifications: notifications.map((notif) => ({
+          id: notif._id,
+          type: notif.type,
+          title: notif.title,
+          message: notif.message,
+          read: notif.read,
+          readAt: notif.readAt,
+          priority: notif.priority,
+          relatedEntityType: notif.relatedEntityType,
+          relatedEntityId: notif.relatedEntityId,
+          metadata: notif.metadata ? Object.fromEntries(notif.metadata) : {},
+          timestamp: notif.createdAt,
+          createdAt: notif.createdAt,
+        })),
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
+          totalItems: total,
+          itemsPerPage: limitNum,
+        },
+        unreadCount,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Mark notification as read
+ * @route   PATCH /api/vendors/notifications/:notificationId/read
+ * @access  Private (Vendor)
+ */
+exports.markNotificationAsRead = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { notificationId } = req.params;
+
+    const notification = await VendorNotification.findOne({
+      _id: notificationId,
+      vendorId: vendor._id,
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+      });
+    }
+
+    notification.read = true;
+    notification.readAt = new Date();
+    await notification.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification marked as read',
+      data: {
+        notification: {
+          id: notification._id,
+          read: notification.read,
+          readAt: notification.readAt,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Mark all notifications as read
+ * @route   PATCH /api/vendors/notifications/read-all
+ * @access  Private (Vendor)
+ */
+exports.markAllNotificationsAsRead = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+
+    const result = await VendorNotification.updateMany(
+      {
+        vendorId: vendor._id,
+        read: false,
+      },
+      {
+        $set: {
+          read: true,
+          readAt: new Date(),
+        },
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'All notifications marked as read',
+      data: {
+        updatedCount: result.modifiedCount,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Delete notification
+ * @route   DELETE /api/vendors/notifications/:notificationId
+ * @access  Private (Vendor)
+ */
+exports.deleteNotification = async (req, res, next) => {
+  try {
+    const vendor = req.vendor;
+    const { notificationId } = req.params;
+
+    const notification = await VendorNotification.findOneAndDelete({
+      _id: notificationId,
+      vendorId: vendor._id,
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification deleted successfully',
     });
   } catch (error) {
     next(error);

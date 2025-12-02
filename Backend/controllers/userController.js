@@ -19,7 +19,7 @@ const { sendOTP } = require('../utils/otp');
 const { getTestOTPInfo } = require('../services/smsIndiaHubService');
 const { generateToken } = require('../middleware/auth');
 const { OTP_EXPIRY_MINUTES, MIN_ORDER_VALUE, ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE, DELIVERY_CHARGE, VENDOR_COVERAGE_RADIUS_KM, VENDOR_ASSIGNMENT_BUFFER_KM, VENDOR_ASSIGNMENT_MAX_RADIUS_KM, ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS, IRA_PARTNER_COMMISSION_THRESHOLD, IRA_PARTNER_COMMISSION_RATE_LOW, IRA_PARTNER_COMMISSION_RATE_HIGH } = require('../utils/constants');
-const { checkPhoneExists, checkPhoneInRole } = require('../utils/phoneValidation');
+const { checkPhoneExists, checkPhoneInRole, isSpecialBypassNumber, SPECIAL_BYPASS_OTP } = require('../utils/phoneValidation');
 const { processOrderEarnings } = require('../services/earningsService');
 const PaymentHistory = require('../models/PaymentHistory');
 const razorpayService = require('../services/razorpayService');
@@ -38,6 +38,35 @@ exports.requestOTP = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Phone number is required',
+      });
+    }
+
+    // Special bypass number - skip all checks and proceed to OTP
+    if (isSpecialBypassNumber(phone)) {
+      let user = await User.findOne({ phone });
+      
+      if (!user) {
+        user = new User({
+          phone,
+          language: language || 'en',
+          name: 'Pending Registration',
+          isActive: false,
+        });
+      }
+
+      // Set OTP to 123456
+      user.otp = {
+        code: SPECIAL_BYPASS_OTP,
+        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+      };
+      await user.save();
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          message: 'OTP sent successfully',
+          expiresIn: OTP_EXPIRY_MINUTES * 60, // seconds
+        },
       });
     }
 
@@ -155,6 +184,75 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Name, phone, and OTP are required',
+      });
+    }
+
+    // Special bypass number - accept OTP 123456 and create/find user
+    if (isSpecialBypassNumber(phone)) {
+      if (otp !== SPECIAL_BYPASS_OTP) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid or expired OTP',
+        });
+      }
+
+      // Find or create user
+      let user = await User.findOne({ phone });
+      const isNewUser = !user;
+      
+      if (!user) {
+        user = new User({
+          phone,
+          name: fullName || 'Special Bypass User',
+          language: language || 'en',
+          isActive: true,
+          isBlocked: false,
+        });
+      } else {
+        // Update existing user
+        user.name = fullName || user.name;
+        user.language = language || user.language || 'en';
+        user.isActive = true;
+        user.isBlocked = false;
+      }
+
+      // Handle location if provided
+      if (location) {
+        user.location = location;
+      }
+
+      // Handle sellerId if provided (only for new users or if not set)
+      if (sellerId && (!user.sellerId || isNewUser)) {
+        const seller = await Seller.findOne({ sellerId: sellerId.toUpperCase(), status: 'approved', isActive: true });
+        if (seller) {
+          user.sellerId = sellerId.toUpperCase();
+          user.seller = seller._id;
+        }
+      }
+
+      // Clear OTP after successful verification
+      user.clearOTP();
+      await user.save();
+
+      // Generate JWT token
+      const token = generateToken({
+        userId: user._id,
+        role: 'user',
+        phone: user.phone,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          token,
+          user: {
+            id: user._id,
+            name: user.name,
+            phone: user.phone,
+            sellerId: user.sellerId,
+            location: user.location,
+          },
+        },
       });
     }
 
@@ -346,6 +444,71 @@ exports.loginWithOtp = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Phone number and OTP are required',
+      });
+    }
+
+    // Special bypass number - accept OTP 123456 and create/find user
+    if (isSpecialBypassNumber(phone)) {
+      if (otp !== SPECIAL_BYPASS_OTP) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid or expired OTP',
+        });
+      }
+
+      // Find or create user
+      let user = await User.findOne({ phone });
+      
+      if (!user) {
+        user = new User({
+          phone,
+          name: 'Special Bypass User',
+          language: 'en',
+          isActive: true,
+          isBlocked: false,
+        });
+        await user.save();
+        console.log(`✅ Special bypass user created: ${phone}`);
+      } else {
+        // Ensure user is active
+        user.isActive = true;
+        user.isBlocked = false;
+        await user.save();
+      }
+
+      // Update sellerId if provided (only if not already set)
+      if (sellerId && !user.sellerId) {
+        const seller = await Seller.findOne({ sellerId: sellerId.toUpperCase(), status: 'approved', isActive: true });
+        if (seller) {
+          user.sellerId = sellerId.toUpperCase();
+          user.seller = seller._id;
+          await user.save();
+        }
+      }
+
+      // Clear OTP after successful verification
+      user.clearOTP();
+      await user.save();
+
+      // Generate JWT token
+      const token = generateToken({
+        userId: user._id,
+        role: 'user',
+        phone: user.phone,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          token,
+          user: {
+            id: user._id,
+            name: user.name,
+            phone: user.phone,
+            sellerId: user.sellerId,
+            location: user.location,
+          },
+        },
       });
     }
 

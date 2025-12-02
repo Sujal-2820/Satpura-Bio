@@ -487,6 +487,27 @@ router.get('/finance/credits', authorizeAdmin, adminController.getCredits);
 router.get('/finance/vendors/:vendorId/history', authorizeAdmin, adminController.getVendorCreditHistory);
 
 /**
+ * @route   GET /api/admin/finance/repayments
+ * @desc    Get all vendor credit repayments
+ * @access  Private (Admin)
+ */
+router.get('/finance/repayments', authorizeAdmin, adminController.getRepayments);
+
+/**
+ * @route   GET /api/admin/finance/repayments/:repaymentId
+ * @desc    Get repayment details
+ * @access  Private (Admin)
+ */
+router.get('/finance/repayments/:repaymentId', authorizeAdmin, adminController.getRepaymentDetails);
+
+/**
+ * @route   GET /api/admin/finance/vendors/:vendorId/repayments
+ * @desc    Get vendor repayments
+ * @access  Private (Admin)
+ */
+router.get('/finance/vendors/:vendorId/repayments', authorizeAdmin, adminController.getVendorRepayments);
+
+/**
  * @route   GET /api/admin/finance/parameters
  * @desc    Get financial parameters (advance payment %, min order, min vendor purchase)
  * @access  Private (Admin)
