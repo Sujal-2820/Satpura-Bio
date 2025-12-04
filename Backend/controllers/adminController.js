@@ -778,6 +778,7 @@ exports.createProduct = async (req, res, next) => {
     const {
       name,
       description,
+      shortDescription,
       category,
       priceToVendor,
       priceToUser,
@@ -797,10 +798,19 @@ exports.createProduct = async (req, res, next) => {
     } = req.body;
 
     // Validate required fields
-    if (!name || !description || !category || priceToVendor === undefined || priceToUser === undefined) {
+    if (!name || !description || !category) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: name, description, category, priceToVendor, priceToUser',
+        message: 'Missing required fields: name, description, category',
+      });
+    }
+    
+    // Validate shortDescription - use fallback if not provided
+    const shortDescriptionValue = shortDescription?.trim() || description?.substring(0, 150) || name.substring(0, 150);
+    if (!shortDescriptionValue || shortDescriptionValue.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Short description is required',
       });
     }
 
@@ -815,12 +825,52 @@ exports.createProduct = async (req, res, next) => {
       });
     }
 
-    // Validate prices
-    if (priceToVendor < 0 || priceToUser < 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Prices cannot be negative',
-      });
+    // Validate prices - only required if not using attributeStocks
+    // If attributeStocks are provided, prices can be undefined (they're in attributeStocks)
+    if (!attributeStocks || !Array.isArray(attributeStocks) || attributeStocks.length === 0) {
+      // Main product prices are required when not using attributeStocks
+      if (priceToVendor === undefined || priceToUser === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing required fields: priceToVendor, priceToUser (required when not using attributeStocks)',
+        });
+      }
+      
+      // Validate prices are not negative
+      if (priceToVendor < 0 || priceToUser < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Prices cannot be negative',
+        });
+      }
+      
+      // Validate user price is greater than vendor price
+      if (priceToUser <= priceToVendor) {
+        return res.status(400).json({
+          success: false,
+          message: 'User price must be greater than vendor price',
+        });
+      }
+    } else {
+      // When using attributeStocks, main prices are optional but if provided, must be valid
+      if (priceToVendor !== undefined && priceToVendor < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vendor price cannot be negative',
+        });
+      }
+      if (priceToUser !== undefined && priceToUser < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'User price cannot be negative',
+        });
+      }
+      if (priceToVendor !== undefined && priceToUser !== undefined && priceToUser <= priceToVendor) {
+        return res.status(400).json({
+          success: false,
+          message: 'User price must be greater than vendor price',
+        });
+      }
     }
 
     // Validate category against fertilizer categories
@@ -834,12 +884,51 @@ exports.createProduct = async (req, res, next) => {
     }
 
     // Create product
+    // Handle prices - if using attributeStocks and main prices are undefined, calculate from attributeStocks or use defaults
+    let finalPriceToVendor = priceToVendor;
+    let finalPriceToUser = priceToUser;
+    
+    if ((finalPriceToVendor === undefined || finalPriceToUser === undefined) && attributeStocks && Array.isArray(attributeStocks) && attributeStocks.length > 0) {
+      // Calculate weighted average prices from attributeStocks
+      let totalStock = 0;
+      let weightedVendorPrice = 0;
+      let weightedUserPrice = 0;
+      
+      attributeStocks.forEach(stock => {
+        const stockQty = parseFloat(stock.displayStock) || parseFloat(stock.actualStock) || 0;
+        if (stockQty > 0 && stock.vendorPrice !== undefined && stock.userPrice !== undefined) {
+          totalStock += stockQty;
+          weightedVendorPrice += (parseFloat(stock.vendorPrice) || 0) * stockQty;
+          weightedUserPrice += (parseFloat(stock.userPrice) || 0) * stockQty;
+        }
+      });
+      
+      if (totalStock > 0) {
+        finalPriceToVendor = weightedVendorPrice / totalStock;
+        finalPriceToUser = weightedUserPrice / totalStock;
+      } else {
+        // Fallback to first entry's prices
+        const firstEntry = attributeStocks[0];
+        finalPriceToVendor = parseFloat(firstEntry.vendorPrice) || 0;
+        finalPriceToUser = parseFloat(firstEntry.userPrice) || 0;
+      }
+    }
+    
+    // Ensure prices are always defined (required by schema)
+    if (finalPriceToVendor === undefined || finalPriceToVendor < 0) {
+      finalPriceToVendor = 0;
+    }
+    if (finalPriceToUser === undefined || finalPriceToUser < 0) {
+      finalPriceToUser = 0;
+    }
+    
     const productData = {
       name,
       description,
+      shortDescription: shortDescriptionValue.trim(),
       category: categoryLower,
-      priceToVendor,
-      priceToUser,
+      priceToVendor: finalPriceToVendor,
+      priceToUser: finalPriceToUser,
       actualStock: actualStockValue,
       displayStock: displayStockValue,
       stock: displayStockValue, // Legacy field for backward compatibility

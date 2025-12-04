@@ -23,7 +23,7 @@ app.use(helmet()); // Security headers
 // CORS configuration - Environment-aware
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'];
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'https://www.iraagritech.com'];
 
 app.use(cors({
   origin: function (origin, callback) {
