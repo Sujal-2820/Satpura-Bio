@@ -105,9 +105,7 @@ const sellerSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Index for sellerId-based queries
-sellerSchema.index({ sellerId: 1 });
-sellerSchema.index({ phone: 1 });
+// Note: sellerId and phone already have indexes from unique: true
 
 // Generate and store OTP
 sellerSchema.methods.generateOTP = function () {

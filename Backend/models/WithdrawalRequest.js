@@ -125,7 +125,7 @@ withdrawalRequestSchema.index({ vendorId: 1, status: 1 }); // Vendor's withdrawa
 withdrawalRequestSchema.index({ sellerId: 1, status: 1 }); // Seller's withdrawals by status
 withdrawalRequestSchema.index({ userType: 1, status: 1, createdAt: -1 }); // Withdrawals by type and status
 withdrawalRequestSchema.index({ status: 1, createdAt: -1 }); // Pending withdrawals for admin
-withdrawalRequestSchema.index({ withdrawalId: 1 }); // Withdrawal ID lookup
+// Note: withdrawalId already has an index from unique: true
 
 const WithdrawalRequest = mongoose.model('WithdrawalRequest', withdrawalRequestSchema);
 

@@ -133,7 +133,7 @@ const vendorAdminMessageSchema = new mongoose.Schema({
 vendorAdminMessageSchema.index({ vendorId: 1, createdAt: -1 }); // Vendor's messages
 vendorAdminMessageSchema.index({ direction: 1, status: 1, createdAt: -1 }); // Messages by direction and status
 vendorAdminMessageSchema.index({ status: 1, isRead: 1, createdAt: -1 }); // Unread messages for admin
-vendorAdminMessageSchema.index({ messageId: 1 }); // Message ID lookup
+// Note: messageId already has an index from unique: true
 vendorAdminMessageSchema.index({ category: 1, createdAt: -1 }); // Messages by category
 vendorAdminMessageSchema.index({ priority: 1, status: 1 }); // High priority open messages
 

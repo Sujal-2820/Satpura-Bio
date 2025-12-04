@@ -90,10 +90,9 @@ const userSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Index for phone-based queries
-userSchema.index({ phone: 1 });
+// Index for sellerId-based queries
 userSchema.index({ sellerId: 1 });
-userSchema.index({ userId: 1 }); // User ID lookup
+// Note: phone and userId already have indexes from unique: true
 
 // Generate and store OTP
 userSchema.methods.generateOTP = function () {

@@ -84,7 +84,7 @@ const addressSchema = new mongoose.Schema({
 addressSchema.index({ userId: 1, isDefault: 1 }); // User's default address
 addressSchema.index({ userId: 1, createdAt: -1 }); // User's addresses
 addressSchema.index({ 'coordinates.lat': 1, 'coordinates.lng': 1 }); // Geospatial queries
-addressSchema.index({ addressId: 1 }); // Address ID lookup
+// Note: addressId already has an index from unique: true
 
 // Pre-save hook: Ensure only one default address per user
 addressSchema.pre('save', async function (next) {

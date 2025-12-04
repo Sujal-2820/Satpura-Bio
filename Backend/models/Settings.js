@@ -38,8 +38,7 @@ const settingsSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Index for fast lookup by key
-settingsSchema.index({ key: 1 });
+// Note: key already has an index from unique: true
 
 // Static method: Get setting value by key
 settingsSchema.statics.getSetting = async function(key, defaultValue = null) {

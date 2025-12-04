@@ -2,8 +2,23 @@ services:
   - type: web
     name: ira-sathi-backend
     env: node
-    buildCommand: npm install
-    startCommand: npm start
+    # Try different paths - Render will use the first that works
+    buildCommand: |
+      if [ -d "Backend" ]; then
+        cd Backend && npm install
+      elif [ -d "FarmCommerce/Backend" ]; then
+        cd FarmCommerce/Backend && npm install
+      else
+        npm install
+      fi
+    startCommand: |
+      if [ -d "Backend" ]; then
+        cd Backend && npm start
+      elif [ -d "FarmCommerce/Backend" ]; then
+        cd FarmCommerce/Backend && npm start
+      else
+        npm start
+      fi
     envVars:
       - key: NODE_ENV
         value: production

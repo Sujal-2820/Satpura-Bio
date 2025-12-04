@@ -85,7 +85,7 @@ const notificationSchema = new mongoose.Schema({
 notificationSchema.index({ targetAudience: 1, isActive: 1, createdAt: -1 }); // Get active notifications by audience
 notificationSchema.index({ isActive: 1, createdAt: -1 }); // Get all active notifications
 notificationSchema.index({ createdBy: 1, createdAt: -1 }); // Admin's notifications
-notificationSchema.index({ notificationId: 1 }); // Notification ID lookup
+// Note: notificationId already has an index from unique: true
 
 // Virtual: Check if notification is currently active (considering dates)
 notificationSchema.virtual('isCurrentlyActive').get(function() {

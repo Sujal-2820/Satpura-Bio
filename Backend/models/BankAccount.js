@@ -73,7 +73,7 @@ const bankAccountSchema = new mongoose.Schema({
 // Indexes
 bankAccountSchema.index({ userId: 1, userType: 1 }); // User's bank accounts
 bankAccountSchema.index({ userId: 1, userType: 1, isPrimary: 1 }); // Primary account lookup
-bankAccountSchema.index({ bankAccountId: 1 }); // Bank account ID lookup
+// Note: bankAccountId already has an index from unique: true
 
 // Ensure only one primary account per user
 bankAccountSchema.pre('save', async function (next) {

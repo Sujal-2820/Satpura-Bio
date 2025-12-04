@@ -62,8 +62,7 @@ const cartSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Indexes
-cartSchema.index({ userId: 1 }); // User's cart
+// Note: userId already has an index from unique: true
 
 // Virtual: Calculate subtotal from items
 cartSchema.virtual('calculatedSubtotal').get(function () {

@@ -101,7 +101,7 @@ const paymentSchema = new mongoose.Schema({
 paymentSchema.index({ orderId: 1, createdAt: -1 }); // Order's payments
 paymentSchema.index({ userId: 1, createdAt: -1 }); // User's payments
 paymentSchema.index({ status: 1, createdAt: -1 }); // Payments by status
-paymentSchema.index({ paymentId: 1 }); // Payment ID lookup
+// Note: paymentId already has an index from unique: true
 paymentSchema.index({ gatewayPaymentId: 1 }); // Gateway payment lookup
 
 // Pre-save hook: Generate payment ID

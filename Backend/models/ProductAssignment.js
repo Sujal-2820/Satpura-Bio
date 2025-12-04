@@ -72,7 +72,7 @@ productAssignmentSchema.index({ productId: 1, vendorId: 1 }, { unique: true });
 // Indexes for queries
 productAssignmentSchema.index({ vendorId: 1, isActive: 1 }); // Vendor's active assignments
 productAssignmentSchema.index({ productId: 1, isActive: 1 }); // Product's active assignments
-productAssignmentSchema.index({ assignmentId: 1 }); // Assignment ID lookup
+// Note: assignmentId already has an index from unique: true
 
 const ProductAssignment = mongoose.model('ProductAssignment', productAssignmentSchema);
 

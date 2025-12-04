@@ -195,7 +195,7 @@ const vendorSchema = new mongoose.Schema({
 
 // Index for location-based queries (20km radius)
 vendorSchema.index({ 'location.coordinates': '2dsphere' });
-vendorSchema.index({ vendorId: 1 }); // Vendor ID lookup
+// Note: vendorId already has an index from unique: true
 
 // Generate and store OTP (always generates a new unique OTP)
 vendorSchema.methods.generateOTP = function () {

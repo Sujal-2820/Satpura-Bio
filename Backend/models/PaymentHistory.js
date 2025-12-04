@@ -158,7 +158,7 @@ paymentHistorySchema.index({ sellerId: 1, createdAt: -1 });
 paymentHistorySchema.index({ orderId: 1 });
 paymentHistorySchema.index({ withdrawalRequestId: 1 });
 paymentHistorySchema.index({ createdAt: -1 }); // For admin history view
-paymentHistorySchema.index({ historyId: 1 }); // History ID lookup
+// Note: historyId already has an index from unique: true
 
 // Virtual for formatted activity description
 paymentHistorySchema.virtual('formattedDescription').get(function() {

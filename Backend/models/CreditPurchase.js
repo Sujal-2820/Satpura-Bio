@@ -126,7 +126,7 @@ const creditPurchaseSchema = new mongoose.Schema({
 // Indexes
 creditPurchaseSchema.index({ vendorId: 1, status: 1 }); // Vendor's purchases by status
 creditPurchaseSchema.index({ status: 1, createdAt: -1 }); // Pending purchases for admin
-creditPurchaseSchema.index({ creditPurchaseId: 1 }); // Credit purchase ID lookup
+// Note: creditPurchaseId already has an index from unique: true
 
 // Virtual: Calculate total amount from items
 creditPurchaseSchema.virtual('calculatedTotal').get(function () {

@@ -14,7 +14,6 @@ const offerSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: ['carousel', 'special_offer'],
-      index: true,
     },
     
     // Common fields
@@ -36,7 +35,6 @@ const offerSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
-      index: true,
     },
     order: {
       type: Number,
@@ -93,7 +91,7 @@ const offerSchema = new mongoose.Schema(
 // Indexes for efficient queries
 offerSchema.index({ type: 1, isActive: 1 });
 offerSchema.index({ type: 1, isActive: 1, order: 1 }); // For carousel ordering
-offerSchema.index({ offerId: 1 }); // Offer ID lookup
+// Note: offerId already has an index from unique: true
 
 // Virtual for carousel count check
 offerSchema.statics.getCarouselCount = async function() {

@@ -113,7 +113,7 @@ commissionSchema.index({ userId: 1, month: 1, year: 1 }); // User's commissions 
 commissionSchema.index({ orderId: 1 }); // Order's commission
 commissionSchema.index({ sellerId: 1, createdAt: -1 }); // Seller's commission history
 commissionSchema.index({ sellerId: 1, userId: 1, month: 1, year: 1 }); // Commission per user per month
-commissionSchema.index({ commissionId: 1 }); // Commission ID lookup
+// Note: commissionId already has an index from unique: true
 
 // Instance method: Check if commission is for threshold month
 commissionSchema.methods.isThresholdMonth = function () {

@@ -19,7 +19,6 @@ const vendorNotificationSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Vendor',
     required: [true, 'Vendor ID is required'],
-    index: true,
   },
   type: {
     type: String,
@@ -39,7 +38,6 @@ const vendorNotificationSchema = new mongoose.Schema({
       'system_alert',
     ],
     required: [true, 'Notification type is required'],
-    index: true,
   },
   title: {
     type: String,
@@ -66,7 +64,6 @@ const vendorNotificationSchema = new mongoose.Schema({
   read: {
     type: Boolean,
     default: false,
-    index: true,
   },
   readAt: {
     type: Date,
@@ -87,7 +84,6 @@ const vendorNotificationSchema = new mongoose.Schema({
   expiresAt: {
     type: Date,
     required: true,
-    index: true,
     // Default to 24 hours from creation
     default: function() {
       return new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
@@ -102,7 +98,7 @@ vendorNotificationSchema.index({ vendorId: 1, read: 1, createdAt: -1 }); // Get 
 vendorNotificationSchema.index({ vendorId: 1, createdAt: -1 }); // Get all notifications by vendor
 vendorNotificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // Auto-delete expired notifications
 vendorNotificationSchema.index({ type: 1, createdAt: -1 }); // Get notifications by type
-vendorNotificationSchema.index({ notificationId: 1 }); // Notification ID lookup
+// Note: notificationId already has an index from unique: true
 
 // Pre-save hook: Set expiresAt to 24 hours from now if not set
 vendorNotificationSchema.pre('save', function(next) {

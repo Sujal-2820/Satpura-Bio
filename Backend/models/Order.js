@@ -313,7 +313,7 @@ orderSchema.index({ userId: 1, createdAt: -1 }); // User's orders
 orderSchema.index({ vendorId: 1, status: 1 }); // Vendor's orders by status
 orderSchema.index({ sellerId: 1, createdAt: -1 }); // Seller's referral orders
 orderSchema.index({ status: 1, createdAt: -1 }); // Orders by status
-orderSchema.index({ orderNumber: 1 }); // Order number lookup
+// Note: orderNumber already has an index from unique: true
 orderSchema.index({ paymentStatus: 1 }); // Payment status filter
 orderSchema.index({ assignedTo: 1, status: 1 }); // Admin escalated orders
 

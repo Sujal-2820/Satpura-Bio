@@ -90,7 +90,7 @@ vendorEarningSchema.index({ vendorId: 1, createdAt: -1 }); // Vendor's earnings 
 vendorEarningSchema.index({ orderId: 1 }); // Order's earnings
 vendorEarningSchema.index({ vendorId: 1, status: 1 }); // Vendor's earnings by status
 vendorEarningSchema.index({ vendorId: 1, processedAt: -1 }); // Vendor's earnings by processing date
-vendorEarningSchema.index({ earningId: 1 }); // Earning ID lookup
+// Note: earningId already has an index from unique: true
 
 const VendorEarning = mongoose.model('VendorEarning', vendorEarningSchema);
 

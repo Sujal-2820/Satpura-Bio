@@ -109,7 +109,7 @@ const creditRepaymentSchema = new mongoose.Schema({
 // Indexes
 creditRepaymentSchema.index({ vendorId: 1, createdAt: -1 }); // Vendor's repayments
 creditRepaymentSchema.index({ status: 1, createdAt: -1 }); // Repayments by status
-creditRepaymentSchema.index({ repaymentId: 1 }); // Repayment ID lookup
+// Note: repaymentId already has an index from unique: true
 creditRepaymentSchema.index({ razorpayOrderId: 1 }); // Razorpay order lookup
 creditRepaymentSchema.index({ razorpayPaymentId: 1 }); // Razorpay payment lookup
 

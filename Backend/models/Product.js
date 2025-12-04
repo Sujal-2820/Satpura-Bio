@@ -202,7 +202,7 @@ productSchema.index({ name: 'text', description: 'text', category: 'text', tags:
 productSchema.index({ category: 1, isActive: 1 }); // Category and active status filter
 productSchema.index({ isActive: 1 }); // Active products filter
 productSchema.index({ createdAt: -1 }); // Recent products first
-productSchema.index({ productId: 1 }); // Product ID lookup
+// Note: productId already has an index from unique: true
 
 // Virtual for primary image URL
 productSchema.virtual('primaryImage').get(function () {

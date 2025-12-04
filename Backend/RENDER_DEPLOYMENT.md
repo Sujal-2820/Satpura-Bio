@@ -27,9 +27,56 @@ Ensure your backend code is pushed to a Git repository (GitHub, GitLab, or Bitbu
 - **Environment**: `Node`
 - **Region**: Choose closest to your users
 - **Branch**: `main` (or your default branch)
-- **Root Directory**: `FarmCommerce/Backend` (if backend is in subdirectory)
-- **Build Command**: `npm install`
-- **Start Command**: `npm start`
+- **Root Directory**: 
+  
+  **⚠️ IMPORTANT: Fix the Root Directory Setting**
+  
+  The error `Service Root Directory "/opt/render/project/src/FarmCommerce/Backend" is missing` means Render is looking in the wrong place.
+  
+  **To fix this:**
+  
+  1. **Check your GitHub repository structure:**
+     - Go to your GitHub repo: `https://github.com/Sujal-2820/FarmCommerce`
+     - Look at the folder structure at the root level
+     
+  2. **Determine the correct Root Directory:**
+     
+     **If your repo structure is:**
+     ```
+     FarmCommerce/
+     ├── Backend/
+     │   ├── index.js
+     │   ├── package.json
+     │   └── ...
+     └── Frontend/
+     ```
+     Then set **Root Directory** to: `Backend` (NOT `FarmCommerce/Backend`)
+     
+     **If your repo structure is:**
+     ```
+     FarmCommerce/
+     └── FarmCommerce/
+         ├── Backend/
+         └── Frontend/
+     ```
+     Then set **Root Directory** to: `FarmCommerce/Backend`
+     
+     **If Backend folder is at repository root:**
+     ```
+     Backend/
+     ├── index.js
+     ├── package.json
+     └── ...
+     ```
+     Then leave **Root Directory** EMPTY
+  
+  3. **Alternative Solution (if above doesn't work):**
+     - Leave Root Directory **EMPTY**
+     - Set **Build Command** to: `cd Backend && npm install` or `cd FarmCommerce/Backend && npm install` (based on your structure)
+     - Set **Start Command** to: `cd Backend && npm start` or `cd FarmCommerce/Backend && npm start`
+  
+- **Build Command**: `npm install` (or use alternative above)
+- **Start Command**: `npm start` (or use alternative above)
 
 ### 4. Set Environment Variables
 
@@ -139,11 +186,27 @@ Once deployed, you can verify the deployment by:
 
 ## Troubleshooting
 
+### Error: "Service Root Directory is missing"
+
+**Problem**: `Service Root Directory "/opt/render/project/src/FarmCommerce/Backend" is missing`
+
+**Solution**:
+1. Go to your Render service → Settings
+2. Check the **Root Directory** field
+3. Based on your GitHub repo structure, set it to:
+   - `Backend` (if Backend folder is inside FarmCommerce at root)
+   - `FarmCommerce/Backend` (if there's a nested FarmCommerce folder)
+   - Leave EMPTY (if Backend is at repo root)
+4. Save and redeploy
+
+**Quick Fix**: Try setting Root Directory to just `Backend` (without FarmCommerce/)
+
 ### Build Fails
 
 1. Check build logs in Render dashboard
 2. Ensure `package.json` has correct `start` script
 3. Verify Node.js version compatibility
+4. Check Root Directory setting matches your repo structure
 
 ### Application Crashes
 
