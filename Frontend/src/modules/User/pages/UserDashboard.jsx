@@ -9,6 +9,8 @@ import * as userApi from '../services/userApi'
 import { cn } from '../../../lib/cn'
 import { useToast, ToastProvider } from '../components/ToastNotification'
 import { useUserApi } from '../hooks/useUserApi'
+import { useTranslatedNavItems } from '../../../utils/translateNavItems'
+import { Trans } from '../../../components/Trans'
 import { HomeView } from './views/HomeView'
 import { SearchView } from './views/SearchView'
 import { ProductDetailView } from './views/ProductDetailView'
@@ -57,7 +59,7 @@ const NAV_ITEMS = [
 ]
 
 function UserDashboardContent({ onLogout }) {
-  const { profile, cart, favourites, notifications, orders } = useUserState()
+  const { profile, cart, favourites, notifications, orders, authenticated } = useUserState()
   const dispatch = useUserDispatch()
   const [activeTab, setActiveTab] = useState('home')
   const [cartRefreshKey, setCartRefreshKey] = useState(0) // Key to force CartView refresh
@@ -447,12 +449,15 @@ function UserDashboardContent({ onLogout }) {
   const favouritesCount = useMemo(() => favourites.length, [favourites])
   const unreadNotificationsCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications])
   
+  // Translate navigation items
+  const translatedNavItems = useTranslatedNavItems(NAV_ITEMS)
+  
   const tabLabels = useMemo(() => {
-    return NAV_ITEMS.reduce((acc, item) => {
+    return translatedNavItems.reduce((acc, item) => {
       acc[item.id] = item.label
       return acc
     }, {})
-  }, [])
+  }, [translatedNavItems])
   
   const searchCatalog = useMemo(
     () =>
@@ -821,7 +826,7 @@ function UserDashboardContent({ onLogout }) {
   }, [searchOpen])
 
   const buildMenuItems = (close) => [
-    ...NAV_ITEMS.map((item) => ({
+    ...translatedNavItems.map((item) => ({
       id: item.id,
       label: item.label,
       description: item.description,
@@ -833,9 +838,9 @@ function UserDashboardContent({ onLogout }) {
     })),
     {
       id: 'logout',
-      label: 'Sign out',
+      label: <Trans>Sign out</Trans>,
       icon: <MenuIcon className="h-4 w-4" />,
-      description: 'Log out from your account',
+      description: <Trans>Log out from your account</Trans>,
       onSelect: () => {
         dispatch({ type: 'AUTH_LOGOUT' })
         onLogout?.()
@@ -851,8 +856,25 @@ function UserDashboardContent({ onLogout }) {
         title={activeTab === 'home' ? `Hello ${profile.name.split(' ')[0]}` : null}
         subtitle={profile.location?.city ? `${profile.location.city}, ${profile.location.state}` : null}
         onSearchClick={handleSearchClick}
+        onFilterClick={handleFilterClick}
         notificationsCount={unreadNotificationsCount}
-        navigation={NAV_ITEMS.map((item) => (
+        navigation={translatedNavItems.filter(item => item.id !== 'home' && item.id !== 'orders').map((item) => (
+          <BottomNavItem
+            key={item.id}
+            label={item.label}
+            active={activeTab === item.id}
+            onClick={() => {
+              setActiveTab(item.id)
+              setSelectedProduct(null)
+              setSelectedCategory(null)
+              setSelectedCarousel(null)
+              setShowCheckout(false)
+            }}
+            icon={<item.icon active={activeTab === item.id} className="h-5 w-5" filled={item.id === 'favourites' ? favouritesCount > 0 : undefined} />}
+            badge={item.id === 'cart' ? (cartCount > 0 ? cartCount : undefined) : item.id === 'favourites' ? (favouritesCount > 0 ? favouritesCount : undefined) : undefined}
+          />
+        ))}
+        bottomNavigation={translatedNavItems.map((item) => (
           <BottomNavItem
             key={item.id}
             label={item.label}
@@ -870,6 +892,18 @@ function UserDashboardContent({ onLogout }) {
         ))}
         menuContent={({ close }) => <MenuList items={buildMenuItems(close)} active={activeTab} />}
         cartCount={cartCount}
+        isAuthenticated={authenticated}
+        onNavigate={(tab) => {
+          setActiveTab(tab)
+          setSelectedProduct(null)
+          setSelectedCategory(null)
+          setSelectedCarousel(null)
+          setShowCheckout(false)
+        }}
+        onLogout={onLogout}
+        onLogin={() => {
+          window.location.href = '/user/login'
+        }}
       >
         <section className="space-y-6">
           {activeTab === 'home' && (

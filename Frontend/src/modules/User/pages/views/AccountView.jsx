@@ -44,7 +44,7 @@ export function AccountView({ onNavigate }) {
   const [newPhone, setNewPhone] = useState('')
   const [newPhoneOTP, setNewPhoneOTP] = useState('')
   const [phoneUpdateLoading, setPhoneUpdateLoading] = useState(false)
-  
+  const [activeSectionId, setActiveSectionId] = useState('profile') // For laptop view navigation
   
   // Report issue form
   const [reportForm, setReportForm] = useState({
@@ -300,79 +300,183 @@ export function AccountView({ onNavigate }) {
 
       {/* Sections */}
       <div className="user-account-view__sections">
-        {sections.map((section) => (
-          <div key={section.id} className="user-account-view__section">
-            <div className="user-account-view__section-header">
-              <section.icon className="user-account-view__section-icon" />
-              <h3 className="user-account-view__section-title">{section.title}</h3>
-            </div>
-            <div className="user-account-view__section-content">
-              {section.items.length > 0 ? (
-                section.items.map((item) => (
-                  <div key={item.id} className="user-account-view__item">
-                    <div className="user-account-view__item-content">
-                      <div className="user-account-view__item-label-wrapper">
-                        <span className="user-account-view__item-label">{item.label}</span>
-                        {item.isDefault && (
-                          <span className="user-account-view__item-badge">Default</span>
+        {/* Left Navigation - Laptop View */}
+        <div className="user-account-view__nav">
+          {sections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              className={cn(
+                'user-account-view__nav-item',
+                activeSectionId === section.id && 'user-account-view__nav-item--active'
+              )}
+              onClick={() => setActiveSectionId(section.id)}
+            >
+              <section.icon className="user-account-view__nav-item-icon" />
+              <span className="user-account-view__nav-item-title">{section.title}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Right Content - Laptop View */}
+        <div className="user-account-view__content">
+          {sections.map((section) => (
+            <div
+              key={section.id}
+              className={cn(
+                'user-account-view__section',
+                activeSectionId === section.id && 'user-account-view__section--active'
+              )}
+            >
+              <div className="user-account-view__section-header">
+                <section.icon className="user-account-view__section-icon" />
+                <h3 className="user-account-view__section-title">{section.title}</h3>
+              </div>
+              <div className="user-account-view__section-content">
+                {section.items.length > 0 ? (
+                  section.items.map((item) => (
+                    <div key={item.id} className="user-account-view__item">
+                      <div className="user-account-view__item-content">
+                        <div className="user-account-view__item-label-wrapper">
+                          <span className="user-account-view__item-label">{item.label}</span>
+                          {item.isDefault && (
+                            <span className="user-account-view__item-badge">Default</span>
+                          )}
+                        </div>
+                        <span className="user-account-view__item-value">{item.value}</span>
+                      </div>
+                      <div className="user-account-view__item-actions">
+                        {item.toggle ? (
+                          <label className="user-account-view__toggle">
+                            <input
+                              type="checkbox"
+                              checked={item.enabled}
+                              onChange={item.onToggle || (() => {})}
+                              className="user-account-view__toggle-input"
+                            />
+                            <span className="user-account-view__toggle-slider" />
+                          </label>
+                        ) : (
+                          <>
+                            {item.editable && (
+                              <button
+                                type="button"
+                                className="user-account-view__item-edit"
+                                onClick={item.onEdit}
+                              >
+                                <EditIcon className="h-4 w-4" />
+                              </button>
+                            )}
+                            {item.onDelete && (
+                              <button
+                                type="button"
+                                className="user-account-view__item-delete"
+                                onClick={item.onDelete}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            )}
+                            {item.action && (
+                              <button
+                                type="button"
+                                className="user-account-view__item-action"
+                                onClick={item.action}
+                              >
+                                <ChevronRightIcon className="h-5 w-5" />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
-                      <span className="user-account-view__item-value">{item.value}</span>
                     </div>
-                    <div className="user-account-view__item-actions">
-                      {item.toggle ? (
-                        <label className="user-account-view__toggle">
-                          <input
-                            type="checkbox"
-                            checked={item.enabled}
-                            onChange={item.onToggle || (() => {})}
-                            className="user-account-view__toggle-input"
-                          />
-                          <span className="user-account-view__toggle-slider" />
-                        </label>
-                      ) : (
-                        <>
-                          {item.editable && (
-                            <button
-                              type="button"
-                              className="user-account-view__item-edit"
-                              onClick={item.onEdit}
-                            >
-                              <EditIcon className="h-4 w-4" />
-                            </button>
-                          )}
-                          {item.onDelete && (
-                            <button
-                              type="button"
-                              className="user-account-view__item-delete"
-                              onClick={item.onDelete}
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
-                          )}
-                          {item.action && (
-                            <button
-                              type="button"
-                              className="user-account-view__item-action"
-                              onClick={item.action}
-                            >
-                              <ChevronRightIcon className="h-5 w-5" />
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
+                  ))
+                ) : (
+                  <div className="user-account-view__empty">
+                    <section.icon className="user-account-view__empty-icon" />
+                    <p className="user-account-view__empty-text">No {section.title.toLowerCase()} yet</p>
                   </div>
-                ))
-              ) : (
-                <div className="user-account-view__empty">
-                  <section.icon className="user-account-view__empty-icon" />
-                  <p className="user-account-view__empty-text">No {section.title.toLowerCase()} yet</p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+
+        {/* Mobile View - All Sections */}
+        <div className="user-account-view__sections-mobile">
+          {sections.map((section) => (
+            <div key={section.id} className="user-account-view__section">
+              <div className="user-account-view__section-header">
+                <section.icon className="user-account-view__section-icon" />
+                <h3 className="user-account-view__section-title">{section.title}</h3>
+              </div>
+              <div className="user-account-view__section-content">
+                {section.items.length > 0 ? (
+                  section.items.map((item) => (
+                    <div key={item.id} className="user-account-view__item">
+                      <div className="user-account-view__item-content">
+                        <div className="user-account-view__item-label-wrapper">
+                          <span className="user-account-view__item-label">{item.label}</span>
+                          {item.isDefault && (
+                            <span className="user-account-view__item-badge">Default</span>
+                          )}
+                        </div>
+                        <span className="user-account-view__item-value">{item.value}</span>
+                      </div>
+                      <div className="user-account-view__item-actions">
+                        {item.toggle ? (
+                          <label className="user-account-view__toggle">
+                            <input
+                              type="checkbox"
+                              checked={item.enabled}
+                              onChange={item.onToggle || (() => {})}
+                              className="user-account-view__toggle-input"
+                            />
+                            <span className="user-account-view__toggle-slider" />
+                          </label>
+                        ) : (
+                          <>
+                            {item.editable && (
+                              <button
+                                type="button"
+                                className="user-account-view__item-edit"
+                                onClick={item.onEdit}
+                              >
+                                <EditIcon className="h-4 w-4" />
+                              </button>
+                            )}
+                            {item.onDelete && (
+                              <button
+                                type="button"
+                                className="user-account-view__item-delete"
+                                onClick={item.onDelete}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            )}
+                            {item.action && (
+                              <button
+                                type="button"
+                                className="user-account-view__item-action"
+                                onClick={item.action}
+                              >
+                                <ChevronRightIcon className="h-5 w-5" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="user-account-view__empty">
+                    <section.icon className="user-account-view__empty-icon" />
+                    <p className="user-account-view__empty-text">No {section.title.toLowerCase()} yet</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Support Panel */}

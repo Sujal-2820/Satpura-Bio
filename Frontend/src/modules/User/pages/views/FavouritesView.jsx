@@ -4,6 +4,7 @@ import { ProductCard } from '../../components/ProductCard'
 import { HeartIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import * as userApi from '../../services/userApi'
+import { Trans } from '../../../../components/Trans'
 
 export function FavouritesView({ onProductClick, onAddToCart, onRemoveFromFavourites }) {
   const { favourites } = useUserState()
@@ -53,9 +54,9 @@ export function FavouritesView({ onProductClick, onAddToCart, onRemoveFromFavour
   return (
     <div className="user-favourites-view space-y-6">
       <div className="user-favourites-view__header">
-        <h2 className="user-favourites-view__title">My Favourites</h2>
+        <h2 className="user-favourites-view__title"><Trans>My Favourites</Trans></h2>
         <p className="user-favourites-view__subtitle">
-          {favouriteProducts.length} {favouriteProducts.length === 1 ? 'item' : 'items'} saved
+          {favouriteProducts.length} {favouriteProducts.length === 1 ? <Trans>item saved</Trans> : <Trans>items saved</Trans>}
         </p>
       </div>
 
@@ -64,16 +65,16 @@ export function FavouritesView({ onProductClick, onAddToCart, onRemoveFromFavour
           <div className="user-favourites-view__empty-icon">
             <HeartIcon className="h-16 w-16" filled={false} />
           </div>
-          <h3 className="user-favourites-view__empty-title">Loading favourites...</h3>
+          <h3 className="user-favourites-view__empty-title"><Trans>Loading favourites...</Trans></h3>
         </div>
       ) : favouriteProducts.length === 0 ? (
         <div className="user-favourites-view__empty">
           <div className="user-favourites-view__empty-icon">
             <HeartIcon className="h-16 w-16" filled={false} />
           </div>
-          <h3 className="user-favourites-view__empty-title">No favourites yet</h3>
+          <h3 className="user-favourites-view__empty-title"><Trans>No favourites yet</Trans></h3>
           <p className="user-favourites-view__empty-text">
-            Start adding products to your favourites by tapping the heart icon on any product
+            <Trans>Start adding products to your favourites by tapping the heart icon on any product</Trans>
           </p>
         </div>
       ) : (

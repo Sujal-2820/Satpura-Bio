@@ -128,7 +128,7 @@ export function UserRegister({ onSuccess, onSwitchToLogin }) {
         })
         
         onSuccess?.(userData)
-        navigate('/user/dashboard')
+        // Navigation is handled by onSuccess callback from parent component
       } else {
         setError(result.error?.message || 'Invalid OTP. Please try again.')
       }

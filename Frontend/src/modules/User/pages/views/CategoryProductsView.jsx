@@ -3,6 +3,8 @@ import { ProductCard } from '../../components/ProductCard'
 import { ChevronLeftIcon, FilterIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import * as userApi from '../../services/userApi'
+import { TransText } from '../../../../components/TransText'
+import { Trans } from '../../../../components/Trans'
 
 export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, onBack, onToggleFavourite, favourites = [] }) {
   const [selectedCategory, setSelectedCategory] = useState(categoryId || 'all')
@@ -133,7 +135,7 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
         <div className="user-category-products-view__header-content">
           <div className="user-category-products-view__header-text">
             <h2 className="user-category-products-view__title">
-              {category ? category.name : 'All Products'}
+              {category ? <TransText>{category.name}</TransText> : <Trans>All Products</Trans>}
             </h2>
             <p className="user-category-products-view__subtitle">
               {categoryProducts.length} {categoryProducts.length === 1 ? 'product' : 'products'} available
@@ -365,6 +367,187 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
         </div>
       )}
 
+      {/* Main Content - 2 Column Layout for Laptop */}
+      <div className="user-category-products-view__main-content">
+        {/* Left Column - Filters Sidebar (Laptop) */}
+        <div className="user-category-products-view__filters-sidebar">
+          <div className="user-category-products-view__filter-panel-desktop">
+            <div className="user-category-products-view__filter-header-desktop">
+              <h3 className="user-category-products-view__filter-title-desktop">Filter Products</h3>
+            </div>
+            <div className="user-category-products-view__filter-content-desktop">
+              <div className="user-category-products-view__filter-section">
+                <h4 className="user-category-products-view__filter-section-title">Price Range</h4>
+                <div className="user-category-products-view__filter-options">
+                  <label className="user-category-products-view__filter-option">
+                    <input
+                      type="radio"
+                      name="price-desktop"
+                      value="all"
+                      checked={filters.priceRange === 'all'}
+                      onChange={(e) => setFilters({ ...filters, priceRange: e.target.value })}
+                    />
+                    <span>All Prices</span>
+                  </label>
+                  <label className="user-category-products-view__filter-option">
+                    <input
+                      type="radio"
+                      name="price-desktop"
+                      value="0-500"
+                      checked={filters.priceRange === '0-500'}
+                      onChange={(e) => setFilters({ ...filters, priceRange: e.target.value })}
+                    />
+                    <span>₹0 - ₹500</span>
+                  </label>
+                  <label className="user-category-products-view__filter-option">
+                    <input
+                      type="radio"
+                      name="price-desktop"
+                      value="500-1000"
+                      checked={filters.priceRange === '500-1000'}
+                      onChange={(e) => setFilters({ ...filters, priceRange: e.target.value })}
+                    />
+                    <span>₹500 - ₹1,000</span>
+                  </label>
+                  <label className="user-category-products-view__filter-option">
+                    <input
+                      type="radio"
+                      name="price-desktop"
+                      value="1000-2000"
+                      checked={filters.priceRange === '1000-2000'}
+                      onChange={(e) => setFilters({ ...filters, priceRange: e.target.value })}
+                    />
+                    <span>₹1,000 - ₹2,000</span>
+                  </label>
+                  <label className="user-category-products-view__filter-option">
+                    <input
+                      type="radio"
+                      name="price-desktop"
+                      value="2000+"
+                      checked={filters.priceRange === '2000+'}
+                      onChange={(e) => setFilters({ ...filters, priceRange: e.target.value })}
+                    />
+                    <span>₹2,000+</span>
+                  </label>
+                </div>
+              </div>
+              <div className="user-category-products-view__filter-section">
+                <h4 className="user-category-products-view__filter-section-title">Availability</h4>
+                <div className="user-category-products-view__filter-options">
+                  <label className="user-category-products-view__filter-option">
+                    <input
+                      type="checkbox"
+                      checked={filters.availability.inStock}
+                      onChange={(e) =>
+                        setFilters({
+                          ...filters,
+                          availability: { ...filters.availability, inStock: e.target.checked },
+                        })
+                      }
+                    />
+                    <span>In Stock</span>
+                  </label>
+                  <label className="user-category-products-view__filter-option">
+                    <input
+                      type="checkbox"
+                      checked={filters.availability.lowStock}
+                      onChange={(e) =>
+                        setFilters({
+                          ...filters,
+                          availability: { ...filters.availability, lowStock: e.target.checked },
+                        })
+                      }
+                    />
+                    <span>Low Stock</span>
+                  </label>
+                  <label className="user-category-products-view__filter-option">
+                    <input
+                      type="checkbox"
+                      checked={filters.availability.outOfStock}
+                      onChange={(e) =>
+                        setFilters({
+                          ...filters,
+                          availability: { ...filters.availability, outOfStock: e.target.checked },
+                        })
+                      }
+                    />
+                    <span>Out of Stock</span>
+                  </label>
+                </div>
+              </div>
+              <div className="user-category-products-view__filter-section">
+                <h4 className="user-category-products-view__filter-section-title">Rating</h4>
+                <div className="user-category-products-view__filter-options">
+                  <label className="user-category-products-view__filter-option">
+                    <input
+                      type="checkbox"
+                      checked={filters.rating.rating45}
+                      onChange={(e) =>
+                        setFilters({
+                          ...filters,
+                          rating: { ...filters.rating, rating45: e.target.checked },
+                        })
+                      }
+                    />
+                    <span>4.5 & above</span>
+                  </label>
+                  <label className="user-category-products-view__filter-option">
+                    <input
+                      type="checkbox"
+                      checked={filters.rating.rating40}
+                      onChange={(e) =>
+                        setFilters({
+                          ...filters,
+                          rating: { ...filters.rating, rating40: e.target.checked },
+                        })
+                      }
+                    />
+                    <span>4.0 & above</span>
+                  </label>
+                  <label className="user-category-products-view__filter-option">
+                    <input
+                      type="checkbox"
+                      checked={filters.rating.rating35}
+                      onChange={(e) =>
+                        setFilters({
+                          ...filters,
+                          rating: { ...filters.rating, rating35: e.target.checked },
+                        })
+                      }
+                    />
+                    <span>3.5 & above</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="user-category-products-view__filter-actions-desktop">
+              <button
+                type="button"
+                className="user-category-products-view__filter-reset-desktop"
+                onClick={() => {
+                  setFilters({
+                    priceRange: 'all',
+                    availability: {
+                      inStock: true,
+                      lowStock: false,
+                      outOfStock: false,
+                    },
+                    rating: {
+                      rating45: false,
+                      rating40: false,
+                      rating35: false,
+                    },
+                  })
+                }}
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Products Grid (Laptop) */}
+        <div className="user-category-products-view__products-column">
       {/* Products List */}
       {loading ? (
         <div className="user-category-products-view__empty">
@@ -375,7 +558,42 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
           <p className="user-category-products-view__empty-text">No products found in this category</p>
         </div>
       ) : (
-        <div className="user-category-products-view__list">
+            <div className="user-category-products-view__list-desktop">
+              {categoryProducts.map((product) => (
+                <ProductCard
+                  key={product._id || product.id}
+                  product={{
+                    id: product._id || product.id,
+                    name: product.name,
+                    price: product.priceToUser || product.price || 0,
+                    image: product.images?.[0]?.url || product.primaryImage || product.image,
+                    category: product.category,
+                    stock: product.stock,
+                    description: product.description,
+                    isWishlisted: favourites.includes(product._id || product.id),
+                  }}
+                  onNavigate={onProductClick}
+                  onAddToCart={onAddToCart}
+                  onWishlist={onToggleFavourite}
+                  className="product-card-wrapper"
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile Products List */}
+      {loading ? (
+        <div className="user-category-products-view__empty-mobile">
+          <p className="user-category-products-view__empty-text">Loading products...</p>
+        </div>
+      ) : categoryProducts.length === 0 ? (
+        <div className="user-category-products-view__empty-mobile">
+          <p className="user-category-products-view__empty-text">No products found in this category</p>
+        </div>
+      ) : (
+        <div className="user-category-products-view__list-mobile">
           {categoryProducts.map((product) => (
             <div key={product._id || product.id} className="user-category-products-view__card-wrapper">
               <div
@@ -413,9 +631,9 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
                 <div className="user-category-products-view__card-content">
                   <div className="user-category-products-view__card-header">
                     <div className="user-category-products-view__card-info">
-                      <h3 className="user-category-products-view__card-title">{product.name}</h3>
+                      <h3 className="user-category-products-view__card-title"><TransText>{product.name}</TransText></h3>
                       {product.vendor && (
-                        <p className="user-category-products-view__card-vendor">{product.vendor.name}</p>
+                        <p className="user-category-products-view__card-vendor"><TransText>{product.vendor.name}</TransText></p>
                       )}
                     </div>
                     <div className="user-category-products-view__card-rating">

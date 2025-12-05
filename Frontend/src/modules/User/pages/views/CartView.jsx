@@ -5,6 +5,7 @@ import { PlusIcon, MinusIcon, TrashIcon, TruckIcon, ChevronRightIcon } from '../
 import { cn } from '../../../../lib/cn'
 import * as userApi from '../../services/userApi'
 import { getPrimaryImageUrl } from '../../utils/productImages'
+import { Trans } from '../../../../components/Trans'
 
 export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }) {
   const { cart } = useUserState()
@@ -213,8 +214,8 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
     return (
       <div className="user-cart-view space-y-4">
         <div className="text-center py-12">
-          <p className="text-lg font-semibold text-[rgba(26,42,34,0.75)] mb-2">Your cart is empty</p>
-          <p className="text-sm text-[rgba(26,42,34,0.55)]">Add some products to get started</p>
+          <p className="text-lg font-semibold text-[rgba(26,42,34,0.75)] mb-2"><Trans>Your cart is empty</Trans></p>
+          <p className="text-sm text-[rgba(26,42,34,0.55)]"><Trans>Add some products to get started</Trans></p>
         </div>
       </div>
     )
@@ -223,8 +224,8 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
   return (
     <div className="user-cart-view space-y-6">
       <div className="mb-4">
-        <h2 className="text-xl font-bold text-[#172022] mb-1">Shopping Cart</h2>
-        <p className="text-sm text-[rgba(26,42,34,0.65)]">{totalItemsCount} {totalItemsCount === 1 ? 'item' : 'items'}</p>
+        <h2 className="text-xl font-bold text-[#172022] mb-1"><Trans>Shopping Cart</Trans></h2>
+        <p className="text-sm text-[rgba(26,42,34,0.65)]">{totalItemsCount} {totalItemsCount === 1 ? <Trans>item</Trans> : <Trans>items</Trans>}</p>
       </div>
 
       <div className="space-y-4">
@@ -239,9 +240,9 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
                 <img src={group.image} alt={group.name} className="w-full h-full object-cover" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-[#172022] mb-1 line-clamp-2">{group.name}</h3>
+                <h3 className="text-sm font-semibold text-[#172022] mb-1 line-clamp-2"><TransText>{group.name}</TransText></h3>
                 {group.vendor && (
-                  <p className="text-xs text-[rgba(26,42,34,0.6)] mb-1">{group.vendor.name}</p>
+                  <p className="text-xs text-[rgba(26,42,34,0.6)] mb-1"><TransText>{group.vendor.name}</TransText></p>
                 )}
               </div>
             </div>
@@ -263,10 +264,10 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
                     >
                       <div className="flex-1 min-w-0 text-left">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-bold text-[#172022]">Variant {variantIdx + 1}</span>
+                          <span className="text-xs font-bold text-[#172022]"><Trans>Variant</Trans> {variantIdx + 1}</span>
                           {variant.variantAttributes && Object.keys(variant.variantAttributes).length > 0 && (
                             <span className="text-[0.65rem] text-[rgba(26,42,34,0.6)]">
-                              ({Object.keys(variant.variantAttributes).length} properties)
+                              ({Object.keys(variant.variantAttributes).length} <Trans>properties</Trans>)
                             </span>
                           )}
                         </div>
@@ -291,11 +292,11 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
                             ))}
                           </div>
                         ) : (
-                          <p className="text-xs text-[rgba(26,42,34,0.6)]">Standard variant</p>
+                          <p className="text-xs text-[rgba(26,42,34,0.6)]"><Trans>Standard variant</Trans></p>
                         )}
                         {/* Variant Price - Always visible */}
                         <div className="text-sm font-bold text-[#1b8f5b] mt-1">
-                          ₹{(variant.unitPrice || 0).toLocaleString('en-IN')} per unit
+                          ₹{(variant.unitPrice || 0).toLocaleString('en-IN')} <Trans>per unit</Trans>
                           {(() => {
                             console.log(`💰 Variant ${variantIdx + 1} Price Display:`, {
                               unitPrice: variant.unitPrice,
@@ -319,7 +320,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
                       <div className="px-3 pb-3 border-t border-[rgba(34,94,65,0.1)] bg-[rgba(240,245,242,0.2)]">
                         {variant.variantAttributes && Object.keys(variant.variantAttributes).length > 0 ? (
                           <div className="pt-2 space-y-1">
-                            <p className="text-xs font-bold text-[rgba(26,42,34,0.7)] mb-2">Variant Properties:</p>
+                            <p className="text-xs font-bold text-[rgba(26,42,34,0.7)] mb-2"><Trans>Variant Properties:</Trans></p>
                             {Object.entries(variant.variantAttributes).map(([key, value]) => (
                               <div key={key} className="flex items-center justify-between text-xs py-1">
                                 <span className="text-[rgba(26,42,34,0.5)] font-medium">{key}:</span>
@@ -329,7 +330,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
                           </div>
                         ) : (
                           <div className="pt-2">
-                            <p className="text-xs text-[rgba(26,42,34,0.6)]">No variant properties available</p>
+                            <p className="text-xs text-[rgba(26,42,34,0.6)]"><Trans>No variant properties available</Trans></p>
                           </div>
                         )}
                       </div>
@@ -388,32 +389,45 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
         ))}
       </div>
 
-      <div className="p-4 rounded-2xl border border-[rgba(34,94,65,0.16)] bg-gradient-to-br from-white to-[rgba(241,244,236,0.9)] shadow-[0_18px_38px_-28px_rgba(13,38,24,0.35)] space-y-3">
+      <div className="p-4 rounded-2xl border border-[rgba(34,94,65,0.16)] bg-gradient-to-br from-white to-[rgba(241,244,236,0.9)] shadow-[0_18px_38px_-28px_rgba(13,38,24,0.35)] space-y-3 user-cart-summary">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-[rgba(26,42,34,0.65)]">Subtotal</span>
+          <span className="text-[rgba(26,42,34,0.65)]"><Trans>Subtotal</Trans></span>
           <span className="font-semibold text-[#172022]">₹{totals.subtotal.toLocaleString('en-IN')}</span>
         </div>
         <div className="flex items-center justify-between text-sm">
-          <span className="text-[rgba(26,42,34,0.65)]">Delivery</span>
-          <span className="font-semibold text-[#172022]">{totals.delivery === 0 ? 'Free' : `₹${totals.delivery}`}</span>
+          <span className="text-[rgba(26,42,34,0.65)]"><Trans>Delivery</Trans></span>
+          <span className="font-semibold text-[#172022]">{totals.delivery === 0 ? <Trans>Free</Trans> : `₹${totals.delivery}`}</span>
         </div>
         <div className="flex items-center justify-between pt-3 border-t border-[rgba(34,94,65,0.1)]">
-          <span className="text-base font-bold text-[#172022]">Total</span>
+          <span className="text-base font-bold text-[#172022]"><Trans>Total</Trans></span>
           <span className="text-xl font-bold text-[#1b8f5b]">₹{totals.total.toLocaleString('en-IN')}</span>
         </div>
         {!totals.meetsMinimum && (
           <div className="p-3 rounded-xl bg-orange-50 border border-orange-200">
             <p className="text-xs font-semibold text-orange-700 text-center">
-              Add ₹{totals.shortfall.toLocaleString('en-IN')} more to reach minimum order value of ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')}
+              <Trans>Add ₹{totals.shortfall.toLocaleString('en-IN')} more to reach minimum order value of ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')}</Trans>
             </p>
           </div>
         )}
+        <button
+          type="button"
+          className={cn(
+            'w-full py-4 px-6 rounded-2xl text-base font-bold transition-all duration-200 mt-4 user-cart-checkout-btn',
+            totals.meetsMinimum
+              ? 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          )}
+          onClick={onCheckout}
+          disabled={!totals.meetsMinimum}
+        >
+          {totals.meetsMinimum ? <Trans>Proceed to Checkout</Trans> : <Trans>Add ₹{totals.shortfall.toLocaleString('en-IN')} more</Trans>}
+        </button>
       </div>
 
       {/* Suggested Items Section */}
       {suggestedProducts.length > 0 && (
         <div className="user-cart-suggested">
-          <h3 className="text-base font-bold text-[#172022] mb-3">You might also like</h3>
+          <h3 className="text-base font-bold text-[#172022] mb-3"><Trans>You might also like</Trans></h3>
           <div className="user-cart-suggested__rail">
             {suggestedProducts.map((product) => (
               <div key={product._id || product.id} className="user-cart-suggested__card">
@@ -421,7 +435,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
                   <img src={getPrimaryImageUrl(product)} alt={product.name} className="user-cart-suggested__image" />
                 </div>
                 <div className="user-cart-suggested__content">
-                  <h4 className="user-cart-suggested__title">{product.name}</h4>
+                  <h4 className="user-cart-suggested__title"><TransText>{product.name}</TransText></h4>
                   <div className="user-cart-suggested__price">₹{(product.priceToUser || product.price || 0).toLocaleString('en-IN')}</div>
                   <button
                     type="button"
@@ -429,7 +443,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
                     onClick={() => onAddToCart?.(product._id || product.id, 1)}
                   >
                     <PlusIcon className="h-4 w-4" />
-                    <span>Add</span>
+                    <span><Trans>Add</Trans></span>
                   </button>
                 </div>
               </div>
@@ -450,7 +464,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
           onClick={onCheckout}
           disabled={!totals.meetsMinimum}
         >
-          {totals.meetsMinimum ? 'Proceed to Checkout' : `Add ₹${totals.shortfall.toLocaleString('en-IN')} more`}
+          {totals.meetsMinimum ? <Trans>Proceed to Checkout</Trans> : <Trans>Add ₹{totals.shortfall.toLocaleString('en-IN')} more</Trans>}
         </button>
       </div>
     </div>

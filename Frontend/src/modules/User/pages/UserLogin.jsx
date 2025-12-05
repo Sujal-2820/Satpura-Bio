@@ -77,7 +77,7 @@ export function UserLogin({ onSuccess, onSwitchToRegister }) {
         })
         
         onSuccess?.(userData)
-        navigate('/user/dashboard')
+        // Navigation is handled by onSuccess callback from parent component
       } else {
         // Check if user needs to register
         if (result.error?.message?.includes('not found') || result.requiresRegistration) {

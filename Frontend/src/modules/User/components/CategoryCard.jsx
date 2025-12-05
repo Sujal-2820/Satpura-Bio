@@ -1,26 +1,26 @@
 import { cn } from '../../../lib/cn'
+import { TransText } from '../../../components/TransText'
 
 export function CategoryCard({ category, onClick, className, isSelected = false }) {
   return (
-    <div className={cn('home-category-card', className)}>
+    <div className={cn('category-card-wrapper', className)}>
       <button
         type="button"
         className={cn(
-          'home-category-card-button',
-          isSelected && 'home-category-card-button--selected'
+          'category-card-btn',
+          isSelected && 'category-card-btn--selected'
         )}
         onClick={() => onClick?.(category.id)}
       >
-      <div className="home-category-card-button__icon">
+        <div className="category-card-btn__icon">
         {category.icon ? (
-          <img src={category.icon} alt={category.name} className="home-category-card-button__icon-img" />
+            <img src={category.icon} alt={category.name} className="category-card-btn__icon-img" />
         ) : (
-          <span className="home-category-card-button__icon-text">{category.emoji || category.name.charAt(0)}</span>
+            <span className="category-card-btn__icon-text">{category.emoji || category.name.charAt(0)}</span>
         )}
       </div>
-      <span className="home-category-card-button__label">{category.name}</span>
+        <span className="category-card-btn__label"><TransText>{category.name}</TransText></span>
       </button>
     </div>
   )
 }
-

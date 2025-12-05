@@ -777,11 +777,11 @@ function InformationDisplayContent({ data, buttonId }) {
                         <span className="vendor-info-display__item-amount">-₹{(repayment.amount || 0).toLocaleString('en-IN')}</span>
                         <span className="vendor-info-display__item-status">{repayment.status === 'completed' ? 'Completed' : repayment.status}</span>
                         <span className="vendor-info-display__item-date">{formatDate(repaymentDate)}</span>
-                        {repayment.penaltyAmount > 0 && (
+                          {repayment.penaltyAmount > 0 && (
                           <span className="vendor-info-display__item-penalty">
-                            (Penalty: ₹{repayment.penaltyAmount.toLocaleString('en-IN')})
-                          </span>
-                        )}
+                              (Penalty: ₹{repayment.penaltyAmount.toLocaleString('en-IN')})
+                            </span>
+                          )}
                       </div>
                     )
                   })}

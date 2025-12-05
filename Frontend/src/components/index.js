@@ -4,5 +4,8 @@ export { FeatureGrid } from './FeatureGrid'
 export { FAQAccordion } from './FAQAccordion'
 export { Footer } from './Footer'
 export { Navbar } from './Navbar'
+export { LanguageToggle } from './LanguageToggle'
+export { Trans } from './Trans'
+export { TransText } from './TransText'
 
 

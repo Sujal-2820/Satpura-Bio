@@ -93,7 +93,7 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
   }, [showSortDropdown])
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 user-search-view">
       {/* Search Header */}
       <div className="flex items-start justify-between gap-4 mb-4">
         <div>

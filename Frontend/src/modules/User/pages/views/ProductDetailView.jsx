@@ -3,6 +3,8 @@ import { StarIcon, HeartIcon, TruckIcon, MapPinIcon, ChevronRightIcon, PlusIcon,
 import { cn } from '../../../../lib/cn'
 import * as userApi from '../../services/userApi'
 import { getPrimaryImageUrl } from '../../utils/productImages'
+import { TransText } from '../../../../components/TransText'
+import { Trans } from '../../../../components/Trans'
 
 export function ProductDetailView({ productId, onAddToCart, onBack, onProductClick }) {
   const [product, setProduct] = useState(null)
@@ -541,7 +543,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
          {/* Title and Wishlist */}
          <div className="flex items-start justify-between gap-3">
            <div className="flex-1">
-             <h1 className="text-xl font-bold text-[#172022] leading-tight mb-1.5">{product.name}</h1>
+             <h1 className="text-xl font-bold text-[#172022] leading-tight mb-1.5"><TransText>{product.name}</TransText></h1>
              {/* Rating */}
              <div className="flex items-center gap-2">
                <div className="flex items-center gap-0.5">
@@ -733,7 +735,9 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
                            <div className="flex-1">
                              <div className="flex items-center gap-2 mb-1">
                                {isSelected && <CheckCircleIcon className="h-4 w-4 text-[#1b8f5b]" />}
-                               <span className="text-xs font-bold text-[#172022]">Variant {idx + 1}</span>
+                               <span className="text-xs font-bold text-[#172022]">
+                                 {stockAttrs[attributeStructure.attributeNameKey] || `Variant ${idx + 1}`}
+                               </span>
                              </div>
                              <p className="text-xs text-[rgba(26,42,34,0.7)] mb-2">{variantAttributes || 'No additional attributes'}</p>
                              <div className="grid grid-cols-2 gap-2 text-xs">
@@ -817,9 +821,9 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
            <div className="flex items-start gap-2.5 p-2.5 rounded-lg border-l-4 border-[#1b8f5b] bg-gradient-to-r from-[rgba(240,245,242,0.6)] to-[rgba(240,245,242,0.3)]">
              <MapPinIcon className="h-4 w-4 text-[#1b8f5b] shrink-0 mt-0.5" />
              <div className="flex-1 min-w-0">
-               <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.5)] uppercase tracking-wide mb-0.5">Vendor</p>
-               <p className="text-xs font-bold text-[#172022] mb-0.5">{product.vendor.name}</p>
-               <p className="text-[0.65rem] text-[rgba(26,42,34,0.65)]">{product.vendor.location}</p>
+               <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.5)] uppercase tracking-wide mb-0.5"><Trans>Vendor</Trans></p>
+               <p className="text-xs font-bold text-[#172022] mb-0.5"><TransText>{product.vendor.name}</TransText></p>
+               <p className="text-[0.65rem] text-[rgba(26,42,34,0.65)]"><TransText>{product.vendor.location}</TransText></p>
              </div>
            </div>
          )}
@@ -944,7 +948,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
                                  {isHeading ? (
                                    <h4 className="text-base font-bold text-[#1b8f5b] mb-2 flex items-center gap-2">
                                      <div className="w-2 h-2 rounded-full bg-[#1b8f5b]"></div>
-                                     {paragraph}
+                                     <TransText>{paragraph}</TransText>
                                    </h4>
                                  ) : isUsage ? (
                                    <div>
@@ -952,15 +956,15 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
                                        <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
                                          <span className="text-white text-xs font-bold">!</span>
                                        </div>
-                                       <span className="text-sm font-bold text-blue-700 uppercase tracking-wide">Usage Instructions</span>
+                                       <span className="text-sm font-bold text-blue-700 uppercase tracking-wide"><Trans>Usage Instructions</Trans></span>
                                      </div>
                                      <p className="text-sm text-[rgba(26,42,34,0.85)] leading-relaxed ml-8">
-                                       {paragraph.replace(/^(usage|how to use):\s*/i, '').trim()}
+                                       <TransText>{paragraph.replace(/^(usage|how to use):\s*/i, '').trim()}</TransText>
                                      </p>
                                    </div>
                                  ) : (
                                    <p className="text-sm text-[rgba(26,42,34,0.85)] leading-relaxed">
-                                     {paragraph}
+                                     <TransText>{paragraph}</TransText>
                                    </p>
                                  )}
                                </div>
@@ -1130,7 +1134,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
                     <img src={getPrimaryImageUrl(similarProduct)} alt={similarProduct.name} />
                   </div>
                   <div className="user-product-detail-view__similar-card-content">
-                    <h4 className="user-product-detail-view__similar-card-title">{similarProduct.name}</h4>
+                    <h4 className="user-product-detail-view__similar-card-title"><TransText>{similarProduct.name}</TransText></h4>
                     <div className="user-product-detail-view__similar-card-price">
                       <span className="user-product-detail-view__similar-card-price-main">
                         ₹{(similarProduct.priceToUser || similarProduct.price || 0).toLocaleString('en-IN')}
@@ -1177,7 +1181,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
                     <img src={getPrimaryImageUrl(suggestedProduct)} alt={suggestedProduct.name} />
                   </div>
                   <div className="user-product-detail-view__suggested-card-content">
-                    <h4 className="user-product-detail-view__suggested-card-title">{suggestedProduct.name}</h4>
+                    <h4 className="user-product-detail-view__suggested-card-title"><TransText>{suggestedProduct.name}</TransText></h4>
                     <div className="user-product-detail-view__suggested-card-price">
                       <span className="user-product-detail-view__suggested-card-price-main">
                         ₹{(suggestedProduct.priceToUser || suggestedProduct.price || 0).toLocaleString('en-IN')}

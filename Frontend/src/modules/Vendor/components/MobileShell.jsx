@@ -3,6 +3,7 @@ import { cn } from '../../../lib/cn'
 import { CloseIcon, MenuIcon, SearchIcon, BellIcon } from './icons'
 import iraSathiLogo from '../../../assets/IRA Sathi.png'
 import { MapPinIcon } from './icons'
+import { LanguageToggle } from '../../../components/LanguageToggle'
 
 export function MobileShell({ title, subtitle, children, navigation, menuContent, onSearchClick, onNotificationClick, notificationCount = 0, isNotificationAnimating = false }) {
   const [open, setOpen] = useState(false)
@@ -122,6 +123,9 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-3 pb-10">
+          <div className="mb-4">
+            <LanguageToggle variant="default" onLanguageChange={() => setOpen(false)} />
+          </div>
           {typeof menuContent === 'function'
             ? menuContent({
                 close: () => setOpen(false),

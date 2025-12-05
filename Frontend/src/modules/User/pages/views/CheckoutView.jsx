@@ -493,7 +493,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
   )
 
   return (
-    <div className="user-checkout-view">
+    <div className="user-checkout-view user-checkout-view-container">
       {/* Back Button */}
       <button
         type="button"
@@ -630,7 +630,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           </div>
 
           {/* Payment Breakdown */}
-          <div className="p-4 rounded-xl border border-[rgba(34,94,65,0.12)] bg-white">
+          <div className="p-4 rounded-xl border border-[rgba(34,94,65,0.12)] bg-white user-checkout-payment-breakdown">
             <h3 className="text-sm font-semibold text-[#172022] mb-3">Payment Breakdown</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
@@ -768,7 +768,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           </div>
 
           {(assignedVendor || cartItems[0]?.vendor) && (
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-[rgba(240,245,242,0.6)] to-[rgba(255,255,255,0.9)] border border-[rgba(34,94,65,0.2)] shadow-sm">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-[rgba(240,245,242,0.6)] to-[rgba(255,255,255,0.9)] border border-[rgba(34,94,65,0.2)] shadow-sm user-checkout-vendor-container">
               <p className="text-xs font-bold text-[rgba(26,42,34,0.7)] uppercase tracking-wide mb-2 flex items-center gap-2">
                 <PackageIcon className="h-4 w-4 text-[#1b8f5b]" />
                 Assigned Vendor
@@ -808,7 +808,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           </div>
 
           {/* Final Summary */}
-          <div className="p-5 rounded-2xl border-2 border-[rgba(34,94,65,0.15)] bg-gradient-to-br from-[rgba(240,245,242,0.6)] to-[rgba(255,255,255,0.95)] shadow-[0_4px_12px_-4px_rgba(16,44,30,0.15)]">
+          <div className="p-5 rounded-2xl border-2 border-[rgba(34,94,65,0.15)] bg-gradient-to-br from-[rgba(240,245,242,0.6)] to-[rgba(255,255,255,0.95)] shadow-[0_4px_12px_-4px_rgba(16,44,30,0.15)] user-checkout-final-summary">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg bg-[rgba(27,143,91,0.1)] flex items-center justify-center">
                 <PackageIcon className="h-5 w-5 text-[#1b8f5b]" />
@@ -861,7 +861,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       )}
 
       {/* Navigation Buttons */}
-      <div className="sticky bottom-0 left-0 right-0 p-4 bg-white border-t border-[rgba(34,94,65,0.1)] -mx-5 mt-6 space-y-2">
+      <div className="sticky bottom-0 left-0 right-0 p-4 bg-white border-t border-[rgba(34,94,65,0.1)] -mx-5 mt-6 space-y-2 user-checkout-navigation">
         {currentStep < 3 ? (
           <button
             type="button"

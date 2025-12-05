@@ -54,7 +54,7 @@
   padding: 0.75rem 1.25rem 0.5rem;
   border-bottom-left-radius: 26px;
   border-bottom-right-radius: 26px;
-  background: #8fc4a5;
+  background: linear-gradient(135deg, #4aaf7a, #5abf8a);
   border-bottom: 1px solid transparent;
   box-shadow: 0 4px 16px -8px rgba(34, 94, 65, 0.15), 0 0 0 0 rgba(34, 94, 65, 0.08);
   overflow: visible;

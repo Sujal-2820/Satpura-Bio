@@ -10,6 +10,8 @@ import {
   VendorRolePage,
 } from './modules/Vendor'
 import { SellerDashboardPage, SellerLogin, SellerRegister, SellerProvider } from './modules/Seller'
+import { WebsiteProvider, WebsiteRoutes } from './modules/website'
+import { TranslationProvider } from './context/TranslationContext'
 
 function Home() {
   const links = [
@@ -66,12 +68,12 @@ function AdminDashboardRoute() {
 
 function UserLoginRoute() {
   const navigate = useNavigate()
-  return <UserLogin onSubmit={() => navigate('/user/dashboard')} onSwitchToRegister={() => navigate('/user/register')} />
+  return <UserLogin onSuccess={() => navigate('/user/dashboard')} onSwitchToRegister={() => navigate('/user/register')} />
 }
 
 function UserRegisterRoute() {
   const navigate = useNavigate()
-  return <UserRegister onSubmit={() => navigate('/user/dashboard')} onSwitchToLogin={() => navigate('/user/login')} />
+  return <UserRegister onSuccess={() => navigate('/user/dashboard')} onSwitchToLogin={() => navigate('/user/login')} />
 }
 
 function SellerLoginRoute() {
@@ -94,17 +96,16 @@ function SellerRegisterRoute() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-
+    <TranslationProvider>
+      <BrowserRouter>
+        <Routes>
+        {/* Console/Admin Routes - Specific paths first */}
+        <Route path="/console" element={<Home />} />
         <Route path="/admin/login" element={<AdminLoginRoute />} />
         <Route path="/admin/dashboard" element={<AdminDashboardRoute />} />
-
         <Route path="/user/login" element={<UserLoginRoute />} />
         <Route path="/user/register" element={<UserRegisterRoute />} />
         <Route path="/user/dashboard" element={<UserDashboardPage />} />
-
         <Route path="/vendor" element={<VendorRouteContainer />}>
           <Route path="language" element={<VendorLanguagePage />} />
           <Route path="role" element={<VendorRolePage />} />
@@ -112,14 +113,19 @@ function App() {
           <Route path="register" element={<VendorRegisterPage />} />
           <Route path="dashboard" element={<VendorDashboardPage />} />
         </Route>
-
         <Route path="/seller/login" element={<SellerLoginRoute />} />
         <Route path="/seller/register" element={<SellerRegisterRoute />} />
         <Route path="/seller/dashboard" element={<SellerDashboardPage />} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+        {/* Website Routes - Public E-commerce Site (catch-all for remaining paths) */}
+        <Route path="/*" element={
+          <WebsiteProvider>
+            <WebsiteRoutes />
+          </WebsiteProvider>
+        } />
+        </Routes>
+      </BrowserRouter>
+    </TranslationProvider>
   )
 }
 

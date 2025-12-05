@@ -275,9 +275,18 @@ export function AttributeStockForm({
           const attrKey = customAttr.label.trim()
           // Try to get value using label first, then fallback to internal key
           const attrValue = stock.attributes[attrKey] || stock.attributes[customAttr.key]
-          if (attrValue && attrValue.toString().trim() !== '') {
-            // Store as key-value pair: label (key) -> value
-            finalAttributes[attrKey] = attrValue.toString().trim()
+          if (attrValue) {
+            // Handle both array (legacy) and string values - convert array to first element
+            let finalValue = ''
+            if (Array.isArray(attrValue)) {
+              finalValue = attrValue.length > 0 ? attrValue[0].toString().trim() : ''
+            } else {
+              finalValue = attrValue.toString().trim()
+            }
+            // Store as key-value pair: label (key) -> value (single string)
+            if (finalValue !== '') {
+              finalAttributes[attrKey] = finalValue
+            }
           }
         }
       })
@@ -285,10 +294,17 @@ export function AttributeStockForm({
       // Also include any attributes that might have been set directly (for backward compatibility)
       Object.keys(stock.attributes || {}).forEach(key => {
         // Skip internal keys (starting with 'attr_')
-        if (!key.startsWith('attr_') && stock.attributes[key] && stock.attributes[key].toString().trim() !== '') {
-          // Only add if not already in finalAttributes
-          if (!finalAttributes[key]) {
-            finalAttributes[key] = stock.attributes[key].toString().trim()
+        if (!key.startsWith('attr_') && stock.attributes[key]) {
+          // Handle both array (legacy) and string values - convert array to first element
+          let finalValue = ''
+          if (Array.isArray(stock.attributes[key])) {
+            finalValue = stock.attributes[key].length > 0 ? stock.attributes[key][0].toString().trim() : ''
+          } else {
+            finalValue = stock.attributes[key].toString().trim()
+          }
+          // Only add if not already in finalAttributes and value is not empty
+          if (finalValue !== '' && !finalAttributes[key]) {
+            finalAttributes[key] = finalValue
           }
         }
       })
@@ -442,130 +458,42 @@ export function AttributeStockForm({
                                 />
                               </div>
                               
-                              {/* Attribute Value Field - Support Multiple Subvalues */}
+                              {/* Attribute Value Field - Single Value Only */}
                               <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                  Attribute Value(s) <span className="text-red-500">*</span>
-                                  <span className="text-xs font-normal text-gray-500 ml-1">(Add multiple values separated by comma)</span>
+                                  Attribute Value <span className="text-red-500">*</span>
                                 </label>
                                 
-                                {/* Input for adding new values */}
-                                <div className="flex gap-2 mb-2">
-                                  <input
-                                    type="text"
-                                    placeholder={
-                                      customAttr.label && (customAttr.label.toLowerCase().includes('percent') || customAttr.label.toLowerCase().includes('%')) 
-                                        ? 'e.g., Liquid, Powder, Granular (comma-separated)' 
-                                        : customAttr.label
-                                          ? `Enter ${customAttr.label.toLowerCase()} values (comma-separated)`
-                                          : 'Enter values (comma-separated)'
+                                {/* Input for single value */}
+                                <input
+                                  type="text"
+                                  value={(() => {
+                                    const attrKey = customAttr.label || customAttr.key
+                                    const currentValue = stock.attributes[attrKey]
+                                    // Handle both array (legacy) and string values - convert array to first element or empty string
+                                    if (Array.isArray(currentValue)) {
+                                      return currentValue.length > 0 ? currentValue[0] : ''
                                     }
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && e.target.value.trim()) {
-                                        e.preventDefault()
-                                        const attrKey = customAttr.label || customAttr.key
-                                        const currentValue = stock.attributes[attrKey]
-                                        const newValue = e.target.value.trim()
-                                        
-                                        // Convert to array if not already
-                                        let values = []
-                                        if (Array.isArray(currentValue)) {
-                                          values = [...currentValue]
-                                        } else if (currentValue) {
-                                          values = [currentValue]
-                                        }
-                                        
-                                        // Add new value if not already present
-                                        if (!values.includes(newValue)) {
-                                          values.push(newValue)
-                                          handleAttributeChange(stock.id, attrKey, values)
-                                        }
-                                        
-                                        e.target.value = ''
-                                      }
-                                    }}
-                                    disabled={!customAttr.label}
-                                    className={cn(
-                                      "flex-1 rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all focus:outline-none focus:ring-2",
-                                      !customAttr.label 
-                                        ? "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
-                                        : "border-gray-300 bg-white focus:border-blue-500 focus:ring-blue-500/30"
-                                    )}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      const input = e.target.previousElementSibling
-                                      if (input.value.trim()) {
-                                        const attrKey = customAttr.label || customAttr.key
-                                        const currentValue = stock.attributes[attrKey]
-                                        
-                                        // Convert to array if not already
-                                        let values = []
-                                        if (Array.isArray(currentValue)) {
-                                          values = [...currentValue]
-                                        } else if (currentValue) {
-                                          values = [currentValue]
-                                        }
-                                        
-                                        // Split by comma and add each value
-                                        const newValues = input.value.split(',').map(v => v.trim()).filter(v => v && !values.includes(v))
-                                        if (newValues.length > 0) {
-                                          handleAttributeChange(stock.id, attrKey, [...values, ...newValues])
-                                        }
-                                        
-                                        input.value = ''
-                                      }
-                                    }}
-                                    disabled={!customAttr.label}
-                                    className={cn(
-                                      "px-3 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all",
-                                      !customAttr.label
-                                        ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
-                                        : "border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-500"
-                                    )}
-                                  >
-                                    <Plus className="h-4 w-4" />
-                                  </button>
-                                </div>
+                                    return currentValue || ''
+                                  })()}
+                                  onChange={(e) => {
+                                    const attrKey = customAttr.label || customAttr.key
+                                    handleAttributeChange(stock.id, attrKey, e.target.value)
+                                  }}
+                                  placeholder={
+                                    customAttr.label
+                                      ? `Enter ${customAttr.label.toLowerCase()} value`
+                                      : 'Enter attribute value'
+                                  }
+                                  disabled={!customAttr.label}
+                                  className={cn(
+                                    "w-full rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all focus:outline-none focus:ring-2",
+                                    !customAttr.label 
+                                      ? "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                                      : "border-gray-300 bg-white focus:border-blue-500 focus:ring-blue-500/30"
+                                  )}
+                                />
                                 
-                                {/* Display current values as chips */}
-                                {(() => {
-                                  const attrKey = customAttr.label || customAttr.key
-                                  const currentValue = stock.attributes[attrKey]
-                                  const values = Array.isArray(currentValue) ? currentValue : (currentValue ? [currentValue] : [])
-                                  
-                                  return values.length > 0 ? (
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                      {values.map((value, idx) => (
-                                        <div
-                                          key={idx}
-                                          className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-200"
-                                        >
-                                          <span>{value}</span>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const newValues = values.filter((_, i) => i !== idx)
-                                              handleAttributeChange(stock.id, attrKey, newValues.length === 1 ? newValues[0] : newValues.length > 0 ? newValues : '')
-                                            }}
-                                            className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
-                                          >
-                                            <X className="h-3 w-3" />
-                                          </button>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : null
-                                })()}
-                                
-                                {/* Hint for percentage fields */}
-                                {customAttr.label && (customAttr.label.toLowerCase().includes('percent') || customAttr.label.toLowerCase().includes('%')) && (
-                                  <p className="mt-1.5 text-xs text-blue-600 bg-blue-50 rounded px-2 py-1 flex items-center gap-1">
-                                    <span>💡</span>
-                                    <span>Hint: Add multiple percentage values separated by comma (e.g., 46%, 30%, 20%)</span>
-                                  </p>
-                                )}
                                 {!customAttr.label && (
                                   <p className="mt-1.5 text-xs text-gray-400 italic">Please enter attribute name first</p>
                                 )}
@@ -575,20 +503,22 @@ export function AttributeStockForm({
                               {(() => {
                                 const attrKey = customAttr.label || customAttr.key
                                 const currentValue = stock.attributes[attrKey]
-                                const values = Array.isArray(currentValue) ? currentValue : (currentValue ? [currentValue] : [])
+                                // Handle both array (legacy) and string values - convert array to first element
+                                let displayValue = ''
+                                if (Array.isArray(currentValue)) {
+                                  displayValue = currentValue.length > 0 ? currentValue[0] : ''
+                                } else if (currentValue) {
+                                  displayValue = currentValue.toString()
+                                }
                                 
-                                return customAttr.label && values.length > 0 ? (
+                                return customAttr.label && displayValue ? (
                                   <div className="mt-2 pt-2 border-t border-blue-200">
                                     <p className="text-xs font-semibold text-gray-600 mb-1">Preview:</p>
                                     <div className="bg-white rounded-lg px-3 py-2 border border-blue-200">
                                       <span className="text-xs font-bold text-blue-700">{customAttr.label}:</span>
-                                      <div className="mt-1 flex flex-wrap gap-1">
-                                        {values.map((value, idx) => (
-                                          <span key={idx} className="text-xs text-gray-800 font-medium bg-gray-50 px-2 py-0.5 rounded">
-                                            {value}
-                                          </span>
-                                        ))}
-                                      </div>
+                                      <span className="text-xs text-gray-800 font-medium bg-gray-50 px-2 py-0.5 rounded ml-2">
+                                        {displayValue}
+                                      </span>
                                     </div>
                                   </div>
                                 ) : null

@@ -98,7 +98,7 @@ export function CarouselProductsView({ carouselId, onProductClick, onAddToCart, 
               onNavigate={onProductClick}
               onAddToCart={onAddToCart}
               onWishlist={onToggleFavourite}
-              className="home-product-card"
+              className="product-card-wrapper"
             />
           ))}
         </div>

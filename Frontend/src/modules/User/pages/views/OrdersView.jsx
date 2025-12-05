@@ -6,6 +6,9 @@ import { cn } from '../../../../lib/cn'
 import { useToast } from '../../components/ToastNotification'
 import { getPrimaryImageUrl } from '../../utils/productImages'
 import { openRazorpayCheckout } from '../../../../utils/razorpay'
+import { Trans } from '../../../../components/Trans'
+import { useTranslatedArray } from '../../../../hooks/useTranslatedArray'
+import { TransText } from '../../../../components/TransText'
 
 const FILTER_TABS = [
   { id: 'all', label: 'All' },
@@ -27,6 +30,43 @@ const STATUS_DESCRIPTIONS = {
   delivered: 'Order delivered. Complete remaining payment if pending.',
 }
 
+// Hook to get translated filter tabs
+function useTranslatedFilterTabs() {
+  const labels = FILTER_TABS.map(tab => tab.label)
+  const translatedLabels = useTranslatedArray(labels)
+  
+  return FILTER_TABS.map((tab, index) => ({
+    ...tab,
+    label: translatedLabels[index] || tab.label,
+  }))
+}
+
+// Hook to get translated status labels
+function useTranslatedStatusLabels() {
+  const statusKeys = Object.keys(STATUS_LABELS)
+  const statusValues = statusKeys.map(key => STATUS_LABELS[key])
+  const translatedValues = useTranslatedArray(statusValues)
+  
+  const translated = {}
+  statusKeys.forEach((key, index) => {
+    translated[key] = translatedValues[index] || STATUS_LABELS[key]
+  })
+  return translated
+}
+
+// Hook to get translated status descriptions
+function useTranslatedStatusDescriptions() {
+  const statusKeys = Object.keys(STATUS_DESCRIPTIONS)
+  const statusValues = statusKeys.map(key => STATUS_DESCRIPTIONS[key])
+  const translatedValues = useTranslatedArray(statusValues)
+  
+  const translated = {}
+  statusKeys.forEach((key, index) => {
+    translated[key] = translatedValues[index] || STATUS_DESCRIPTIONS[key]
+  })
+  return translated
+}
+
 const getStatusKey = (status) => {
   if (!status) return 'awaiting'
   const normalized = status.toLowerCase()
@@ -36,10 +76,10 @@ const getStatusKey = (status) => {
   return normalized
 }
 
-const getDisplayStatus = (status) => {
+const getDisplayStatus = (status, translatedLabels) => {
   if (status === 'added_to_cart') return 'In Cart'
   const key = getStatusKey(status)
-  return STATUS_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1)
+  return translatedLabels[key] || STATUS_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1)
 }
 
 const formatTimelineTimestamp = (timestamp) => {
@@ -63,6 +103,11 @@ export function OrdersView() {
   const { success, error: showError } = useToast()
   const [activeFilter, setActiveFilter] = useState('all')
   const [processingPayment, setProcessingPayment] = useState(null)
+  
+  // Get translated labels
+  const translatedFilterTabs = useTranslatedFilterTabs()
+  const translatedStatusLabels = useTranslatedStatusLabels()
+  const translatedStatusDescriptions = useTranslatedStatusDescriptions()
 
   // Combine orders and cart items
   const allItems = useMemo(() => {
@@ -228,8 +273,8 @@ export function OrdersView() {
             >
               <span className="user-orders-view__tracker-step-index">{index + 1}</span>
               <div className="user-orders-view__tracker-step-body">
-                <p className="user-orders-view__tracker-step-title">{STATUS_LABELS[status]}</p>
-                <p className="user-orders-view__tracker-step-desc">{STATUS_DESCRIPTIONS[status]}</p>
+                <p className="user-orders-view__tracker-step-title">{translatedStatusLabels[status] || STATUS_LABELS[status]}</p>
+                <p className="user-orders-view__tracker-step-desc">{translatedStatusDescriptions[status] || STATUS_DESCRIPTIONS[status]}</p>
                 {timelineEntry?.timestamp && (
                   <p className="user-orders-view__tracker-step-time">
                     {formatTimelineTimestamp(timelineEntry.timestamp)}
@@ -246,13 +291,13 @@ export function OrdersView() {
   return (
     <div className="user-orders-view space-y-6">
       <div className="user-orders-view__header">
-        <h2 className="user-orders-view__title">My Orders</h2>
+        <h2 className="user-orders-view__title"><Trans>My Orders</Trans></h2>
       </div>
 
       {/* Filter Tabs */}
       <div className="user-orders-view__filters">
         <div className="user-orders-view__filters-rail">
-          {FILTER_TABS.map((tab) => (
+          {translatedFilterTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -273,11 +318,13 @@ export function OrdersView() {
         {filteredItems.length === 0 ? (
           <div className="user-orders-view__empty">
             <PackageIcon className="user-orders-view__empty-icon" />
-            <h3 className="user-orders-view__empty-title">No orders found</h3>
+            <h3 className="user-orders-view__empty-title"><Trans>No orders found</Trans></h3>
             <p className="user-orders-view__empty-text">
-              {activeFilter === 'all'
-                ? "You haven't placed any orders yet"
-                : `No ${FILTER_TABS.find((t) => t.id === activeFilter)?.label.toLowerCase()} orders`}
+              {activeFilter === 'all' ? (
+                <Trans>You haven't placed any orders yet</Trans>
+              ) : (
+                <Trans>No {translatedFilterTabs.find((t) => t.id === activeFilter)?.label.toLowerCase()} orders</Trans>
+              )}
             </p>
           </div>
         ) : (
@@ -286,14 +333,14 @@ export function OrdersView() {
               <div className="user-orders-view__card-header">
                 <div className="user-orders-view__card-header-left">
                   <div className="user-orders-view__card-id">
-                    {item.type === 'cart' ? 'Cart' : `Order #${item.id?.slice(-8) || 'N/A'}`}
+                    {item.type === 'cart' ? <Trans>Cart</Trans> : <Trans>Order #{item.id?.slice(-8) || 'N/A'}</Trans>}
                   </div>
                   <div className="user-orders-view__card-date">{formatDate(item.date)}</div>
                 </div>
                 <div className={cn('user-orders-view__card-status', getStatusColor(item.status))}>
                   {getStatusIcon(item.status)}
                   <span className="user-orders-view__card-status-text">
-                    {getDisplayStatus(item.status)}
+                    {getDisplayStatus(item.status, translatedStatusLabels)}
                   </span>
                 </div>
               </div>
@@ -323,7 +370,7 @@ export function OrdersView() {
                         />
                       </div>
                       <div className="user-orders-view__card-item-details">
-                        <h4 className="user-orders-view__card-item-name">{productName}</h4>
+                        <h4 className="user-orders-view__card-item-name"><TransText>{productName}</TransText></h4>
                         {hasVariants && (
                           <div className="user-orders-view__card-item-variants">
                             {variantKeys.map((key) => (
@@ -335,7 +382,7 @@ export function OrdersView() {
                         )}
                         <div className="user-orders-view__card-item-meta">
                           <span className="user-orders-view__card-item-quantity">
-                            Qty: {orderItem.quantity}
+                            <Trans>Qty</Trans>: {orderItem.quantity}
                           </span>
                           <span className="user-orders-view__card-item-price">
                             ₹{unitPrice.toLocaleString('en-IN')}
@@ -352,18 +399,18 @@ export function OrdersView() {
                 <div className="space-y-2 mb-3">
                   {item.subtotal !== undefined && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Subtotal:</span>
+                      <span className="text-gray-600"><Trans>Subtotal</Trans>:</span>
                       <span className="text-gray-900 font-medium">₹{item.subtotal?.toLocaleString('en-IN') || '0'}</span>
                     </div>
                   )}
                   {item.deliveryCharge !== undefined && item.deliveryCharge > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Delivery:</span>
+                      <span className="text-gray-600"><Trans>Delivery</Trans>:</span>
                       <span className="text-gray-900 font-medium">₹{item.deliveryCharge?.toLocaleString('en-IN') || '0'}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-base font-semibold pt-2 border-t border-gray-200">
-                    <span className="text-gray-900">Total:</span>
+                    <span className="text-gray-900"><Trans>Total</Trans>:</span>
                     <span className="text-gray-900">₹{(item.totalAmount || item.total || 0).toLocaleString('en-IN')}</span>
                   </div>
                 </div>
@@ -373,13 +420,13 @@ export function OrdersView() {
                   <div className="space-y-2 mb-3">
                     {item.paymentPreference === 'partial' && item.upfrontAmount !== undefined && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Advance (30%):</span>
+                        <span className="text-gray-600"><Trans>Advance (30%)</Trans>:</span>
                         <span className="text-green-600 font-medium">₹{item.upfrontAmount?.toLocaleString('en-IN') || '0'}</span>
                       </div>
                     )}
                     {item.paymentPreference === 'partial' && item.remainingAmount !== undefined && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Remaining (70%):</span>
+                        <span className="text-gray-600"><Trans>Remaining (70%)</Trans>:</span>
                         <span className={cn(
                           'font-medium',
                           item.paymentStatus === 'partial_paid' ? 'text-orange-600' : 'text-red-600'
@@ -389,7 +436,7 @@ export function OrdersView() {
                       </div>
                     )}
                     <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
-                      <span className="text-gray-600">Payment Status:</span>
+                      <span className="text-gray-600"><Trans>Payment Status</Trans>:</span>
                       <span
                         className={cn(
                           'font-semibold',
@@ -397,11 +444,13 @@ export function OrdersView() {
                           item.paymentStatus === 'pending' && 'text-red-600'
                         )}
                       >
-                        {item.paymentStatus === 'partial_paid'
-                          ? 'Partial Paid'
-                          : item.paymentStatus === 'pending'
-                            ? 'Pending'
-                            : item.paymentStatus}
+                        {item.paymentStatus === 'partial_paid' ? (
+                          <Trans>Partial Paid</Trans>
+                        ) : item.paymentStatus === 'pending' ? (
+                          <Trans>Pending</Trans>
+                        ) : (
+                          item.paymentStatus
+                        )}
                       </span>
                     </div>
                   </div>
@@ -416,9 +465,11 @@ export function OrdersView() {
                     className="mt-3 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white text-sm font-semibold hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <CreditCardIcon className="h-4 w-4" />
-                    {processingPayment === item.id || loading
-                      ? 'Processing...'
-                      : `Pay Remaining ₹${((item.remainingAmount || item.remaining) || 0).toLocaleString('en-IN')}`}
+                    {processingPayment === item.id || loading ? (
+                      <Trans>Processing...</Trans>
+                    ) : (
+                      <><Trans>Pay Remaining</Trans> ₹{((item.remainingAmount || item.remaining) || 0).toLocaleString('en-IN')}</>
+                    )}
                   </button>
                 )}
               </div>

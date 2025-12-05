@@ -4,6 +4,7 @@ import { CloseIcon, MenuIcon, SearchIcon, BellIcon, UserIcon } from './icons'
 import iraSathiLogo from '../../../assets/IRA Sathi.png'
 import { MapPinIcon } from './icons'
 import { NotificationsDropdown } from './NotificationsDropdown'
+import { LanguageToggle } from '../../../components/LanguageToggle'
 
 export function MobileShell({ title, subtitle, children, navigation, menuContent, onSearchClick, notificationsCount = 0, notifications = [], onProfileClick, onNotificationClick, isNotificationAnimating = false }) {
   const [open, setOpen] = useState(false)
@@ -129,6 +130,9 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-3 pb-10">
+          <div className="mb-4">
+            <LanguageToggle variant="default" onLanguageChange={() => setOpen(false)} />
+          </div>
           {typeof menuContent === 'function'
             ? menuContent({
                 close: () => setOpen(false),

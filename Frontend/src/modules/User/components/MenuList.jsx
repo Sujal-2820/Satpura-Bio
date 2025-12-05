@@ -1,4 +1,5 @@
 import { cn } from '../../../lib/cn'
+import { Trans } from '../../../components/Trans'
 
 export function MenuList({ items = [], active }) {
   return (
@@ -19,9 +20,13 @@ export function MenuList({ items = [], active }) {
               {item.icon}
             </span>
             <div className="flex-1">
-              <p className="font-semibold leading-tight text-surface-foreground">{item.label}</p>
+              <p className="font-semibold leading-tight text-surface-foreground">
+                {typeof item.label === 'string' ? <Trans>{item.label}</Trans> : item.label}
+              </p>
               {item.description ? (
-                <p className="text-xs text-muted-foreground">{item.description}</p>
+                <p className="text-xs text-muted-foreground">
+                  {typeof item.description === 'string' ? <Trans>{item.description}</Trans> : item.description}
+                </p>
               ) : null}
             </div>
           </button>
