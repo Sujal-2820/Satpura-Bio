@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from '../context/TranslationContext'
 
 /**
@@ -13,26 +13,29 @@ import { useTranslation } from '../context/TranslationContext'
  */
 export function Trans({ children, forceRefresh = false }) {
   const { translate, isEnglish, language } = useTranslation()
+  
+  // If children is not a string, render it directly without translation
+  if (typeof children !== 'string') {
+    return <>{children}</>
+  }
+
   const [translatedText, setTranslatedText] = useState(children)
   const [isTranslating, setIsTranslating] = useState(false)
+  const previousTextRef = useRef(children)
+  const previousLanguageRef = useRef(language)
 
   useEffect(() => {
-    // Only translate string children
-    if (typeof children !== 'string') {
-      setTranslatedText(children)
-      setIsTranslating(false)
-      return
-    }
-
-    if (isEnglish || !children) {
-      setTranslatedText(children)
-      setIsTranslating(false)
-      return
-    }
-
     const text = children.trim()
     
-    if (!text) {
+    // Skip if text and language haven't changed
+    if (text === previousTextRef.current && language === previousLanguageRef.current) {
+      return
+    }
+
+    previousTextRef.current = text
+    previousLanguageRef.current = language
+
+    if (isEnglish || !text) {
       setTranslatedText(children)
       setIsTranslating(false)
       return

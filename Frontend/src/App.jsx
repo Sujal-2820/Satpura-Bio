@@ -100,24 +100,27 @@ function App() {
       <BrowserRouter>
         <Routes>
         {/* Home route redirects to user dashboard */}
-        <Route path="/" element={<Navigate to="/user/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/user/dashboard/home" replace />} />
         {/* Console/Admin Routes - Specific paths first */}
         <Route path="/console" element={<Home />} />
         <Route path="/admin/login" element={<AdminLoginRoute />} />
         <Route path="/admin/dashboard" element={<AdminDashboardRoute />} />
         <Route path="/user/login" element={<UserLoginRoute />} />
         <Route path="/user/register" element={<UserRegisterRoute />} />
-        <Route path="/user/dashboard" element={<UserDashboardPage />} />
+        <Route path="/user/dashboard" element={<Navigate to="/user/dashboard/home" replace />} />
+        <Route path="/user/dashboard/:tab" element={<UserDashboardPage />} />
         <Route path="/vendor" element={<VendorRouteContainer />}>
           <Route path="language" element={<VendorLanguagePage />} />
           <Route path="role" element={<VendorRolePage />} />
           <Route path="login" element={<VendorLoginPage />} />
           <Route path="register" element={<VendorRegisterPage />} />
-          <Route path="dashboard" element={<VendorDashboardPage />} />
+          <Route path="dashboard" element={<Navigate to="/vendor/dashboard/overview" replace />} />
+          <Route path="dashboard/:tab" element={<VendorDashboardPage />} />
         </Route>
         <Route path="/seller/login" element={<SellerLoginRoute />} />
         <Route path="/seller/register" element={<SellerRegisterRoute />} />
-        <Route path="/seller/dashboard" element={<SellerDashboardPage />} />
+        <Route path="/seller/dashboard" element={<Navigate to="/seller/dashboard/overview" replace />} />
+        <Route path="/seller/dashboard/:tab" element={<SellerDashboardPage />} />
 
         {/* Website Routes - Public E-commerce Site (catch-all for remaining paths) */}
         <Route path="/*" element={

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useSellerDispatch, useSellerState } from '../context/SellerContext'
 import { useSellerApi } from '../hooks/useSellerApi'
 import { MobileShell } from '../components/MobileShell'
@@ -56,6 +57,9 @@ const NAV_ITEMS = [
 export function SellerDashboard({ onLogout }) {
   const { profile, notifications, dashboard } = useSellerState()
   const dispatch = useSellerDispatch()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { tab: urlTab } = useParams()
   const { fetchDashboardOverview, fetchWalletData } = useSellerApi()
   const [activeTab, setActiveTab] = useState('overview')
   const welcomeName = (profile?.name || sellerSnapshot.profile.name || 'Seller').split(' ')[0]
@@ -66,6 +70,37 @@ export function SellerDashboard({ onLogout }) {
   const searchInputRef = useRef(null)
   const [activePanel, setActivePanel] = useState(null)
   const [panelMounted, setPanelMounted] = useState(false)
+
+  // Valid tabs for navigation
+  const validTabs = ['overview', 'referrals', 'wallet', 'announcements', 'profile', 'performance']
+
+  // Initialize tab from URL parameter on mount or when URL changes
+  useEffect(() => {
+    const tab = urlTab || 'overview'
+    if (validTabs.includes(tab)) {
+      setActiveTab(tab)
+      // Close panels when navigating to a different tab
+      setActivePanel(null)
+    } else {
+      // Invalid tab, redirect to overview
+      navigate('/seller/dashboard/overview', { replace: true })
+    }
+  }, [urlTab, navigate])
+
+  // Navigate function that updates both state and URL
+  const navigateToTab = useCallback((tab) => {
+    if (validTabs.includes(tab)) {
+      setActiveTab(tab)
+      navigate(`/seller/dashboard/${tab}`, { replace: false })
+      // Close panels when navigating
+      setActivePanel(null)
+    }
+  }, [navigate])
+
+  // Scroll to top when tab changes
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [activeTab])
 
   // Initialize seller data if not present
   useEffect(() => {
@@ -89,7 +124,7 @@ export function SellerDashboard({ onLogout }) {
   }
 
   const navigateTo = (target) => {
-    setActiveTab(target)
+    navigateToTab(target)
   }
 
   const buildMenuItems = (close) => [
@@ -99,7 +134,7 @@ export function SellerDashboard({ onLogout }) {
       description: item.description,
       icon: <item.icon className="h-4 w-4" />,
       onSelect: () => {
-        setActiveTab(item.id)
+        navigateToTab(item.id)
         close()
       },
     })),
@@ -160,7 +195,7 @@ export function SellerDashboard({ onLogout }) {
         requestAnimationFrame(() => setActivePanel(actionType))
         break
       case 'view-performance':
-        setActiveTab('performance')
+        navigateToTab('performance')
         break
       default:
         break
@@ -181,7 +216,7 @@ export function SellerDashboard({ onLogout }) {
     await fetchDashboardOverview()
     // Navigate to wallet tab if not already there
     if (activeTab !== 'wallet') {
-      setActiveTab('wallet')
+      navigateToTab('wallet')
     }
   }
 
@@ -198,7 +233,7 @@ export function SellerDashboard({ onLogout }) {
     window.dispatchEvent(new CustomEvent('seller-refresh-bank-accounts'))
     // Navigate to wallet tab if not already there
     if (activeTab !== 'wallet') {
-      setActiveTab('wallet')
+      navigateToTab('wallet')
     }
   }
 
@@ -384,7 +419,7 @@ export function SellerDashboard({ onLogout }) {
   const handleSearchNavigate = (item) => {
     if (!item) return
     const delay = item.tab === activeTab ? 150 : 420
-    setActiveTab(item.tab)
+    navigateToTab(item.tab)
     if (item.targetId) {
       setPendingScroll({ id: item.targetId, delay })
     }
@@ -418,7 +453,7 @@ export function SellerDashboard({ onLogout }) {
         title={`Hello ${welcomeName}`}
         subtitle={profile.area || profile.location?.area || 'Location not set'}
         onSearchClick={openSearch}
-        onProfileClick={() => setActiveTab('profile')}
+        onProfileClick={() => navigateToTab('profile')}
         onNotificationClick={handleNotificationClick}
         notificationsCount={unreadNotificationsCount}
         notifications={notifications}
@@ -428,7 +463,7 @@ export function SellerDashboard({ onLogout }) {
             key={item.id}
             label={item.label}
             active={activeTab === item.id}
-            onClick={() => setActiveTab(item.id)}
+            onClick={() => navigateToTab(item.id)}
             icon={<item.icon active={activeTab === item.id} className="h-5 w-5" />}
           />
         ))}
@@ -442,7 +477,7 @@ export function SellerDashboard({ onLogout }) {
           {activeTab === 'wallet' && <WalletView openPanel={handlePanelAction} />}
           {activeTab === 'announcements' && <AnnouncementsView />}
           {activeTab === 'performance' && (
-            <PerformanceView onBack={() => setActiveTab('overview')} />
+            <PerformanceView onBack={() => navigateToTab('overview')} />
           )}
           {activeTab === 'profile' && <ProfileView onLogout={handleLogout} onNavigate={navigateTo} />}
         </section>

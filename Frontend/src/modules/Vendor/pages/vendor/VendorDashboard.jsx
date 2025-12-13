@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useVendorDispatch, useVendorState } from '../../context/VendorContext'
 import { useVendorApi } from '../../hooks/useVendorApi'
 import { MobileShell } from '../../components/MobileShell'
@@ -71,6 +72,9 @@ const NAV_ITEMS = [
 export function VendorDashboard({ onLogout }) {
   const { profile, dashboard, notifications } = useVendorState()
   const dispatch = useVendorDispatch()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { tab: urlTab } = useParams()
   const { acceptOrder, confirmOrderAcceptance, cancelOrderAcceptance, acceptOrderPartially, rejectOrder, updateInventoryStock, requestCreditPurchase, updateOrderStatus, fetchProfile, fetchDashboardData, getOrders, requestWithdrawal, getEarningsSummary, getBankAccounts, createRepaymentIntent, confirmRepayment, getCreditInfo, getNotifications, markNotificationAsRead, markAllNotificationsAsRead, getOrderDetails } = useVendorApi()
   const [activeTab, setActiveTab] = useState('overview')
   const [showAllOrders, setShowAllOrders] = useState(false)
@@ -94,15 +98,54 @@ export function VendorDashboard({ onLogout }) {
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
   const [confirmationData, setConfirmationData] = useState(null)
   const [confirmationLoading, setConfirmationLoading] = useState(false)
+
+  // Valid tabs for navigation
+  const validTabs = ['overview', 'inventory', 'orders', 'credit', 'earnings', 'reports']
+
+  // Initialize tab from URL parameter on mount or when URL changes
+  useEffect(() => {
+    const tab = urlTab || 'overview'
+    if (validTabs.includes(tab)) {
+      setActiveTab(tab)
+      // Close modals/panels when navigating to a different tab
+      if (tab !== 'orders' || !showOrderDetails) {
+        setShowOrderDetails(false)
+        setSelectedOrderForDetails(null)
+      }
+      closePanel()
+    } else {
+      // Invalid tab, redirect to overview
+      navigate('/vendor/dashboard/overview', { replace: true })
+    }
+  }, [urlTab, navigate, closePanel, showOrderDetails])
+
+  // Navigate function that updates both state and URL
+  const navigateToTab = useCallback((tab) => {
+    if (validTabs.includes(tab)) {
+      setActiveTab(tab)
+      navigate(`/vendor/dashboard/${tab}`, { replace: false })
+      // Close modals/panels when navigating to a different tab
+      if (tab !== 'orders' || !showOrderDetails) {
+        setShowOrderDetails(false)
+        setSelectedOrderForDetails(null)
+      }
+      closePanel()
+    }
+  }, [navigate, closePanel, showOrderDetails])
+
+  // Scroll to top when tab changes
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [activeTab])
   
   // Fetch vendor profile and dashboard data on mount (only if authenticated or has token)
   useEffect(() => {
     const token = localStorage.getItem('vendor_token')
     if (!token) {
-      // No token, redirect to login
+      // No token, redirect to login only if not already on login page
       dispatch({ type: 'AUTH_LOGOUT' })
-      if (onLogout) {
-        onLogout()
+      if (location.pathname !== '/vendor/login') {
+        navigate('/vendor/login', { replace: true })
       }
       return
     }
@@ -286,7 +329,7 @@ export function VendorDashboard({ onLogout }) {
   }
 
   const navigateTo = (target) => {
-    setActiveTab(target)
+    navigateToTab(target)
   }
 
   // Calculate unread notification count
@@ -402,7 +445,7 @@ export function VendorDashboard({ onLogout }) {
       description: item.description,
       icon: <item.icon className="h-4 w-4" />,
       onSelect: () => {
-        setActiveTab(item.id)
+        navigateToTab(item.id)
         close()
       },
     })),
@@ -453,7 +496,7 @@ export function VendorDashboard({ onLogout }) {
   const handleSearchNavigate = (item) => {
     if (!item) return
     const delay = item.tab === activeTab ? 150 : 420
-    setActiveTab(item.tab)
+    navigateToTab(item.tab)
     setPendingScroll({ id: item.targetId, delay })
     closeSearch()
   }
@@ -498,7 +541,7 @@ export function VendorDashboard({ onLogout }) {
             key={item.id}
             label={item.label}
             active={activeTab === item.id}
-            onClick={() => setActiveTab(item.id)}
+            onClick={() => navigateToTab(item.id)}
             icon={<item.icon active={activeTab === item.id} className="h-5 w-5" />}
         />
         ))}
@@ -742,7 +785,7 @@ export function VendorDashboard({ onLogout }) {
                   fetchDashboardData()
                   // Navigate to orders tab if not already there
                   if (activeTab !== 'orders') {
-                    setActiveTab('orders')
+                    navigateToTab('orders')
                   }
                 } else if (result.error) {
                   error(result.error.message || 'Failed to reject order')
@@ -797,7 +840,7 @@ export function VendorDashboard({ onLogout }) {
                   fetchDashboardData()
                   // Navigate to orders tab if not already there
                   if (activeTab !== 'orders') {
-                    setActiveTab('orders')
+                    navigateToTab('orders')
                   }
                 } else if (result.error) {
                   error(result.error.message || 'Failed to accept order partially')
@@ -857,7 +900,7 @@ export function VendorDashboard({ onLogout }) {
                   fetchDashboardData()
                   // Navigate to inventory tab if not already there
                   if (activeTab !== 'inventory') {
-                    setActiveTab('inventory')
+                    navigateToTab('inventory')
                   }
                 } else if (result.error) {
                   error(result.error.message || 'Failed to update stock')
@@ -877,7 +920,7 @@ export function VendorDashboard({ onLogout }) {
                   fetchDashboardData()
                   // Navigate to credit tab if not already there
                   if (activeTab !== 'credit') {
-                    setActiveTab('credit')
+                    navigateToTab('credit')
                   }
                 } else if (result.error) {
                   error(result.error.message || 'Failed to submit purchase request')
@@ -1019,7 +1062,7 @@ export function VendorDashboard({ onLogout }) {
                       // Trigger repayment history refresh
                       window.dispatchEvent(new Event('repayment-success'))
                       if (activeTab !== 'credit') {
-                        setActiveTab('credit')
+                        navigateToTab('credit')
                       }
                     } else if (confirmResult.error) {
                       error(confirmResult.error.message || 'Failed to confirm repayment')
@@ -1057,7 +1100,7 @@ export function VendorDashboard({ onLogout }) {
                           // Trigger repayment history refresh
                           window.dispatchEvent(new Event('repayment-success'))
                           if (activeTab !== 'credit') {
-                            setActiveTab('credit')
+                            navigateToTab('credit')
                           }
                         } else if (confirmResult.error) {
                           error(confirmResult.error.message || 'Failed to confirm repayment')
@@ -1119,7 +1162,7 @@ export function VendorDashboard({ onLogout }) {
                 fetchDashboardData()
                 // Navigate to earnings tab if not already there
                 if (activeTab !== 'earnings') {
-                  setActiveTab('earnings')
+                  navigateToTab('earnings')
                 }
               } else if (result.error) {
                 error(result.error.message || 'Failed to submit withdrawal request')
@@ -1176,7 +1219,7 @@ export function VendorDashboard({ onLogout }) {
                     fetchDashboardData()
                     // Navigate to credit tab if not already there
                     if (activeTab !== 'credit') {
-                      setActiveTab('credit')
+                      navigateToTab('credit')
                     }
                   } else if (confirmResult.error) {
                     error(confirmResult.error.message || 'Failed to confirm repayment')
@@ -5278,7 +5321,7 @@ function ReportsView() {
               key={tab.id}
               type="button"
               className={cn('reports-tab-button', activeTab === tab.id && 'is-active')}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => navigateToTab(tab.id)}
             >
               {tab.label}
           </button>
