@@ -50,6 +50,11 @@ const creditPurchaseSchema = new mongoose.Schema({
       type: String,
       trim: true,
     },
+    attributeCombination: {
+      type: Map,
+      of: String,
+      default: undefined,
+    },
   }],
   totalAmount: {
     type: Number,

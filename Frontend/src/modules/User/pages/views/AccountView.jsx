@@ -19,7 +19,7 @@ import { cn } from '../../../../lib/cn'
 import { Trans } from '../../../../components/Trans'
 import { TransText } from '../../../../components/TransText'
 
-export function AccountView({ onNavigate }) {
+export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAuthPrompt }) {
   const { profile, orders } = useUserState()
   const dispatch = useUserDispatch()
   const { updateUserProfile, loading } = useUserApi()
@@ -71,6 +71,14 @@ export function AccountView({ onNavigate }) {
   }, [profile.location])
 
   const handleSaveName = async () => {
+    // Check authentication
+    if (!authenticated) {
+      if (onShowAuthPrompt) {
+        onShowAuthPrompt('profile')
+      }
+      return
+    }
+
     if (!editedName.trim()) {
       alert('Name cannot be empty')
       return
@@ -105,6 +113,14 @@ export function AccountView({ onNavigate }) {
   }
   
   const handleSaveDeliveryAddress = async () => {
+    // Check authentication
+    if (!authenticated) {
+      if (onShowAuthPrompt) {
+        onShowAuthPrompt('profile')
+      }
+      return
+    }
+
     // Validate that location is selected from Google Maps
     if (!selectedDeliveryLocation || !selectedDeliveryLocation.coordinates) {
       showError('Please select a location from Google Maps')
@@ -148,6 +164,14 @@ export function AccountView({ onNavigate }) {
   }
   
   const handleSubmitReport = () => {
+    // Check authentication
+    if (!authenticated) {
+      if (onShowAuthPrompt) {
+        onShowAuthPrompt('profile')
+      }
+      return
+    }
+
     if (!reportForm.subject || !reportForm.description) {
       alert('Please fill in all fields')
       return
@@ -169,7 +193,15 @@ export function AccountView({ onNavigate }) {
           label: 'Full Name',
           value: profile.name,
           editable: true,
-          onEdit: () => setEditingName(true),
+          onEdit: () => {
+            if (!authenticated) {
+              if (onShowAuthPrompt) {
+                onShowAuthPrompt('profile')
+              }
+              return
+            }
+            setEditingName(true)
+          },
         },
         {
           id: 'phone',
@@ -177,6 +209,12 @@ export function AccountView({ onNavigate }) {
           value: profile.phone || 'Not set',
           editable: true,
           onEdit: () => {
+            if (!authenticated) {
+              if (onShowAuthPrompt) {
+                onShowAuthPrompt('profile')
+              }
+              return
+            }
             setPhoneUpdateStep(1)
             setShowPhoneUpdatePanel(true)
             setCurrentPhoneOTP('')
@@ -214,6 +252,12 @@ export function AccountView({ onNavigate }) {
             : 'Not set',
           editable: true,
           action: () => {
+            if (!authenticated) {
+              if (onShowAuthPrompt) {
+                onShowAuthPrompt('profile')
+              }
+              return
+            }
             setDeliveryAddressOTPStep(1)
             setDeliveryAddressOTP('')
             setSelectedDeliveryLocation(null)
@@ -702,6 +746,14 @@ export function AccountView({ onNavigate }) {
                   <button
                     type="button"
                     onClick={async () => {
+                      // Check authentication
+                      if (!authenticated) {
+                        if (onShowAuthPrompt) {
+                          onShowAuthPrompt('profile')
+                        }
+                        return
+                      }
+
                       setPhoneUpdateLoading(true)
                       try {
                         const result = await userApi.requestOTPForCurrentPhone()
@@ -757,14 +809,22 @@ export function AccountView({ onNavigate }) {
                     </button>
                     <button
                       type="button"
-                      onClick={async () => {
-                        if (!currentPhoneOTP || currentPhoneOTP.length !== 6) {
-                          showError('Please enter a valid 6-digit OTP')
-                          return
+                    onClick={async () => {
+                      // Check authentication
+                      if (!authenticated) {
+                        if (onShowAuthPrompt) {
+                          onShowAuthPrompt('profile')
                         }
-                        setPhoneUpdateLoading(true)
-                        try {
-                          const result = await userApi.verifyOTPForCurrentPhone({ otp: currentPhoneOTP })
+                        return
+                      }
+
+                      if (!currentPhoneOTP || currentPhoneOTP.length !== 6) {
+                        showError('Please enter a valid 6-digit OTP')
+                        return
+                      }
+                      setPhoneUpdateLoading(true)
+                      try {
+                        const result = await userApi.verifyOTPForCurrentPhone({ otp: currentPhoneOTP })
                           if (result.success) {
                             success('Current phone verified successfully')
                             setPhoneUpdateStep(3)
@@ -821,17 +881,25 @@ export function AccountView({ onNavigate }) {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (!newPhone || newPhone.length < 10) {
-                          showError('Please enter a valid phone number')
-                          return
+                      // Check authentication
+                      if (!authenticated) {
+                        if (onShowAuthPrompt) {
+                          onShowAuthPrompt('profile')
                         }
-                        if (newPhone === profile.phone) {
-                          showError('New phone number must be different from current phone number')
-                          return
-                        }
-                        setPhoneUpdateLoading(true)
-                        try {
-                          const result = await userApi.requestOTPForNewPhone({ newPhone })
+                        return
+                      }
+
+                      if (!newPhone || newPhone.length < 10) {
+                        showError('Please enter a valid phone number')
+                        return
+                      }
+                      if (newPhone === profile.phone) {
+                        showError('New phone number must be different from current phone number')
+                        return
+                      }
+                      setPhoneUpdateLoading(true)
+                      try {
+                        const result = await userApi.requestOTPForNewPhone({ newPhone })
                           if (result.success) {
                             success('OTP sent to your new phone number')
                             setPhoneUpdateStep(4)
@@ -889,13 +957,21 @@ export function AccountView({ onNavigate }) {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (!newPhoneOTP || newPhoneOTP.length !== 6) {
-                          showError('Please enter a valid 6-digit OTP')
-                          return
+                      // Check authentication
+                      if (!authenticated) {
+                        if (onShowAuthPrompt) {
+                          onShowAuthPrompt('profile')
                         }
-                        setPhoneUpdateLoading(true)
-                        try {
-                          const result = await userApi.verifyOTPForNewPhone({ otp: newPhoneOTP })
+                        return
+                      }
+
+                      if (!newPhoneOTP || newPhoneOTP.length !== 6) {
+                        showError('Please enter a valid 6-digit OTP')
+                        return
+                      }
+                      setPhoneUpdateLoading(true)
+                      try {
+                        const result = await userApi.verifyOTPForNewPhone({ otp: newPhoneOTP })
                           if (result.success) {
                             success('Phone number updated successfully')
                             dispatch({
@@ -971,6 +1047,14 @@ export function AccountView({ onNavigate }) {
                   <button
                     type="button"
                     onClick={async () => {
+                      // Check authentication
+                      if (!authenticated) {
+                        if (onShowAuthPrompt) {
+                          onShowAuthPrompt('profile')
+                        }
+                        return
+                      }
+
                       setDeliveryAddressOTPLoading(true)
                       try {
                         const result = await userApi.requestOTPForCurrentPhone()
@@ -1027,6 +1111,14 @@ export function AccountView({ onNavigate }) {
                     <button
                       type="button"
                       onClick={async () => {
+                        // Check authentication
+                        if (!authenticated) {
+                          if (onShowAuthPrompt) {
+                            onShowAuthPrompt('profile')
+                          }
+                          return
+                        }
+
                         if (!deliveryAddressOTP || deliveryAddressOTP.length !== 6) {
                           showError('Please enter a valid 6-digit OTP')
                           return

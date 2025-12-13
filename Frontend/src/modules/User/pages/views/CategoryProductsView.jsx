@@ -155,9 +155,9 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
       {/* Category Filter Menu */}
       <div className="user-category-products-view__categories">
         <div className="user-category-products-view__categories-rail">
-          {allCategories.map((cat) => (
+          {allCategories.map((cat, index) => (
             <button
-              key={cat._id || cat.id}
+              key={cat._id || cat.id || `category-${index}`}
               type="button"
               className={cn(
                 'user-category-products-view__category-tab',
@@ -369,8 +369,11 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
 
       {/* Main Content - 2 Column Layout for Laptop */}
       <div className="user-category-products-view__main-content">
-        {/* Left Column - Filters Sidebar (Laptop) */}
-        <div className="user-category-products-view__filters-sidebar">
+        {/* This wrapper is hidden on laptop, only used for mobile structure */}
+      </div>
+
+      {/* Left Column - Filters Sidebar (Laptop) - Outside main-content for sticky behavior */}
+      <div className="user-category-products-view__filters-sidebar">
           <div className="user-category-products-view__filter-panel-desktop">
             <div className="user-category-products-view__filter-header-desktop">
               <h3 className="user-category-products-view__filter-title-desktop">Filter Products</h3>
@@ -546,8 +549,8 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
           </div>
         </div>
 
-        {/* Right Column - Products Grid (Laptop) */}
-        <div className="user-category-products-view__products-column">
+      {/* Right Column - Products Grid (Laptop) - Outside main-content */}
+      <div className="user-category-products-view__products-column">
       {/* Products List */}
       {loading ? (
         <div className="user-category-products-view__empty">
@@ -559,9 +562,9 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
         </div>
       ) : (
             <div className="user-category-products-view__list-desktop">
-              {categoryProducts.map((product) => (
+              {categoryProducts.map((product, index) => (
                 <ProductCard
-                  key={product._id || product.id}
+                  key={product._id || product.id || `product-${index}`}
                   product={{
                     id: product._id || product.id,
                     name: product.name,
@@ -583,7 +586,6 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
               ))}
             </div>
           )}
-        </div>
       </div>
 
       {/* Mobile Products List */}
@@ -597,8 +599,8 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
         </div>
       ) : (
         <div className="user-category-products-view__list-mobile">
-          {categoryProducts.map((product) => (
-            <div key={product._id || product.id} className="user-category-products-view__card-wrapper">
+          {categoryProducts.map((product, index) => (
+            <div key={product._id || product.id || `product-${index}`} className="user-category-products-view__card-wrapper">
               <div
                 className="user-category-products-view__card"
                 onClick={() => onProductClick?.(product._id || product.id)}

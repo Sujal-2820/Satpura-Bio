@@ -79,9 +79,9 @@ export function FavouritesView({ onProductClick, onAddToCart, onRemoveFromFavour
         </div>
       ) : (
         <div className="user-favourites-view__grid">
-          {favouriteProducts.map((product) => (
+          {favouriteProducts.map((product, index) => (
             <ProductCard
-              key={product._id || product.id}
+              key={product._id || product.id || `favourite-${index}`}
               product={{ 
                 ...product, 
                 id: product._id || product.id,

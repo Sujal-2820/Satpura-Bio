@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { cn } from '../../../lib/cn'
-import { CloseIcon, MenuIcon, BellIcon, SearchIcon, FilterIcon } from './icons'
+import { CloseIcon, MenuIcon, BellIcon, SearchIcon, FilterIcon, UserIcon, ChevronRightIcon } from './icons'
 import iraSathiLogo from '../../../assets/IRA Sathi.png'
 import { MapPinIcon } from './icons'
 import { NotificationsDropdown } from './NotificationsDropdown'
@@ -112,21 +112,36 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
 
   useEffect(() => {
     let ticking = false
-    let lastScrollY = 0
+    let lastScrollY = window.scrollY
+    let scrollDirection = 0 // -1 = up, 1 = down, 0 = neutral
+    const scrollThreshold = 10 // Minimum scroll difference to trigger change
+    const hideThreshold = 50 // Scroll position to hide second row
+    const showThreshold = 20 // Scroll position to show second row
 
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY
-          if (currentScrollY > lastScrollY) {
-            // Scrolling down
-            setCompact(currentScrollY > 30)
-            setHideSecondRow(currentScrollY > 50) // Hide second row when scrolling down
-          } else {
-            // Scrolling up
-            setCompact(currentScrollY > 20)
-            setHideSecondRow(false) // Show second row when scrolling up
+          const scrollDelta = currentScrollY - lastScrollY
+          
+          // Determine scroll direction with threshold to prevent jitter
+          if (Math.abs(scrollDelta) > scrollThreshold) {
+            scrollDirection = scrollDelta > 0 ? 1 : -1
           }
+
+          // Only update state if there's a meaningful scroll change
+          if (Math.abs(scrollDelta) > 2) {
+            if (scrollDirection === 1) {
+              // Scrolling down
+              setCompact(currentScrollY > 30)
+              setHideSecondRow(currentScrollY > hideThreshold)
+            } else if (scrollDirection === -1) {
+              // Scrolling up
+              setCompact(currentScrollY > 20)
+              setHideSecondRow(false)
+            }
+          }
+          
           lastScrollY = currentScrollY
           ticking = false
         })
@@ -134,7 +149,9 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
       }
     }
 
+    // Initial state
     handleScroll()
+    
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
@@ -275,16 +292,18 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
               <button
                 type="button"
                 onClick={onLogout}
-                className="user-shell-header__link"
+                className="user-shell-header__link user-shell-header__link--signout"
               >
+                <UserIcon className="h-4 w-4 mr-1.5" />
                 <Trans>SIGNOUT</Trans>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={onLogin}
-                className="user-shell-header__link"
+                className="user-shell-header__link user-shell-header__link--signin"
               >
+                <UserIcon className="h-4 w-4 mr-1.5" />
                 <Trans>SIGNIN</Trans>
               </button>
             )}

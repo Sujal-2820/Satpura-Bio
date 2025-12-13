@@ -230,9 +230,9 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
       </div>
 
       <div className="space-y-4">
-        {groupedCartItems.map((group) => (
+        {groupedCartItems.map((group, groupIndex) => (
           <div
-            key={group.productId}
+            key={group.productId || `cart-group-${groupIndex}`}
             className="rounded-2xl border border-[rgba(34,94,65,0.16)] bg-gradient-to-br from-white to-[rgba(239,246,240,0.92)] shadow-[0_20px_42px_-30px_rgba(16,44,30,0.36)] overflow-hidden"
           >
             {/* Product Header */}
@@ -256,7 +256,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
                 const isExpanded = expandedVariants[variantId] || false
                 
                 return (
-                  <div key={variantId} className="rounded-xl bg-white border border-[rgba(34,94,65,0.1)] overflow-hidden">
+                  <div key={variantId || variant.cartItemId || `variant-${groupIndex}-${variantIdx}`} className="rounded-xl bg-white border border-[rgba(34,94,65,0.1)] overflow-hidden">
                     {/* Variant Header - Collapsible */}
                     <button
                       type="button"
@@ -285,8 +285,8 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
                         })()}
                         {variant.variantAttributes && Object.keys(variant.variantAttributes).length > 0 ? (
                           <div className="text-xs text-[rgba(26,42,34,0.7)]">
-                            {Object.entries(variant.variantAttributes).slice(0, 1).map(([key, value]) => (
-                              <span key={key}>
+                            {Object.entries(variant.variantAttributes).slice(0, 1).map(([key, value], attrIndex) => (
+                              <span key={`${variantId || variantIdx}-attr-${key}-${attrIndex}`}>
                                 <span className="font-medium">{key}:</span> {value}
                                 {Object.keys(variant.variantAttributes).length > 1 && ' + more'}
                               </span>
@@ -322,8 +322,8 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
                         {variant.variantAttributes && Object.keys(variant.variantAttributes).length > 0 ? (
                           <div className="pt-2 space-y-1">
                             <p className="text-xs font-bold text-[rgba(26,42,34,0.7)] mb-2"><Trans>Variant Properties:</Trans></p>
-                            {Object.entries(variant.variantAttributes).map(([key, value]) => (
-                              <div key={key} className="flex items-center justify-between text-xs py-1">
+                            {Object.entries(variant.variantAttributes).map(([key, value], attrIndex) => (
+                              <div key={`${variantId || variantIdx}-expanded-attr-${key}-${attrIndex}`} className="flex items-center justify-between text-xs py-1">
                                 <span className="text-[rgba(26,42,34,0.5)] font-medium">{key}:</span>
                                 <span className="text-[rgba(26,42,34,0.7)] font-semibold">{value}</span>
                               </div>
@@ -430,8 +430,8 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
         <div className="user-cart-suggested">
           <h3 className="text-base font-bold text-[#172022] mb-3"><Trans>You might also like</Trans></h3>
           <div className="user-cart-suggested__rail">
-            {suggestedProducts.map((product) => (
-              <div key={product._id || product.id} className="user-cart-suggested__card">
+            {suggestedProducts.map((product, index) => (
+              <div key={product._id || product.id || `suggested-${index}`} className="user-cart-suggested__card">
                 <div className="user-cart-suggested__image-wrapper">
                   <img src={getPrimaryImageUrl(product)} alt={product.name} className="user-cart-suggested__image" />
                 </div>

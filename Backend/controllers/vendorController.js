@@ -2744,7 +2744,7 @@ exports.getProductDetails = async (req, res, next) => {
     const { productId } = req.params;
 
     const product = await Product.findById(productId)
-      .select('name description category priceToVendor displayStock actualStock images sku weight expiry brand specifications tags')
+      .select('name description category priceToVendor displayStock actualStock images sku weight expiry brand specifications tags attributeStocks')
       .lean();
 
     if (!product) {
@@ -2814,6 +2814,7 @@ exports.getProductDetails = async (req, res, next) => {
           brand: product.brand,
           specifications: product.specifications,
           tags: product.tags,
+          attributeStocks: product.attributeStocks || [], // Include attributeStocks for variants
           isAssigned: !!assignment,
           assignmentId: assignment?._id || null,
           ordersFulfilled: ordersInfo.totalOrders,
@@ -3317,8 +3318,14 @@ exports.requestCreditPurchase = async (req, res, next) => {
       };
       
       // Add attribute combination if provided
+      // Convert to Map format for MongoDB schema
       if (hasAttributes && Object.keys(attributeCombination).length > 0) {
-        itemPayload.attributeCombination = attributeCombination;
+        // Convert plain object to Map for MongoDB
+        const attributeMap = new Map();
+        Object.entries(attributeCombination).forEach(([key, value]) => {
+          attributeMap.set(key, String(value));
+        });
+        itemPayload.attributeCombination = attributeMap;
       }
 
       return itemPayload;

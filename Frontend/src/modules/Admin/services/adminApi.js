@@ -16,8 +16,19 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
  */
 async function handleResponse(response) {
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'An error occurred' }))
-    throw new Error(error.message || `HTTP error! status: ${response.status}`)
+    const error = await response.json().catch(() => ({ 
+      success: false,
+      message: `HTTP error! status: ${response.status}` 
+    }))
+    const errorObj = {
+      success: false,
+      error: {
+        message: error.message || error.error?.message || `HTTP error! status: ${response.status}`,
+        status: response.status,
+        ...error
+      }
+    }
+    return errorObj
   }
   return response.json()
 }
@@ -37,8 +48,19 @@ async function apiRequest(endpoint, options = {}) {
     ...options,
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, config)
-  return handleResponse(response)
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, config)
+    return handleResponse(response)
+  } catch (error) {
+    // If handleResponse throws, catch it and return error format
+    return {
+      success: false,
+      error: {
+        message: error.message || 'An error occurred',
+        status: 500,
+      }
+    }
+  }
 }
 
 // ============================================================================
@@ -993,10 +1015,24 @@ function transformPurchaseRequest(backendPurchase) {
       const productName = typeof item.productId === 'object'
         ? item.productId?.name
         : item.productName || 'Unknown Product'
+      
+      // Handle attributeCombination (variants)
+      let attributeCombination = null
+      if (item.attributeCombination) {
+        // Convert Map to object if needed
+        if (item.attributeCombination instanceof Map) {
+          attributeCombination = Object.fromEntries(item.attributeCombination)
+        } else if (typeof item.attributeCombination === 'object') {
+          attributeCombination = item.attributeCombination
+        }
+      }
+      
       return {
         name: productName,
         quantity: item.quantity || 0,
         price: item.unitPrice || item.pricePerUnit || 0,
+        unit: item.unit || 'kg',
+        attributeCombination: attributeCombination,
       }
     }) || [],
     documents: [], // Backend doesn't store documents yet
@@ -1014,12 +1050,51 @@ function transformPurchaseRequest(backendPurchase) {
  * POST /admin/vendors/purchases/:requestId/approve
  * 
  * @param {string} requestId - Purchase request ID
+ * @param {string} shortDescription - Short description for approval (optional)
  * @returns {Promise<Object>} - { message: string, purchase: Object, vendor: Object }
  */
-export async function approveVendorPurchase(requestId) {
+export async function approveVendorPurchase(requestId, shortDescription = '') {
+  const trimmedDesc = shortDescription ? shortDescription.trim() : ''
+  if (!trimmedDesc) {
+    return {
+      success: false,
+      error: {
+        message: 'Short description is required',
+        status: 400,
+      }
+    }
+  }
+  
+  const requestBody = { shortDescription: trimmedDesc }
+  const bodyString = JSON.stringify(requestBody)
+  console.log('Sending approve request:', { 
+    requestId, 
+    shortDescription: trimmedDesc, 
+    body: requestBody, 
+    stringified: bodyString,
+    bodyLength: bodyString.length
+  })
+  
   const response = await apiRequest(`/admin/vendors/purchases/${requestId}/approve`, {
     method: 'POST',
+    body: bodyString,
   })
+  
+  console.log('Approve response received:', response)
+  console.log('Response success:', response.success)
+  console.log('Response error:', response.error)
+  console.log('Response message:', response.message)
+  
+  // Check for error response
+  if (!response.success) {
+    return {
+      success: false,
+      error: {
+        message: response.error?.message || response.message || 'Failed to approve purchase request',
+        status: response.error?.status || 400,
+      }
+    }
+  }
 
   // Transform backend response to frontend format
   if (response.success && response.data) {

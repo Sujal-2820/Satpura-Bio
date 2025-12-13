@@ -454,8 +454,8 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       {summaryExpanded && (
         <div className="user-checkout-summary__content">
           <div className="space-y-3 mb-3">
-            {groupedCartItems.map((group) => (
-              <div key={group.productId} className="space-y-2">
+            {groupedCartItems.map((group, index) => (
+              <div key={group.productId || `checkout-group-${index}`} className="space-y-2">
                 {/* Product Header */}
                 <div className="flex items-center gap-2 pb-2 border-b border-[rgba(34,94,65,0.1)]">
                   <img src={group.image} alt={group.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
@@ -466,14 +466,14 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
                 </div>
                 
                 {/* Variants */}
-                {group.variants.map((variant) => (
-                  <div key={variant.id || variant._id} className="flex items-start justify-between gap-2 pl-4">
+                {group.variants.map((variant, variantIndex) => (
+                  <div key={variant.id || variant._id || variant.cartItemId || `variant-${variantIndex}`} className="flex items-start justify-between gap-2 pl-4">
                     <div className="flex-1 min-w-0">
                       {/* Variant Attributes */}
                       {variant.variantAttributes && Object.keys(variant.variantAttributes).length > 0 ? (
                         <div className="mb-1 space-y-0.5">
-                          {Object.entries(variant.variantAttributes).map(([key, value]) => (
-                            <p key={key} className="text-[0.65rem] text-[rgba(26,42,34,0.6)]">
+                          {Object.entries(variant.variantAttributes).map(([key, value], attrIndex) => (
+                            <p key={`${variant.id || variant._id || variantIndex}-attr-${key}-${attrIndex}`} className="text-[0.65rem] text-[rgba(26,42,34,0.6)]">
                               <span className="font-medium">{key}:</span> {value}
                             </p>
                           ))}

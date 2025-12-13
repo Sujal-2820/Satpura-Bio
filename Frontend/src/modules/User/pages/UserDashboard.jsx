@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useLocation, useParams } from 'react-router-dom'
+import { useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useUserDispatch, useUserState } from '../context/UserContext'
 import { MobileShell } from '../components/MobileShell'
 import { BottomNavItem } from '../components/BottomNavItem'
 import { MenuList } from '../components/MenuList'
 import { HomeIcon, SearchIcon, CartIcon, UserIcon, MenuIcon, HeartIcon, PackageIcon } from '../components/icons'
+import { Trans } from '../../../components/Trans'
 import { MIN_ORDER_VALUE } from '../services/userData'
 import * as userApi from '../services/userApi'
 import { cn } from '../../../lib/cn'
 import { useToast, ToastProvider } from '../components/ToastNotification'
 import { useUserApi } from '../hooks/useUserApi'
 import { useTranslatedNavItems } from '../../../utils/translateNavItems'
-import { Trans } from '../../../components/Trans'
 import { HomeView } from './views/HomeView'
 import { SearchView } from './views/SearchView'
 import { ProductDetailView } from './views/ProductDetailView'
@@ -23,7 +23,12 @@ import { FavouritesView } from './views/FavouritesView'
 import { CategoryProductsView } from './views/CategoryProductsView'
 import { CarouselProductsView } from './views/CarouselProductsView'
 import { OrdersView } from './views/OrdersView'
+import { LoginPageView } from './views/LoginPageView'
+import { SignupPageView } from './views/SignupPageView'
 import { VendorAvailabilityWarning } from '../components/VendorAvailabilityWarning'
+import { AuthPromptModal } from '../components/AuthPromptModal'
+import { AuthPromptLaptop } from '../components/AuthPromptLaptop'
+import { AuthPromptMobile } from '../components/AuthPromptMobile'
 import '../user.css'
 
 const NAV_ITEMS = [
@@ -65,6 +70,7 @@ function UserDashboardContent({ onLogout }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { tab: urlTab } = useParams()
+  const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState('home')
   const [cartRefreshKey, setCartRefreshKey] = useState(0) // Key to force CartView refresh
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -79,38 +85,71 @@ function UserDashboardContent({ onLogout }) {
   const searchInputRef = useRef(null)
   const searchPanelRef = useRef(null)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showAuthPromptLaptop, setShowAuthPromptLaptop] = useState(false)
+  const [authActionType, setAuthActionType] = useState(null) // 'favourites' | 'cart' | 'orders' | null
+  const [hasShownInitialModal, setHasShownInitialModal] = useState(false)
+  const [isLaptopView, setIsLaptopView] = useState(window.innerWidth >= 1024)
 
   // Valid tabs for navigation
-  const validTabs = ['home', 'favourites', 'cart', 'orders', 'account', 'search', 'product-detail', 'category-products', 'carousel-products', 'checkout']
+  const validTabs = ['home', 'favourites', 'cart', 'orders', 'account', 'search', 'product-detail', 'category-products', 'carousel-products', 'checkout', 'login', 'signup', 'signin']
 
   // Initialize tab from URL parameter on mount or when URL changes
   useEffect(() => {
     const tab = urlTab || 'home'
     if (validTabs.includes(tab)) {
       setActiveTab(tab)
-      // Clear selections when navigating to a different tab
-      if (tab !== 'product-detail') setSelectedProduct(null)
-      if (tab !== 'category-products') setSelectedCategory(null)
-      if (tab !== 'carousel-products') setSelectedCarousel(null)
-      if (tab !== 'checkout') setShowCheckout(false)
+      
+      // Extract category ID from URL search params for category-products page
+      if (tab === 'category-products') {
+        const categoryIdFromUrl = searchParams.get('category')
+        if (categoryIdFromUrl) {
+          setSelectedCategory(categoryIdFromUrl)
+        } else {
+          // Default to 'all' if no category in URL
+          setSelectedCategory('all')
+        }
+      } else {
+        // Clear selections when navigating to a different tab
+        if (tab !== 'product-detail') setSelectedProduct(null)
+        if (tab !== 'category-products') setSelectedCategory(null)
+        if (tab !== 'carousel-products') setSelectedCarousel(null)
+        if (tab !== 'checkout') setShowCheckout(false)
+      }
     } else {
       // Invalid tab, redirect to home
       navigate('/user/dashboard/home', { replace: true })
     }
-  }, [urlTab, navigate])
+  }, [urlTab, navigate, searchParams])
 
   // Navigate function that updates both state and URL
   const navigateToTab = useCallback((tab) => {
-    if (validTabs.includes(tab)) {
-      setActiveTab(tab)
-      navigate(`/user/dashboard/${tab}`, { replace: false })
-      // Clear selections when navigating to a different tab type
-      if (tab !== 'product-detail') setSelectedProduct(null)
-      if (tab !== 'category-products') setSelectedCategory(null)
-      if (tab !== 'carousel-products') setSelectedCarousel(null)
-      if (tab !== 'checkout') setShowCheckout(false)
+    // Check authentication for orders tab
+    if (tab === 'orders' && !authenticated) {
+      if (isLaptopView) {
+        // Show prompt on laptop
+        setAuthActionType('orders')
+        setShowAuthPromptLaptop(true)
+      } else {
+        // Show modal on mobile
+        setAuthActionType('orders')
+        setShowAuthModal(true)
+      }
+      return
     }
-  }, [navigate])
+
+    if (validTabs.includes(tab)) {
+      // Handle signin as alias for login
+      const targetTab = tab === 'signin' ? 'login' : tab
+      setActiveTab(targetTab)
+      navigate(`/user/dashboard/${targetTab}`, { replace: false })
+      // Clear selections when navigating to a different tab type
+      if (targetTab !== 'product-detail') setSelectedProduct(null)
+      if (targetTab !== 'category-products') setSelectedCategory(null)
+      if (targetTab !== 'carousel-products') setSelectedCarousel(null)
+      if (targetTab !== 'checkout') setShowCheckout(false)
+    }
+  }, [navigate, authenticated, isLaptopView])
 
   // Scroll to top when tab changes
   useEffect(() => {
@@ -156,21 +195,30 @@ function UserDashboardContent({ onLogout }) {
           }
         } catch (error) {
           console.error('Error fetching user profile:', error)
-          // If token is invalid, redirect to login
+          // If token is invalid, remove it but don't redirect
           if (error.error?.message?.includes('unauthorized') || error.error?.message?.includes('token')) {
             localStorage.removeItem('user_token')
-            navigate('/user/login', { replace: true })
+            dispatch({ type: 'AUTH_LOGOUT' })
           }
         }
       }
       fetchProfile()
     } else {
-      // No token - redirect to login only if not already on login page
-      if (location.pathname !== '/user/login') {
-        navigate('/user/login', { replace: true })
+      // No token - redirect to login/signup based on view
+      if (!hasShownInitialModal) {
+        if (isLaptopView) {
+          // Redirect to login page on laptop
+          setActiveTab('login')
+          navigate('/user/dashboard/login', { replace: false })
+        } else {
+          // Show modal on mobile
+          setShowAuthModal(true)
+          setAuthActionType(null)
+        }
+        setHasShownInitialModal(true)
       }
     }
-  }, [dispatch, navigate, location.pathname])
+  }, [dispatch, hasShownInitialModal, isLaptopView, navigate])
 
   // Initialize welcome notification (only first time user enters dashboard)
   useEffect(() => {
@@ -623,6 +671,20 @@ function UserDashboardContent({ onLogout }) {
   }, [pendingScroll, activeTab])
 
   const handleAddToCart = async (productId, quantity = 1, variantAttributes = {}) => {
+    // Check if user is authenticated
+    if (!authenticated) {
+      if (isLaptopView) {
+        // Show prompt on laptop
+        setAuthActionType('cart')
+        setShowAuthPromptLaptop(true)
+      } else {
+        // Show modal on mobile
+        setAuthActionType('cart')
+        setShowAuthModal(true)
+      }
+      return
+    }
+
     try {
       console.log('🛒 handleAddToCart called:', { productId, quantity, variantAttributes })
       
@@ -742,6 +804,20 @@ function UserDashboardContent({ onLogout }) {
   }
 
   const handleToggleFavourite = (productId) => {
+    // Check if user is authenticated
+    if (!authenticated) {
+      if (isLaptopView) {
+        // Show prompt on laptop
+        setAuthActionType('favourites')
+        setShowAuthPromptLaptop(true)
+      } else {
+        // Show modal on mobile
+        setAuthActionType('favourites')
+        setShowAuthModal(true)
+      }
+      return
+    }
+
     const isFavourite = favourites.includes(productId)
     if (isFavourite) {
       dispatch({ type: 'REMOVE_FROM_FAVOURITES', payload: { productId } })
@@ -891,8 +967,60 @@ function UserDashboardContent({ onLogout }) {
     },
   ]
 
+  // Handle auth success - refresh profile and close modal
+  const handleAuthSuccess = async () => {
+    const token = localStorage.getItem('user_token')
+    if (token) {
+      try {
+        const result = await userApi.getUserProfile()
+        if (result.success && result.data?.user) {
+          const userData = result.data.user
+          dispatch({
+            type: 'AUTH_LOGIN',
+            payload: {
+              name: userData.name || 'User',
+              phone: userData.phone || '',
+              email: userData.email || '',
+              sellerId: userData.sellerId || null,
+              location: userData.location || null,
+            },
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching user profile after login:', error)
+      }
+    }
+    
+    // Close modal on mobile, redirect to home on laptop
+    if (isLaptopView) {
+      navigateToTab('home')
+    } else {
+      setShowAuthModal(false)
+      setAuthActionType(null)
+    }
+  }
+
   return (
     <>
+      {/* Mobile prompt - redirects to /user/login */}
+      <AuthPromptMobile
+        isOpen={showAuthModal && !isLaptopView}
+        onClose={() => {
+          setShowAuthModal(false)
+          setAuthActionType(null)
+        }}
+        actionType={authActionType}
+      />
+      {/* Laptop prompt - redirects to /user/dashboard/login */}
+      <AuthPromptLaptop
+        isOpen={showAuthPromptLaptop}
+        onClose={() => {
+          setShowAuthPromptLaptop(false)
+          setAuthActionType(null)
+        }}
+        actionType={authActionType}
+        onNavigateToSignin={() => navigateToTab('signin')}
+      />
       <VendorAvailabilityWarning />
       <MobileShell
         title={activeTab === 'home' ? `Hello ${profile.name.split(' ')[0]}` : null}
@@ -926,7 +1054,11 @@ function UserDashboardContent({ onLogout }) {
         onNavigate={navigateToTab}
         onLogout={onLogout}
         onLogin={() => {
-          window.location.href = '/user/login'
+          if (isLaptopView) {
+            navigateToTab('login')
+          } else {
+            window.location.href = '/user/login'
+          }
         }}
       >
         <section className="space-y-6">
@@ -949,7 +1081,8 @@ function UserDashboardContent({ onLogout }) {
               }}
               onCategoryClick={(categoryId) => {
                 setSelectedCategory(categoryId)
-                navigateToTab('category-products')
+                // Include category ID in URL for refresh persistence
+                navigate(`/user/dashboard/category-products?category=${categoryId}`, { replace: false })
               }}
               onAddToCart={handleAddToCart}
               onSearchClick={handleSearchClick}
@@ -970,9 +1103,9 @@ function UserDashboardContent({ onLogout }) {
               }}
             />
           )}
-          {activeTab === 'category-products' && selectedCategory && (
+          {activeTab === 'category-products' && (
             <CategoryProductsView
-              categoryId={selectedCategory}
+              categoryId={selectedCategory || 'all'}
               onProductClick={(productId) => {
                 setSelectedProduct(productId)
                 navigateToTab('product-detail')
@@ -1060,8 +1193,53 @@ function UserDashboardContent({ onLogout }) {
               )}
             </>
           )}
-          {activeTab === 'orders' && <OrdersView />}
-          {activeTab === 'account' && <AccountView onNavigate={navigateToTab} />}
+          {activeTab === 'orders' && authenticated && <OrdersView />}
+          {activeTab === 'orders' && !authenticated && isLaptopView && (
+            <div className="user-orders-view__auth-prompt">
+              <div className="user-orders-view__auth-prompt-content">
+                <h2 className="user-orders-view__auth-prompt-title"><Trans>Authentication Required</Trans></h2>
+                <p className="user-orders-view__auth-prompt-message">
+                  <Trans>You can't view your orders now. First login or create your account.</Trans>
+                </p>
+                <button
+                  onClick={() => navigateToTab('signin')}
+                  className="user-orders-view__auth-prompt-button"
+                >
+                  <UserIcon className="h-4 w-4 mr-2" />
+                  <Trans>Sign In</Trans>
+                </button>
+              </div>
+            </div>
+          )}
+          {activeTab === 'orders' && !authenticated && !isLaptopView && <OrdersView />}
+          {activeTab === 'account' && (
+            <AccountView
+              onNavigate={navigateToTab}
+              authenticated={authenticated}
+              isLaptopView={isLaptopView}
+              onShowAuthPrompt={(actionType) => {
+                if (isLaptopView) {
+                  setAuthActionType('profile')
+                  setShowAuthPromptLaptop(true)
+                } else {
+                  setAuthActionType('profile')
+                  setShowAuthModal(true)
+                }
+              }}
+            />
+          )}
+          {activeTab === 'login' && (
+            <LoginPageView
+              onSuccess={handleAuthSuccess}
+              onSwitchToSignup={() => navigateToTab('signup')}
+            />
+          )}
+          {activeTab === 'signup' && (
+            <SignupPageView
+              onSuccess={handleAuthSuccess}
+              onSwitchToLogin={() => navigateToTab('login')}
+            />
+          )}
         </section>
       </MobileShell>
 

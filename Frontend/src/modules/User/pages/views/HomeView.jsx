@@ -305,7 +305,7 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
         >
           {banners.map((banner, index) => (
             <div
-              key={banner.id}
+              key={banner.id || `banner-${index}`}
               className={cn(
                 'home-hero-banner__slide',
                 index === bannerIndex ? 'home-hero-banner__slide--active' : 'home-hero-banner__slide--hidden'

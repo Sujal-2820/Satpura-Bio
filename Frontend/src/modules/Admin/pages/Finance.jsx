@@ -610,14 +610,44 @@ export function FinancePage({ subRoute = null, navigate }) {
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <p className="mb-3 text-xs font-bold text-gray-500">Products Requested</p>
                   <div className="space-y-2">
-                    {request.products.map((product, index) => (
-                      <div key={index} className="flex items-center justify-between rounded-lg bg-white p-3">
-                        <span className="text-sm text-gray-700">{product.name || product}</span>
-                        {product.quantity && (
-                          <span className="text-xs text-gray-500">Qty: {product.quantity}</span>
-                        )}
-                      </div>
-                    ))}
+                    {request.products.map((product, index) => {
+                      // Format attribute label
+                      const formatAttributeLabel = (key) => {
+                        return key
+                          .replace(/([A-Z])/g, ' $1')
+                          .replace(/^./, str => str.toUpperCase())
+                          .trim()
+                      }
+                      
+                      return (
+                        <div key={index} className="rounded-lg bg-white p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-semibold text-gray-900">{product.name || product}</span>
+                            {product.quantity && (
+                              <span className="text-xs text-gray-500">
+                                Qty: {product.quantity} {product.unit || 'kg'}
+                              </span>
+                            )}
+                          </div>
+                          {/* Display variant attributes if present */}
+                          {product.attributeCombination && Object.keys(product.attributeCombination).length > 0 && (
+                            <div className="mt-2 space-y-1 pt-2 border-t border-gray-100">
+                              {Object.entries(product.attributeCombination).map(([key, value]) => (
+                                <div key={key} className="flex items-center gap-2 text-xs">
+                                  <span className="text-gray-600 font-medium">{formatAttributeLabel(key)}:</span>
+                                  <span className="text-gray-900">{value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {product.price && (
+                            <div className="mt-1 text-xs text-gray-500">
+                              Price: ₹{product.price.toLocaleString('en-IN')}/{product.unit || 'kg'}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}

@@ -115,6 +115,9 @@ export function VendorsPage({ subRoute = null, navigate }) {
   const [revocationReason, setRevocationReason] = useState('')
   const [purchaseRejectReason, setPurchaseRejectReason] = useState(null) // null = not showing, '' = showing input
   const [searchQuery, setSearchQuery] = useState('')
+  const [processingPurchase, setProcessingPurchase] = useState(false) // Local loading state for purchase actions
+  const [purchaseApprovalNotes, setPurchaseApprovalNotes] = useState('') // Notes for purchase approval
+  const [loadingPurchaseRequests, setLoadingPurchaseRequests] = useState(false) // Loading state for purchase requests
 
   // Format vendor data for display
   const formatVendorForDisplay = (vendor, flaggedVendorIds = new Set()) => {
@@ -153,6 +156,11 @@ export function VendorsPage({ subRoute = null, navigate }) {
 
   // Filter vendors based on subRoute and search
   useEffect(() => {
+    // Skip filtering if we're on purchase-requests subRoute
+    if (subRoute === 'purchase-requests') {
+      return
+    }
+
     let filtered = allVendorsList
 
     // Filter by subRoute
@@ -189,9 +197,16 @@ export function VendorsPage({ subRoute = null, navigate }) {
 
   // Fetch purchase requests
   const fetchPurchaseRequests = useCallback(async () => {
-    const result = await getVendorPurchaseRequests({ status: 'pending' })
-    if (result.data?.purchases) {
-      setPurchaseRequests(result.data.purchases)
+    setLoadingPurchaseRequests(true)
+    try {
+      const result = await getVendorPurchaseRequests({ status: 'pending' })
+      if (result.data?.purchases) {
+        setPurchaseRequests(result.data.purchases)
+      }
+    } catch (error) {
+      console.error('Failed to fetch purchase requests:', error)
+    } finally {
+      setLoadingPurchaseRequests(false)
     }
   }, [getVendorPurchaseRequests])
 
@@ -199,6 +214,24 @@ export function VendorsPage({ subRoute = null, navigate }) {
     fetchVendors()
     fetchPurchaseRequests()
   }, [fetchVendors, fetchPurchaseRequests])
+
+  // Handle purchase-requests subRoute - show purchase requests view
+  useEffect(() => {
+    if (subRoute === 'purchase-requests') {
+      fetchPurchaseRequests()
+      // Reset selected request when entering list view
+      if (!currentView || currentView !== 'purchaseRequest') {
+        setSelectedPurchaseRequest(null)
+        setCurrentView(null)
+      }
+    } else if (subRoute !== 'purchase-requests' && currentView === 'purchaseRequest') {
+      // Reset view when navigating away from purchase-requests
+      setCurrentView(null)
+      setSelectedPurchaseRequest(null)
+      setPurchaseApprovalNotes('')
+      setPurchaseRejectReason(null)
+    }
+  }, [subRoute, fetchPurchaseRequests, currentView])
 
   // Refresh when vendors are updated
   useEffect(() => {
@@ -331,35 +364,61 @@ export function VendorsPage({ subRoute = null, navigate }) {
     }
   }
 
-  const handleApprovePurchase = async (requestId) => {
+  const handleApprovePurchase = async (requestId, shortDescription) => {
+    // Use provided shortDescription or fallback to state
+    const notes = shortDescription || purchaseApprovalNotes || ''
+    const trimmedNotes = notes.trim()
+    if (!trimmedNotes) {
+      showError('Short description is required for approval', 3000)
+      return
+    }
+    
+    console.log('handleApprovePurchase called:', { requestId, shortDescription, trimmedNotes, stateValue: purchaseApprovalNotes })
+    
+    setProcessingPurchase(true)
     try {
-      const result = await approveVendorPurchase(requestId)
-      if (result.data) {
+      const result = await approveVendorPurchase(requestId, trimmedNotes)
+      if (result.success && result.data) {
         setCurrentView(null)
         setSelectedPurchaseRequest(null)
+        setPurchaseApprovalNotes('')
+        setPurchaseRejectReason(null)
         fetchPurchaseRequests()
         fetchVendors()
         success('Vendor purchase request approved successfully!', 3000)
-      } else if (result.error) {
-        const errorMessage = result.error.message || 'Failed to approve purchase request'
-        if (errorMessage.includes('credit') || errorMessage.includes('limit') || errorMessage.includes('insufficient')) {
+      } else {
+        const errorMessage = result.error?.message || result.message || 'Failed to approve purchase request'
+        console.error('Purchase approval error:', result)
+        console.error('Error details:', {
+          success: result.success,
+          error: result.error,
+          message: result.message,
+          fullResult: JSON.stringify(result, null, 2)
+        })
+        console.error('Error message:', errorMessage)
+        if (errorMessage.includes('credit') || errorMessage.includes('limit') || errorMessage.includes('insufficient') || errorMessage.includes('stock')) {
           showWarning(errorMessage, 6000)
         } else {
           showError(errorMessage, 5000)
         }
       }
     } catch (error) {
+      console.error('Purchase approval exception:', error)
       showError(error.message || 'Failed to approve purchase request', 5000)
+    } finally {
+      setProcessingPurchase(false)
     }
   }
 
   const handleRejectPurchase = async (requestId, rejectionData) => {
+    setProcessingPurchase(true)
     try {
       const result = await rejectVendorPurchase(requestId, rejectionData)
       if (result.data) {
         setCurrentView(null)
         setSelectedPurchaseRequest(null)
         setActionData(null)
+        setPurchaseRejectReason(null)
         fetchPurchaseRequests()
         fetchVendors()
         success('Vendor purchase request rejected.', 3000)
@@ -369,6 +428,8 @@ export function VendorsPage({ subRoute = null, navigate }) {
       }
     } catch (error) {
       showError(error.message || 'Failed to reject purchase request', 5000)
+    } finally {
+      setProcessingPurchase(false)
     }
   }
 
@@ -950,7 +1011,21 @@ export function VendorsPage({ subRoute = null, navigate }) {
     }
 
     const handleRejectWithReason = () => {
-      handleRejectPurchase(request.id, { reason: purchaseRejectReason || 'Purchase request rejected by admin' })
+      if (!purchaseRejectReason || !purchaseRejectReason.trim()) {
+        showError('Please provide a reason for rejection', 3000)
+        return
+      }
+      handleRejectPurchase(request.id, { reason: purchaseRejectReason.trim() })
+    }
+
+    const handleBackToVendors = () => {
+      setCurrentView(null)
+      setSelectedPurchaseRequest(null)
+      setPurchaseRejectReason(null)
+      setPurchaseApprovalNotes('')
+      if (navigate) {
+        navigate('vendors')
+      }
     }
 
     return (
@@ -958,7 +1033,7 @@ export function VendorsPage({ subRoute = null, navigate }) {
         <div>
           <button
             type="button"
-            onClick={handleBackToList}
+            onClick={handleBackToVendors}
             className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -1024,12 +1099,44 @@ export function VendorsPage({ subRoute = null, navigate }) {
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <p className="mb-3 text-xs font-bold text-gray-500">Products Requested</p>
                   <div className="space-y-2">
-                    {request.products.map((product, index) => (
-                      <div key={index} className="flex items-center justify-between rounded-lg bg-white p-3">
-                        <span className="text-sm text-gray-700">{product.name || product}</span>
-                        {product.quantity && <span className="text-xs text-gray-500">Qty: {product.quantity}</span>}
-                      </div>
-                    ))}
+                    {request.products.map((product, index) => {
+                      // Format attribute label
+                      const formatAttributeLabel = (key) => {
+                        return key
+                          .replace(/([A-Z])/g, ' $1')
+                          .replace(/^./, str => str.toUpperCase())
+                          .trim()
+                      }
+                      
+                      return (
+                        <div key={index} className="rounded-lg bg-white p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-semibold text-gray-900">{product.name || product}</span>
+                            {product.quantity && (
+                              <span className="text-xs text-gray-500">
+                                Qty: {product.quantity} {product.unit || 'kg'}
+                              </span>
+                            )}
+                          </div>
+                          {/* Display variant attributes if present */}
+                          {product.attributeCombination && Object.keys(product.attributeCombination).length > 0 && (
+                            <div className="mt-2 space-y-1 pt-2 border-t border-gray-100">
+                              {Object.entries(product.attributeCombination).map(([key, value]) => (
+                                <div key={key} className="flex items-center gap-2 text-xs">
+                                  <span className="text-gray-600 font-medium">{formatAttributeLabel(key)}:</span>
+                                  <span className="text-gray-900">{value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {product.price && (
+                            <div className="mt-1 text-xs text-gray-500">
+                              Price: ₹{product.price.toLocaleString('en-IN')}/{product.unit || 'kg'}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -1040,6 +1147,29 @@ export function VendorsPage({ subRoute = null, navigate }) {
                   <p className="text-sm text-gray-700">{request.description}</p>
                 </div>
               )}
+            </div>
+
+            {/* Short Description Input (Required for Approval) */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <label className="mb-2 block text-sm font-bold text-gray-900">
+                Short Description <span className="text-xs font-normal text-red-500">*</span>
+                <span className="text-xs font-normal text-gray-500 ml-1">(Required for approval)</span>
+              </label>
+              <textarea
+                value={purchaseApprovalNotes || ''}
+                onChange={(e) => {
+                  const value = e.target.value || ''
+                  setPurchaseApprovalNotes(value)
+                }}
+                placeholder="Enter a short description for this approval (max 150 characters)"
+                rows={3}
+                maxLength={150}
+                required
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/50"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                {(purchaseApprovalNotes || '').length}/150 characters
+              </p>
             </div>
 
             {/* Rejection Reason Input (shown when rejecting) */}
@@ -1062,9 +1192,9 @@ export function VendorsPage({ subRoute = null, navigate }) {
             <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
               <button
                 type="button"
-                onClick={handleBackToList}
-                disabled={loading}
-                className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50"
+                onClick={handleBackToVendors}
+                disabled={processingPurchase}
+                className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
@@ -1078,20 +1208,31 @@ export function VendorsPage({ subRoute = null, navigate }) {
                       handleRejectWithReason()
                     }
                   }}
-                  disabled={loading}
-                  className="flex items-center gap-2 rounded-xl border border-red-300 bg-white px-6 py-3 text-sm font-bold text-red-600 transition-all hover:bg-red-50 disabled:opacity-50"
+                  disabled={processingPurchase}
+                  className="flex items-center gap-2 rounded-xl border border-red-300 bg-white px-6 py-3 text-sm font-bold text-red-600 transition-all hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <XCircle className="h-4 w-4" />
                   {purchaseRejectReason === null ? 'Reject' : 'Confirm Rejection'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleApprovePurchase(request.id)}
-                  disabled={loading}
-                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    const notes = purchaseApprovalNotes || ''
+                    const trimmedNotes = notes.trim()
+                    console.log('Approve button clicked:', { notes, trimmedNotes, purchaseApprovalNotes })
+                    if (!trimmedNotes) {
+                      showError('Short description is required for approval', 3000)
+                      return
+                    }
+                    handleApprovePurchase(request.id, trimmedNotes)
+                  }}
+                  disabled={processingPurchase || !(purchaseApprovalNotes || '').trim()}
+                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <CheckCircle className="h-4 w-4" />
-                  {loading ? 'Processing...' : 'Approve Request'}
+                  {processingPurchase ? 'Processing...' : 'Approve Request'}
                 </button>
               </div>
             </div>
@@ -1401,6 +1542,84 @@ export function VendorsPage({ subRoute = null, navigate }) {
     )
   }
 
+  // Show purchase requests list view when subRoute is 'purchase-requests' and no specific request is selected
+  if (subRoute === 'purchase-requests' && !selectedPurchaseRequest && !currentView) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate('vendors')}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Vendors
+          </button>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 3 • Vendor Management</p>
+            <h2 className="text-2xl font-bold text-gray-900">Purchase Requests</h2>
+            <p className="text-sm text-gray-600">
+              Review and approve vendor purchase requests.
+            </p>
+          </div>
+        </div>
+        {loadingPurchaseRequests ? (
+          <div className="rounded-3xl border border-gray-200 bg-white p-12 text-center">
+            <p className="text-sm text-gray-600">Loading purchase requests...</p>
+          </div>
+        ) : purchaseRequests.length === 0 ? (
+          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+            <div className="text-center py-12">
+              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-sm font-semibold text-gray-900">No Purchase Requests</p>
+              <p className="text-xs text-gray-600 mt-1">There are no pending purchase requests at the moment.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
+            <div className="space-y-3">
+              {purchaseRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 p-4 transition-all hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer"
+                  onClick={() => {
+                    setSelectedPurchaseRequest(request)
+                    setCurrentView('purchaseRequest')
+                  }}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <p className="font-bold text-gray-900">{request.vendorName || 'Unknown Vendor'}</p>
+                      <StatusBadge tone="warning">Pending</StatusBadge>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-600">
+                      Request ID: {request.requestId || request.id} • Amount: ₹{(request.amount || request.value || 0).toLocaleString('en-IN')}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {request.date ? new Date(request.date).toLocaleDateString('en-IN') : 'N/A'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedPurchaseRequest(request)
+                      setCurrentView('purchaseRequest')
+                    }}
+                    className="ml-4 flex h-9 w-9 items-center justify-center rounded-lg border border-blue-300 bg-white text-blue-600 transition-all hover:border-blue-500 hover:bg-blue-50"
+                    title="Review request"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // Main vendors list view
   return (
     <div className="space-y-6">
@@ -1416,13 +1635,18 @@ export function VendorsPage({ subRoute = null, navigate }) {
           {purchaseRequests.length > 0 && (
             <button
               onClick={() => {
-                setSelectedPurchaseRequest(purchaseRequests[0])
-                setCurrentView('purchaseRequest')
+                if (navigate) {
+                  navigate('vendors/purchase-requests')
+                } else {
+                  setSelectedPurchaseRequest(purchaseRequests[0])
+                  setCurrentView('purchaseRequest')
+                }
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105"
+              disabled={loadingPurchaseRequests}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Package className="h-4 w-4" />
-              Purchase Requests ({purchaseRequests.length})
+              {loadingPurchaseRequests ? 'Loading...' : `Purchase Requests (${purchaseRequests.length})`}
             </button>
           )}
         </div>

@@ -132,9 +132,9 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
               >
                 All
               </button>
-              {categories.map((cat) => (
+              {categories.map((cat, index) => (
                 <button
-                  key={cat._id || cat.id}
+                  key={cat._id || cat.id || `category-${index}`}
                   type="button"
                   className={cn(
                     'px-3 py-1.5 rounded-full text-xs font-semibold transition-all',
@@ -260,9 +260,9 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
         </div>
       ) : filteredProducts.length > 0 ? (
         <div className="grid grid-cols-2 gap-3">
-          {filteredProducts.map((product) => (
+          {filteredProducts.map((product, index) => (
             <ProductCard
-              key={product._id || product.id}
+              key={product._id || product.id || `search-product-${index}`}
               product={{ 
                 ...product, 
                 id: product._id || product.id,

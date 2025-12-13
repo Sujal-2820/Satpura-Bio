@@ -194,8 +194,8 @@ export function useAdminApi() {
   )
 
   const approveVendorPurchase = useCallback(
-    (requestId) => {
-      return callApi(adminApi.approveVendorPurchase, requestId).then((result) => {
+    (requestId, shortDescription = '') => {
+      return callApi(adminApi.approveVendorPurchase, requestId, shortDescription).then((result) => {
         if (result.data) {
           dispatch({ type: 'SET_FINANCE_UPDATED', payload: true })
           dispatch({ type: 'SET_PRODUCTS_UPDATED', payload: true }) // Refresh products after stock update

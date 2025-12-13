@@ -17,6 +17,8 @@ import {
   TruckIcon,
   WalletIcon,
   CloseIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import { useButtonAction } from '../../hooks/useButtonAction'
@@ -132,7 +134,7 @@ export function VendorDashboard({ onLogout }) {
       closePanel()
     }
   }, [navigate, closePanel, showOrderDetails])
-
+  
   // Scroll to top when tab changes
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -1780,6 +1782,9 @@ function InventoryView({ openPanel, onNavigate }) {
   const [isPurchaseHistoryLoading, setIsPurchaseHistoryLoading] = useState(false)
   const [showCreditPolicyModal, setShowCreditPolicyModal] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [expandedProductId, setExpandedProductId] = useState(null) // Track which product's variants are expanded
+  const [productsWithVariants, setProductsWithVariants] = useState({}) // Cache products with full variant details: { productId: product }
+  const [loadingVariants, setLoadingVariants] = useState(false) // Track if variants are being loaded
   const orderFormRef = useRef(null)
 
   useEffect(() => {
@@ -1790,6 +1795,27 @@ function InventoryView({ openPanel, onNavigate }) {
     getProducts({ limit: 100 }).then((result) => {
       if (result.data) {
         setProductsData(result.data)
+        // Debug: Check if any products have attributeStocks
+        const products = result.data.products || []
+        const productsWithVariants = products.filter(p => 
+          p.attributeStocks && 
+          Array.isArray(p.attributeStocks) && 
+          p.attributeStocks.length > 0
+        )
+        if (productsWithVariants.length > 0) {
+          console.log('Products with variants found:', productsWithVariants.length, productsWithVariants.map(p => ({ name: p.name, attributeStocks: p.attributeStocks })))
+        } else {
+          console.log('No products with attributeStocks found. Total products:', products.length)
+          // Log first product structure for debugging
+          if (products.length > 0) {
+            console.log('Sample product structure:', { 
+              name: products[0].name, 
+              hasAttributeStocks: !!products[0].attributeStocks,
+              attributeStocks: products[0].attributeStocks,
+              keys: Object.keys(products[0])
+            })
+          }
+        }
       } else if (result.error?.status === 401) {
         localStorage.removeItem('vendor_token')
       }
@@ -1854,13 +1880,120 @@ function InventoryView({ openPanel, onNavigate }) {
     }
   }
 
+  const handleAddVariantToOrder = (productId, variantStock) => {
+    // Check if this exact variant is already added
+    const variantKey = JSON.stringify(variantStock.attributes || {})
+    const exists = selectedProducts.find((p) => {
+      if (p.productId !== productId) return false
+      const existingVariantKey = JSON.stringify(p.attributes || {})
+      return existingVariantKey === variantKey
+    })
+    
+    if (!exists) {
+      setSelectedProducts((prev) => [...prev, { 
+        productId, 
+        quantity: '', 
+        attributes: variantStock.attributes || {},
+        attributeStock: variantStock
+      }])
+      // Keep dropdown open so user can add more variants
+      // Don't close: setExpandedProductId(null)
+    }
+  }
+
+  // Fetch product details when user wants to view variants
+  const handleViewVariants = async (productId) => {
+    // If already expanded, just collapse
+    if (expandedProductId === productId) {
+      setExpandedProductId(null)
+      return
+    }
+
+    // If we already have variant details cached, just expand
+    if (productsWithVariants[productId]) {
+      setExpandedProductId(productId)
+      return
+    }
+
+    // Otherwise, fetch product details
+    setLoadingVariants(true)
+    try {
+      const result = await getProductDetails(productId)
+      if (result.data?.product) {
+        const productWithVariants = result.data.product
+        // Check if product actually has variants
+        const hasVariants = productWithVariants.attributeStocks && 
+                          Array.isArray(productWithVariants.attributeStocks) && 
+                          productWithVariants.attributeStocks.length > 0 &&
+                          productWithVariants.attributeStocks.some(stock => {
+                            if (!stock) return false
+                            if (stock.attributes && typeof stock.attributes === 'object') {
+                              const attrKeys = Object.keys(stock.attributes)
+                              if (attrKeys.length > 0) {
+                                return attrKeys.some(key => stock.attributes[key] != null && stock.attributes[key] !== '')
+                              }
+                            }
+                            return false
+                          })
+        
+        // Cache the product (even if no variants, cache it to avoid re-fetching)
+        setProductsWithVariants(prev => ({
+          ...prev,
+          [productId]: productWithVariants
+        }))
+        // Update the products list with variant info
+        setProductsData(prev => {
+          if (!prev || !prev.products) return prev
+          const updatedProducts = prev.products.map(p => 
+            (p.id || p._id)?.toString() === productId 
+              ? { ...p, attributeStocks: productWithVariants.attributeStocks || [] }
+              : p
+          )
+          return { ...prev, products: updatedProducts }
+        })
+        
+        // Only expand if product has variants
+        if (hasVariants) {
+          setExpandedProductId(productId)
+        } else {
+          // Product has no variants, add it directly to order
+          handleAddProduct(productId)
+        }
+      } else {
+        // Product not found or no data, add it directly to order
+        handleAddProduct(productId)
+      }
+    } catch (err) {
+      console.error('Failed to load product variants:', err)
+      showError('Failed to load product variants')
+    } finally {
+      setLoadingVariants(false)
+    }
+  }
+
   const handleRemoveProduct = (productId) => {
     setSelectedProducts((prev) => prev.filter((p) => p.productId !== productId))
   }
 
-  const handleQuantityChange = (productId, quantity) => {
+  const handleQuantityChange = (productId, quantity, variantAttributes = null) => {
     setSelectedProducts((prev) =>
-      prev.map((p) => (p.productId === productId ? { ...p, quantity } : p))
+      prev.map((p) => {
+        if (p.productId !== productId) return p
+        // If variantAttributes is provided, only update matching variant
+        if (variantAttributes && Object.keys(variantAttributes).length > 0) {
+          const variantKey = JSON.stringify(variantAttributes)
+          const existingVariantKey = JSON.stringify(p.attributes || {})
+          if (variantKey === existingVariantKey) {
+            return { ...p, quantity }
+          }
+          return p
+        }
+        // If no variant attributes, update if this product has no variants
+        if (!p.attributes || Object.keys(p.attributes).length === 0) {
+          return { ...p, quantity }
+        }
+        return p
+      })
     )
   }
 
@@ -2031,14 +2164,44 @@ function InventoryView({ openPanel, onNavigate }) {
         return
       }
 
-      // Check if product has attributes and if they're selected
-      const hasAttributes = product.attributeStocks && 
-                           Array.isArray(product.attributeStocks) && 
-                           product.attributeStocks.length > 0
+      // Check if product has attributes - check both product data and cached variant data
+      // Also check if selected.attributeStock exists (indicates variant was selected, so product has variants)
+      const productWithVariants = productsWithVariants[selected.productId] || product
+      const hasAttributesInProduct = productWithVariants.attributeStocks && 
+                           Array.isArray(productWithVariants.attributeStocks) && 
+                           productWithVariants.attributeStocks.length > 0 &&
+                           productWithVariants.attributeStocks.some(stock => {
+                             if (!stock) return false
+                             if (stock.attributes && typeof stock.attributes === 'object') {
+                               const attrKeys = Object.keys(stock.attributes)
+                               if (attrKeys.length > 0) {
+                                 return attrKeys.some(key => stock.attributes[key] != null && stock.attributes[key] !== '')
+                               }
+                             }
+                             return false
+                           })
       
-      if (hasAttributes && (!selected.attributes || Object.keys(selected.attributes).length === 0)) {
-        setOrderRequestError(`Please select a variant for ${product.name}.`)
-        return
+      // If selected.attributeStock exists, product definitely has variants
+      const hasVariantSelected = selected.attributeStock && selected.attributeStock.attributes
+      const hasAttributes = hasAttributesInProduct || hasVariantSelected
+      
+      // If product has variants, ensure attributes are selected
+      // Check both selected.attributes and selected.attributeStock as indicators
+      if (hasAttributes) {
+        // Check if variant was selected - attributeStock exists (with attributes) OR attributes object is present and not empty
+        const hasAttributeStock = selected.attributeStock && 
+                                selected.attributeStock.attributes && 
+                                typeof selected.attributeStock.attributes === 'object' &&
+                                Object.keys(selected.attributeStock.attributes).length > 0
+        const hasAttributesObject = selected.attributes && 
+                                   typeof selected.attributes === 'object' && 
+                                   Object.keys(selected.attributes).length > 0
+        const hasSelectedAttributes = hasAttributeStock || hasAttributesObject
+        
+        if (!hasSelectedAttributes) {
+          setOrderRequestError(`Product ${product.name} requires attribute selection.`)
+          return
+        }
       }
 
       const quantityNumber = parseFloat(selected.quantity)
@@ -2070,9 +2233,14 @@ function InventoryView({ openPanel, onNavigate }) {
         pricePerUnit,
       }
       
-      // Add attribute combination if product has attributes
-      if (hasAttributes && selected.attributes && Object.keys(selected.attributes).length > 0) {
-        itemPayload.attributeCombination = selected.attributes
+      // Add attribute combination if product has attributes and variant was selected
+      // Use attributes from selected.attributes or from selected.attributeStock.attributes
+      if (hasAttributes && (selected.attributeStock || (selected.attributes && Object.keys(selected.attributes).length > 0))) {
+        // Prefer attributes from attributeStock if available, otherwise use selected.attributes
+        const attributesToUse = selected.attributeStock?.attributes || selected.attributes || {}
+        if (Object.keys(attributesToUse).length > 0) {
+          itemPayload.attributeCombination = attributesToUse
+        }
       }
 
       purchaseItems.push(itemPayload)
@@ -2139,7 +2307,7 @@ function InventoryView({ openPanel, onNavigate }) {
 
       const result = await requestCreditPurchase(payload)
       if (result.data) {
-        success('Stock request submitted. Admin will review shortly.')
+        success(`Order request submitted successfully! Request ID: ${result.data.purchase?.creditPurchaseId || 'N/A'}. Admin will review shortly.`)
         resetOrderRequestForm()
         setShowOrderRequestScreen(false)
         loadPurchaseRequests()
@@ -2394,14 +2562,22 @@ function InventoryView({ openPanel, onNavigate }) {
       )
       if (!product) return null
       const quantity = parseFloat(selected.quantity) || 0
-      const pricePerUnit = product.pricePerUnit || product.priceToVendor || 0
+      
+      // Use variant-specific price if available, otherwise use main product price
+      const pricePerUnit = selected.attributeStock
+        ? (selected.attributeStock.vendorPrice || 0)
+        : (product.pricePerUnit || product.priceToVendor || 0)
+      
       const itemTotal = quantity * pricePerUnit
       billingTotal += itemTotal
+      
       return {
         product,
         quantity,
         pricePerUnit,
+        unitPrice: pricePerUnit, // Alias for billing display
         itemTotal,
+        variantAttributes: selected.attributes || {}, // Include variant attributes for display
       }
     }).filter(Boolean)
 
@@ -2500,9 +2676,45 @@ function InventoryView({ openPanel, onNavigate }) {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Available Products</h3>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {products.map((product) => {
-                  const isSelected = selectedProducts.some((p) => p.productId === (product.id || product._id)?.toString())
+                  const productId = (product.id || product._id)?.toString()
+                  const isSelected = selectedProducts.some((p) => p.productId === productId)
+                  const isExpanded = expandedProductId === productId
+                  
+                  // Check if product has variants (either from list or from cached details)
+                  // Use cached variant details if available, otherwise check product.attributeStocks
+                  const productWithVariants = productsWithVariants[productId] || product
+                  const hasVariants = productWithVariants.attributeStocks && 
+                                    Array.isArray(productWithVariants.attributeStocks) && 
+                                    productWithVariants.attributeStocks.length > 0 &&
+                                    productWithVariants.attributeStocks.some(stock => {
+                                      if (!stock) return false
+                                      // Check if stock has attributes object with at least one key
+                                      if (stock.attributes && typeof stock.attributes === 'object') {
+                                        const attrKeys = Object.keys(stock.attributes)
+                                        if (attrKeys.length > 0) {
+                                          // Check if at least one attribute value is not empty
+                                          return attrKeys.some(key => stock.attributes[key] != null && stock.attributes[key] !== '')
+                                        }
+                                      }
+                                      return false
+                                    })
+                  
+                  // Use product with variants for rendering
+                  const productToRender = hasVariants && isExpanded ? productWithVariants : product
+                  
+                  // Check if any variants of this product are selected
+                  const hasSelectedVariants = selectedProducts.some(p => p.productId === productId && p.attributes && Object.keys(p.attributes).length > 0)
+                  
                   const adminStock = product.adminStock ?? product.displayStock ?? product.stock ?? 0
                   const pricePerUnit = product.pricePerUnit || product.priceToVendor || 0
+                  
+                  // Format attribute label
+                  const formatAttributeLabel = (key) => {
+                    return key
+                      .replace(/([A-Z])/g, ' $1')
+                      .replace(/^./, str => str.toUpperCase())
+                      .trim()
+                  }
                   
                   return (
                     <div
@@ -2532,41 +2744,169 @@ function InventoryView({ openPanel, onNavigate }) {
                         )}
                       </div>
                       
-                      <div className="space-y-2 mb-3">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-600">Admin stock:</span>
-                          <span className="font-semibold text-gray-900">{adminStock} {product.unit || 'kg'}</span>
+                      {/* Show common info only if no variants */}
+                      {!hasVariants && (
+                        <div className="space-y-2 mb-3">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600">Admin stock:</span>
+                            <span className="font-semibold text-gray-900">{adminStock} {product.unit || 'kg'}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600">Price:</span>
+                            <span className="font-semibold text-purple-600">₹{pricePerUnit.toLocaleString('en-IN')}/{product.unit || 'kg'}</span>
+                          </div>
+                          {product.category && (
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-600">Category:</span>
+                              <span className="font-semibold text-gray-700 capitalize">{product.category}</span>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-600">Price:</span>
-                          <span className="font-semibold text-purple-600">₹{pricePerUnit.toLocaleString('en-IN')}/{product.unit || 'kg'}</span>
-                        </div>
-                        {product.category && (
+                      )}
+
+                      {/* Show category even if variants exist */}
+                      {hasVariants && product.category && (
+                        <div className="mb-3">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-gray-600">Category:</span>
                             <span className="font-semibold text-gray-700 capitalize">{product.category}</span>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
-                      {!isSelected ? (
-                        <button
-                          type="button"
-                          onClick={() => handleAddProduct((product.id || product._id).toString())}
-                          disabled={adminStock === 0}
-                          className={cn(
-                            'w-full rounded-lg px-4 py-2 text-xs font-semibold transition-all',
-                            adminStock === 0
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : 'bg-purple-600 text-white hover:bg-purple-700'
+                      {/* Button: View Variants or Add to Order */}
+                      {/* Only hide button if non-variant product is selected */}
+                      {!isSelected && (
+                        <>
+                          {/* If we know product has variants, show "View Variants", otherwise show "Add to Order" */}
+                          {/* If product hasn't been checked yet (no cached data), show "View Variants" to check */}
+                          {hasVariants || !productsWithVariants[productId] ? (
+                            <button
+                              type="button"
+                              onClick={() => handleViewVariants(productId)}
+                              disabled={adminStock === 0 || (loadingVariants && expandedProductId === productId)}
+                              className={cn(
+                                'w-full rounded-lg px-4 py-2 text-xs font-semibold transition-all flex items-center justify-center gap-2',
+                                adminStock === 0 || (loadingVariants && expandedProductId === productId)
+                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                  : 'bg-purple-600 text-white hover:bg-purple-700'
+                              )}
+                            >
+                              {loadingVariants && expandedProductId === productId ? (
+                                <>Loading variants...</>
+                              ) : adminStock === 0 ? (
+                                'Out of Stock'
+                              ) : (
+                                <>
+                                  View Variants
+                                  {isExpanded ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
+                                </>
+                              )}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleAddProduct(productId)}
+                              disabled={adminStock === 0}
+                              className={cn(
+                                'w-full rounded-lg px-4 py-2 text-xs font-semibold transition-all',
+                                adminStock === 0
+                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                  : 'bg-purple-600 text-white hover:bg-purple-700'
+                              )}
+                            >
+                              {adminStock === 0 ? 'Out of Stock' : 'Add to Order'}
+                            </button>
                           )}
-                        >
-                          {adminStock === 0 ? 'Out of Stock' : 'Add to Order'}
-                        </button>
-                      ) : (
+                        </>
+                      )}
+
+                      {/* Variants Dropdown */}
+                      {hasVariants && isExpanded && productToRender.attributeStocks && (
+                        <div className="mt-3 space-y-2 pt-3 border-t border-gray-200">
+                          {productToRender.attributeStocks.map((variantStock, idx) => {
+                            const variantAttrs = variantStock.attributes || {}
+                            const variantAdminStock = variantStock.displayStock || variantStock.actualStock || 0
+                            const variantPrice = variantStock.vendorPrice || 0
+                            const variantUnit = variantStock.stockUnit || product.unit || 'kg'
+                            
+                            // Check if this variant is already added
+                            const variantKey = JSON.stringify(variantAttrs)
+                            const isVariantAdded = selectedProducts.some((p) => {
+                              if (p.productId !== productId) return false
+                              const existingVariantKey = JSON.stringify(p.attributes || {})
+                              return existingVariantKey === variantKey
+                            })
+                            
+                            return (
+                              <div
+                                key={idx}
+                                className={cn(
+                                  'p-3 rounded-lg border-2 transition-all',
+                                  isVariantAdded
+                                    ? 'bg-purple-50 border-purple-300'
+                                    : 'bg-white border-gray-200'
+                                )}
+                              >
+                                <div className="space-y-2">
+                                  {/* Variant Attributes */}
+                                  <div>
+                                    {Object.entries(variantAttrs).map(([key, value]) => (
+                                      <div key={key} className="flex items-center gap-1 text-xs mb-1">
+                                        <span className="text-gray-600 font-medium">{formatAttributeLabel(key)}:</span>
+                                        <span className="text-gray-900 font-semibold">{value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  
+                                  {/* Variant Stock and Price */}
+                                  <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                      <span className="text-gray-600">Stock:</span>
+                                      <span className="ml-1 font-semibold text-gray-900">
+                                        {variantAdminStock} {variantUnit}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">Price:</span>
+                                      <span className="ml-1 font-semibold text-purple-600">
+                                        ₹{variantPrice.toLocaleString('en-IN')}/{variantUnit}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Add to Order Button */}
+                                  {!isVariantAdded ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddVariantToOrder(productId, variantStock)}
+                                      disabled={variantAdminStock === 0}
+                                      className={cn(
+                                        'w-full mt-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+                                        variantAdminStock === 0
+                                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                          : 'bg-purple-600 text-white hover:bg-purple-700'
+                                      )}
+                                    >
+                                      {variantAdminStock === 0 ? 'Out of Stock' : 'Add to Order'}
+                                    </button>
+                                  ) : (
+                                    <div className="mt-2 text-xs text-purple-700 font-semibold text-center">
+                                      ✓ Added to order
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Remove button if product is selected (non-variant product) */}
+                      {isSelected && !hasVariants && (
                         <button
                           type="button"
-                          onClick={() => handleRemoveProduct((product.id || product._id).toString())}
+                          onClick={() => handleRemoveProduct(productId)}
                           className="w-full rounded-lg px-4 py-2 text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-all"
                         >
                           Remove
@@ -2612,14 +2952,32 @@ function InventoryView({ openPanel, onNavigate }) {
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <p className="text-sm font-semibold text-gray-900">{product.name}</p>
+                            {/* Show variant info if variant is selected */}
+                            {selected.attributes && Object.keys(selected.attributes).length > 0 && (
+                              <div className="mt-1 space-y-0.5">
+                                {Object.entries(selected.attributes).map(([key, value]) => {
+                                  const formatLabel = (k) => {
+                                    return k
+                                      .replace(/([A-Z])/g, ' $1')
+                                      .replace(/^./, str => str.toUpperCase())
+                                      .trim()
+                                  }
+                                  return (
+                                    <p key={key} className="text-xs text-purple-700 font-medium">
+                                      {formatLabel(key)}: {value}
+                                    </p>
+                                  )
+                                })}
+                              </div>
+                            )}
                             <p className="text-xs text-gray-500">
                               Available: {adminStock} {stockUnit} • ₹{pricePerUnit.toLocaleString('en-IN')}/{stockUnit}
                             </p>
                           </div>
                         </div>
                         
-                        {/* Attribute Selection - Only show if product has attributes */}
-                        {hasAttributes && (
+                        {/* Attribute Selection - Only show if product has attributes but no variant is selected yet */}
+                        {hasAttributes && (!selected.attributes || Object.keys(selected.attributes).length === 0) && (
                           <ProductAttributeSelector
                             product={product}
                             selectedAttributes={selected.attributes || {}}
@@ -2645,14 +3003,42 @@ function InventoryView({ openPanel, onNavigate }) {
                             min="1"
                             max={adminStock}
                             value={selected.quantity}
-                            onChange={(e) => handleQuantityChange(selected.productId, e.target.value)}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              // Only allow numbers and prevent values greater than max
+                              if (value === '' || (parseFloat(value) >= 1 && parseFloat(value) <= adminStock)) {
+                                handleQuantityChange(selected.productId, value, selected.attributes)
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              // Disable arrow keys (Up/Down) to prevent accidental value changes
+                              if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                                e.preventDefault()
+                              }
+                            }}
+                            onWheel={(e) => {
+                              // Disable mouse wheel scrolling on number input
+                              e.target.blur()
+                            }}
                             placeholder="Qty"
-                            className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                            className="vendor-quantity-input w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
                           />
                           <span className="text-xs text-gray-600">{stockUnit}</span>
                           <button
                             type="button"
-                            onClick={() => handleRemoveProduct(selected.productId)}
+                            onClick={() => {
+                              // If it's a variant, remove only this specific variant, otherwise remove the product
+                              if (selected.attributes && Object.keys(selected.attributes).length > 0) {
+                                const variantKey = JSON.stringify(selected.attributes)
+                                setSelectedProducts(prev => prev.filter(p => {
+                                  if (p.productId !== selected.productId) return true
+                                  const existingVariantKey = JSON.stringify(p.attributes || {})
+                                  return existingVariantKey !== variantKey
+                                }))
+                              } else {
+                                handleRemoveProduct(selected.productId)
+                              }
+                            }}
                             className="text-red-600 hover:text-red-800"
                           >
                             <CloseIcon className="h-5 w-5" />
@@ -2677,11 +3063,20 @@ function InventoryView({ openPanel, onNavigate }) {
                         {/* Display variant attributes if present */}
                         {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
                           <div className="mt-1 space-y-0.5">
-                            {Object.entries(item.variantAttributes).map(([key, value]) => (
-                              <p key={key} className="text-xs text-gray-600">
-                                <span className="font-medium">{key}:</span> {value}
-                              </p>
-                            ))}
+                            {Object.entries(item.variantAttributes).map(([key, value]) => {
+                              // Format attribute label
+                              const formatLabel = (k) => {
+                                return k
+                                  .replace(/([A-Z])/g, ' $1')
+                                  .replace(/^./, str => str.toUpperCase())
+                                  .trim()
+                              }
+                              return (
+                                <p key={key} className="text-xs text-gray-600">
+                                  <span className="font-medium">{formatLabel(key)}:</span> {value}
+                                </p>
+                              )
+                            })}
                           </div>
                         )}
                         <p className="text-xs text-gray-500">

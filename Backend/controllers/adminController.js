@@ -1985,6 +1985,36 @@ exports.getVendorPurchases = async (req, res, next) => {
 exports.approveVendorPurchase = async (req, res, next) => {
   try {
     const { requestId } = req.params;
+    const { shortDescription } = req.body;
+
+    console.log('=== APPROVE PURCHASE REQUEST ===');
+    console.log('Request ID:', requestId);
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+    console.log('Request Body Keys:', Object.keys(req.body || {}));
+    console.log('Short Description:', shortDescription);
+    console.log('Short Description Type:', typeof shortDescription);
+    console.log('Short Description Value:', shortDescription);
+    console.log('Is Undefined:', shortDescription === undefined);
+    console.log('Is Null:', shortDescription === null);
+    console.log('Is Empty String:', shortDescription === '');
+    console.log('Trimmed:', shortDescription ? shortDescription.trim() : 'N/A');
+    console.log('===============================');
+
+    // Validate shortDescription - it's required
+    if (!shortDescription || typeof shortDescription !== 'string' || !shortDescription.trim()) {
+      console.log('❌ VALIDATION FAILED');
+      console.log('Reason:', {
+        isFalsy: !shortDescription,
+        isNotString: typeof shortDescription !== 'string',
+        isEmptyAfterTrim: shortDescription && !shortDescription.trim()
+      });
+      return res.status(400).json({
+        success: false,
+        message: 'Short description is required',
+      });
+    }
+    
+    console.log('✅ VALIDATION PASSED');
 
     const purchase = await CreditPurchase.findById(requestId)
       .populate('items.productId', 'name sku priceToVendor');
@@ -2025,17 +2055,95 @@ exports.approveVendorPurchase = async (req, res, next) => {
         });
       }
 
-      const adminStock = product.displayStock ?? product.stock ?? 0;
-      if (item.quantity > adminStock) {
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient admin stock for ${product.name}. Available: ${adminStock}, Requested: ${item.quantity}`,
+      // Check if this is a variant product (has attributeCombination)
+      const hasVariantAttributes = item.attributeCombination && 
+        (item.attributeCombination instanceof Map ? item.attributeCombination.size > 0 : Object.keys(item.attributeCombination || {}).length > 0);
+
+      if (hasVariantAttributes && product.attributeStocks && product.attributeStocks.length > 0) {
+        // Handle variant stock reduction
+        const attributeCombination = item.attributeCombination instanceof Map 
+          ? Object.fromEntries(item.attributeCombination)
+          : item.attributeCombination || {};
+
+        // Find matching variant in attributeStocks
+        const matchingVariantIndex = product.attributeStocks.findIndex((variantStock) => {
+          if (!variantStock.attributes) return false;
+          const variantAttrs = variantStock.attributes instanceof Map
+            ? Object.fromEntries(variantStock.attributes)
+            : variantStock.attributes || {};
+          
+          // Check if all attributes match
+          return Object.keys(attributeCombination).every(key => {
+            const variantValue = variantAttrs[key];
+            const requestedValue = attributeCombination[key];
+            return variantValue === requestedValue;
+          });
+        });
+
+        if (matchingVariantIndex === -1) {
+          return res.status(400).json({
+            success: false,
+            message: `Variant not found for ${product.name} with the selected attributes.`,
+          });
+        }
+
+        const variantStock = product.attributeStocks[matchingVariantIndex];
+        const variantDisplayStock = variantStock.displayStock || 0;
+        const variantActualStock = variantStock.actualStock || 0;
+
+        if (item.quantity > variantDisplayStock) {
+          return res.status(400).json({
+            success: false,
+            message: `Insufficient variant stock for ${product.name}. Available: ${variantDisplayStock}, Requested: ${item.quantity}`,
+          });
+        }
+
+        // Update variant stock in attributeStocks array
+        product.attributeStocks[matchingVariantIndex].displayStock = Math.max(0, variantDisplayStock - item.quantity);
+        product.attributeStocks[matchingVariantIndex].actualStock = Math.max(0, variantActualStock - item.quantity);
+
+        // Update product with modified attributeStocks
+        await Product.updateOne(
+          { _id: item.productId },
+          {
+            $set: {
+              attributeStocks: product.attributeStocks,
+            }
+          }
+        );
+
+        console.log(`✅ Variant stock updated for ${product.name}:`, {
+          variant: attributeCombination,
+          displayStock: `${variantDisplayStock} → ${product.attributeStocks[matchingVariantIndex].displayStock}`,
+          actualStock: `${variantActualStock} → ${product.attributeStocks[matchingVariantIndex].actualStock}`,
+        });
+      } else {
+        // Handle non-variant product stock reduction
+        const adminStock = product.displayStock ?? product.stock ?? 0;
+        if (item.quantity > adminStock) {
+          return res.status(400).json({
+            success: false,
+            message: `Insufficient admin stock for ${product.name}. Available: ${adminStock}, Requested: ${item.quantity}`,
+          });
+        }
+
+        // Update stock without triggering full validation
+        // Use updateOne to avoid validation errors for existing products
+        await Product.updateOne(
+          { _id: item.productId },
+          {
+            $set: {
+              displayStock: Math.max(0, adminStock - item.quantity),
+              actualStock: Math.max(0, (product.actualStock ?? adminStock) - item.quantity),
+            }
+          }
+        );
+
+        console.log(`✅ Main product stock updated for ${product.name}:`, {
+          displayStock: `${adminStock} → ${Math.max(0, adminStock - item.quantity)}`,
+          actualStock: `${product.actualStock ?? adminStock} → ${Math.max(0, (product.actualStock ?? adminStock) - item.quantity)}`,
         });
       }
-
-      product.displayStock = Math.max(0, adminStock - item.quantity);
-      product.actualStock = Math.max(0, (product.actualStock ?? adminStock) - item.quantity);
-      await product.save();
 
       await ProductAssignment.findOneAndUpdate(
         { productId: item.productId, vendorId: vendor._id },

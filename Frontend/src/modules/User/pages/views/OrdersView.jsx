@@ -483,8 +483,9 @@ export function OrdersView() {
                   // Get price - use unitPrice from orderItem or price
                   const unitPrice = orderItem.unitPrice || orderItem.price || 0
                   
-                  // Create unique key for order item
-                  const orderItemKey = orderItem.productId || orderItem.id || orderItem._id || `${item.uniqueId || item.id}-item-${index}`
+                  // Create unique key for order item - include index to ensure uniqueness even if productId is same
+                  const orderItemId = orderItem.id || orderItem._id || orderItem.productId
+                  const orderItemKey = `${item.uniqueId || item.id || item._id || 'order'}-item-${orderItemId || index}-${index}`
                   
                   return (
                     <div key={orderItemKey} className="user-orders-view__card-item">
@@ -500,7 +501,7 @@ export function OrdersView() {
                         {hasVariants && (
                           <div className="user-orders-view__card-item-variants">
                             {variantKeys.map((key) => (
-                              <span key={key} className="text-xs text-gray-600">
+                              <span key={`${orderItemKey}-variant-${key}`} className="text-xs text-gray-600">
                                 {key}: {variantAttrs[key]}
                               </span>
                             ))}
