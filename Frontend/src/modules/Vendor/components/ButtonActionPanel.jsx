@@ -92,6 +92,10 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
         undefined
       )
       if (maxValue !== undefined && numValue > maxValue) {
+        // For repay-credit, show exact max value (can be decimal)
+        if (buttonId === 'repay-credit' && field.name === 'amount') {
+          return `${field.label} must be at most ₹${maxValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
+        }
         return `${field.label} must be at most ₹${Math.round(maxValue).toLocaleString('en-IN')}`
       }
     }
@@ -167,12 +171,25 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
 
   const handleSubmit = () => {
     if (intent === BUTTON_INTENT.UPDATION) {
-      // Validate all fields
+      // For repay-credit, cap amount to creditUsed if exceeds (keep decimal values)
+      let adjustedFormData = { ...formData }
+      if (buttonId === 'repay-credit' && formData.amount) {
+        const numAmount = parseFloat(formData.amount)
+        
+        // If exceeds max, set to exact max value (can be decimal)
+        if (data?.creditUsed && numAmount > data.creditUsed) {
+          adjustedFormData.amount = data.creditUsed.toString()
+          // Update state immediately
+          setFormData(adjustedFormData)
+        }
+      }
+      
+      // Validate all fields using adjusted form data
       const errors = {}
       let hasErrors = false
 
       data.fields?.forEach((field) => {
-        const value = formData[field.name] || field.value || ''
+        const value = adjustedFormData[field.name] || field.value || ''
         const error = validateField(field, value)
         if (error) {
           errors[field.name] = error
@@ -186,7 +203,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
         return
       }
 
-      const submissionData = { ...formData }
+      const submissionData = { ...adjustedFormData }
       // Preserve orderId and other metadata from action.data (passed via openPanel)
       // Always include these if they exist in action.data, even if they're in formData
       if (data?.orderId) {
@@ -212,14 +229,17 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
           submissionData.bankAccountId = data.bankAccountId
         }
       }
-      // For repayment requests, include bankAccounts and credit information
+      // For repayment requests, include credit information
+      // Bank account will be filled in Razorpay interface
       if (buttonId === 'repay-credit') {
         submissionData.creditUsed = data.creditUsed
         submissionData.creditLimit = data.creditLimit
-        submissionData.bankAccounts = data.bankAccounts || []
-        // Ensure bankAccountId is included
-        if (!submissionData.bankAccountId && data.bankAccountId) {
-          submissionData.bankAccountId = data.bankAccountId
+        // Keep amount as-is (can be decimal), but ensure it doesn't exceed creditUsed
+        if (submissionData.amount && data?.creditUsed) {
+          const amount = parseFloat(submissionData.amount)
+          if (amount > data.creditUsed) {
+            submissionData.amount = data.creditUsed
+          }
         }
         // For repayment, let the handler manage the flow (payment intent, Razorpay, etc.)
         // Don't close panel or show success message here - handler will do that
@@ -563,11 +583,11 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                             return
                           }
                         }
-                        // For repayment amount, automatically cap to creditUsed
+                        // For repayment amount, automatically cap to creditUsed (keep decimal values)
                         if (field.name === 'amount' && buttonId === 'repay-credit' && data?.creditUsed) {
                           const numValue = parseFloat(value)
                           if (!isNaN(numValue) && numValue > data.creditUsed) {
-                            // Automatically set to maximum (creditUsed)
+                            // If value exceeds max, set to exact max value (can be decimal)
                             handleFormChange(field.name, data.creditUsed.toString())
                             return
                           }
@@ -590,7 +610,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                     )}
                     {field.name === 'amount' && buttonId === 'repay-credit' && data?.creditUsed && (
                       <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
-                        Maximum: ₹{Math.round(data.creditUsed).toLocaleString('en-IN')} (Outstanding credit)
+                        Maximum: ₹{data.creditUsed.toLocaleString('en-IN', { maximumFractionDigits: 2 })} (Outstanding credit)
                       </p>
                     )}
                   </>
@@ -606,8 +626,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
               </button>
               <button type="button" onClick={handleSubmit} className="vendor-action-panel__button is-primary">
                 {data.type === 'admin_request' ? 'Send Request' : 
-                 buttonId === 'repay-credit' && formData.amount ? 
-                   `Pay ₹${parseFloat(formData.amount) > 0 ? Math.round(parseFloat(formData.amount)).toLocaleString('en-IN') : '0'}` : 
+                 buttonId === 'repay-credit' ? 'Repay' : 
                  'Update'}
               </button>
             </div>

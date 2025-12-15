@@ -4528,7 +4528,8 @@ exports.createRepaymentIntent = async (req, res, next) => {
       });
     }
 
-    // Check vendor has bank account
+    // Bank account is optional - will be filled in Razorpay interface
+    // We don't require bank account selection on our side
     let bankAccount = null;
     if (bankAccountId) {
       bankAccount = await BankAccount.findOne({
@@ -4543,21 +4544,8 @@ exports.createRepaymentIntent = async (req, res, next) => {
           message: 'Bank account not found',
         });
       }
-    } else {
-      // Get primary bank account
-      bankAccount = await BankAccount.findOne({
-        userId: vendor._id,
-        userType: 'vendor',
-        isPrimary: true,
-      });
-
-      if (!bankAccount) {
-        return res.status(400).json({
-          success: false,
-          message: 'Please add a bank account before making repayment. Go to Profile → Bank Accounts to add one.',
-        });
-      }
     }
+    // If no bankAccountId provided, that's fine - Razorpay will handle it
 
     // Calculate penalty if overdue
     const now = new Date();
@@ -4625,7 +4613,7 @@ exports.createRepaymentIntent = async (req, res, next) => {
       status: 'pending',
       paymentMethod: 'razorpay',
       razorpayOrderId: razorpayOrder.id,
-      bankAccountId: bankAccount._id,
+      bankAccountId: bankAccount?._id || null, // Optional - Razorpay will handle bank account
     });
     
     let repayment;
@@ -4641,7 +4629,7 @@ exports.createRepaymentIntent = async (req, res, next) => {
         status: 'pending',
         paymentMethod: 'razorpay',
         razorpayOrderId: razorpayOrder.id,
-        bankAccountId: bankAccount._id,
+        bankAccountId: bankAccount?._id || undefined, // Optional - Razorpay will handle bank account
       });
       console.log('[createRepaymentIntent] Repayment record created successfully:', {
         _id: repayment._id,
@@ -4680,12 +4668,12 @@ exports.createRepaymentIntent = async (req, res, next) => {
           currency: razorpayOrder.currency,
           key: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder', // Frontend needs this for Razorpay checkout
         },
-        bankAccount: {
+        bankAccount: bankAccount ? {
           id: bankAccount._id,
           accountHolderName: bankAccount.accountHolderName,
           accountNumber: bankAccount.accountNumber.slice(-4), // Last 4 digits only
           bankName: bankAccount.bankName,
-        },
+        } : null,
       },
     });
   } catch (error) {

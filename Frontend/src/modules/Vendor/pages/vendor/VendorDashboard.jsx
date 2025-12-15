@@ -971,53 +971,35 @@ export function VendorDashboard({ onLogout }) {
               }
               // Credit repayment actions
               else if (buttonId === 'repay-credit' && data.amount) {
+                // Keep amount as-is (can be decimal)
                 const repaymentAmount = parseFloat(data.amount)
                 const creditUsed = data.creditUsed || 0
                 
                 // Validate amount
-                if (repaymentAmount < 1) {
-                  error('Minimum repayment amount is ₹1')
+                if (repaymentAmount < 0.01) {
+                  error('Minimum repayment amount is ₹0.01')
                   return
                 }
                 
+                // Check if exceeds creditUsed (can be decimal)
                 if (repaymentAmount > creditUsed) {
-                  error(`Repayment amount cannot exceed outstanding credit. Outstanding: ₹${Math.round(creditUsed).toLocaleString('en-IN')}, Requested: ₹${repaymentAmount.toLocaleString('en-IN')}`)
+                  error(`Repayment amount cannot exceed outstanding credit. Outstanding: ₹${creditUsed.toLocaleString('en-IN', { maximumFractionDigits: 2 })}, Requested: ₹${repaymentAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`)
                   return
-                }
-                
-                // Validate bank account
-                if (!data.bankAccountId) {
-                  error('Please select a bank account for repayment')
-                  return
-                }
-                
-                // Get bank account details for confirmation
-                let bankAccountDetails = null
-                if (data.bankAccountId && data.bankAccounts) {
-                  const selectedAccount = data.bankAccounts.find(acc => (acc._id || acc.id) === data.bankAccountId)
-                  if (selectedAccount) {
-                    bankAccountDetails = {
-                      'Account Holder': selectedAccount.accountHolderName || 'N/A',
-                      'Account Number': `****${(selectedAccount.accountNumber || '').slice(-4)}`,
-                      'IFSC Code': selectedAccount.ifscCode || 'N/A',
-                      'Bank Name': selectedAccount.bankName || 'N/A',
-                    }
-                  }
                 }
                 
                 // Create payment intent and open Razorpay directly
+                // Bank account will be filled in Razorpay interface
                 try {
                   closePanel() // Close the action panel first
                   
                   console.log('[VendorDashboard] Creating repayment intent with data:', {
                     amount: repaymentAmount,
-                    bankAccountId: data.bankAccountId,
                     creditUsed: creditUsed,
                   })
                   
                   const intentResult = await createRepaymentIntent({
                     amount: repaymentAmount,
-                    bankAccountId: data.bankAccountId,
+                    // bankAccountId not required - will be filled in Razorpay
                   })
                   
                   console.log('[VendorDashboard] Repayment intent result:', intentResult)
@@ -5214,8 +5196,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
 function CreditView({ openPanel }) {
   const { dashboard } = useVendorState()
   const dispatch = useVendorDispatch()
-  const { getCreditInfo, getBankAccounts, getRepaymentHistory } = useVendorApi()
-  const [bankAccounts, setBankAccounts] = useState([])
+  const { getCreditInfo, getRepaymentHistory } = useVendorApi()
   const [repaymentHistory, setRepaymentHistory] = useState([])
   const [repaymentRefreshKey, setRepaymentRefreshKey] = useState(0)
 
@@ -5235,16 +5216,9 @@ function CreditView({ openPanel }) {
       }
     })
     
-    // Fetch bank accounts for repayment
-    getBankAccounts().then((result) => {
-      if (result.data?.bankAccounts) {
-        setBankAccounts(result.data.bankAccounts)
-      }
-    })
-    
     // Fetch repayment history
     refreshRepaymentHistory()
-  }, [getCreditInfo, getBankAccounts, refreshRepaymentHistory, dispatch, repaymentRefreshKey])
+  }, [getCreditInfo, refreshRepaymentHistory, dispatch, repaymentRefreshKey])
 
   // Listen for repayment success event to refresh history
   useEffect(() => {
@@ -5422,29 +5396,8 @@ function CreditView({ openPanel }) {
                   const latestCreditResult = await getCreditInfo()
                   const latestCreditUsed = latestCreditResult.data?.credit?.used || creditUsed
                   
-                  if (bankAccounts.length === 0) {
-                    openPanel('repay-credit', { 
-                      creditUsed: latestCreditUsed, 
-                      error: 'Please add a bank account before making repayment',
-                    })
-                    return
-                  }
-                  
-                  // Prepare bank account options for the select field
-                  const bankAccountOptions = bankAccounts.map((account) => ({
-                    value: account._id || account.id,
-                    label: `${account.accountHolderName} - ${account.bankName} (${account.accountNumber.slice(-4)})${account.isPrimary ? ' - Primary' : ''}`,
-                  }))
-                  
-                  // Set default to primary account if available
-                  const primaryAccount = bankAccounts.find((acc) => acc.isPrimary)
-                  const defaultBankAccountId = primaryAccount?._id || primaryAccount?.id || bankAccounts[0]?._id || bankAccounts[0]?.id
-                  
                   openPanel('repay-credit', { 
-                    creditUsed: latestCreditUsed, 
-                    bankAccountOptions,
-                    bankAccountId: defaultBankAccountId,
-                    bankAccounts: bankAccounts, // Pass full bank accounts array
+                    creditUsed: latestCreditUsed,
                   })
                 }}
               >

@@ -300,7 +300,6 @@ export const BUTTON_CONFIGS = {
       type: 'credit_repayment',
       fields: [
         { name: 'amount', label: 'Repayment Amount', value: '', type: 'number', required: true, min: 1, placeholder: 'Enter amount to repay' },
-        { name: 'bankAccountId', label: 'Bank Account', value: '', type: 'select', required: true, placeholder: 'Select bank account' },
       ],
     },
   },
