@@ -41,7 +41,7 @@ exports.register = async (req, res, next) => {
     if (isSpecialBypassNumber(phone)) {
       // Find or create seller
       let seller = await Seller.findOne({ phone });
-      
+
       if (!seller) {
         // Generate unique sellerId
         const lastSeller = await Seller.findOne()
@@ -190,7 +190,7 @@ exports.register = async (req, res, next) => {
 
     // Clear any existing OTP before generating new one
     seller.clearOTP();
-    
+
     // Check if this is a test phone number - use default OTP 123456
     const testOTPInfo = getTestOTPInfo(phone);
     let otpCode;
@@ -249,7 +249,7 @@ exports.requestOTP = async (req, res, next) => {
     if (isSpecialBypassNumber(phone)) {
       // Find or create seller
       let seller = await Seller.findOne({ phone });
-      
+
       if (!seller) {
         // Generate unique sellerId
         const lastSeller = await Seller.findOne()
@@ -270,6 +270,7 @@ exports.requestOTP = async (req, res, next) => {
         seller = new Seller({
           sellerId: `SLR-${nextNumber}`,
           phone: phone,
+          name: 'Special Bypass Seller', // Placeholder name
           status: 'pending',
         });
       }
@@ -333,13 +334,14 @@ exports.requestOTP = async (req, res, next) => {
       seller = new Seller({
         sellerId: generatedSellerId,
         phone,
+        name: 'New Seller', // Placeholder name to satisfy model requirement
         status: 'pending',
       });
     }
 
     // Clear any existing OTP before generating new one
     seller.clearOTP();
-    
+
     // Check if this is a test phone number - use default OTP 123456
     const testOTPInfo = getTestOTPInfo(phone);
     let otpCode;
@@ -402,7 +404,7 @@ exports.verifyOTP = async (req, res, next) => {
 
       // Find or create seller
       let seller = await Seller.findOne({ phone });
-      
+
       if (!seller) {
         // Generate unique sellerId
         const lastSeller = await Seller.findOne()
@@ -624,7 +626,7 @@ exports.getProfile = async (req, res, next) => {
   try {
     // Seller is attached by authorizeSeller middleware
     const seller = req.seller;
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -751,7 +753,7 @@ exports.getDashboard = async (req, res, next) => {
     // Get current month's sales (completed orders)
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     const currentMonthSales = await Order.aggregate([
       {
         $match: {
@@ -827,7 +829,7 @@ exports.getOverview = async (req, res, next) => {
     // Get current month's sales
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     const salesData = await Order.aggregate([
       {
         $match: {
@@ -1260,7 +1262,7 @@ exports.requestWithdrawal = async (req, res, next) => {
     ]);
 
     const actualPendingAmount = actualPendingWithdrawals[0]?.totalAmount || 0;
-    
+
     // Sync wallet.pending if it's out of sync (for data consistency)
     if (Math.abs(seller.wallet.pending - actualPendingAmount) > 0.01) {
       seller.wallet.pending = actualPendingAmount;
@@ -1909,7 +1911,7 @@ exports.getDashboardHighlights = async (req, res, next) => {
     const totalReferrals = await User.countDocuments({ sellerId: seller.sellerId });
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     const currentMonthSales = await Order.aggregate([
       {
         $match: {
