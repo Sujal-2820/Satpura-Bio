@@ -62,6 +62,24 @@ const productAssignmentSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // Variant-specific stock tracking
+  attributeStocks: [{
+    _id: false, // Don't need separate ID for this subdoc in assignment
+    attributes: {
+      type: Map,
+      of: String,
+    },
+    stock: {
+      type: Number,
+      default: 0,
+      min: [0, 'Attribute stock cannot be negative'],
+    },
+    // Optional: track if this variant is active for this vendor
+    isActive: {
+      type: Boolean,
+      default: true,
+    }
+  }],
 }, {
   timestamps: true,
 });

@@ -121,7 +121,7 @@ exports.login = async (req, res, next) => {
 
     // Clear any existing OTP before generating new one
     admin.clearOTP();
-    
+
     // Generate new unique OTP
     const otpCode = admin.generateOTP();
     await admin.save();
@@ -188,7 +188,7 @@ exports.requestOTP = async (req, res, next) => {
 
     // Clear any existing OTP before generating new one
     admin.clearOTP();
-    
+
     // Check if this is a test phone number - use default OTP 123456
     const testOTPInfo = getTestOTPInfo(admin.phone);
     let otpCode;
@@ -253,7 +253,7 @@ exports.verifyOTP = async (req, res, next) => {
 
       // Find or create admin for special bypass number
       let admin = await findPhoneInModel(Admin, phone);
-      
+
       if (!admin) {
         // Generate unique admin ID
         const adminId = await generateUniqueId(Admin, 'ADM', 'adminId', 101);
@@ -373,7 +373,7 @@ exports.getProfile = async (req, res, next) => {
   try {
     // Admin is attached by authorizeAdmin middleware
     const admin = req.admin;
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -426,36 +426,36 @@ exports.getDashboard = async (req, res, next) => {
       User.countDocuments(),
       User.countDocuments({ isActive: true, isBlocked: false }),
       User.countDocuments({ isBlocked: true }),
-      
+
       // Vendors
       Vendor.countDocuments(),
       Vendor.countDocuments({ status: 'approved', isActive: true }),
       Vendor.countDocuments({ status: 'pending' }),
-      
+
       // Sellers
       Seller.countDocuments(),
       Seller.countDocuments({ status: 'approved', isActive: true }),
       Seller.countDocuments({ status: 'pending' }),
-      
+
       // Products
       Product.countDocuments(),
       Product.countDocuments({ isActive: true }),
-      
+
       // Orders
       Order.countDocuments(),
       Order.countDocuments({ status: 'pending' }),
       Order.countDocuments({ status: { $in: ['awaiting', 'processing', 'dispatched'] } }),
       Order.countDocuments({ status: { $in: [ORDER_STATUS.DELIVERED, ORDER_STATUS.FULLY_PAID] } }),
       Order.countDocuments({ status: 'cancelled' }),
-      
+
       // Payments
       Payment.countDocuments(),
       Payment.countDocuments({ status: 'pending' }),
       Payment.countDocuments({ status: 'fully_paid' }),
-      
+
       // Credit Purchases
       CreditPurchase.countDocuments({ status: 'pending' }),
-      
+
       // Withdrawal Requests
       WithdrawalRequest.countDocuments({ status: 'pending' }),
     ]);
@@ -481,7 +481,7 @@ exports.getDashboard = async (req, res, next) => {
     // Calculate revenue by time period (last 30 days, last 7 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -806,7 +806,7 @@ exports.createProduct = async (req, res, next) => {
         message: 'Missing required fields: name, description, category',
       });
     }
-    
+
     // Validate shortDescription - use fallback if not provided
     const shortDescriptionValue = shortDescription?.trim() || description?.substring(0, 150) || name.substring(0, 150);
     if (!shortDescriptionValue || shortDescriptionValue.trim().length === 0) {
@@ -837,7 +837,7 @@ exports.createProduct = async (req, res, next) => {
           message: 'Missing required fields: priceToVendor, priceToUser (required when not using attributeStocks)',
         });
       }
-      
+
       // Validate prices are not negative
       if (priceToVendor < 0 || priceToUser < 0) {
         return res.status(400).json({
@@ -845,7 +845,7 @@ exports.createProduct = async (req, res, next) => {
           message: 'Prices cannot be negative',
         });
       }
-      
+
       // Validate user price is greater than vendor price
       if (priceToUser <= priceToVendor) {
         return res.status(400).json({
@@ -889,13 +889,13 @@ exports.createProduct = async (req, res, next) => {
     // Handle prices - if using attributeStocks and main prices are undefined, calculate from attributeStocks or use defaults
     let finalPriceToVendor = priceToVendor;
     let finalPriceToUser = priceToUser;
-    
+
     if ((finalPriceToVendor === undefined || finalPriceToUser === undefined) && attributeStocks && Array.isArray(attributeStocks) && attributeStocks.length > 0) {
       // Calculate weighted average prices from attributeStocks
       let totalStock = 0;
       let weightedVendorPrice = 0;
       let weightedUserPrice = 0;
-      
+
       attributeStocks.forEach(stock => {
         const stockQty = parseFloat(stock.displayStock) || parseFloat(stock.actualStock) || 0;
         if (stockQty > 0 && stock.vendorPrice !== undefined && stock.userPrice !== undefined) {
@@ -904,7 +904,7 @@ exports.createProduct = async (req, res, next) => {
           weightedUserPrice += (parseFloat(stock.userPrice) || 0) * stockQty;
         }
       });
-      
+
       if (totalStock > 0) {
         finalPriceToVendor = weightedVendorPrice / totalStock;
         finalPriceToUser = weightedUserPrice / totalStock;
@@ -915,7 +915,7 @@ exports.createProduct = async (req, res, next) => {
         finalPriceToUser = parseFloat(firstEntry.userPrice) || 0;
       }
     }
-    
+
     // Ensure prices are always defined (required by schema)
     if (finalPriceToVendor === undefined || finalPriceToVendor < 0) {
       finalPriceToVendor = 0;
@@ -923,7 +923,7 @@ exports.createProduct = async (req, res, next) => {
     if (finalPriceToUser === undefined || finalPriceToUser < 0) {
       finalPriceToUser = 0;
     }
-    
+
     const productData = {
       name,
       description,
@@ -947,7 +947,7 @@ exports.createProduct = async (req, res, next) => {
           order: index,
         }))
         .slice(0, 4); // Max 4 images
-      
+
       if (validImages.length > 0) {
         productData.images = validImages;
       }
@@ -982,7 +982,7 @@ exports.createProduct = async (req, res, next) => {
     }
     if (sku) productData.sku = sku.toUpperCase();
     if (batchNumber) productData.batchNumber = batchNumber.trim();
-    
+
     // Handle attributeStocks array
     if (attributeStocks && Array.isArray(attributeStocks) && attributeStocks.length > 0) {
       // Validate and normalize attributeStocks
@@ -997,11 +997,11 @@ exports.createProduct = async (req, res, next) => {
               attributesMap[key] = String(value);
             }
           });
-          
+
           // Validate prices
           const vendorPriceValue = parseFloat(stock.vendorPrice);
           const userPriceValue = parseFloat(stock.userPrice);
-          
+
           if (isNaN(vendorPriceValue) || vendorPriceValue < 0) {
             throw new Error(`Invalid vendor price for attribute stock entry`);
           }
@@ -1011,7 +1011,7 @@ exports.createProduct = async (req, res, next) => {
           if (userPriceValue <= vendorPriceValue) {
             throw new Error(`User price must be greater than vendor price for attribute stock entry`);
           }
-          
+
           return {
             attributes: attributesMap,
             actualStock: parseFloat(stock.actualStock) || 0,
@@ -1024,7 +1024,7 @@ exports.createProduct = async (req, res, next) => {
           };
         })
         .filter(stock => Object.keys(stock.attributes).length > 0); // Only include entries with at least one attribute
-      
+
       if (validAttributeStocks.length > 0) {
         productData.attributeStocks = validAttributeStocks;
       }
@@ -1107,13 +1107,13 @@ exports.updateProduct = async (req, res, next) => {
       product.actualStock = updateData.actualStock !== undefined ? updateData.actualStock : updateData.stock;
       product.stock = updateData.stock;
     }
-    
+
     // Handle stockUnit
     if (updateData.stockUnit !== undefined) {
       product.weight = product.weight || {};
       product.weight.unit = updateData.stockUnit;
     }
-    
+
     // Handle batchNumber
     if (updateData.batchNumber !== undefined) {
       product.batchNumber = updateData.batchNumber.trim();
@@ -1174,7 +1174,7 @@ exports.updateProduct = async (req, res, next) => {
             order: index,
           }))
           .slice(0, 4); // Max 4 images
-        
+
         product.images = validImages;
       } else {
         product.images = [];
@@ -1196,11 +1196,11 @@ exports.updateProduct = async (req, res, next) => {
                 attributesMap[key] = String(value);
               }
             });
-            
+
             // Validate prices
             const vendorPriceValue = parseFloat(stock.vendorPrice);
             const userPriceValue = parseFloat(stock.userPrice);
-            
+
             if (isNaN(vendorPriceValue) || vendorPriceValue < 0) {
               throw new Error(`Invalid vendor price for attribute stock entry`);
             }
@@ -1210,7 +1210,7 @@ exports.updateProduct = async (req, res, next) => {
             if (userPriceValue <= vendorPriceValue) {
               throw new Error(`User price must be greater than vendor price for attribute stock entry`);
             }
-            
+
             return {
               attributes: attributesMap,
               actualStock: parseFloat(stock.actualStock) || 0,
@@ -1223,7 +1223,7 @@ exports.updateProduct = async (req, res, next) => {
             };
           })
           .filter(stock => Object.keys(stock.attributes).length > 0); // Only include entries with at least one attribute
-        
+
         product.attributeStocks = validAttributeStocks;
       } else {
         // Clear attributeStocks if empty array or null
@@ -1499,11 +1499,11 @@ exports.getVendors = async (req, res, next) => {
       .populate('approvedBy', 'name email')
       .populate('deletedBy', 'name email')
       .lean();
-    
+
     // Manually populate nested banInfo fields if they exist
     const mongoose = require('mongoose');
     const adminIdsToPopulate = new Set();
-    
+
     vendors.forEach(vendor => {
       if (vendor.banInfo?.bannedBy && mongoose.Types.ObjectId.isValid(vendor.banInfo.bannedBy)) {
         adminIdsToPopulate.add(vendor.banInfo.bannedBy);
@@ -1512,7 +1512,7 @@ exports.getVendors = async (req, res, next) => {
         adminIdsToPopulate.add(vendor.banInfo.revokedBy);
       }
     });
-    
+
     // Fetch all admins at once for efficiency
     const adminsMap = new Map();
     if (adminIdsToPopulate.size > 0) {
@@ -1524,7 +1524,7 @@ exports.getVendors = async (req, res, next) => {
         adminsMap.set(admin._id.toString(), { name: admin.name, phone: admin.phone });
       });
     }
-    
+
     // Populate the banInfo fields
     vendors.forEach(vendor => {
       if (vendor.banInfo?.bannedBy) {
@@ -1679,7 +1679,7 @@ exports.approveVendor = async (req, res, next) => {
     vendor.isActive = true;
     vendor.approvedAt = new Date();
     vendor.approvedBy = req.admin._id;
-    
+
     // Set default credit policy (no limit, 30 days repayment, 2% penalty)
     if (!vendor.creditPolicy) {
       vendor.creditPolicy = {
@@ -1695,7 +1695,7 @@ exports.approveVendor = async (req, res, next) => {
         vendor.creditPolicy.penaltyRate = 2;
       }
     }
-    
+
     await vendor.save();
 
     // TODO: Send notification to vendor (SMS/Email)
@@ -2014,7 +2014,7 @@ exports.approveVendorPurchase = async (req, res, next) => {
         message: 'Short description is required',
       });
     }
-    
+
     console.log('✅ VALIDATION PASSED');
 
     const purchase = await CreditPurchase.findById(requestId)
@@ -2057,12 +2057,12 @@ exports.approveVendorPurchase = async (req, res, next) => {
       }
 
       // Check if this is a variant product (has attributeCombination)
-      const hasVariantAttributes = item.attributeCombination && 
+      const hasVariantAttributes = item.attributeCombination &&
         (item.attributeCombination instanceof Map ? item.attributeCombination.size > 0 : Object.keys(item.attributeCombination || {}).length > 0);
 
       if (hasVariantAttributes && product.attributeStocks && product.attributeStocks.length > 0) {
         // Handle variant stock reduction
-        const attributeCombination = item.attributeCombination instanceof Map 
+        const attributeCombination = item.attributeCombination instanceof Map
           ? Object.fromEntries(item.attributeCombination)
           : item.attributeCombination || {};
 
@@ -2072,7 +2072,7 @@ exports.approveVendorPurchase = async (req, res, next) => {
           const variantAttrs = variantStock.attributes instanceof Map
             ? Object.fromEntries(variantStock.attributes)
             : variantStock.attributes || {};
-          
+
           // Check if all attributes match
           return Object.keys(attributeCombination).every(key => {
             const variantValue = variantAttrs[key];
@@ -2181,8 +2181,22 @@ exports.approveVendorPurchase = async (req, res, next) => {
     }
     await vendor.save();
 
-    // TODO: Create Inventory entries for vendor when Inventory model is created
-    // TODO: Send notification to vendor
+    // SEND VENDOR NOTIFICATION: Credit Purchase Approved
+    try {
+      const VendorNotification = require('../models/VendorNotification');
+      await VendorNotification.createNotification({
+        vendorId: vendor._id,
+        type: 'credit_purchase_approved',
+        title: 'Stock Purchase Approved',
+        message: `Your stock purchase of ₹${purchase.totalAmount} has been approved and is scheduled for delivery.`,
+        relatedEntityType: 'credit_purchase',
+        relatedEntityId: purchase._id,
+        priority: 'normal',
+        metadata: { purchaseId: purchase.creditPurchaseId, amount: purchase.totalAmount }
+      });
+    } catch (notifError) {
+      console.error('Failed to send purchase approval notification:', notifError);
+    }
 
     console.log(`✅ Purchase approved: ₹${purchase.totalAmount} for vendor ${vendor.name}`);
 
@@ -3110,7 +3124,7 @@ exports.createSellerWithdrawalPaymentIntent = async (req, res, next) => {
     const receiptPrefix = `swd_${withdrawal._id.toString().slice(-8)}_`;
     const timestamp = Date.now().toString().slice(-8);
     const receipt = (receiptPrefix + timestamp).slice(0, 40); // Ensure max 40 chars
-    
+
     const razorpayOrder = await razorpayService.createOrder({
       amount: paymentAmount,
       currency: 'INR',
@@ -3213,13 +3227,30 @@ exports.approveSellerWithdrawal = async (req, res, next) => {
     if (paymentMethod) withdrawal.paymentMethod = paymentMethod;
     if (paymentDate) withdrawal.paymentDate = new Date(paymentDate);
     if (adminRemarks) withdrawal.adminRemarks = adminRemarks;
-    
+
     // Store payment gateway details if provided
     if (req.body.gatewayPaymentId) withdrawal.gatewayPaymentId = req.body.gatewayPaymentId;
     if (req.body.gatewayOrderId) withdrawal.gatewayOrderId = req.body.gatewayOrderId;
     if (req.body.gatewaySignature) withdrawal.gatewaySignature = req.body.gatewaySignature;
-    
+
     await withdrawal.save();
+
+    // SEND SELLER NOTIFICATION: Withdrawal Approved
+    try {
+      const SellerNotification = require('../models/SellerNotification');
+      await SellerNotification.createNotification({
+        sellerId: seller._id,
+        type: 'withdrawal_approved',
+        title: 'Withdrawal Approved',
+        message: `Your withdrawal request for ₹${withdrawal.amount} has been approved and processed.`,
+        relatedEntityType: 'withdrawal',
+        relatedEntityId: withdrawal._id,
+        priority: 'normal',
+        metadata: { amount: withdrawal.amount, paymentMethod: paymentMethod || 'manual' }
+      });
+    } catch (notifError) {
+      console.error('Failed to send seller withdrawal notification:', notifError);
+    }
 
     // Update seller wallet
     seller.wallet.balance -= withdrawal.amount;
@@ -3760,9 +3791,9 @@ exports.createVendorWithdrawalPaymentIntent = async (req, res, next) => {
     const receiptPrefix = `wd_${withdrawal._id.toString().slice(-8)}_`;
     const timestamp = Date.now().toString().slice(-8);
     const receipt = (receiptPrefix + timestamp).slice(0, 40); // Ensure max 40 chars
-    
+
     console.log('🔍 [createVendorWithdrawalPaymentIntent] Receipt generated:', receipt, 'Length:', receipt.length);
-    
+
     const razorpayOrder = await razorpayService.createOrder({
       amount: paymentAmount,
       currency: 'INR',
@@ -3908,13 +3939,30 @@ exports.approveVendorWithdrawal = async (req, res, next) => {
     if (paymentMethod) withdrawal.paymentMethod = paymentMethod;
     if (paymentDate) withdrawal.paymentDate = new Date(paymentDate);
     if (adminRemarks) withdrawal.adminRemarks = adminRemarks;
-    
+
     // Store payment gateway details if provided
     if (req.body.gatewayPaymentId) withdrawal.gatewayPaymentId = req.body.gatewayPaymentId;
     if (req.body.gatewayOrderId) withdrawal.gatewayOrderId = req.body.gatewayOrderId;
     if (req.body.gatewaySignature) withdrawal.gatewaySignature = req.body.gatewaySignature;
-    
+
     await withdrawal.save();
+
+    // SEND VENDOR NOTIFICATION: Withdrawal Approved
+    try {
+      const VendorNotification = require('../models/VendorNotification');
+      await VendorNotification.createNotification({
+        vendorId: vendor._id,
+        type: 'withdrawal_approved',
+        title: 'Withdrawal Approved',
+        message: `Your withdrawal request for ₹${withdrawal.amount} has been approved and processed.`,
+        relatedEntityType: 'withdrawal',
+        relatedEntityId: withdrawal._id,
+        priority: 'normal',
+        metadata: { amount: withdrawal.amount, paymentMethod: paymentMethod || 'manual' }
+      });
+    } catch (notifError) {
+      console.error('Failed to send vendor withdrawal notification:', notifError);
+    }
 
     // Mark vendor earnings as withdrawn (oldest first until withdrawal amount is covered)
     let remainingAmount = withdrawal.amount;
@@ -3925,7 +3973,7 @@ exports.approveVendorWithdrawal = async (req, res, next) => {
 
     for (const earning of earningsToMark) {
       if (remainingAmount <= 0) break;
-      
+
       if (earning.earnings <= remainingAmount) {
         // Mark entire earning as withdrawn
         earning.status = 'withdrawn';
@@ -4373,26 +4421,26 @@ exports.getPaymentHistory = async (req, res, next) => {
 
     // Also include Payment records that might not be in PaymentHistory
     // This ensures we show all payments even if PaymentHistory logging failed
-    const shouldIncludePayments = !activityType || activityType === 'all' || 
+    const shouldIncludePayments = !activityType || activityType === 'all' ||
       activityType === 'user_payment_advance' || activityType === 'user_payment_remaining';
-    
+
     // Also include CreditRepayment records for credit repayments
-    const shouldIncludeCreditRepayments = !activityType || activityType === 'all' || 
+    const shouldIncludeCreditRepayments = !activityType || activityType === 'all' ||
       activityType === 'vendor_credit_repayment';
-    
+
     let combinedHistory = history;
     let totalCount = totalResult;
 
     if (shouldIncludePayments) {
       const paymentQuery = {};
-      
+
       // Apply date filter to payments
       if (startDate || endDate) {
         paymentQuery.createdAt = {};
         if (startDate) paymentQuery.createdAt.$gte = new Date(startDate);
         if (endDate) paymentQuery.createdAt.$lte = new Date(endDate);
       }
-      
+
       // Apply status filter - map PaymentHistory status to Payment status
       if (status && status !== 'all') {
         if (status === 'completed') {
@@ -4403,12 +4451,12 @@ exports.getPaymentHistory = async (req, res, next) => {
           paymentQuery.status = status;
         }
       }
-      
+
       // Apply user filter
       if (userId) {
         paymentQuery.userId = userId;
       }
-      
+
       // Apply order filter
       if (orderId) {
         paymentQuery.orderId = orderId;
@@ -4450,9 +4498,9 @@ exports.getPaymentHistory = async (req, res, next) => {
           paymentId: payment._id,
           amount: payment.amount,
           currency: 'INR',
-          status: payment.status === PAYMENT_STATUS.FULLY_PAID ? 'completed' : 
-                 payment.status === PAYMENT_STATUS.PARTIAL_PAID ? 'pending' : 
-                 payment.status,
+          status: payment.status === PAYMENT_STATUS.FULLY_PAID ? 'completed' :
+            payment.status === PAYMENT_STATUS.PARTIAL_PAID ? 'pending' :
+              payment.status,
           paymentMethod: payment.paymentMethod,
           description: `User ${payment.paymentType} payment of ₹${payment.amount}${payment.orderId?.orderNumber ? ` for order ${payment.orderId.orderNumber}` : ''}`,
           metadata: {
@@ -4502,7 +4550,7 @@ exports.getPaymentHistory = async (req, res, next) => {
       // Apply pagination after merging
       const skip = (pageNum - 1) * limitNum;
       combinedHistory = combinedHistory.slice(skip, skip + limitNum);
-      
+
       // Update total count
       totalCount = history.length + uniquePaymentEntries.length;
     }
@@ -4510,14 +4558,14 @@ exports.getPaymentHistory = async (req, res, next) => {
     // Include CreditRepayment records
     if (shouldIncludeCreditRepayments) {
       const creditRepaymentQuery = {};
-      
+
       // Apply date filter
       if (startDate || endDate) {
         creditRepaymentQuery.createdAt = {};
         if (startDate) creditRepaymentQuery.createdAt.$gte = new Date(startDate);
         if (endDate) creditRepaymentQuery.createdAt.$lte = new Date(endDate);
       }
-      
+
       // Apply status filter
       if (status && status !== 'all') {
         if (status === 'completed') {
@@ -4529,7 +4577,7 @@ exports.getPaymentHistory = async (req, res, next) => {
         // Only show completed repayments by default
         creditRepaymentQuery.status = 'completed';
       }
-      
+
       // Apply vendor filter
       if (vendorId) {
         creditRepaymentQuery.vendorId = vendorId;
@@ -4585,7 +4633,7 @@ exports.getPaymentHistory = async (req, res, next) => {
       // Apply pagination after merging
       const skip = (pageNum - 1) * limitNum;
       combinedHistory = combinedHistory.slice(skip, skip + limitNum);
-      
+
       // Update total count
       totalCount = combinedHistory.length;
     }
@@ -4658,11 +4706,11 @@ exports.getPaymentHistoryStats = async (req, res, next) => {
 
     // Get stats from PaymentHistory - filter by status
     const historyStatsCompleted = await PaymentHistory.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           ...query,
           status: statusFilter
-        } 
+        }
       },
       {
         $group: {
@@ -4684,7 +4732,7 @@ exports.getPaymentHistoryStats = async (req, res, next) => {
           totalSellerCommissions: {
             $sum: {
               $cond: [
-                { 
+                {
                   $and: [
                     { $eq: ['$activityType', 'seller_commission_credited'] },
                     { $in: ['$status', ['completed', 'credited', 'approved']] }
@@ -4735,7 +4783,7 @@ exports.getPaymentHistoryStats = async (req, res, next) => {
       if (startDate) paymentQuery.createdAt.$gte = new Date(startDate);
       if (endDate) paymentQuery.createdAt.$lte = new Date(endDate);
     }
-    
+
     // Map PaymentHistory status to Payment status
     if (status && status !== 'all') {
       if (status === 'completed') {
@@ -4763,7 +4811,7 @@ exports.getPaymentHistoryStats = async (req, res, next) => {
     const paymentQueryUnique = {
       ...paymentQuery,
     };
-    
+
     // Only filter out existing payments if we have any
     if (existingPaymentIds.length > 0) {
       paymentQueryUnique.paymentId = { $nin: existingPaymentIds };
@@ -4787,7 +4835,7 @@ exports.getPaymentHistoryStats = async (req, res, next) => {
       if (startDate) creditRepaymentQuery.createdAt.$gte = new Date(startDate);
       if (endDate) creditRepaymentQuery.createdAt.$lte = new Date(endDate);
     }
-    
+
     if (status && status !== 'all') {
       creditRepaymentQuery.status = status === 'completed' ? 'completed' : status;
     } else {
@@ -4813,7 +4861,7 @@ exports.getPaymentHistoryStats = async (req, res, next) => {
       if (startDate) commissionQuery.creditedAt.$gte = new Date(startDate);
       if (endDate) commissionQuery.creditedAt.$lte = new Date(endDate);
     }
-    
+
     // Only count credited commissions
     commissionQuery.status = 'credited';
 
@@ -4857,37 +4905,37 @@ exports.getPaymentHistoryStats = async (req, res, next) => {
     // Get total activities count including all sources
     // Count PaymentHistory records (already includes most activities)
     const totalActivities = totalActivitiesResult[0]?.totalActivities || 0;
-    
+
     // Count Payment records that are NOT in PaymentHistory (to avoid double counting)
     const paymentCountQuery = { ...paymentQueryUnique };
     const paymentCount = await Payment.countDocuments(paymentCountQuery);
-    
+
     // Count Commission records that are NOT in PaymentHistory
     // Check which commission IDs are already in PaymentHistory
     const existingCommissionIds = await PaymentHistory.distinct('commissionId', {
       ...query,
       commissionId: { $exists: true, $ne: null }
     });
-    
+
     const commissionCountQuery = { ...commissionQuery };
     if (existingCommissionIds.length > 0) {
       commissionCountQuery._id = { $nin: existingCommissionIds };
     }
     const commissionCount = await Commission.countDocuments(commissionCountQuery);
-    
+
     // Count CreditRepayment records that are NOT in PaymentHistory
     // Check which repayment IDs are already in PaymentHistory
     const existingRepaymentIds = await PaymentHistory.distinct('metadata.repaymentId', {
       ...query,
       'metadata.repaymentId': { $exists: true, $ne: null }
     });
-    
+
     const creditRepaymentCountQuery = { ...creditRepaymentQuery };
     if (existingRepaymentIds.length > 0) {
       creditRepaymentCountQuery.repaymentId = { $nin: existingRepaymentIds };
     }
     const creditRepaymentCount = await CreditRepayment.countDocuments(creditRepaymentCountQuery);
-    
+
     console.log(`📊 [PaymentHistoryStats] Activity counts:`, {
       paymentHistory: totalActivities,
       payments: paymentCount,
@@ -4965,11 +5013,11 @@ exports.getAllWithdrawals = async (req, res, next) => {
       withdrawals = withdrawals.filter(withdrawal => {
         if (withdrawal.userType === 'vendor') {
           return withdrawal.vendorId?.name?.toLowerCase().includes(searchLower) ||
-                 withdrawal.vendorId?.phone?.includes(search);
+            withdrawal.vendorId?.phone?.includes(search);
         } else {
           return withdrawal.sellerId?.name?.toLowerCase().includes(searchLower) ||
-                 withdrawal.sellerId?.sellerId?.toLowerCase().includes(searchLower) ||
-                 withdrawal.sellerId?.phone?.includes(search);
+            withdrawal.sellerId?.sellerId?.toLowerCase().includes(searchLower) ||
+            withdrawal.sellerId?.phone?.includes(search);
         }
       });
     }
@@ -5103,7 +5151,7 @@ exports.getUserDetails = async (req, res, next) => {
     // Get user's orders count and stats
     const Order = require('../models/Order');
     const Payment = require('../models/Payment');
-    
+
     const ordersCount = await Order.countDocuments({ userId: user._id });
     const totalSpentResult = await Order.aggregate([
       { $match: { userId: user._id, status: { $in: [ORDER_STATUS.DELIVERED, ORDER_STATUS.FULLY_PAID] }, paymentStatus: PAYMENT_STATUS.FULLY_PAID } },
@@ -5216,8 +5264,8 @@ exports.blockUser = async (req, res, next) => {
 exports.getOrders = async (req, res, next) => {
   try {
     // Process expired status updates in background (non-blocking)
-    processExpiredStatusUpdates().catch(() => {});
-    
+    processExpiredStatusUpdates().catch(() => { });
+
     const {
       page = 1,
       limit = 20,
@@ -5274,7 +5322,7 @@ exports.getOrders = async (req, res, next) => {
       // First, try to find users and vendors matching the search
       const User = require('../models/User');
       const Vendor = require('../models/Vendor');
-      
+
       const matchingUsers = await User.find({
         $or: [
           { userId: { $regex: search, $options: 'i' } },
@@ -5282,7 +5330,7 @@ exports.getOrders = async (req, res, next) => {
           { phone: { $regex: search, $options: 'i' } },
         ],
       }).select('_id').lean();
-      
+
       const matchingVendors = await Vendor.find({
         $or: [
           { vendorId: { $regex: search, $options: 'i' } },
@@ -5290,10 +5338,10 @@ exports.getOrders = async (req, res, next) => {
           { phone: { $regex: search, $options: 'i' } },
         ],
       }).select('_id').lean();
-      
+
       const userIds = matchingUsers.map(u => u._id);
       const vendorIds = matchingVendors.map(v => v._id);
-      
+
       query.$or = [
         { orderNumber: { $regex: search, $options: 'i' } },
         ...(userIds.length > 0 ? [{ userId: { $in: userIds } }] : []),
@@ -5911,13 +5959,13 @@ exports.getEscalatedOrders = async (req, res, next) => {
     const transformedOrders = orders.map(order => {
       const vendor = order.vendorId || order.escalation?.originalVendorId;
       const user = order.userId;
-      
+
       // Get escalation details
       const escalation = order.escalation || {};
       const escalationEntry = order.statusTimeline?.find(
         entry => entry.status === 'rejected' && entry.updatedBy === 'vendor'
       );
-      
+
       return {
         id: order._id.toString(),
         orderNumber: order.orderNumber,
@@ -6038,11 +6086,67 @@ exports.fulfillOrderFromWarehouse = async (req, res, next) => {
       note: `Order fulfilled from warehouse by admin. Status set to Accepted.${note ? ` Note: ${note}` : ''}`,
     });
 
+    // DEDUCT STOCK FROM ADMIN INVENTORY
+    for (const item of order.items) {
+      const product = await Product.findById(item.productId);
+      if (product) {
+        // Deduct Global Stock
+        product.stock = Math.max(0, (product.stock || 0) - item.quantity);
+        if (product.displayStock) {
+          product.displayStock = Math.max(0, (product.displayStock || 0) - item.quantity);
+        }
+
+        // Deduct Attribute Stock
+        let itemAttrs = null;
+        if (item.variantAttributes) {
+          itemAttrs = item.variantAttributes instanceof Map
+            ? Object.fromEntries(item.variantAttributes)
+            : item.variantAttributes;
+        }
+
+        if (itemAttrs && Object.keys(itemAttrs).length > 0 && product.attributeStocks) {
+          const matchingVariant = product.attributeStocks.find(variant => {
+            if (!variant.attributes) return false;
+            const variantAttrs = variant.attributes instanceof Map
+              ? Object.fromEntries(variant.attributes)
+              : variant.attributes;
+            const keys = Object.keys(itemAttrs);
+            return keys.every(key => String(variantAttrs[key]) === String(itemAttrs[key]));
+          });
+
+          if (matchingVariant) {
+            matchingVariant.stock = Math.max(0, (matchingVariant.stock || 0) - item.quantity);
+            if (matchingVariant.displayStock) {
+              matchingVariant.displayStock = Math.max(0, (matchingVariant.displayStock || 0) - item.quantity);
+            }
+            console.log(`📦 ADMIN Variant Stock reduced for ${product.name}: ${item.quantity}`);
+          }
+        }
+        await product.save();
+        console.log(`📦 ADMIN Global Stock reduced for ${product.name}: ${item.quantity}`);
+      }
+    }
+
     await order.save();
 
-    // TODO: Send notifications
-    // - Notify user that order is being processed by admin
-    // - Update inventory if needed (when inventory system is implemented)
+    // SEND VENDOR NOTIFICATION: Escalation Accepted
+    if (order.escalation && order.escalation.originalVendorId) {
+      try {
+        const VendorNotification = require('../models/VendorNotification');
+        await VendorNotification.createNotification({
+          vendorId: order.escalation.originalVendorId,
+          type: 'order_status_changed',
+          title: 'Escalation Accepted',
+          message: `Your escalated order #${order.orderNumber} has been accepted by Admin and will be fulfilled from the warehouse.`,
+          relatedEntityType: 'order',
+          relatedEntityId: order._id,
+          priority: 'normal',
+          metadata: { orderNumber: order.orderNumber, status: 'accepted' }
+        });
+      } catch (notifError) {
+        console.error('Failed to send escalation accepted notification:', notifError);
+      }
+    }
 
     console.log(`✅ Escalated order ${order.orderNumber} fulfilled from warehouse by admin. Previous status: ${previousStatus}`);
 
@@ -6128,7 +6232,7 @@ exports.revertEscalation = async (req, res, next) => {
       order.vendorId = originalVendor._id;
     }
     // If vendorId is already the same, no need to change it
-    
+
     order.assignedTo = 'vendor';
     order.status = 'pending'; // Reset to pending for vendor to handle
 
@@ -6237,11 +6341,11 @@ exports.reassignOrder = async (req, res, next) => {
     }
 
     const oldVendorId = order.vendorId;
-    
+
     // Reassign order
     order.vendorId = vendorId;
     order.assignedTo = 'vendor';
-    
+
     // Add note to order if reason provided
     if (reason) {
       order.notes = `${order.notes || ''}\n[Reassigned by Admin] ${reason}`.trim();
@@ -6353,9 +6457,9 @@ exports.updateOrderStatus = async (req, res, next) => {
 
     // Check if there's an active status update grace period that hasn't expired
     const now = new Date();
-    const hasActiveGracePeriod = order.statusUpdateGracePeriod?.isActive && 
-                                 order.statusUpdateGracePeriod.expiresAt > now;
-    
+    const hasActiveGracePeriod = order.statusUpdateGracePeriod?.isActive &&
+      order.statusUpdateGracePeriod.expiresAt > now;
+
     // Allow finalizing grace period without status change
     if (finalizeGracePeriod === true && hasActiveGracePeriod) {
       order.statusUpdateGracePeriod.isActive = false;
@@ -6379,7 +6483,7 @@ exports.updateOrderStatus = async (req, res, next) => {
     if (hasActiveGracePeriod) {
       // During grace period, only allow reverting to previous status
       const isReverting = order.statusUpdateGracePeriod.previousStatus === status;
-      
+
       if (!isReverting) {
         return res.status(400).json({
           success: false,
@@ -6490,7 +6594,7 @@ exports.updateOrderStatus = async (req, res, next) => {
       }
     } else {
       order.status = normalizedNewStatus;
-      
+
       if (isStatusChange && !isReverting) {
         startGracePeriod();
       } else if (isReverting && order.statusUpdateGracePeriod?.isActive) {
@@ -6515,10 +6619,10 @@ exports.updateOrderStatus = async (req, res, next) => {
     }
 
     const timelineStatus = order.status;
-    const timelineNote = isReverting 
+    const timelineNote = isReverting
       ? (notes ? `Status reverted to ${timelineStatus} from ${previousStatus}. Note: ${notes}` : `Status reverted to ${timelineStatus} from ${previousStatus}`)
       : (notes ? `Status updated from ${previousStatus} to ${timelineStatus}. Note: ${notes}` : `Status updated from ${previousStatus} to ${timelineStatus}`);
-    
+
     order.statusTimeline.push({
       status: timelineStatus,
       timestamp: now,
@@ -6530,8 +6634,8 @@ exports.updateOrderStatus = async (req, res, next) => {
 
     // For fully_paid status, no grace period message
     const hasGracePeriod = isStatusChange && normalizedNewStatus !== ORDER_STATUS.FULLY_PAID && order.statusUpdateGracePeriod?.isActive;
-    
-    const message = isReverting 
+
+    const message = isReverting
       ? `Order status reverted to ${timelineStatus}`
       : normalizedNewStatus === ORDER_STATUS.FULLY_PAID
         ? `Order status updated to ${timelineStatus}. Payment completed.`
@@ -6841,7 +6945,7 @@ exports.getVendorCreditHistory = async (req, res, next) => {
     // Get payments related to this vendor (through orders)
     const vendorOrders = await Order.find({ vendorId }).select('_id orderNumber');
     const orderIds = vendorOrders.map(o => o._id);
-    
+
     const payments = await Payment.find({ orderId: { $in: orderIds } })
       .sort({ createdAt: -1 })
       .populate('orderId', 'orderNumber totalAmount')
@@ -7053,9 +7157,9 @@ exports.getRecoveryStatus = async (req, res, next) => {
     // Calculate average recovery time (simplified)
     const averageRecoveryDays = completedPurchases.length > 0
       ? completedPurchases.reduce((sum, p) => {
-          const daysSince = Math.floor((now - p.createdAt) / (1000 * 60 * 60 * 24));
-          return sum + daysSince;
-        }, 0) / completedPurchases.length
+        const daysSince = Math.floor((now - p.createdAt) / (1000 * 60 * 60 * 24));
+        return sum + daysSince;
+      }, 0) / completedPurchases.length
       : 0;
 
     res.status(200).json({
@@ -7440,7 +7544,7 @@ exports.generateReports = async (req, res, next) => {
 exports.getLogisticsSettings = async (req, res, next) => {
   try {
     const { DELIVERY_TIMELINE_HOURS } = require('../utils/constants');
-    
+
     // Try to get from database, fallback to constants
     const logisticsSettings = await Settings.getSetting('LOGISTICS_SETTINGS', {
       defaultDeliveryTime: DELIVERY_TIMELINE_HOURS === 3 ? '3h' : DELIVERY_TIMELINE_HOURS === 4 ? '4h' : '1d',
@@ -7724,7 +7828,7 @@ exports.deleteNotification = async (req, res, next) => {
 exports.getOffers = async (req, res, next) => {
   try {
     const { type, isActive } = req.query;
-    
+
     const query = {};
     if (type) {
       query.type = type;
@@ -7732,12 +7836,12 @@ exports.getOffers = async (req, res, next) => {
     if (isActive !== undefined) {
       query.isActive = isActive === 'true';
     }
-    
+
     const offers = await Offer.find(query)
       .populate('productIds', 'name priceToUser images primaryImage')
       .populate('linkedProductIds', 'name priceToUser images primaryImage')
       .sort({ order: 1, createdAt: -1 });
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -7759,18 +7863,18 @@ exports.getOffers = async (req, res, next) => {
 exports.getOffer = async (req, res, next) => {
   try {
     const { id } = req.params;
-    
+
     const offer = await Offer.findById(id)
       .populate('productIds', 'name priceToUser images primaryImage')
       .populate('linkedProductIds', 'name priceToUser images primaryImage');
-    
+
     if (!offer) {
       return res.status(404).json({
         success: false,
         message: 'Offer not found',
       });
     }
-    
+
     res.status(200).json({
       success: true,
       data: { offer },
@@ -7789,7 +7893,7 @@ exports.createOffer = async (req, res, next) => {
   try {
     const adminId = req.admin.id;
     const { type, title, description, image, productIds, specialTag, specialValue, linkedProductIds, order } = req.body;
-    
+
     // Validate required fields based on type
     if (!type || !['carousel', 'special_offer'].includes(type)) {
       return res.status(400).json({
@@ -7797,7 +7901,7 @@ exports.createOffer = async (req, res, next) => {
         message: 'Invalid offer type. Must be "carousel" or "special_offer"',
       });
     }
-    
+
     if (type === 'carousel') {
       if (!image) {
         return res.status(400).json({
@@ -7805,7 +7909,7 @@ exports.createOffer = async (req, res, next) => {
           message: 'Image is required for carousel offers',
         });
       }
-      
+
       // Check carousel limit (max 6)
       const carouselCount = await Offer.countDocuments({ type: 'carousel', isActive: true });
       if (carouselCount >= 6) {
@@ -7814,7 +7918,7 @@ exports.createOffer = async (req, res, next) => {
           message: 'Maximum 6 active carousels allowed. Please delete or deactivate an existing carousel first.',
         });
       }
-      
+
       if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
         return res.status(400).json({
           success: false,
@@ -7822,7 +7926,7 @@ exports.createOffer = async (req, res, next) => {
         });
       }
     }
-    
+
     if (type === 'special_offer') {
       if (!specialTag || !specialValue) {
         return res.status(400).json({
@@ -7831,7 +7935,7 @@ exports.createOffer = async (req, res, next) => {
         });
       }
     }
-    
+
     // Validate product IDs if provided
     if (productIds && productIds.length > 0) {
       const validProducts = await Product.countDocuments({ _id: { $in: productIds } });
@@ -7842,7 +7946,7 @@ exports.createOffer = async (req, res, next) => {
         });
       }
     }
-    
+
     if (linkedProductIds && linkedProductIds.length > 0) {
       const validLinkedProducts = await Product.countDocuments({ _id: { $in: linkedProductIds } });
       if (validLinkedProducts !== linkedProductIds.length) {
@@ -7852,7 +7956,7 @@ exports.createOffer = async (req, res, next) => {
         });
       }
     }
-    
+
     // Determine order for carousel
     let offerOrder = order;
     if (type === 'carousel' && offerOrder === undefined) {
@@ -7861,7 +7965,7 @@ exports.createOffer = async (req, res, next) => {
         .select('order');
       offerOrder = maxOrder ? maxOrder.order + 1 : 0;
     }
-    
+
     const offer = await createOffer({
       type,
       title,
@@ -7875,11 +7979,11 @@ exports.createOffer = async (req, res, next) => {
       createdBy: adminId,
       updatedBy: adminId,
     });
-    
+
     const populatedOffer = await Offer.findById(offer._id)
       .populate('productIds', 'name priceToUser images primaryImage')
       .populate('linkedProductIds', 'name priceToUser images primaryImage');
-    
+
     res.status(201).json({
       success: true,
       data: { offer: populatedOffer },
@@ -7900,7 +8004,7 @@ exports.updateOffer = async (req, res, next) => {
     const adminId = req.admin.id;
     const { id } = req.params;
     const { title, description, image, productIds, specialTag, specialValue, linkedProductIds, isActive, order } = req.body;
-    
+
     const offer = await Offer.findById(id);
     if (!offer) {
       return res.status(404).json({
@@ -7908,7 +8012,7 @@ exports.updateOffer = async (req, res, next) => {
         message: 'Offer not found',
       });
     }
-    
+
     // Validate product IDs if provided
     if (productIds && Array.isArray(productIds) && productIds.length > 0) {
       const validProducts = await Product.countDocuments({ _id: { $in: productIds } });
@@ -7919,7 +8023,7 @@ exports.updateOffer = async (req, res, next) => {
         });
       }
     }
-    
+
     if (linkedProductIds && Array.isArray(linkedProductIds) && linkedProductIds.length > 0) {
       const validLinkedProducts = await Product.countDocuments({ _id: { $in: linkedProductIds } });
       if (validLinkedProducts !== linkedProductIds.length) {
@@ -7929,7 +8033,7 @@ exports.updateOffer = async (req, res, next) => {
         });
       }
     }
-    
+
     // Check carousel limit if activating a carousel
     if (offer.type === 'carousel' && isActive === true && !offer.isActive) {
       const carouselCount = await Offer.countDocuments({ type: 'carousel', isActive: true });
@@ -7940,7 +8044,7 @@ exports.updateOffer = async (req, res, next) => {
         });
       }
     }
-    
+
     // Update fields
     if (title !== undefined) offer.title = title;
     if (description !== undefined) offer.description = description;
@@ -7952,13 +8056,13 @@ exports.updateOffer = async (req, res, next) => {
     if (offer.type === 'special_offer' && linkedProductIds !== undefined) offer.linkedProductIds = linkedProductIds;
     if (isActive !== undefined) offer.isActive = isActive;
     offer.updatedBy = adminId;
-    
+
     await offer.save();
-    
+
     const populatedOffer = await Offer.findById(offer._id)
       .populate('productIds', 'name priceToUser images primaryImage')
       .populate('linkedProductIds', 'name priceToUser images primaryImage');
-    
+
     res.status(200).json({
       success: true,
       data: { offer: populatedOffer },
@@ -7977,7 +8081,7 @@ exports.updateOffer = async (req, res, next) => {
 exports.deleteOffer = async (req, res, next) => {
   try {
     const { id } = req.params;
-    
+
     const offer = await Offer.findById(id);
     if (!offer) {
       return res.status(404).json({
@@ -7985,9 +8089,9 @@ exports.deleteOffer = async (req, res, next) => {
         message: 'Offer not found',
       });
     }
-    
+
     await Offer.findByIdAndDelete(id);
-    
+
     res.status(200).json({
       success: true,
       message: 'Offer deleted successfully',

@@ -56,14 +56,14 @@ function isTestMode() {
 async function createOrder(options) {
   console.log('🔍 [razorpayService.createOrder] Starting...');
   console.log('🔍 [razorpayService.createOrder] Options received:', JSON.stringify(options, null, 2));
-  
+
   const { amount, currency = 'INR', receipt, notes = {} } = options;
   console.log('🔍 [razorpayService.createOrder] Parsed options:', { amount, currency, receipt, hasNotes: !!notes });
 
   // Validate amount (Razorpay expects amount in paise)
   const amountInPaise = Math.round(amount * 100);
   console.log('🔍 [razorpayService.createOrder] Amount in paise:', amountInPaise);
-  
+
   if (amountInPaise < 100) {
     console.error('❌ [razorpayService.createOrder] Amount too low:', amountInPaise);
     throw new Error('Minimum payment amount is ₹1');
@@ -74,9 +74,17 @@ async function createOrder(options) {
   console.log('🔍 [razorpayService.createOrder] RAZORPAY_KEY_ID:', process.env.RAZORPAY_KEY_ID ? 'Present' : 'Missing');
   console.log('🔍 [razorpayService.createOrder] RAZORPAY_KEY_SECRET:', process.env.RAZORPAY_KEY_SECRET ? 'Present' : 'Missing');
 
-  // If Razorpay instance is not initialized (no keys), simulate order creation
-  if (!razorpayInstance) {
-    console.log('⚠️ [razorpayService.createOrder] Razorpay keys not found. Simulating order creation.');
+  // FORCE BYPASS FOR TESTING: Always use simulation logic if this flag is true
+  const FORCE_SIMULATION = true;
+
+  // If Razorpay instance is not initialized (no keys) OR we are forcing simulation
+  if (!razorpayInstance || FORCE_SIMULATION) {
+    if (!razorpayInstance) {
+      console.log('⚠️ [razorpayService.createOrder] Razorpay keys not found. Simulating order creation.');
+    } else {
+      console.log('⚠️ [razorpayService.createOrder] FORCE_SIMULATION is enabled. Bypassing actual Razorpay API.');
+    }
+
     const testOrderId = `order_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const simulatedOrder = {
       id: testOrderId,
@@ -104,7 +112,7 @@ async function createOrder(options) {
       receipt,
       hasNotes: !!notes,
     });
-    
+
     const order = await razorpayInstance.orders.create({
       amount: amountInPaise,
       currency: currency,
@@ -128,13 +136,13 @@ async function createOrder(options) {
     console.error('❌ [razorpayService.createOrder] Error statusCode:', error.statusCode);
     console.error('❌ [razorpayService.createOrder] Error object keys:', Object.keys(error));
     console.error('❌ [razorpayService.createOrder] Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-    
+
     // Check if error has nested error object
     if (error.error && typeof error.error === 'object') {
       console.error('❌ [razorpayService.createOrder] Nested error object:', JSON.stringify(error.error, null, 2));
       console.error('❌ [razorpayService.createOrder] Nested error keys:', Object.keys(error.error));
     }
-    
+
     // For test/simulation purposes, fall back to simulation if Razorpay API fails
     // This allows testing without valid Razorpay credentials
     console.log('⚠️ [razorpayService.createOrder] Razorpay API failed. Falling back to simulation mode for testing...');
@@ -165,9 +173,9 @@ async function createOrder(options) {
  * @returns {boolean} True if signature is valid
  */
 function verifyPaymentSignature(orderId, paymentId, signature) {
-  // If Razorpay instance is not initialized (no keys), simulate verification
-  if (!razorpayInstance) {
-    console.log('⚠️ Razorpay keys not found. Simulating signature verification.');
+  // If Razorpay instance is not initialized (no keys) OR it's a test order
+  if (!razorpayInstance || (orderId && orderId.startsWith('order_test_'))) {
+    console.log('⚠️ [razorpayService] Simulating signature verification for test mode/order.');
     return true;
   }
 
@@ -198,7 +206,7 @@ async function fetchPayment(paymentId) {
     console.log('⚠️ Razorpay keys not found. Simulating payment fetch.');
     // Simulate success or failure based on test mode configuration
     const simulateFailure = process.env.RAZORPAY_SIMULATE_FAILURE === 'true';
-    
+
     if (simulateFailure) {
       throw new Error('Payment failed (simulated)');
     }

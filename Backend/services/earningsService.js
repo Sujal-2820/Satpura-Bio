@@ -192,6 +192,41 @@ async function calculateSellerCommission(order) {
 
     console.log(`💰 Commission credited: ₹${commissionAmount} to seller ${seller.sellerId} for order ${order.orderNumber}`);
 
+    // SEND SELLER NOTIFICATION: Commission Earned
+    try {
+      const SellerNotification = require('../models/SellerNotification');
+
+      await SellerNotification.createNotification({
+        sellerId: seller._id,
+        type: 'commission_earned',
+        title: 'New Commission Earned',
+        message: `You earned ₹${commission.commissionAmount} (Rate: ${commission.commissionRate}%) for Order #${order.orderNumber}.`,
+        relatedEntityType: 'commission',
+        relatedEntityId: commission._id,
+        priority: 'normal',
+        metadata: { orderNumber: order.orderNumber, amount: commission.commissionAmount }
+      });
+
+      // SEND SELLER NOTIFICATION: Tier Upgraded (2% -> 3%)
+      if (cumulativePurchaseAmount < IRA_PARTNER_COMMISSION_THRESHOLD &&
+        newCumulativePurchaseAmount >= IRA_PARTNER_COMMISSION_THRESHOLD) {
+
+        await SellerNotification.createNotification({
+          sellerId: seller._id,
+          type: 'tier_upgraded',
+          title: '🎉 Commission Tier Upgraded!',
+          message: `Congratulations! Your monthly sales crossed ₹${IRA_PARTNER_COMMISSION_THRESHOLD}. You are now earning ${IRA_PARTNER_COMMISSION_RATE_HIGH}% commission!`,
+          relatedEntityType: 'seller',
+          relatedEntityId: seller._id,
+          priority: 'high',
+          metadata: { newRate: IRA_PARTNER_COMMISSION_RATE_HIGH, threshold: IRA_PARTNER_COMMISSION_THRESHOLD }
+        });
+      }
+
+    } catch (notifError) {
+      console.error('Failed to send seller commission notification:', notifError);
+    }
+
     return commission;
   } catch (error) {
     console.error('Error calculating seller commission:', error);

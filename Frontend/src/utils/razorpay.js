@@ -50,8 +50,25 @@ export function loadRazorpay(keyId) {
  */
 export async function openRazorpayCheckout(options) {
   try {
+    // CHECK FOR TEST MODE BYPASS
+    if (options.order_id && options.order_id.startsWith('order_test_')) {
+      console.log('🧪 [Razorpay Bypass] Test order detected. Simulating successful payment...');
+
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          console.log('✅ [Razorpay Bypass] Payment simulated.');
+          resolve({
+            success: true,
+            paymentId: `pay_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            orderId: options.order_id,
+            signature: `sig_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          });
+        }, 1500); // 1.5s delay to feel "real"
+      });
+    }
+
     const Razorpay = await loadRazorpay(options.key);
-    
+
     // Validate required fields
     if (!options.order_id) {
       throw new Error('Razorpay order ID is required');
@@ -59,7 +76,7 @@ export async function openRazorpayCheckout(options) {
     if (!options.amount || options.amount <= 0) {
       throw new Error('Payment amount must be greater than 0');
     }
-    
+
     return new Promise((resolve, reject) => {
       const razorpayOptions = {
         key: options.key,

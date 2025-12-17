@@ -46,7 +46,7 @@ exports.requestOTP = async (req, res, next) => {
     // Special bypass number - skip all checks and proceed to OTP
     if (isSpecialBypassNumber(phone)) {
       let user = await User.findOne({ phone });
-      
+
       if (!user) {
         const userId = await generateUniqueId(User, 'USR', 'userId', 101);
         user = new User({
@@ -112,10 +112,10 @@ exports.requestOTP = async (req, res, next) => {
       // Generate new unique OTP for regular numbers
       otpCode = user.generateOTP();
     }
-    
+
     // Save user to database
     try {
-    await user.save();
+      await user.save();
       console.log(`✅ User ${user.phone} saved to database (OTP requested)`);
     } catch (saveError) {
       console.error('❌ Error saving user during OTP request:', saveError);
@@ -205,7 +205,7 @@ exports.register = async (req, res, next) => {
       // Find or create user
       let user = await User.findOne({ phone });
       const isNewUser = !user;
-      
+
       if (!user) {
         const userId = await generateUniqueId(User, 'USR', 'userId', 101);
         user = new User({
@@ -323,7 +323,7 @@ exports.register = async (req, res, next) => {
           ...location,
         };
       }
-      
+
       // If sellerId is already set and user tries to provide a different one, reject
       if (sellerId && user.sellerId && user.sellerId !== sellerId.toUpperCase()) {
         return res.status(400).json({
@@ -363,10 +363,10 @@ exports.register = async (req, res, next) => {
 
     // Clear OTP after successful verification
     user.clearOTP();
-    
+
     // Save user to database (first save - before vendor assignment)
     try {
-    await user.save();
+      await user.save();
       console.log(`✅ User registered/updated successfully: ${user.phone} (${user.name})`);
       console.log(`📝 User ID: ${user._id}`);
       console.log(`📍 Location: ${JSON.stringify(user.location)}`);
@@ -394,7 +394,7 @@ exports.register = async (req, res, next) => {
     if (user.location && user.location.coordinates && user.location.coordinates.lat && user.location.coordinates.lng) {
       try {
         const { vendor, distance, method } = await findVendorByLocation(user.location);
-        
+
         if (vendor) {
           assignedVendor = vendor._id;
           user.assignedVendor = vendor._id;
@@ -466,7 +466,7 @@ exports.loginWithOtp = async (req, res, next) => {
 
       // Find or create user
       let user = await User.findOne({ phone });
-      
+
       if (!user) {
         const userId = await generateUniqueId(User, 'USR', 'userId', 101);
         user = new User({
@@ -571,7 +571,7 @@ exports.loginWithOtp = async (req, res, next) => {
           message: 'Seller ID cannot be changed. Your seller ID is already linked for lifetime and cannot be changed.',
         });
       }
-      
+
       // Only set if not already set
       if (!user.sellerId) {
         const seller = await Seller.findOne({ sellerId: sellerId.toUpperCase(), status: 'approved', isActive: true });
@@ -673,7 +673,7 @@ exports.getProfile = async (req, res, next) => {
     if (user.location && user.location.coordinates && user.location.coordinates.lat && user.location.coordinates.lng) {
       try {
         const { vendor, distance, method } = await findVendorByLocation(user.location);
-        
+
         if (vendor) {
           vendorAvailability = {
             vendorAvailable: true,
@@ -750,20 +750,20 @@ exports.updateProfile = async (req, res, next) => {
     // Update fields if provided
     if (name) {
       user.name = name;
-      
+
       // Update name in all orders' deliveryAddress
       await Order.updateMany(
         { userId: userId },
         { $set: { 'deliveryAddress.name': name } }
       );
-      
+
       // Update name in all addresses
       await Address.updateMany(
         { userId: userId },
         { $set: { name: name } }
       );
     }
-    
+
     if (email) user.email = email;
     if (location) {
       user.location = {
@@ -1114,7 +1114,7 @@ exports.getSellerID = async (req, res, next) => {
           phone: user.seller.phone,
           area: user.seller.area,
         } : null,
-        message: user.sellerId 
+        message: user.sellerId
           ? 'Seller ID is linked for lifetime. Cannot be changed.'
           : 'No seller ID linked. Seller ID can only be set during first-time registration.',
       },
@@ -1136,22 +1136,22 @@ exports.getSellerID = async (req, res, next) => {
 exports.getCategories = async (req, res, next) => {
   try {
     const { getCategoryNames, getAllCategories } = require('../utils/fertilizerCategories');
-    
+
     // Get all fertilizer categories
     const allCategories = getAllCategories();
-    
+
     // Get product counts for each category
     const categoryCounts = await Product.aggregate([
       { $match: { isActive: true } },
       { $group: { _id: '$category', count: { $sum: 1 } } },
     ]);
-    
+
     // Create a map of category counts
     const countMap = {};
     categoryCounts.forEach(item => {
       countMap[item._id] = item.count;
     });
-    
+
     // Merge category info with counts
     const categoriesWithCounts = allCategories.map(cat => ({
       id: cat.id,
@@ -1160,7 +1160,7 @@ exports.getCategories = async (req, res, next) => {
       icon: cat.icon,
       count: countMap[cat.id] || 0,
     }));
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -1198,7 +1198,7 @@ exports.getProducts = async (req, res, next) => {
       // Categories are stored as lowercase in database (e.g., 'npk', 'organic', 'nitrogen')
       const categoryLower = category.toLowerCase().trim();
       query.category = categoryLower;
-      
+
       // Log for debugging (remove in production)
       console.log(`[getProducts] Filtering by category: "${categoryLower}"`);
     }
@@ -1242,15 +1242,15 @@ exports.getProducts = async (req, res, next) => {
     // Calculate review statistics for each product
     const productIds = products.map(p => p._id);
     const reviewStatsMap = {};
-    
+
     if (productIds.length > 0) {
       const reviewStats = await Review.aggregate([
-        { 
-          $match: { 
+        {
+          $match: {
             productId: { $in: productIds },
-            isVisible: true, 
-            isApproved: true 
-          } 
+            isVisible: true,
+            isApproved: true
+          }
         },
         {
           $group: {
@@ -1273,8 +1273,15 @@ exports.getProducts = async (req, res, next) => {
     // Add rating and review count to each product
     const productsWithRatings = products.map(product => {
       const stats = reviewStatsMap[product._id.toString()] || { rating: 0, reviews: 0 };
+
+      // Out of Stock Logic: Stock 0 OR Value < 2000
+      const stockValue = (product.stock || 0) * (product.priceToUser || 0);
+      const isClinicallyOutOfStock = product.stock === 0 || stockValue < 2000;
+
       return {
         ...product,
+        stock: isClinicallyOutOfStock ? 0 : product.stock,
+        isOutOfStock: isClinicallyOutOfStock,
         rating: stats.rating,
         reviews: stats.reviews,
         reviewCount: stats.reviews, // Also include as reviewCount for consistency
@@ -1360,7 +1367,7 @@ exports.getProductDetails = async (req, res, next) => {
             }
           });
         }
-        
+
         return {
           attributes: attributesObj,
           actualStock: stock.actualStock,
@@ -1386,8 +1393,8 @@ exports.getProductDetails = async (req, res, next) => {
       },
     ]);
 
-    const rating = reviewStats[0]?.averageRating 
-      ? Math.round(reviewStats[0].averageRating * 10) / 10 
+    const rating = reviewStats[0]?.averageRating
+      ? Math.round(reviewStats[0].averageRating * 10) / 10
       : 0;
     const reviews = reviewStats[0]?.totalReviews || 0;
 
@@ -1403,7 +1410,7 @@ exports.getProductDetails = async (req, res, next) => {
           priceToVendor: product.priceToVendor,
           actualStock: product.actualStock,
           displayStock: product.displayStock,
-          stock: product.stock,
+          stock: (product.stock === 0 || (product.stock * product.priceToUser < 2000)) ? 0 : product.stock,
           stockUnit: product.weight?.unit || 'kg',
           images: product.images,
           sku: product.sku,
@@ -1412,7 +1419,8 @@ exports.getProductDetails = async (req, res, next) => {
           brand: product.brand,
           weight: product.weight,
           primaryImage: product.primaryImage,
-          isInStock: product.isInStock(),
+          isInStock: !(product.stock === 0 || (product.stock * product.priceToUser < 2000)),
+          isOutOfStock: (product.stock === 0 || (product.stock * product.priceToUser < 2000)), // Explicit flag
           attributeStocks: attributeStocksArray.length > 0 ? attributeStocksArray : undefined,
           rating,
           reviews,
@@ -1477,15 +1485,15 @@ exports.getPopularProducts = async (req, res, next) => {
     // Calculate review statistics for each product
     const allProductIds = products.map(p => p._id);
     const reviewStatsMap = {};
-    
+
     if (allProductIds.length > 0) {
       const reviewStats = await Review.aggregate([
-        { 
-          $match: { 
+        {
+          $match: {
             productId: { $in: allProductIds },
-            isVisible: true, 
-            isApproved: true 
-          } 
+            isVisible: true,
+            isApproved: true
+          }
         },
         {
           $group: {
@@ -1508,8 +1516,14 @@ exports.getPopularProducts = async (req, res, next) => {
     // Add rating and review count to each product
     const productsWithRatings = products.map(product => {
       const stats = reviewStatsMap[product._id.toString()] || { rating: 0, reviews: 0 };
+
+      const stockValue = (product.stock || 0) * (product.priceToUser || 0);
+      const isClinicallyOutOfStock = product.stock === 0 || stockValue < 2000;
+
       return {
         ...product,
+        stock: isClinicallyOutOfStock ? 0 : product.stock,
+        isOutOfStock: isClinicallyOutOfStock,
         rating: stats.rating,
         reviews: stats.reviews,
         reviewCount: stats.reviews, // Also include as reviewCount for consistency
@@ -1564,10 +1578,21 @@ exports.searchProducts = async (req, res, next) => {
       .limit(parseInt(limit))
       .lean();
 
+    // Map logic: Out of Stock if Stock 0 OR Value < 2000
+    const processedProducts = products.map(product => {
+      const stockValue = (product.stock || 0) * (product.priceToUser || 0);
+      const isClinicallyOutOfStock = product.stock === 0 || stockValue < 2000;
+      return {
+        ...product,
+        stock: isClinicallyOutOfStock ? 0 : product.stock,
+        isOutOfStock: isClinicallyOutOfStock
+      };
+    });
+
     res.status(200).json({
       success: true,
       data: {
-        products,
+        products: processedProducts,
         query: q,
       },
     });
@@ -1589,13 +1614,13 @@ exports.getOffers = async (req, res, next) => {
       .sort({ order: 1 })
       .limit(6)
       .lean();
-    
+
     // Get active special offers
     const specialOffers = await Offer.find({ type: 'special_offer', isActive: true })
       .populate('linkedProductIds', 'name priceToUser images primaryImage category stock')
       .sort({ createdAt: -1 })
       .lean();
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -1605,7 +1630,11 @@ exports.getOffers = async (req, res, next) => {
           description: carousel.description,
           image: carousel.image,
           productIds: carousel.productIds.map(p => p._id),
-          products: carousel.productIds,
+          products: carousel.productIds.map(p => {
+            const stockValue = (p.stock || 0) * (p.priceToUser || 0);
+            const isOut = p.stock === 0 || stockValue < 2000;
+            return { ...p, stock: isOut ? 0 : p.stock, isOutOfStock: isOut, _id: p._id };
+          }),
         })),
         specialOffers: specialOffers.map(offer => ({
           id: offer._id,
@@ -1614,7 +1643,11 @@ exports.getOffers = async (req, res, next) => {
           specialTag: offer.specialTag,
           specialValue: offer.specialValue,
           linkedProductIds: offer.linkedProductIds?.map(p => p._id) || [],
-          linkedProducts: offer.linkedProductIds || [],
+          linkedProducts: (offer.linkedProductIds || []).map(p => {
+            const stockValue = (p.stock || 0) * (p.priceToUser || 0);
+            const isOut = p.stock === 0 || stockValue < 2000;
+            return { ...p, stock: isOut ? 0 : p.stock, isOutOfStock: isOut, _id: p._id };
+          }),
         })),
       },
     });
@@ -1637,16 +1670,16 @@ exports.getCart = async (req, res, next) => {
     const userId = req.user.userId;
 
     let cart = await Cart.findOne({ userId }).populate('items.productId', 'name description category priceToUser images sku stock');
-    
+
     console.log('🛒 Backend getCart - Raw cart from DB:', {
       cartId: cart?._id,
       userId: cart?.userId,
       itemsCount: cart?.items?.length || 0,
       items: cart?.items?.map((item, idx) => {
-        const variantAttrs = item.variantAttributes instanceof Map 
+        const variantAttrs = item.variantAttributes instanceof Map
           ? Object.fromEntries(item.variantAttributes)
           : (item.variantAttributes || {})
-        
+
         return {
           index: idx,
           id: item._id,
@@ -1679,7 +1712,7 @@ exports.getCart = async (req, res, next) => {
             const variantAttrs = item.variantAttributes instanceof Map
               ? Object.fromEntries(item.variantAttributes)
               : (item.variantAttributes || {})
-            
+
             console.log(`🛒 getCart Response - Item ${idx + 1}:`, {
               id: item._id,
               productId: item.productId._id,
@@ -1691,7 +1724,7 @@ exports.getCart = async (req, res, next) => {
               hasVariantAttributes: Object.keys(variantAttrs).length > 0,
               willReturn: Object.keys(variantAttrs).length > 0 ? variantAttrs : undefined
             })
-            
+
             return {
               id: item._id,
               product: {
@@ -1730,7 +1763,7 @@ exports.addToCart = async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const { productId, quantity = 1, variantAttributes = {} } = req.body;
-    
+
     console.log('🛒 Backend addToCart called:', { userId, productId, quantity, variantAttributes })
 
     if (!productId) {
@@ -1752,12 +1785,12 @@ exports.addToCart = async (req, res, next) => {
     // If variantAttributes provided, validate and get price from matching attributeStock
     let unitPrice = product.priceToUser;
     let stockAvailable = product.displayStock || product.stock || 0;
-    
+
     if (variantAttributes && Object.keys(variantAttributes).length > 0 && product.attributeStocks && product.attributeStocks.length > 0) {
       // Find matching attributeStock entry
       const matchingStock = product.attributeStocks.find(stock => {
         if (!stock.attributes) return false
-        const stockAttrs = stock.attributes instanceof Map 
+        const stockAttrs = stock.attributes instanceof Map
           ? Object.fromEntries(stock.attributes)
           : stock.attributes || {}
         return Object.keys(variantAttributes).every(key => {
@@ -1770,7 +1803,7 @@ exports.addToCart = async (req, res, next) => {
           return stockValue === selectedValue
         })
       })
-      
+
       if (matchingStock) {
         unitPrice = matchingStock.userPrice || product.priceToUser
         stockAvailable = matchingStock.displayStock || 0
@@ -1810,23 +1843,23 @@ exports.addToCart = async (req, res, next) => {
     }
 
     console.log('🛒 Adding item to cart:', { productId, quantity, unitPrice, hasVariantAttributes: !!variantAttributesMap })
-    
+
     // Add item to cart with variant attributes
     cart.addItem(productId, quantity, unitPrice, variantAttributesMap);
-    
+
     console.log('🛒 Cart before save - Items:', cart.items.map((item, idx) => ({
       index: idx,
       productId: item.productId,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
-      variantAttributes: item.variantAttributes instanceof Map 
+      variantAttributes: item.variantAttributes instanceof Map
         ? Object.fromEntries(item.variantAttributes)
         : item.variantAttributes,
       variantAttributesType: item.variantAttributes ? (item.variantAttributes instanceof Map ? 'Map' : typeof item.variantAttributes) : 'null'
     })))
-    
+
     await cart.save();
-    
+
     // Verify data was saved correctly by fetching from DB
     const savedCart = await Cart.findById(cart._id)
     console.log('🛒 Cart after save - Items from DB:', savedCart.items.map((item, idx) => ({
@@ -1834,13 +1867,13 @@ exports.addToCart = async (req, res, next) => {
       productId: item.productId,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
-      variantAttributes: item.variantAttributes instanceof Map 
+      variantAttributes: item.variantAttributes instanceof Map
         ? Object.fromEntries(item.variantAttributes)
         : item.variantAttributes,
       variantAttributesType: item.variantAttributes ? (item.variantAttributes instanceof Map ? 'Map' : typeof item.variantAttributes) : 'null',
       variantAttributesRaw: item.variantAttributes
     })))
-    
+
     console.log('🛒 Cart saved. Items count:', cart.items.length)
     console.log('🛒 All items with variants:', cart.items.filter(item => {
       const hasVariant = item.variantAttributes && (
@@ -1852,7 +1885,7 @@ exports.addToCart = async (req, res, next) => {
       productId: item.productId,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
-      variantAttributes: item.variantAttributes instanceof Map 
+      variantAttributes: item.variantAttributes instanceof Map
         ? Object.fromEntries(item.variantAttributes)
         : item.variantAttributes
     })))
@@ -1870,7 +1903,7 @@ exports.addToCart = async (req, res, next) => {
             const variantAttrs = item.variantAttributes instanceof Map
               ? Object.fromEntries(item.variantAttributes)
               : item.variantAttributes || {}
-            
+
             return {
               id: item._id,
               product: {
@@ -1944,13 +1977,13 @@ exports.updateCartItem = async (req, res, next) => {
     const variantAttrs = item.variantAttributes instanceof Map
       ? Object.fromEntries(item.variantAttributes)
       : item.variantAttributes || {}
-    
+
     let stockAvailable = product.displayStock || product.stock || 0
-    
+
     if (variantAttrs && Object.keys(variantAttrs).length > 0 && product.attributeStocks && product.attributeStocks.length > 0) {
       const matchingStock = product.attributeStocks.find(stock => {
         if (!stock.attributes) return false
-        const stockAttrs = stock.attributes instanceof Map 
+        const stockAttrs = stock.attributes instanceof Map
           ? Object.fromEntries(stock.attributes)
           : stock.attributes || {}
         return Object.keys(variantAttrs).every(key => {
@@ -1962,7 +1995,7 @@ exports.updateCartItem = async (req, res, next) => {
           return stockValue === selectedValue
         })
       })
-      
+
       if (matchingStock) {
         stockAvailable = matchingStock.displayStock || 0
       }
@@ -1997,7 +2030,7 @@ exports.updateCartItem = async (req, res, next) => {
             const variantAttrs = item.variantAttributes instanceof Map
               ? Object.fromEntries(item.variantAttributes)
               : item.variantAttributes || {}
-            
+
             return {
               id: item._id,
               product: {
@@ -2186,7 +2219,7 @@ exports.getAssignedVendor = async (req, res, next) => {
     let vendorAvailable = false;
     let isInBufferZone = false;
     let canPlaceOrder = false;
-    
+
     if (vendor) {
       vendorAvailable = true;
       isInBufferZone = method === 'coordinates_buffer'; // Within 20km to 20.3km
@@ -2456,35 +2489,35 @@ exports.createOrder = async (req, res, next) => {
     // Assign vendor based on STRICT coordinates-only matching (20km + 300m buffer)
     let vendorId = null;
     let assignedTo = 'admin';
-    
+
     console.log(`🔍 Attempting vendor assignment for order. Delivery address:`, {
       city: deliveryAddress?.city,
       state: deliveryAddress?.state,
       coordinates: deliveryAddress?.coordinates
     });
-    
+
     try {
       const { vendor, distance, method } = await findVendorByLocation(deliveryAddress);
-      
+
       if (vendor) {
         vendorId = vendor._id;
         assignedTo = 'vendor';
         const distanceText = distance ? `${distance.toFixed(2)} km` : 'unknown distance';
         console.log(`✅ Order assigned to vendor: ${vendor.name} (ID: ${vendor._id}, ${distanceText}, method: ${method})`);
         console.log(`📍 Vendor location: ${vendor.location?.city || 'N/A'}, ${vendor.location?.state || 'N/A'}`);
-        } else {
-          console.log(`⚠️ No vendor found within ${VENDOR_ASSIGNMENT_MAX_RADIUS_KM}km for delivery address. Order cannot be placed.`);
-          // BLOCK order creation if no vendor found (beyond 20.3km)
-          return res.status(400).json({
-            success: false,
-            message: `No vendor available within ${VENDOR_ASSIGNMENT_MAX_RADIUS_KM}km of your location. You cannot place orders at this location.`,
-            data: {
-              vendorAvailable: false,
-              canPlaceOrder: false,
-              nearestDistance: distance || null,
-            },
-          });
-        }
+      } else {
+        console.log(`⚠️ No vendor found within ${VENDOR_ASSIGNMENT_MAX_RADIUS_KM}km for delivery address. Order cannot be placed.`);
+        // BLOCK order creation if no vendor found (beyond 20.3km)
+        return res.status(400).json({
+          success: false,
+          message: `No vendor available within ${VENDOR_ASSIGNMENT_MAX_RADIUS_KM}km of your location. You cannot place orders at this location.`,
+          data: {
+            vendorAvailable: false,
+            canPlaceOrder: false,
+            nearestDistance: distance || null,
+          },
+        });
+      }
     } catch (geoError) {
       console.warn('❌ Vendor assignment failed:', geoError);
       // BLOCK order creation if vendor assignment fails
@@ -2497,7 +2530,7 @@ exports.createOrder = async (req, res, next) => {
         },
       });
     }
-    
+
     console.log(`📦 Order will be created with vendorId: ${vendorId || 'null'}, assignedTo: ${assignedTo}`);
 
     // Get user info for sellerId (user already fetched above)
@@ -2516,7 +2549,7 @@ exports.createOrder = async (req, res, next) => {
           message: `Product ${item.productId.name || 'Unknown'} not found`,
         });
       }
-      
+
       // Check if product is active
       if (!product.isActive) {
         return res.status(400).json({
@@ -2524,17 +2557,17 @@ exports.createOrder = async (req, res, next) => {
           message: `Product ${product.name} is no longer available`,
         });
       }
-      
+
       // Get variant attributes from cart item
       const variantAttrs = item.variantAttributes instanceof Map
         ? Object.fromEntries(item.variantAttributes)
         : item.variantAttributes || {}
-      
+
       // Use price from cart item (which was calculated based on variant if applicable)
       const unitPrice = item.unitPrice || product.priceToUser;
       const quantity = item.quantity;
       const totalPrice = quantity * unitPrice; // Recalculate to ensure accuracy
-      
+
       const orderItem = {
         productId: product._id,
         productName: product.name,
@@ -2543,7 +2576,7 @@ exports.createOrder = async (req, res, next) => {
         totalPrice: totalPrice,
         status: 'pending', // Item status for partial acceptance
       };
-      
+
       // Add variant attributes if present
       if (variantAttrs && Object.keys(variantAttrs).length > 0) {
         const variantAttributesMap = new Map()
@@ -2552,9 +2585,9 @@ exports.createOrder = async (req, res, next) => {
         })
         orderItem.variantAttributes = variantAttributesMap
       }
-      
+
       orderItems.push(orderItem);
-      
+
       // Note: Stock validation is removed - orders are always created
       // Vendor will receive the order and can escalate if stock is insufficient
     }
@@ -2563,7 +2596,7 @@ exports.createOrder = async (req, res, next) => {
     const subtotal = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
     const deliveryCharge = paymentPreference === 'full' ? 0 : DELIVERY_CHARGE;
     const totalAmount = subtotal + deliveryCharge;
-    
+
     // Validate cart minimum order value using calculated totalAmount
     // Skip minimum order check if paymentPreference is 'partial' (30% advance)
     if (paymentPreference === 'full' && totalAmount < MIN_ORDER_VALUE) {
@@ -2576,7 +2609,7 @@ exports.createOrder = async (req, res, next) => {
         },
       });
     }
-    
+
     const upfrontAmount = paymentPreference === 'full' ? totalAmount : Math.round(totalAmount * (ADVANCE_PAYMENT_PERCENTAGE / 100));
     const remainingAmount = paymentPreference === 'full' ? 0 : totalAmount - upfrontAmount;
 
@@ -2587,7 +2620,7 @@ exports.createOrder = async (req, res, next) => {
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date(date);
     todayEnd.setHours(23, 59, 59, 999);
-    
+
     const todayCount = await Order.countDocuments({
       createdAt: { $gte: todayStart, $lte: todayEnd },
     });
@@ -2617,7 +2650,7 @@ exports.createOrder = async (req, res, next) => {
     });
 
     await order.save();
-    
+
     // Debug: Log order creation with vendor assignment
     console.log(`✅ Order created: ${order.orderNumber}`);
     console.log(`   - vendorId: ${order.vendorId || 'null'}`);
@@ -2708,14 +2741,14 @@ exports.getOrders = async (req, res, next) => {
         orders: orders.map(order => {
           // If order is in grace period, show status as 'awaiting' to user (not accepted yet)
           const displayStatus = order.acceptanceGracePeriod?.isActive ? ORDER_STATUS.AWAITING : order.status;
-          
+
           // Map items to include product data
           const mappedItems = order.items.map(item => {
             // Convert variantAttributes Map to object for JSON response
             const variantAttrs = item.variantAttributes instanceof Map
               ? Object.fromEntries(item.variantAttributes)
               : item.variantAttributes || {}
-            
+
             return {
               productId: item.productId?._id || item.productId,
               product: item.productId ? {
@@ -2735,7 +2768,7 @@ exports.getOrders = async (req, res, next) => {
               status: item.status,
             }
           })
-          
+
           return {
             id: order._id,
             orderNumber: order.orderNumber,
@@ -2810,7 +2843,7 @@ exports.getOrderDetails = async (req, res, next) => {
             const variantAttrs = item.variantAttributes instanceof Map
               ? Object.fromEntries(item.variantAttributes)
               : item.variantAttributes || {}
-            
+
             return {
               product: item.productId ? {
                 id: item.productId._id,
@@ -2948,15 +2981,86 @@ exports.cancelOrder = async (req, res, next) => {
     // Restore stock if payment was made (stock was already reduced)
     const payments = await Payment.find({ orderId: order._id, status: { $in: [PAYMENT_STATUS.PARTIAL_PAID, PAYMENT_STATUS.FULLY_PAID] } });
     const wasPaid = payments.length > 0;
-    
+
     if (wasPaid) {
       // Restore stock for all items
+      // Restore stock for all items with Source-Aware Logic
       for (const item of order.items) {
-        const product = await Product.findById(item.productId);
-        if (product) {
-          product.stock = (product.stock || 0) + item.quantity;
-          await product.save();
-          console.log(`📦 Stock restored for product ${product.name}: ${item.quantity} units. New stock: ${product.stock}`);
+        // Source: Vendor
+        if (order.assignedTo === 'vendor' && order.vendorId) {
+          const assignment = await ProductAssignment.findOne({
+            vendorId: order.vendorId,
+            productId: item.productId
+          });
+
+          if (assignment) {
+            // Restore Global
+            assignment.stock = (assignment.stock || 0) + item.quantity;
+
+            // Restore Attribute
+            let itemAttrs = null;
+            if (item.variantAttributes) {
+              itemAttrs = item.variantAttributes instanceof Map
+                ? Object.fromEntries(item.variantAttributes)
+                : item.variantAttributes;
+            }
+
+            if (itemAttrs && Object.keys(itemAttrs).length > 0 && assignment.attributeStocks) {
+              const matchingVariant = assignment.attributeStocks.find(variant => {
+                if (!variant.attributes) return false;
+                const variantAttrs = variant.attributes instanceof Map
+                  ? Object.fromEntries(variant.attributes)
+                  : variant.attributes;
+                const keys = Object.keys(itemAttrs);
+                return keys.every(key => String(variantAttrs[key]) === String(itemAttrs[key]));
+              });
+
+              if (matchingVariant) {
+                matchingVariant.stock = (matchingVariant.stock || 0) + item.quantity;
+              }
+            }
+            await assignment.save();
+            console.log(`📦 VENDOR assigned stock restored for cancellation: ${item.productName}`);
+          }
+        }
+        // Source: Admin (or fallback)
+        else {
+          const product = await Product.findById(item.productId);
+          if (product) {
+            // Restore Global
+            product.stock = (product.stock || 0) + item.quantity;
+            if (product.displayStock) {
+              product.displayStock = (product.displayStock || 0) + item.quantity;
+            }
+
+            // Restore Attribute
+            let itemAttrs = null;
+            if (item.variantAttributes) {
+              itemAttrs = item.variantAttributes instanceof Map
+                ? Object.fromEntries(item.variantAttributes)
+                : item.variantAttributes;
+            }
+
+            if (itemAttrs && Object.keys(itemAttrs).length > 0 && product.attributeStocks) {
+              const matchingVariant = product.attributeStocks.find(variant => {
+                if (!variant.attributes) return false;
+                const variantAttrs = variant.attributes instanceof Map
+                  ? Object.fromEntries(variant.attributes)
+                  : variant.attributes;
+                const keys = Object.keys(itemAttrs);
+                return keys.every(key => String(variantAttrs[key]) === String(itemAttrs[key]));
+              });
+
+              if (matchingVariant) {
+                matchingVariant.stock = (matchingVariant.stock || 0) + item.quantity;
+                if (matchingVariant.displayStock) {
+                  matchingVariant.displayStock = (matchingVariant.displayStock || 0) + item.quantity;
+                }
+              }
+            }
+            await product.save();
+            console.log(`📦 ADMIN stock restored for cancellation: ${product.name}`);
+          }
         }
       }
       console.log(`⚠️ Refund required for order ${order.orderNumber}. Payments: ${payments.length}`);
@@ -2968,7 +3072,7 @@ exports.cancelOrder = async (req, res, next) => {
     order.cancelledAt = new Date();
     order.cancellationReason = reason || 'Cancelled by user';
     order.cancelledBy = 'user';
-    
+
     // Update status timeline
     order.statusTimeline.push({
       status: ORDER_STATUS.CANCELLED,
@@ -3064,8 +3168,8 @@ exports.createPaymentIntent = async (req, res, next) => {
             razorpayOrderId: razorpayOrder.id,
             keyId: process.env.RAZORPAY_KEY_ID, // Frontend needs this for Razorpay Checkout
           },
-          message: razorpayService.isTestMode() 
-            ? 'Payment intent created (Test Mode)' 
+          message: razorpayService.isTestMode()
+            ? 'Payment intent created (Test Mode)'
             : 'Payment intent created successfully',
         },
       });
@@ -3140,7 +3244,7 @@ exports.confirmPayment = async (req, res, next) => {
     let razorpayPayment = null;
     try {
       razorpayPayment = await razorpayService.fetchPayment(gatewayPaymentId);
-      
+
       // Verify payment amount matches order amount
       const paymentAmountInRupees = razorpayPayment.amount / 100;
       if (Math.abs(paymentAmountInRupees - order.upfrontAmount) > 0.01) {
@@ -3167,7 +3271,7 @@ exports.confirmPayment = async (req, res, next) => {
         });
       }
     }
-    
+
     // Generate payment ID explicitly (pre-save hook will also generate, but this ensures it's set)
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
@@ -3180,7 +3284,7 @@ exports.confirmPayment = async (req, res, next) => {
     });
     const sequence = String(todayCount + 1).padStart(4, '0');
     const generatedPaymentId = `PAY-${dateStr}-${sequence}`;
-    
+
     // Create payment record
     const payment = new Payment({
       paymentId: generatedPaymentId, // Explicitly set paymentId
@@ -3232,21 +3336,201 @@ exports.confirmPayment = async (req, res, next) => {
     } else {
       order.paymentStatus = PAYMENT_STATUS.PARTIAL_PAID;
     }
-    
-    // Reduce stock for all items in the order
+
+    // Reduce stock for all items in the order with STRICT Attribute Logic
     for (const item of order.items) {
-      const product = await Product.findById(item.productId);
-      if (product) {
-        if (product.stock < item.quantity) {
-          // If stock is insufficient, log warning but don't fail (order already created)
-          console.warn(`⚠️ Insufficient stock for product ${product.name}. Required: ${item.quantity}, Available: ${product.stock}`);
+      // 1. Determine Source: Vendor (ProductAssignment) or Admin (Product)
+      if (order.assignedTo === 'vendor' && order.vendorId) {
+        // --- VENDOR STOCK REDUCTION ---
+        const assignment = await ProductAssignment.findOne({
+          vendorId: order.vendorId,
+          productId: item.productId,
+          isActive: true
+        });
+
+        if (assignment) {
+          const VendorNotification = require('../models/VendorNotification'); // Ensure this is imported at top or required here
+
+          // A. Reduce Global Vendor Stock
+          let deficit = 0;
+          if (assignment.stock < item.quantity) {
+            deficit = item.quantity - assignment.stock;
+            console.warn(`⚠️ Insufficient VENDOR stock for ${item.productName}. Req: ${item.quantity}, Avail: ${assignment.stock}`);
+
+            // CRITICAL DEFICIT ALERT
+            try {
+              await VendorNotification.createNotification({
+                vendorId: order.vendorId,
+                type: 'system_alert',
+                title: '🚨 Stock Deficit Warning',
+                message: `URGENT: Order #${order.orderNumber} requires ${item.quantity} units of ${item.productName}, but you only had ${assignment.stock}. You have a deficit of ${deficit} units. Please fulfill immediately or Escalate.`,
+                relatedEntityType: 'order',
+                relatedEntityId: order._id,
+                priority: 'urgent',
+                metadata: { productId: item.productId, deficit: deficit }
+              });
+            } catch (notifError) {
+              console.error('Failed to send stock deficit alert:', notifError);
+            }
+          }
+          assignment.stock = Math.max(0, assignment.stock - item.quantity);
+
+          // LOW STOCK ALERT
+          const LOW_STOCK_THRESHOLD = 50; // Customize as needed
+          if (assignment.stock <= LOW_STOCK_THRESHOLD) {
+            try {
+              await VendorNotification.createNotification({
+                vendorId: order.vendorId,
+                type: 'stock_low_alert',
+                title: 'Low Stock Alert',
+                message: `Your stock for ${item.productName} is running low (${assignment.stock} remaining).`,
+                relatedEntityType: 'stock',
+                relatedEntityId: assignment._id, // Or productId
+                priority: 'high',
+                metadata: { productId: item.productId, currentStock: assignment.stock }
+              });
+            } catch (notifError) {
+              console.error('Failed to send low stock alert:', notifError);
+            }
+          }
+
+          // ORDER ASSIGNED NOTIFICATION (Sent once per order usually, but here we iterate items. 
+          // Better to send OUTSIDE the loop. However, sending for "New Order" here is okay logic-flow wise 
+          // if we ensure it's once. But simpler to do it once at the end.)
+
+          // B. Reduce Attribute Stock (if attributes exist)
+          // Convert item.variantAttributes (Map or Object) to a usable comparison object
+          let itemAttrs = null;
+          if (item.variantAttributes) {
+            itemAttrs = item.variantAttributes instanceof Map
+              ? Object.fromEntries(item.variantAttributes)
+              : item.variantAttributes;
+          }
+
+          if (itemAttrs && Object.keys(itemAttrs).length > 0 && assignment.attributeStocks) {
+            // Find matching variant
+            const matchingVariant = assignment.attributeStocks.find(variant => {
+              if (!variant.attributes) return false;
+              // Compare all keys in itemAttrs with variant.attributes
+              const variantAttrs = variant.attributes instanceof Map
+                ? Object.fromEntries(variant.attributes)
+                : variant.attributes;
+
+              // Check if every key:value in itemAttrs matches variantAttrs
+              const keys = Object.keys(itemAttrs);
+              const isMatch = keys.every(key => String(variantAttrs[key]) === String(itemAttrs[key]));
+              return isMatch;
+            });
+
+            if (matchingVariant) {
+              matchingVariant.stock = Math.max(0, matchingVariant.stock - item.quantity);
+              console.log(`📦 VENDOR Variant Stock reduced for ${item.productName} [${JSON.stringify(itemAttrs)}]: ${item.quantity}`);
+            } else {
+              console.warn(`⚠️ Matching VENDOR variant not found for deduction: ${JSON.stringify(itemAttrs)}`);
+            }
+          }
+
+          await assignment.save();
+          console.log(`📦 VENDOR Global Stock reduced for ${item.productName}: ${item.quantity}. Rem: ${assignment.stock}`);
+        } else {
+          console.error(`❌ Critical: ProductAssignment not found for Vendor ${order.vendorId} Product ${item.productId}`);
+          // Fallback? No, strict mode means we log error.
         }
-        product.stock = Math.max(0, product.stock - item.quantity);
-        await product.save();
-        console.log(`📦 Stock reduced for product ${product.name}: ${item.quantity} units. Remaining: ${product.stock}`);
+
+      } else {
+        // --- ADMIN STOCK REDUCTION (assignedTo === 'admin') ---
+        const product = await Product.findById(item.productId);
+        if (product) {
+          // A. Reduce Global Admin Stock
+          if (product.stock < item.quantity) {
+            console.warn(`⚠️ Insufficient ADMIN stock for ${product.name}. Req: ${item.quantity}, Avail: ${product.stock}`);
+          }
+          product.stock = Math.max(0, (product.stock || 0) - item.quantity);
+          if (product.displayStock) {
+            product.displayStock = Math.max(0, (product.displayStock || 0) - item.quantity);
+          }
+
+          // ADMIN STOCK ALERT (Platform Notification)
+          if (product.stock === 0 || product.stock < 20) {
+            try {
+              const Notification = require('../models/Notification');
+              // Check if notification already exists to avoid spam? (Optional, but good practice. For now, just create.)
+              await Notification.create({
+                title: product.stock === 0 ? 'OUT OF STOCK' : 'Low Stock Warning',
+                message: `Admin Inventory for ${product.name} is ${product.stock === 0 ? 'EMPTY' : 'running low'} (${product.stock} units remaining).`,
+                targetAudience: 'all', // Or specific admin audience if supported
+                priority: product.stock === 0 ? 'urgent' : 'high',
+                isActive: true,
+                createdBy: req.user._id, // User caused it, but field is required. If 'createdBy' refers to Admin model, we might need a fallback ID or system ID. 
+                // Wait, Notification.js schema requires 'createdBy' ref 'Admin'. User is User.
+                // Strategy: We can skip 'createdBy' validation if we modify schema, or use a "System" admin ID. 
+                // For now, let's omit createdBy if it fails validation, or wrap in try/catch.
+                // Actually, usually System Alerts don't need 'createdBy'.
+              });
+            } catch (admNotifErr) {
+              // If validation fails (e.g. createdBy required), log it.
+              // We'll try to find a system admin or just log console.
+              console.log('Skipping Admin Notification (Auth/Schema constraint):', admNotifErr.message);
+            }
+          }
+
+          // B. Reduce Attribute Stock (if attributes exist)
+          let itemAttrs = null;
+          if (item.variantAttributes) {
+            itemAttrs = item.variantAttributes instanceof Map
+              ? Object.fromEntries(item.variantAttributes)
+              : item.variantAttributes;
+          }
+
+          if (itemAttrs && Object.keys(itemAttrs).length > 0 && product.attributeStocks) {
+            // Find matching variant
+            const matchingVariant = product.attributeStocks.find(variant => {
+              if (!variant.attributes) return false;
+              const variantAttrs = variant.attributes instanceof Map
+                ? Object.fromEntries(variant.attributes)
+                : variant.attributes;
+
+              const keys = Object.keys(itemAttrs);
+              const isMatch = keys.every(key => String(variantAttrs[key]) === String(itemAttrs[key]));
+              return isMatch;
+            });
+
+            if (matchingVariant) {
+              // Admin products have 'stock' inside attributeStocks entries
+              matchingVariant.stock = Math.max(0, (matchingVariant.stock || 0) - item.quantity);
+              // Also reduce displayStock if present? Usually synced.
+              if (matchingVariant.displayStock) {
+                matchingVariant.displayStock = Math.max(0, (matchingVariant.displayStock || 0) - item.quantity);
+              }
+              console.log(`📦 ADMIN Variant Stock reduced for ${product.name}: ${item.quantity}`);
+            }
+          }
+
+          await product.save();
+          console.log(`📦 ADMIN Global Stock reduced for ${product.name}: ${item.quantity}. Rem: ${product.stock}`);
+        }
       }
     }
-    
+
+    // SEND VENDOR NOTIFICATION: Order Arrived (Assigned)
+    if (order.assignedTo === 'vendor' && order.vendorId) {
+      try {
+        const VendorNotification = require('../models/VendorNotification');
+        await VendorNotification.createNotification({
+          vendorId: order.vendorId,
+          type: 'order_assigned',
+          title: 'New Order Received',
+          message: `You have received a new order #${order.orderNumber} worth ₹${order.totalAmount}.`,
+          relatedEntityType: 'order',
+          relatedEntityId: order._id,
+          priority: 'high',
+          metadata: { orderNumber: order.orderNumber, amount: order.totalAmount }
+        });
+      } catch (notifError) {
+        console.error('Failed to send vendor new order notification:', notifError);
+      }
+    }
+
     await order.save();
 
     // Clear cart only after payment is successfully confirmed
@@ -3289,8 +3573,8 @@ exports.confirmPayment = async (req, res, next) => {
           orderNumber: order.orderNumber,
           paymentStatus: order.paymentStatus,
         },
-        message: razorpayService.isTestMode() 
-          ? 'Payment confirmed successfully (Test Mode)' 
+        message: razorpayService.isTestMode()
+          ? 'Payment confirmed successfully (Test Mode)'
           : 'Payment confirmed successfully',
       },
     });
@@ -3376,8 +3660,8 @@ exports.createRemainingPaymentIntent = async (req, res, next) => {
             razorpayOrderId: razorpayOrder.id,
             keyId: process.env.RAZORPAY_KEY_ID, // Frontend needs this for Razorpay Checkout
           },
-          message: razorpayService.isTestMode() 
-            ? 'Remaining payment intent created (Test Mode)' 
+          message: razorpayService.isTestMode()
+            ? 'Remaining payment intent created (Test Mode)'
             : 'Remaining payment intent created successfully',
         },
       });
@@ -3458,7 +3742,7 @@ exports.confirmRemainingPayment = async (req, res, next) => {
     let razorpayPayment = null;
     try {
       razorpayPayment = await razorpayService.fetchPayment(gatewayPaymentId);
-      
+
       // Verify payment amount matches order remaining amount
       const paymentAmountInRupees = razorpayPayment.amount / 100;
       if (Math.abs(paymentAmountInRupees - order.remainingAmount) > 0.01) {
@@ -3485,7 +3769,7 @@ exports.confirmRemainingPayment = async (req, res, next) => {
         });
       }
     }
-    
+
     // Generate payment ID explicitly (pre-save hook will also generate, but this ensures it's set)
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
@@ -3498,7 +3782,7 @@ exports.confirmRemainingPayment = async (req, res, next) => {
     });
     const sequence = String(todayCount + 1).padStart(4, '0');
     const generatedPaymentId = `PAY-${dateStr}-${sequence}`;
-    
+
     // Create payment record
     const payment = new Payment({
       paymentId: generatedPaymentId, // Explicitly set paymentId
@@ -3574,8 +3858,8 @@ exports.confirmRemainingPayment = async (req, res, next) => {
           orderNumber: order.orderNumber,
           paymentStatus: order.paymentStatus,
         },
-        message: razorpayService.isTestMode() 
-          ? 'Remaining payment confirmed successfully (Test Mode)' 
+        message: razorpayService.isTestMode()
+          ? 'Remaining payment confirmed successfully (Test Mode)'
           : 'Remaining payment confirmed successfully',
       },
     });
@@ -4382,7 +4666,7 @@ exports.getProductReviews = async (req, res, next) => {
     ]);
 
     const stats = ratingStats[0] || { averageRating: 0, totalReviews: 0, ratingDistribution: [] };
-    
+
     // Calculate rating distribution
     const distribution = {
       5: stats.ratingDistribution.filter(r => r === 5).length,

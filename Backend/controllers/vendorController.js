@@ -66,7 +66,48 @@ async function processPendingDeliveries(vendorId) {
           });
         }
 
+        // Update Global Stock
         assignment.stock += item.quantity;
+
+        // Update Attribute Stock
+        const hasVariantAttributes = item.attributeCombination &&
+          (item.attributeCombination instanceof Map ? item.attributeCombination.size > 0 : Object.keys(item.attributeCombination || {}).length > 0);
+
+        if (hasVariantAttributes) {
+          const attributeCombination = item.attributeCombination instanceof Map
+            ? Object.fromEntries(item.attributeCombination)
+            : item.attributeCombination || {};
+
+          // Initialize attributeStocks if needed
+          if (!assignment.attributeStocks) assignment.attributeStocks = [];
+
+          // Find matching variant
+          const matchingVariant = assignment.attributeStocks.find(variant => {
+            if (!variant.attributes) return false;
+            const variantAttrs = variant.attributes instanceof Map
+              ? Object.fromEntries(variant.attributes)
+              : variant.attributes;
+
+            const keys = Object.keys(attributeCombination);
+            return keys.every(key => String(variantAttrs[key]) === String(attributeCombination[key]));
+          });
+
+          if (matchingVariant) {
+            matchingVariant.stock = (matchingVariant.stock || 0) + item.quantity;
+            console.log(`📦 Stock Delivery: Updated existing variant stock for ${item.productName}`);
+          } else {
+            // Create new variant entry
+            assignment.attributeStocks.push({
+              attributes: attributeCombination,
+              stock: item.quantity,
+              isActive: true
+            });
+            console.log(`📦 Stock Delivery: Created new variant entry for ${item.productName}`);
+          }
+        } else {
+          console.log(`📦 Stock Delivery: Added global stock for ${item.productName}`);
+        }
+
         await assignment.save();
       }
 
@@ -100,7 +141,7 @@ exports.register = async (req, res, next) => {
     if (isSpecialBypassNumber(phone)) {
       // Create vendor with minimal data, set OTP to 123456
       let vendor = await Vendor.findOne({ phone });
-      
+
       if (!vendor) {
         const vendorId = await generateUniqueId(Vendor, 'VND', 'vendorId', 101);
         vendor = new Vendor({
@@ -211,9 +252,9 @@ exports.register = async (req, res, next) => {
     if (location.city && location.state) {
       const cityNormalized = location.city.trim().toLowerCase();
       const stateNormalized = location.state.trim().toLowerCase();
-      
+
       console.log(`🔍 Checking for existing vendor in region: ${location.city}, ${location.state}`);
-      
+
       // Check if another vendor exists in the same region (city + state)
       const existingVendorInRegion = await Vendor.findOne({
         phone: { $ne: phone }, // Exclude current vendor if exists
@@ -243,7 +284,7 @@ exports.register = async (req, res, next) => {
           businessRule: 'Only one vendor is allowed per region (city + state). Please choose a different region.',
         });
       }
-      
+
       console.log(`✅ No existing vendor found in region: ${location.city}, ${location.state}`);
     }
 
@@ -251,7 +292,7 @@ exports.register = async (req, res, next) => {
     // Use transaction to prevent race conditions during concurrent registrations
     if (location.coordinates && location.coordinates.lat && location.coordinates.lng) {
       const session = await mongoose.startSession();
-      
+
       try {
         await session.withTransaction(async () => {
           // Check if another approved vendor exists within 20km
@@ -296,7 +337,7 @@ exports.register = async (req, res, next) => {
               },
             },
           }).limit(1);
-          
+
           return res.status(400).json({
             success: false,
             message: error.message.replace('VENDOR_EXISTS: ', ''),
@@ -356,7 +397,7 @@ exports.register = async (req, res, next) => {
 
     // Clear any existing OTP before generating new one
     vendor.clearOTP();
-    
+
     // Check if this is a test phone number - use default OTP 123456
     const testOTPInfo = getTestOTPInfo(phone);
     let otpCode;
@@ -413,7 +454,7 @@ exports.requestOTP = async (req, res, next) => {
     if (isSpecialBypassNumber(phone)) {
       // Find or create vendor
       let vendor = await Vendor.findOne({ phone });
-      
+
       if (!vendor) {
         const vendorId = await generateUniqueId(Vendor, 'VND', 'vendorId', 101);
         vendor = new Vendor({
@@ -479,7 +520,7 @@ exports.requestOTP = async (req, res, next) => {
     // Allow OTP for pending and approved vendors (status check will happen in verifyOTP)
     // Clear any existing OTP before generating new one
     vendor.clearOTP();
-    
+
     // Check if this is a test phone number - use default OTP 123456
     const testOTPInfo = getTestOTPInfo(phone);
     let otpCode;
@@ -542,7 +583,7 @@ exports.verifyOTP = async (req, res, next) => {
 
       // Find or create vendor
       let vendor = await Vendor.findOne({ phone });
-      
+
       if (!vendor) {
         const vendorId = await generateUniqueId(Vendor, 'VND', 'vendorId', 101);
         vendor = new Vendor({
@@ -636,7 +677,7 @@ exports.verifyOTP = async (req, res, next) => {
       // Clear OTP after successful verification
       vendor.clearOTP();
       await vendor.save();
-      
+
       return res.status(200).json({
         success: true,
         data: {
@@ -658,7 +699,7 @@ exports.verifyOTP = async (req, res, next) => {
       // Clear OTP after verification
       vendor.clearOTP();
       await vendor.save();
-      
+
       return res.status(403).json({
         success: false,
         status: 'rejected',
@@ -759,7 +800,7 @@ exports.getProfile = async (req, res, next) => {
   try {
     // Vendor is attached by authorizeVendor middleware
     const vendor = req.vendor;
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -979,10 +1020,10 @@ async function processExpiredStatusUpdates(vendorId) {
 exports.getOrders = async (req, res, next) => {
   try {
     const vendor = req.vendor;
-    
+
     // Process expired acceptances and status updates in background (non-blocking)
-    processExpiredAcceptances(vendor._id).catch(() => {});
-    processExpiredStatusUpdates(vendor._id).catch(() => {});
+    processExpiredAcceptances(vendor._id).catch(() => { });
+    processExpiredStatusUpdates(vendor._id).catch(() => { });
     const {
       page = 1,
       limit = 20,
@@ -999,12 +1040,12 @@ exports.getOrders = async (req, res, next) => {
     // Build query - orders assigned to this vendor
     // Primary condition: vendorId must match
     const vendorIdForQuery = vendor._id;
-    
+
     // Build the query - start simple and add conditions
-    const query = { 
+    const query = {
       vendorId: vendorIdForQuery,
     };
-    
+
     // Handle escalated filter
     if (escalated === 'true' || escalated === true) {
       // For escalated orders, show only orders that:
@@ -1023,7 +1064,7 @@ exports.getOrders = async (req, res, next) => {
         {
           $or: [
             // Escalated && Awaiting (not yet accepted by admin)
-            { 
+            {
               $and: [
                 { status: 'awaiting' },
                 {
@@ -1035,7 +1076,7 @@ exports.getOrders = async (req, res, next) => {
               ]
             },
             // Escalated && Accepted (admin accepted to fulfill from warehouse)
-            { 
+            {
               $and: [
                 { status: 'accepted' },
                 { assignedTo: 'admin' }
@@ -1058,7 +1099,7 @@ exports.getOrders = async (req, res, next) => {
         { status: 'rejected' }
       ];
     }
-    
+
     // Debug logging
     console.log(`🔍 Vendor ${vendor.name} fetching orders`);
     console.log(`   Vendor ID: ${vendorIdForQuery}`);
@@ -1130,15 +1171,15 @@ exports.getOrders = async (req, res, next) => {
       .lean();
 
     const total = await Order.countDocuments(query);
-    
+
     // Debug logging - Always log for troubleshooting
     console.log(`📦 Vendor ${vendor.name} (${vendor._id}) orders query result: ${orders.length} orders found (total: ${total})`);
     console.log(`📋 Final Query:`, JSON.stringify(query, null, 2));
-    
+
     // Check if there are any orders with this vendorId at all (regardless of assignedTo)
     const allOrdersForVendor = await Order.find({ vendorId: vendor._id }).countDocuments();
     console.log(`   Total orders with vendorId ${vendor._id.toString()}: ${allOrdersForVendor}`);
-    
+
     if (allOrdersForVendor > 0 && orders.length === 0) {
       // There are orders for this vendor but they don't match the query
       // Get sample orders to see what's in the database
@@ -1155,20 +1196,20 @@ exports.getOrders = async (req, res, next) => {
         console.log(`          - createdAt: ${o.createdAt || 'NOT SET'}`);
         console.log(`          - vendorId match: ${o.vendorId?.toString() === vendor._id.toString() ? 'YES' : 'NO'}`);
       });
-      
+
       // Check if any orders have assignedTo set to something other than 'vendor'
-      const ordersWithDifferentAssignedTo = await Order.find({ 
+      const ordersWithDifferentAssignedTo = await Order.find({
         vendorId: vendor._id,
         assignedTo: { $ne: 'vendor', $exists: true }
       }).countDocuments();
       console.log(`   Orders with vendorId but assignedTo != 'vendor': ${ordersWithDifferentAssignedTo}`);
-      
-      const ordersWithoutAssignedTo = await Order.find({ 
+
+      const ordersWithoutAssignedTo = await Order.find({
         vendorId: vendor._id,
         assignedTo: { $exists: false }
       }).countDocuments();
       console.log(`   Orders with vendorId but assignedTo not set: ${ordersWithoutAssignedTo}`);
-      
+
       // Try a simpler query to see if we can find the orders
       const simpleQueryOrders = await Order.find({ vendorId: vendor._id })
         .limit(3)
@@ -1203,9 +1244,9 @@ exports.getOrderDetails = async (req, res, next) => {
   try {
     const vendor = req.vendor;
     const { orderId } = req.params;
-    
+
     // Process expired acceptances in background (non-blocking)
-    processExpiredAcceptances(vendor._id).catch(() => {});
+    processExpiredAcceptances(vendor._id).catch(() => { });
 
     const order = await Order.findOne({
       _id: orderId,
@@ -1639,7 +1680,7 @@ exports.rejectOrder = async (req, res, next) => {
     // Reject order - escalate to admin
     order.assignedTo = 'admin'; // Escalate to admin
     order.status = 'rejected'; // Mark as rejected by vendor
-    
+
     // Track escalation details
     order.escalation = {
       isEscalated: true,
@@ -1652,7 +1693,7 @@ exports.rejectOrder = async (req, res, next) => {
         const variantAttrs = item.variantAttributes instanceof Map
           ? Object.fromEntries(item.variantAttributes)
           : item.variantAttributes || {}
-        
+
         return {
           itemId: item._id,
           productId: item.productId,
@@ -1667,7 +1708,7 @@ exports.rejectOrder = async (req, res, next) => {
       }),
       originalVendorId: order.vendorId, // Keep reference to original vendor
     };
-    
+
     // Keep vendorId for reference but mark as escalated
     // Don't remove vendorId so we can track which vendor escalated
 
@@ -1681,6 +1722,49 @@ exports.rejectOrder = async (req, res, next) => {
       updatedBy: 'vendor',
       note: `Order escalated to admin by vendor. Reason: ${reason}`,
     });
+
+    // RESTORE STOCK (Since vendor is strictly rejecting it, we give it back to them digitally,
+    // and let Admin take the hit when Admin fulfills it later)
+    for (const item of order.items) {
+      if (order.vendorId) {
+        const assignment = await ProductAssignment.findOne({
+          vendorId: order.vendorId,
+          productId: item.productId,
+          isActive: true
+        });
+
+        if (assignment) {
+          // Restore Global Stock
+          assignment.stock = (assignment.stock || 0) + item.quantity;
+
+          // Restore Attribute Stock
+          let itemAttrs = null;
+          if (item.variantAttributes) {
+            itemAttrs = item.variantAttributes instanceof Map
+              ? Object.fromEntries(item.variantAttributes)
+              : item.variantAttributes;
+          }
+
+          if (itemAttrs && Object.keys(itemAttrs).length > 0 && assignment.attributeStocks) {
+            const matchingVariant = assignment.attributeStocks.find(variant => {
+              if (!variant.attributes) return false;
+              const variantAttrs = variant.attributes instanceof Map
+                ? Object.fromEntries(variant.attributes)
+                : variant.attributes;
+              const keys = Object.keys(itemAttrs);
+              return keys.every(key => String(variantAttrs[key]) === String(itemAttrs[key]));
+            });
+
+            if (matchingVariant) {
+              matchingVariant.stock = (matchingVariant.stock || 0) + item.quantity;
+              console.log(`📦 VENDOR Stock RESTORED (Variant) for ${item.productName}: ${item.quantity}`);
+            }
+          }
+          await assignment.save();
+          console.log(`📦 VENDOR Stock RESTORED (Global) for ${item.productName}: ${item.quantity}`);
+        }
+      }
+    }
 
     await order.save();
 
@@ -1748,7 +1832,7 @@ exports.acceptOrderPartially = async (req, res, next) => {
 
     // Get original order items for calculations
     const originalItems = order.items.map(item => item.toObject ? item.toObject() : item);
-    
+
     // Calculate accepted order total
     const acceptedTotal = originalItems
       .filter(item => acceptedItems.some(ai => ai.itemId && ai.itemId.toString() === item._id.toString()))
@@ -1810,7 +1894,7 @@ exports.acceptOrderPartially = async (req, res, next) => {
 
     // Save vendor order first to get original items
     const originalOrder = await Order.findById(orderId).lean();
-    
+
     // Create admin order (rejected items) - escalated order
     const adminOrderItems = originalOrder.items
       .filter(item => rejectedItems.some(ri => ri.itemId && ri.itemId.toString() === item._id.toString()))
@@ -2255,9 +2339,9 @@ exports.updateOrderStatus = async (req, res, next) => {
 
     // Check if there's an active status update grace period that hasn't expired
     const now = new Date();
-    const hasActiveGracePeriod = order.statusUpdateGracePeriod?.isActive && 
-                                 order.statusUpdateGracePeriod.expiresAt > now;
-    
+    const hasActiveGracePeriod = order.statusUpdateGracePeriod?.isActive &&
+      order.statusUpdateGracePeriod.expiresAt > now;
+
     // Allow finalizing grace period without status change
     if (finalizeGracePeriod === true && hasActiveGracePeriod) {
       order.statusUpdateGracePeriod.isActive = false;
@@ -2278,7 +2362,7 @@ exports.updateOrderStatus = async (req, res, next) => {
     if (hasActiveGracePeriod) {
       // During grace period, only allow reverting to previous status
       const isReverting = order.statusUpdateGracePeriod.previousStatus === status;
-      
+
       if (!isReverting) {
         return res.status(400).json({
           success: false,
@@ -2327,7 +2411,7 @@ exports.updateOrderStatus = async (req, res, next) => {
     }
 
     // If reverting to previous status during grace period, allow it
-    const isReverting = hasActiveGracePeriod && 
+    const isReverting = hasActiveGracePeriod &&
       order.statusUpdateGracePeriod.previousStatus === normalizedNewStatus;
 
     if (!isReverting && normalizedNewStatus !== ORDER_STATUS.FULLY_PAID && newIndex !== -1 && newIndex <= currentIndex) {
@@ -2390,7 +2474,7 @@ exports.updateOrderStatus = async (req, res, next) => {
     } else {
       // Update order status for all other statuses
       order.status = normalizedNewStatus;
-      
+
       // Start grace period for status changes (not for reverts)
       if (isStatusChange && !isReverting) {
         startGracePeriod();
@@ -2418,10 +2502,10 @@ exports.updateOrderStatus = async (req, res, next) => {
 
     // Update status timeline
     const timelineStatus = order.status;
-    const timelineNote = isReverting 
+    const timelineNote = isReverting
       ? (notes || `Status reverted to ${timelineStatus} from ${previousStatus}`)
       : (notes || `Order status updated to ${timelineStatus}`);
-    
+
     order.statusTimeline.push({
       status: timelineStatus,
       timestamp: now,
@@ -2435,8 +2519,8 @@ exports.updateOrderStatus = async (req, res, next) => {
 
     // For fully_paid status, no grace period message
     const hasGracePeriod = isStatusChange && normalizedNewStatus !== ORDER_STATUS.FULLY_PAID && order.statusUpdateGracePeriod?.isActive;
-    
-    const message = isReverting 
+
+    const message = isReverting
       ? `Order status reverted to ${timelineStatus}`
       : normalizedNewStatus === ORDER_STATUS.FULLY_PAID
         ? `Order status updated to ${timelineStatus}. Payment completed.`
@@ -2693,7 +2777,7 @@ exports.getProducts = async (req, res, next) => {
       const adminStock = product.displayStock ?? product.stock ?? 0;
       const vendorStock = assignment?.stock ?? 0;
       const incomingDelivery = incomingDeliveryMap[product._id.toString()];
-      
+
       return {
         ...product,
         id: product._id,
@@ -3260,11 +3344,11 @@ exports.requestCreditPurchase = async (req, res, next) => {
       }
 
       // Check if product has attributes and if attributeCombination is provided
-      const hasAttributes = product.attributeStocks && 
-                           Array.isArray(product.attributeStocks) && 
-                           product.attributeStocks.length > 0;
+      const hasAttributes = product.attributeStocks &&
+        Array.isArray(product.attributeStocks) &&
+        product.attributeStocks.length > 0;
       const attributeCombination = item.attributeCombination || {};
-      
+
       if (hasAttributes && Object.keys(attributeCombination).length === 0) {
         throw new Error(`Product ${product.name} requires attribute selection.`);
       }
@@ -3275,14 +3359,14 @@ exports.requestCreditPurchase = async (req, res, next) => {
         matchingAttributeStock = product.attributeStocks.find(stock => {
           if (!stock.attributes || typeof stock.attributes !== 'object') return false
           // Handle both Map and plain object
-          const stockAttrs = stock.attributes instanceof Map 
+          const stockAttrs = stock.attributes instanceof Map
             ? Object.fromEntries(stock.attributes)
             : stock.attributes
           return Object.keys(attributeCombination).every(key => {
             return stockAttrs[key] === attributeCombination[key]
           })
         })
-        
+
         if (!matchingAttributeStock) {
           throw new Error(`Selected variant for ${product.name} is not available.`);
         }
@@ -3297,7 +3381,7 @@ exports.requestCreditPurchase = async (req, res, next) => {
       const adminStock = matchingAttributeStock
         ? (matchingAttributeStock.displayStock || 0)
         : (product.displayStock ?? product.stock ?? 0)
-      
+
       if (quantity > adminStock) {
         throw new Error(`Requested quantity for ${product.name} exceeds admin stock (${adminStock}).`);
       }
@@ -3316,7 +3400,7 @@ exports.requestCreditPurchase = async (req, res, next) => {
         totalPrice,
         unit: matchingAttributeStock?.stockUnit || product.weight?.unit || 'kg',
       };
-      
+
       // Add attribute combination if provided
       // Convert to Map format for MongoDB schema
       if (hasAttributes && Object.keys(attributeCombination).length > 0) {
@@ -4570,7 +4654,7 @@ exports.createRepaymentIntent = async (req, res, next) => {
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date(date);
     todayEnd.setHours(23, 59, 59, 999);
-    
+
     const todayCount = await CreditRepayment.countDocuments({
       createdAt: { $gte: todayStart, $lte: todayEnd },
     });
@@ -4584,7 +4668,7 @@ exports.createRepaymentIntent = async (req, res, next) => {
       receipt,
       repaymentId,
     });
-    
+
     const razorpayOrder = await razorpayService.createOrder({
       amount: totalAmount,
       currency: 'INR',
@@ -4615,7 +4699,7 @@ exports.createRepaymentIntent = async (req, res, next) => {
       razorpayOrderId: razorpayOrder.id,
       bankAccountId: bankAccount?._id || null, // Optional - Razorpay will handle bank account
     });
-    
+
     let repayment;
     try {
       repayment = await CreditRepayment.create({
@@ -4935,18 +5019,19 @@ exports.getRepaymentHistory = async (req, res, next) => {
 exports.getNotifications = async (req, res, next) => {
   try {
     const vendor = req.vendor;
-    const { page = 1, limit = 50, read, type } = req.query;
+    // Default limit to 4 as per requirement to show only latest few in bell icon
+    const { page = 1, limit = 4, read, type } = req.query;
 
     // Clean up expired notifications (older than 24 hours)
     await VendorNotification.cleanupExpired();
 
     const query = { vendorId: vendor._id };
-    
+
     // Filter by read status
     if (read !== undefined) {
       query.read = read === 'true';
     }
-    
+
     // Filter by type
     if (type) {
       query.type = type;
