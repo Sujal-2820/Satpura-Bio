@@ -38,6 +38,8 @@ export function FinancePage({ subRoute = null, navigate }) {
     getVendorPurchaseRequests,
     approveVendorPurchase,
     rejectVendorPurchase,
+    sendVendorPurchaseStock,
+    confirmVendorPurchaseDelivery,
     getVendorCreditHistory,
     loading,
   } = useAdminApi()
@@ -49,12 +51,14 @@ export function FinancePage({ subRoute = null, navigate }) {
   const [recoveryStatus, setRecoveryStatus] = useState([])
   const [purchaseRequests, setPurchaseRequests] = useState([])
   const [purchaseRequestsLoading, setPurchaseRequestsLoading] = useState(false)
-  
+
   // View states (replacing modals with full-screen views)
   const [currentView, setCurrentView] = useState(null) // 'parameters', 'creditBalance', 'purchaseRequest'
   const [selectedVendorForCredit, setSelectedVendorForCredit] = useState(null)
   const [selectedVendorCreditData, setSelectedVendorCreditData] = useState(null)
   const [selectedPurchaseRequest, setSelectedPurchaseRequest] = useState(null)
+  const [selectedVendorRepayments, setSelectedVendorRepayments] = useState([])
+  const [repaymentsLoading, setRepaymentsLoading] = useState(false)
   const [approvingPurchase, setApprovingPurchase] = useState(false)
 
   // Fetch purchase requests
@@ -118,13 +122,13 @@ export function FinancePage({ subRoute = null, navigate }) {
 
   const handleViewCreditBalance = async (vendor) => {
     setSelectedVendorForCredit(vendor)
-    
+
     // Fetch detailed credit data
     const result = await getVendorCreditBalances({ vendorId: vendor.id || vendor.vendorId })
     if (result.data?.creditData) {
       setSelectedVendorCreditData(result.data.creditData)
     }
-    
+
     setCurrentView('creditBalance')
   }
 
@@ -181,9 +185,28 @@ export function FinancePage({ subRoute = null, navigate }) {
     }
   }
 
-  const handleViewPurchaseRequest = (request) => {
+  const handleViewPurchaseRequest = async (request) => {
     setSelectedPurchaseRequest(request)
     setCurrentView('purchaseRequest')
+
+    // Fetch vendor repayments
+    const vendorId = request.vendorId
+    if (vendorId) {
+      setRepaymentsLoading(true)
+      try {
+        const result = await getVendorRepayments(vendorId)
+        if (result.data?.repayments) {
+          setSelectedVendorRepayments(result.data.repayments)
+        } else {
+          setSelectedVendorRepayments([])
+        }
+      } catch (error) {
+        console.error('Failed to fetch vendor repayments:', error)
+        setSelectedVendorRepayments([])
+      } finally {
+        setRepaymentsLoading(false)
+      }
+    }
   }
 
   const handleApprovePurchase = async (requestId) => {
@@ -192,8 +215,10 @@ export function FinancePage({ subRoute = null, navigate }) {
       const result = await approveVendorPurchase(requestId)
       if (result.data) {
         success('Purchase request approved successfully!', 3000)
-        setCurrentView(null)
-        setSelectedPurchaseRequest(null)
+        // Refresh request data so we can see the "Send Stock" button
+        if (selectedPurchaseRequest && selectedPurchaseRequest.id === requestId) {
+          setSelectedPurchaseRequest({ ...selectedPurchaseRequest, status: 'approved', deliveryStatus: 'pending' })
+        }
         fetchPurchaseRequests()
         fetchData() // Refresh credit balances
       } else if (result.error) {
@@ -202,6 +227,47 @@ export function FinancePage({ subRoute = null, navigate }) {
       }
     } catch (error) {
       showError(error.message || 'Failed to approve purchase request', 5000)
+    } finally {
+      setApprovingPurchase(false)
+    }
+  }
+
+  const handleSendStock = async (requestId) => {
+    setApprovingPurchase(true)
+    try {
+      const result = await sendVendorPurchaseStock(requestId)
+      if (result.data) {
+        success('Stock marked as in-transit!', 3000)
+        // Refresh request data
+        if (selectedPurchaseRequest && selectedPurchaseRequest.id === requestId) {
+          setSelectedPurchaseRequest({ ...selectedPurchaseRequest, deliveryStatus: 'in_transit' })
+        }
+        fetchPurchaseRequests()
+      } else if (result.error) {
+        showError(result.error.message || 'Failed to update delivery status', 5000)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to update delivery status', 5000)
+    } finally {
+      setApprovingPurchase(false)
+    }
+  }
+
+  const handleConfirmDelivery = async (requestId) => {
+    setApprovingPurchase(true)
+    try {
+      const result = await confirmVendorPurchaseDelivery(requestId)
+      if (result.data) {
+        success('Stock delivery confirmed and inventory updated!', 3000)
+        setCurrentView(null)
+        setSelectedPurchaseRequest(null)
+        fetchPurchaseRequests()
+        fetchData()
+      } else if (result.error) {
+        showError(result.error.message || 'Failed to confirm delivery', 5000)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to confirm delivery', 5000)
     } finally {
       setApprovingPurchase(false)
     }
@@ -585,10 +651,53 @@ export function FinancePage({ subRoute = null, navigate }) {
               </div>
             </div>
 
+            {/* Vendor Credit Performance */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-900">Vendor Credit Performance</h4>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                  <p className="text-xs text-blue-500">Credit Limit</p>
+                  <p className="mt-1 text-lg font-bold text-blue-900">
+                    {formatCurrency(request.vendorPerformance?.creditLimit || 0)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+                  <p className="text-xs text-purple-500">Used Credit</p>
+                  <p className="mt-1 text-lg font-bold text-purple-900">
+                    {formatCurrency(request.vendorPerformance?.creditUsed || 0)}
+                  </p>
+                </div>
+                <div className={cn(
+                  "rounded-xl border p-4",
+                  request.vendorPerformance?.hasOutstandingDues ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"
+                )}>
+                  <p className={cn("text-xs", request.vendorPerformance?.hasOutstandingDues ? "text-red-500" : "text-green-500")}>
+                    Outstanding Dues
+                  </p>
+                  <p className={cn("mt-1 text-lg font-bold", request.vendorPerformance?.hasOutstandingDues ? "text-red-900" : "text-green-900")}>
+                    {formatCurrency(request.vendorPerformance?.outstandingAmount || 0)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
+                  <p className="text-xs text-orange-500">Utilization</p>
+                  <p className="mt-1 text-lg font-bold text-orange-900">
+                    {(request.vendorPerformance?.creditUtilization || 0).toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+
+              {request.vendorPerformance?.hasOutstandingDues && (
+                <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-100/50 p-3 text-sm text-red-900">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>Warning: This vendor had outstanding dues of {formatCurrency(request.vendorPerformance?.outstandingAmount)} at the time of this request.</span>
+                </div>
+              )}
+            </div>
+
             {/* Purchase Details */}
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-gray-900">Purchase Details</h4>
-              
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <p className="text-xs text-gray-500">Request Amount</p>
@@ -618,7 +727,7 @@ export function FinancePage({ subRoute = null, navigate }) {
                           .replace(/^./, str => str.toUpperCase())
                           .trim()
                       }
-                      
+
                       return (
                         <div key={index} className="rounded-lg bg-white p-3">
                           <div className="flex items-center justify-between mb-1">
@@ -660,6 +769,45 @@ export function FinancePage({ subRoute = null, navigate }) {
               )}
             </div>
 
+            {/* Repayment History */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-900">Repayment History</h4>
+                {repaymentsLoading && <span className="text-xs text-pink-500 animate-pulse">Loading...</span>}
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                {selectedVendorRepayments.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedVendorRepayments.slice(0, 5).map((repayment, index) => (
+                      <div key={repayment.id || index} className="flex items-center justify-between rounded-lg bg-white p-3 shadow-sm">
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">
+                            ₹{repayment.amount?.toLocaleString('en-IN') || 0}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {repayment.date ? new Date(repayment.date).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+                        <StatusBadge tone={repayment.status === 'completed' ? 'success' : 'warning'}>
+                          {repayment.status || 'Pending'}
+                        </StatusBadge>
+                      </div>
+                    ))}
+                    {selectedVendorRepayments.length > 5 && (
+                      <p className="text-center text-xs text-gray-500">
+                        View all {selectedVendorRepayments.length} repayments in Vendor Details
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-center text-sm text-gray-500 py-4">
+                    {repaymentsLoading ? 'Fetching repayment history...' : 'No repayment history found for this vendor.'}
+                  </p>
+                )}
+              </div>
+            </div>
+
             {/* Rejection Reason Input */}
             <div>
               <label htmlFor="rejectReason" className="mb-2 block text-sm font-bold text-gray-900">
@@ -698,14 +846,52 @@ export function FinancePage({ subRoute = null, navigate }) {
                 <button
                   type="button"
                   onClick={() => handleApprovePurchase(request.id)}
-                  disabled={loading}
+                  disabled={loading || approvingPurchase}
                   className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
                 >
                   <CheckCircle className="h-4 w-4" />
-                  {loading ? 'Processing...' : 'Approve Request'}
+                  {approvingPurchase ? 'Processing...' : 'Approve Request'}
                 </button>
               </div>
             </div>
+
+            {/* Delivery Actions (Visible after approval) */}
+            {request.status === 'approved' && request.deliveryStatus !== 'delivered' && (
+              <div className="mt-8 rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/50 p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900">Stock Delivery Workflow</h4>
+                    <p className="text-xs text-gray-600">Current Phase: <span className="font-semibold uppercase text-blue-600">{request.deliveryStatus || 'Pending'}</span></p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-4">
+                  {request.deliveryStatus === 'pending' && (
+                    <button
+                      type="button"
+                      onClick={() => handleSendStock(request.id)}
+                      disabled={approvingPurchase}
+                      className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      <Package className="h-4 w-4" />
+                      Dispatch Stock (Mark Sent)
+                    </button>
+                  )}
+
+                  {request.deliveryStatus === 'in_transit' && (
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmDelivery(request.id)}
+                      disabled={approvingPurchase}
+                      className="flex items-center gap-2 rounded-xl bg-pink-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:bg-pink-700 disabled:opacity-50"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Confirm Receipt (Actual Stock Transfer)
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -832,13 +1018,13 @@ export function FinancePage({ subRoute = null, navigate }) {
               </>
             ) : (
               mockFinance.creditPolicies.map((policy) => (
-              <div key={policy.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)]">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold text-gray-900">{policy.label}</p>
-                  <StatusBadge tone="success">{policy.value}</StatusBadge>
+                <div key={policy.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)]">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-gray-900">{policy.label}</p>
+                    <StatusBadge tone="success">{policy.value}</StatusBadge>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-600">{policy.meta}</p>
                 </div>
-                <p className="mt-2 text-xs text-gray-600">{policy.meta}</p>
-              </div>
               ))
             )}
           </div>

@@ -20,6 +20,7 @@ const { OTP_EXPIRY_MINUTES, IRA_PARTNER_COMMISSION_THRESHOLD, IRA_PARTNER_COMMIS
 const { checkPhoneExists, checkPhoneInRole, isSpecialBypassNumber, SPECIAL_BYPASS_OTP } = require('../utils/phoneValidation');
 const { generateUniqueId } = require('../utils/generateUniqueId');
 const { createPaymentHistory, createBankAccount } = require('../utils/createWithId');
+const adminTaskController = require('./adminTaskController');
 
 /**
  * @desc    Seller registration
@@ -224,6 +225,25 @@ exports.register = async (req, res, next) => {
         expiresIn: OTP_EXPIRY_MINUTES * 60, // seconds
       },
     });
+
+    // Create Admin TODO Task
+    try {
+      await adminTaskController.createTaskInternal({
+        title: 'New IRA Partner Application',
+        description: `A new IRA Partner "${name}" (${phone}) has registered and is waiting for approval in ${area || 'unspecified area'}.`,
+        category: 'seller',
+        priority: 'high',
+        link: '/sellers',
+        relatedId: seller._id,
+        metadata: {
+          sellerName: name,
+          phone: phone,
+          area: area
+        }
+      });
+    } catch (taskError) {
+      console.error('Failed to create admin task:', taskError);
+    }
   } catch (error) {
     next(error);
   }
@@ -1368,6 +1388,25 @@ exports.requestWithdrawal = async (req, res, next) => {
       },
       message: 'Withdrawal request submitted successfully. Awaiting admin approval.',
     });
+
+    // Create Admin TODO Task
+    try {
+      await adminTaskController.createTaskInternal({
+        title: 'New IRA Partner Withdrawal Request',
+        description: `IRA Partner "${seller.name}" (${seller.phone}) requested withdrawal of ₹${amount.toLocaleString('en-IN')}.`,
+        category: 'finance',
+        priority: 'high',
+        link: '/sellers/withdrawals',
+        relatedId: withdrawal._id,
+        metadata: {
+          sellerName: seller.name,
+          amount: amount,
+          withdrawalId: withdrawal.withdrawalId
+        }
+      });
+    } catch (taskError) {
+      console.error('Failed to create admin task:', taskError);
+    }
   } catch (error) {
     next(error);
   }

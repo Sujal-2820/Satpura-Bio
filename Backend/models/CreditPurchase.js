@@ -124,6 +124,14 @@ const creditPurchaseSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  hasOutstandingDues: {
+    type: Boolean,
+    default: false,
+  },
+  outstandingDuesAmount: {
+    type: Number,
+    default: 0,
+  },
 }, {
   timestamps: true,
 });

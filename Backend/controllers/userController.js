@@ -3166,7 +3166,7 @@ exports.createPaymentIntent = async (req, res, next) => {
             paymentMethod,
             status: razorpayOrder.status,
             razorpayOrderId: razorpayOrder.id,
-            keyId: process.env.RAZORPAY_KEY_ID, // Frontend needs this for Razorpay Checkout
+            keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_bypass_dummy_key', // Frontend needs this for Razorpay Checkout
           },
           message: razorpayService.isTestMode()
             ? 'Payment intent created (Test Mode)'
@@ -3658,7 +3658,7 @@ exports.createRemainingPaymentIntent = async (req, res, next) => {
             paymentMethod,
             status: razorpayOrder.status,
             razorpayOrderId: razorpayOrder.id,
-            keyId: process.env.RAZORPAY_KEY_ID, // Frontend needs this for Razorpay Checkout
+            keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_bypass_dummy_key', // Frontend needs this for Razorpay Checkout
           },
           message: razorpayService.isTestMode()
             ? 'Remaining payment intent created (Test Mode)'

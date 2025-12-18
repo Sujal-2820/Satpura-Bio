@@ -11,12 +11,13 @@ import { useAdminApi } from '../hooks/useAdminApi'
 import { cn } from '../../../lib/cn'
 
 export function DashboardPage() {
-  const { dashboard } = useAdminState()
-  const { fetchDashboardData } = useAdminApi()
+  const { dashboard, tasks } = useAdminState()
+  const { fetchDashboardData, fetchTasks } = useAdminApi()
 
   useEffect(() => {
     fetchDashboardData({ period: '30d' })
-  }, [fetchDashboardData])
+    fetchTasks({ limit: 5 })
+  }, [fetchDashboardData, fetchTasks])
 
   // Use data from context or fallback to snapshot
   const dashboardData = dashboard.data || dashboardSummary
@@ -86,44 +87,75 @@ export function DashboardPage() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <Timeline events={analyticsSummary.timeline} />
-        <div className="space-y-4 rounded-3xl border border-orange-200 bg-white p-6 shadow-[0_2px_6px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]">
-          <header className="border-b border-orange-200 pb-3">
-            <h3 className="text-lg font-bold text-orange-700">Important Tasks</h3>
-            <p className="text-sm text-gray-600">
-              Quick access to important tasks that need your attention.
-            </p>
+        <div className="space-y-4 rounded-3xl border border-orange-200 bg-white p-6 shadow-[0_2px_6px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)] transition-all duration-300">
+          <header className="flex items-center justify-between border-b border-orange-200 pb-3">
+            <div>
+              <h3 className="text-lg font-bold text-orange-700">Important Tasks</h3>
+              <p className="text-sm text-gray-600">
+                Tasks that need your immediate attention.
+              </p>
+            </div>
+            <a
+              href="/admin/tasks"
+              className="text-xs font-bold text-orange-600 hover:text-orange-700 hover:underline px-3 py-1 rounded-full bg-orange-50 border border-orange-100 transition-colors"
+            >
+              View All
+            </a>
           </header>
           <div className="space-y-3">
-            {[
-              {
-                title: 'Approve new vendors',
-                description: '14 vendors waiting for approval. Check documents and set payment terms.',
-                color: 'blue',
-              },
-              {
-                title: 'Update product information',
-                description: 'Products expiring soon for Micro Nutrient Mix stock. Check and update prices.',
-                color: 'yellow',
-              },
-              {
-                title: 'Seller rewards plan',
-                description: 'Monthly rewards and earnings need approval before sending.',
-                color: 'green',
-              },
-            ].map((item) => (
-              <div
-                key={item.title}
-                className={cn(
-                  'rounded-2xl border p-4 transition-all duration-300 hover:shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.4)]',
-                  item.color === 'blue' && 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 hover:from-blue-100 hover:to-blue-200/50',
-                  item.color === 'yellow' && 'border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100/50 hover:from-yellow-100 hover:to-yellow-200/50',
-                  item.color === 'green' && 'border-green-200 bg-gradient-to-br from-green-50 to-green-100/50 hover:from-green-100 hover:to-green-200/50',
-                )}
-              >
-                <p className="text-sm font-bold text-gray-900">{item.title}</p>
-                <p className="text-xs text-gray-600">{item.description}</p>
+            {tasks.data && tasks.data.filter(t => t.status !== 'completed' || t.priority === 'urgent').slice(0, 4).map((task) => {
+              // Determine color based on priority or category
+              let color = 'blue';
+              if (task.priority === 'urgent' || task.priority === 'high') color = 'red';
+              else if (task.category === 'finance') color = 'green';
+              else if (task.category === 'order') color = 'yellow';
+
+              return (
+                <div
+                  key={task._id}
+                  className={cn(
+                    'group cursor-pointer rounded-2xl border p-4 transition-all duration-300 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.5)]',
+                    color === 'blue' && 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/30 hover:from-blue-100 hover:to-blue-200/40',
+                    color === 'yellow' && 'border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100/30 hover:from-yellow-100 hover:to-yellow-200/40',
+                    color === 'green' && 'border-green-200 bg-gradient-to-br from-green-50 to-green-100/30 hover:from-green-100 hover:to-green-200/40',
+                    color === 'red' && 'border-red-200 bg-gradient-to-br from-red-50 to-red-100/30 hover:from-red-100 hover:to-red-200/40',
+                  )}
+                  onClick={() => {
+                    if (task.link) {
+                      window.location.href = `/admin${task.link}`;
+                    }
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-bold text-gray-900 group-hover:text-blue-900 transition-colors">{task.title}</p>
+                    {task.priority === 'urgent' && (
+                      <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse mt-1.5" />
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-gray-600 line-clamp-2">{task.description}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className={cn(
+                      "text-[10px] uppercase font-bold px-2 py-0.5 rounded-md",
+                      color === 'blue' ? "bg-blue-100 text-blue-700" :
+                        color === 'yellow' ? "bg-yellow-100 text-yellow-700" :
+                          color === 'green' ? "bg-green-100 text-green-700" :
+                            "bg-red-100 text-red-700"
+                    )}>
+                      {task.category}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-medium">
+                      {new Date(task.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {(!tasks.data || tasks.data.length === 0) && (
+              <div className="py-12 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50">
+                <p className="text-sm text-gray-500 italic">No pending tasks found. All clear! 🎉</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </section>

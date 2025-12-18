@@ -3,6 +3,7 @@ const router = express.Router();
 
 // Import controllers
 const adminController = require('../controllers/adminController');
+const adminTaskController = require('../controllers/adminTaskController');
 const vendorAdminMessageController = require('../controllers/vendorAdminMessageController');
 
 // Import middleware
@@ -58,6 +59,31 @@ router.get('/auth/profile', authorizeAdmin, adminController.getProfile);
  * @access  Private (Admin)
  */
 router.get('/dashboard', authorizeAdmin, adminController.getDashboard);
+
+// ============================================================================
+// TASK (TODO) MANAGEMENT ROUTES
+// ============================================================================
+
+/**
+ * @route   GET /api/admin/tasks
+ * @desc    Get all admin todo tasks
+ * @access  Private (Admin)
+ */
+router.get('/tasks', authorizeAdmin, adminTaskController.getTasks);
+
+/**
+ * @route   PUT /api/admin/tasks/:id/view
+ * @desc    Mark task as viewed
+ * @access  Private (Admin)
+ */
+router.put('/tasks/:id/view', authorizeAdmin, adminTaskController.markAsViewed);
+
+/**
+ * @route   PUT /api/admin/tasks/:id/complete
+ * @desc    Mark task as completed
+ * @access  Private (Admin)
+ */
+router.put('/tasks/:id/complete', authorizeAdmin, adminTaskController.markAsCompleted);
 
 // ============================================================================
 // PRODUCT MANAGEMENT ROUTES
@@ -215,6 +241,9 @@ router.post('/vendors/purchases/:requestId/approve', authorizeAdmin, adminContro
  * @access  Private (Admin)
  */
 router.post('/vendors/purchases/:requestId/reject', authorizeAdmin, adminController.rejectVendorPurchase);
+router.post('/vendors/purchases/:requestId/send', authorizeAdmin, adminController.sendVendorPurchaseStock);
+router.post('/vendors/purchases/:requestId/confirm-delivery', authorizeAdmin, adminController.confirmVendorPurchaseDelivery);
+
 
 /**
  * @route   PUT /api/admin/vendors/:vendorId/ban

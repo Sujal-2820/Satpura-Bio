@@ -304,6 +304,11 @@ const orderSchema = new mongoose.Schema({
       // Store original vendor when escalated
     },
   },
+  stockDeducted: {
+    type: Boolean,
+    default: false,
+    // Whether stock has been deducted from vendor/admin inventory
+  },
 }, {
   timestamps: true,
 });
@@ -324,19 +329,19 @@ orderSchema.pre('save', async function (next) {
     try {
       const date = new Date();
       const dateStr = date.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
-      
+
       // Find count of orders created today
       const todayStart = new Date(date);
       todayStart.setHours(0, 0, 0, 0);
       const todayEnd = new Date(date);
       todayEnd.setHours(23, 59, 59, 999);
-      
+
       // Use mongoose.model to get the Order model
       const OrderModel = this.constructor;
       const todayCount = await OrderModel.countDocuments({
         createdAt: { $gte: todayStart, $lte: todayEnd },
       });
-      
+
       const sequence = String(todayCount + 1).padStart(4, '0');
       this.orderNumber = `ORD-${dateStr}-${sequence}`;
     } catch (error) {

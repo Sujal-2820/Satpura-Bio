@@ -89,13 +89,13 @@ export function VendorDashboard({ onLogout }) {
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false)
   const [isNotificationAnimating, setIsNotificationAnimating] = useState(false)
   const previousNotificationsCountRef = useRef(0)
-  
+
   // Escalation modal states
   const [escalationModalOpen, setEscalationModalOpen] = useState(false)
   const [partialEscalationModalOpen, setPartialEscalationModalOpen] = useState(false)
   const [selectedOrderForEscalation, setSelectedOrderForEscalation] = useState(null)
   const [escalationType, setEscalationType] = useState('items') // 'items' or 'quantities'
-  
+
   // Confirmation modal states
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
   const [confirmationData, setConfirmationData] = useState(null)
@@ -134,12 +134,12 @@ export function VendorDashboard({ onLogout }) {
       closePanel()
     }
   }, [navigate, closePanel, showOrderDetails])
-  
+
   // Scroll to top when tab changes
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [activeTab])
-  
+
   // Fetch vendor profile and dashboard data on mount (only if authenticated or has token)
   useEffect(() => {
     const token = localStorage.getItem('vendor_token')
@@ -151,7 +151,7 @@ export function VendorDashboard({ onLogout }) {
       }
       return
     }
-    
+
     const loadVendorData = async () => {
       try {
         // Only fetch profile if not already authenticated
@@ -180,7 +180,7 @@ export function VendorDashboard({ onLogout }) {
             return
           }
         }
-        
+
         // Fetch dashboard overview
         const dashboardResult = await fetchDashboardData()
         if (dashboardResult.error?.status === 401) {
@@ -202,7 +202,7 @@ export function VendorDashboard({ onLogout }) {
         }
       }
     }
-    
+
     loadVendorData()
   }, []) // Only run once on mount
   const tabLabels = useMemo(() => {
@@ -373,7 +373,7 @@ export function VendorDashboard({ onLogout }) {
       // New notification arrived
       playNotificationSound()
       setIsNotificationAnimating(true)
-      
+
       // Stop animation after 3 seconds
       const animationTimer = setTimeout(() => {
         setIsNotificationAnimating(false)
@@ -409,7 +409,7 @@ export function VendorDashboard({ onLogout }) {
   // Fetch notifications on mount and periodically
   useEffect(() => {
     fetchNotifications()
-    
+
     // Refresh notifications every 30 seconds
     const interval = setInterval(() => {
       fetchNotifications()
@@ -545,7 +545,7 @@ export function VendorDashboard({ onLogout }) {
             active={activeTab === item.id}
             onClick={() => navigateToTab(item.id)}
             icon={<item.icon active={activeTab === item.id} className="h-5 w-5" />}
-        />
+          />
         ))}
         menuContent={({ close }) => <MenuList items={buildMenuItems(close)} active={activeTab} />}
       >
@@ -553,7 +553,7 @@ export function VendorDashboard({ onLogout }) {
           {activeTab === 'overview' && <OverviewView onNavigate={navigateTo} welcomeName={welcomeName} openPanel={openPanel} />}
           {activeTab === 'inventory' && <InventoryView onNavigate={navigateTo} openPanel={openPanel} />}
           {activeTab === 'orders' && !showAllOrders && !showOrderDetails && (
-            <OrdersView 
+            <OrdersView
               openPanel={openPanel}
               refreshKey={ordersViewRefreshKey}
               onRefresh={() => setOrdersViewRefreshKey(prev => prev + 1)}
@@ -574,7 +574,7 @@ export function VendorDashboard({ onLogout }) {
             />
           )}
           {activeTab === 'orders' && showAllOrders && !showOrderDetails && (
-            <AllOrdersView 
+            <AllOrdersView
               openPanel={openPanel}
               onOpenEscalationModal={(order) => {
                 setSelectedOrderForEscalation(order)
@@ -796,12 +796,12 @@ export function VendorDashboard({ onLogout }) {
                 // Handle partial order acceptance
                 const acceptedItems = data.orderItems.filter((item) => item.action === 'accept')
                 const rejectedItems = data.orderItems.filter((item) => item.action === 'reject')
-                
+
                 if (acceptedItems.length === 0 && rejectedItems.length === 0) {
                   error('Please select at least one item to accept or reject')
                   return
                 }
-                
+
                 const partialData = {
                   acceptedItems: acceptedItems.map((item) => ({
                     itemId: item.itemId,
@@ -814,7 +814,7 @@ export function VendorDashboard({ onLogout }) {
                   })),
                   notes: data.notes || '',
                 }
-                
+
                 const result = await acceptOrderPartially(data.orderId, partialData)
                 if (result.data) {
                   const acceptedCount = acceptedItems.length
@@ -828,7 +828,7 @@ export function VendorDashboard({ onLogout }) {
                       dispatch({ type: 'SET_ORDERS_DATA', payload: result.data })
                       // If viewing order details, refresh the order
                       if (showOrderDetails && selectedOrderForDetails) {
-                        const updatedOrder = result.data.orders?.find(o => 
+                        const updatedOrder = result.data.orders?.find(o =>
                           (o._id && selectedOrderForDetails.id && o._id.toString() === selectedOrderForDetails.id.toString()) ||
                           (o.id && selectedOrderForDetails.id && o.id.toString() === selectedOrderForDetails.id.toString()) ||
                           (o._id && selectedOrderForDetails._id && o._id.toString() === selectedOrderForDetails._id.toString())
@@ -848,7 +848,7 @@ export function VendorDashboard({ onLogout }) {
                   error(result.error.message || 'Failed to accept order partially')
                 }
               } else if (buttonId === 'update-order-status' && data.orderId && data.status) {
-                const updatePayload = { 
+                const updatePayload = {
                   status: data.status
                 }
                 if (data.notes) {
@@ -857,12 +857,12 @@ export function VendorDashboard({ onLogout }) {
                 if (data.isRevert) {
                   updatePayload.isRevert = data.isRevert
                 }
-                
+
                 const result = await updateOrderStatus(data.orderId, updatePayload)
                 if (result.data) {
                   // Show message from backend (includes grace period info if applicable)
                   success(result.data.message || 'Order status updated successfully!')
-                  
+
                   // If viewing order details, refresh the order details explicitly (only once)
                   if (showOrderDetails && selectedOrderForDetails) {
                     const orderId = data.orderId
@@ -875,7 +875,7 @@ export function VendorDashboard({ onLogout }) {
                       console.error('Error refreshing order details:', err)
                     })
                   }
-                  
+
                   // Refresh orders list and dashboard
                   getOrders().then((result) => {
                     if (result.data) {
@@ -883,7 +883,7 @@ export function VendorDashboard({ onLogout }) {
                     }
                   })
                   fetchDashboardData()
-                  
+
                   // Trigger OrdersView refresh (only once)
                   setOrdersViewRefreshKey(prev => prev + 1)
                 } else if (result.error) {
@@ -932,18 +932,18 @@ export function VendorDashboard({ onLogout }) {
               else if (buttonId === 'request-withdrawal' && data.amount) {
                 const withdrawalAmount = parseFloat(data.amount)
                 const availableBalance = data.availableBalance || 0
-                
+
                 // Validate amount
                 if (withdrawalAmount < 1000) {
                   error('Minimum withdrawal amount is ₹1,000')
                   return
                 }
-                
+
                 if (withdrawalAmount > availableBalance) {
                   error(`Insufficient balance. Available: ₹${Math.round(availableBalance).toLocaleString('en-IN')}, Requested: ₹${withdrawalAmount.toLocaleString('en-IN')}`)
                   return
                 }
-                
+
                 // Get bank account details for confirmation
                 let bankAccountDetails = null
                 if (data.bankAccountId && data.bankAccounts) {
@@ -957,7 +957,7 @@ export function VendorDashboard({ onLogout }) {
                     }
                   }
                 }
-                
+
                 // Show confirmation modal
                 setConfirmationData({
                   type: 'withdrawal',
@@ -974,57 +974,57 @@ export function VendorDashboard({ onLogout }) {
                 // Keep amount as-is (can be decimal)
                 const repaymentAmount = parseFloat(data.amount)
                 const creditUsed = data.creditUsed || 0
-                
+
                 // Validate amount
                 if (repaymentAmount < 0.01) {
                   error('Minimum repayment amount is ₹0.01')
                   return
                 }
-                
+
                 // Check if exceeds creditUsed (can be decimal)
                 if (repaymentAmount > creditUsed) {
                   error(`Repayment amount cannot exceed outstanding credit. Outstanding: ₹${creditUsed.toLocaleString('en-IN', { maximumFractionDigits: 2 })}, Requested: ₹${repaymentAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`)
                   return
                 }
-                
+
                 // Create payment intent and open Razorpay directly
                 // Bank account will be filled in Razorpay interface
                 try {
                   closePanel() // Close the action panel first
-                  
+
                   console.log('[VendorDashboard] Creating repayment intent with data:', {
                     amount: repaymentAmount,
                     creditUsed: creditUsed,
                   })
-                  
+
                   const intentResult = await createRepaymentIntent({
                     amount: repaymentAmount,
                     // bankAccountId not required - will be filled in Razorpay
                   })
-                  
+
                   console.log('[VendorDashboard] Repayment intent result:', intentResult)
-                  
+
                   if (intentResult.error) {
                     console.error('[VendorDashboard] Repayment intent error:', intentResult.error)
                     error(intentResult.error.message || 'Failed to create payment intent')
                     return
                   }
-                  
+
                   const repaymentData = intentResult.data?.repayment
                   const razorpayData = intentResult.data?.razorpay
-                  
+
                   if (!repaymentData || !razorpayData) {
                     error('Invalid payment intent response')
                     return
                   }
-                  
+
                   // Open Razorpay checkout directly
                   const isTestMode = razorpayData.orderId?.startsWith('order_test_')
-                  
+
                   if (isTestMode) {
                     // Test mode: Simulate payment
                     console.log('⚠️ Test mode: Simulating payment...')
-                    
+
                     const simulatedPaymentResponse = {
                       paymentId: `pay_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                       orderId: razorpayData.orderId,
@@ -1038,7 +1038,7 @@ export function VendorDashboard({ onLogout }) {
                       razorpayOrderId: simulatedPaymentResponse.orderId,
                       razorpaySignature: simulatedPaymentResponse.signature,
                     })
-                    
+
                     if (confirmResult.data) {
                       success(`Repayment of ₹${repaymentAmount.toLocaleString('en-IN')} completed successfully!`)
                       getCreditInfo()
@@ -1067,7 +1067,7 @@ export function VendorDashboard({ onLogout }) {
                           contact: profile?.phone || '',
                         },
                       })
-                      
+
                       if (paymentResponse.success) {
                         // Confirm repayment after successful payment
                         const confirmResult = await confirmRepayment({
@@ -1076,7 +1076,7 @@ export function VendorDashboard({ onLogout }) {
                           razorpayOrderId: paymentResponse.orderId,
                           razorpaySignature: paymentResponse.signature,
                         })
-                        
+
                         if (confirmResult.data) {
                           success(`Repayment of ₹${repaymentAmount.toLocaleString('en-IN')} completed successfully!`)
                           getCreditInfo()
@@ -1126,9 +1126,9 @@ export function VendorDashboard({ onLogout }) {
           setConfirmationModalOpen(false)
           setConfirmationData(null)
         }}
-          onConfirm={async () => {
+        onConfirm={async () => {
           if (!confirmationData) return
-          
+
           setConfirmationLoading(true)
           try {
             if (confirmationData.type === 'withdrawal') {
@@ -1156,9 +1156,9 @@ export function VendorDashboard({ onLogout }) {
               try {
                 // Check if test mode (simulated payment)
                 const isTestMode = confirmationData.razorpayOrderId?.startsWith('order_test_')
-                
+
                 let paymentResponse = null
-                
+
                 if (isTestMode) {
                   // Simulate payment in test mode
                   console.log('⚠️ Test mode: Simulating payment...')
@@ -1184,7 +1184,7 @@ export function VendorDashboard({ onLogout }) {
                     },
                   })
                 }
-                
+
                 if (paymentResponse.success) {
                   // Confirm repayment with payment details
                   const confirmResult = await confirmRepayment({
@@ -1193,7 +1193,7 @@ export function VendorDashboard({ onLogout }) {
                     razorpayOrderId: paymentResponse.orderId,
                     razorpaySignature: paymentResponse.signature,
                   })
-                  
+
                   if (confirmResult.data) {
                     success(`Repayment of ₹${confirmationData.amount.toLocaleString('en-IN')} completed successfully!`)
                     setConfirmationModalOpen(false)
@@ -1222,7 +1222,7 @@ export function VendorDashboard({ onLogout }) {
           }
         }}
         title={confirmationData?.type === 'repayment' ? 'Confirm Repayment' : 'Confirm Withdrawal Request'}
-        message={confirmationData?.type === 'repayment' 
+        message={confirmationData?.type === 'repayment'
           ? 'Please verify all repayment details before proceeding. Payment will be processed via Razorpay.'
           : 'Please verify all bank account details and withdrawal amount before proceeding. Once submitted, this request will be sent to admin for approval.'}
         details={confirmationData ? (confirmationData.type === 'repayment' ? {
@@ -1256,7 +1256,7 @@ export function VendorDashboard({ onLogout }) {
                 dispatch({ type: 'SET_ORDERS_DATA', payload: result.data })
                 // If viewing order details, refresh the order
                 if (showOrderDetails && selectedOrderForDetails) {
-                  const updatedOrder = result.data.orders?.find(o => 
+                  const updatedOrder = result.data.orders?.find(o =>
                     (o._id && selectedOrderForDetails.id && o._id.toString() === selectedOrderForDetails.id.toString()) ||
                     (o.id && selectedOrderForDetails.id && o.id.toString() === selectedOrderForDetails.id.toString()) ||
                     (o._id && selectedOrderForDetails._id && o._id.toString() === selectedOrderForDetails._id.toString())
@@ -1271,7 +1271,7 @@ export function VendorDashboard({ onLogout }) {
           }
         }}
       />
-      
+
       <OrderPartialEscalationModal
         isOpen={partialEscalationModalOpen}
         onClose={() => {
@@ -1288,7 +1288,7 @@ export function VendorDashboard({ onLogout }) {
                 dispatch({ type: 'SET_ORDERS_DATA', payload: result.data })
                 // If viewing order details, refresh the order
                 if (showOrderDetails && selectedOrderForDetails) {
-                  const updatedOrder = result.data.orders?.find(o => 
+                  const updatedOrder = result.data.orders?.find(o =>
                     (o._id && selectedOrderForDetails.id && o._id.toString() === selectedOrderForDetails.id.toString()) ||
                     (o.id && selectedOrderForDetails.id && o.id.toString() === selectedOrderForDetails.id.toString()) ||
                     (o._id && selectedOrderForDetails._id && o._id.toString() === selectedOrderForDetails._id.toString())
@@ -1303,7 +1303,7 @@ export function VendorDashboard({ onLogout }) {
           }
         }}
       />
-      
+
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {/* Notification Panel */}
@@ -1334,7 +1334,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
         // Data is stored in context via the API hook
       }
     })
-    
+
     // Fetch available balance from earnings
     getEarningsSummary().then((result) => {
       if (result.data?.availableBalance) {
@@ -1385,7 +1385,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
 
   useEffect(() => {
     loadRecentRepayments()
-    
+
     // Listen for repayment success to refresh
     const handleRepaymentSuccess = () => {
       loadRecentRepayments()
@@ -1398,7 +1398,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
 
   // Use data from context or fallback to snapshot
   const overviewData = dashboard.overview || {}
-  
+
   // Transform recent orders from backend to activity format
   const recentOrders = overviewData.recentOrders || []
   const orderTransactions = recentOrders.map((order) => {
@@ -1416,7 +1416,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
       date: order.createdAt || order.updatedAt,
     }
   })
-  
+
   // Transform recent withdrawals to activity format
   const withdrawalTransactions = recentWithdrawals.map((withdrawal) => {
     const statusText = withdrawal.status === 'approved' ? 'Approved' : withdrawal.status === 'completed' ? 'Completed' : withdrawal.status
@@ -1431,7 +1431,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
       date: withdrawal.reviewedAt || withdrawal.createdAt,
     }
   })
-  
+
   // Transform recent repayments to activity format
   const repaymentTransactions = recentRepayments.map((repayment) => {
     return {
@@ -1447,14 +1447,14 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
       penaltyAmount: repayment.penaltyAmount || 0,
     }
   })
-  
+
   // Combine and sort by date (most recent first)
   const allTransactions = [...orderTransactions, ...withdrawalTransactions, ...repaymentTransactions].sort((a, b) => {
     const dateA = a.date ? new Date(a.date).getTime() : 0
     const dateB = b.date ? new Date(b.date).getTime() : 0
     return dateB - dateA
   })
-  
+
   // If no transactions, use empty array (don't show dummy data)
   const displayTransactions = allTransactions.length > 0 ? allTransactions.slice(0, 4) : []
 
@@ -1464,7 +1464,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
     if (balance >= 100000) return `₹${(balance / 100000).toFixed(1)}L`
     return `₹${Math.round(balance).toLocaleString('en-IN')}`
   }
-  
+
   const walletBalance = formatAvailableBalance(availableBalance)
 
   const quickActions = [
@@ -1650,26 +1650,26 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
         </div>
         <div className="overview-metric-grid">
           {[
-            { 
-              id: 'orders', 
-              label: 'Total Orders', 
-              value: String(overviewData.orders?.total || 0), 
+            {
+              id: 'orders',
+              label: 'Total Orders',
+              value: String(overviewData.orders?.total || 0),
               trend: 'Today',
               // Calculate progress based on orders today vs average (if available) or use utilization
               progress: overviewData.orders?.total ? Math.min(100, Math.max(10, (overviewData.orders.total / Math.max(overviewData.orders.averageDaily || 10, 1)) * 50)) : 0
             },
-            { 
-              id: 'inventory', 
-              label: 'Products', 
-              value: String(overviewData.inventory?.totalProducts || 0), 
+            {
+              id: 'inventory',
+              label: 'Products',
+              value: String(overviewData.inventory?.totalProducts || 0),
               trend: 'Assigned',
               // Calculate progress based on in-stock vs total products
               progress: overviewData.inventory?.totalProducts ? Math.min(100, Math.max(10, ((overviewData.inventory.totalProducts - (overviewData.inventory.outOfStockCount || 0)) / overviewData.inventory.totalProducts) * 100)) : 0
             },
-            { 
-              id: 'credit', 
-              label: 'Credit Used', 
-              value: overviewData.credit?.used ? `₹${(overviewData.credit.used / 100000).toFixed(1)}L` : '₹0', 
+            {
+              id: 'credit',
+              label: 'Credit Used',
+              value: overviewData.credit?.used ? `₹${(overviewData.credit.used / 100000).toFixed(1)}L` : '₹0',
               trend: `${Math.round(overviewData.credit?.utilization || 0)}%`,
               // Use actual credit utilization percentage
               progress: Math.min(100, Math.max(0, overviewData.credit?.utilization || 0))
@@ -1712,8 +1712,8 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
                 action.tone === 'orange'
                   ? 'is-warn'
                   : action.tone === 'teal'
-                  ? 'is-teal'
-                  : 'is-success',
+                    ? 'is-teal'
+                    : 'is-success',
               )}
             >
               <span className="overview-callout__icon">
@@ -1772,16 +1772,16 @@ function InventoryView({ openPanel, onNavigate }) {
   useEffect(() => {
     const token = localStorage.getItem('vendor_token')
     if (!token) return
-    
+
     setLoading(true)
     getProducts({ limit: 100 }).then((result) => {
       if (result.data) {
         setProductsData(result.data)
         // Debug: Check if any products have attributeStocks
         const products = result.data.products || []
-        const productsWithVariants = products.filter(p => 
-          p.attributeStocks && 
-          Array.isArray(p.attributeStocks) && 
+        const productsWithVariants = products.filter(p =>
+          p.attributeStocks &&
+          Array.isArray(p.attributeStocks) &&
           p.attributeStocks.length > 0
         )
         if (productsWithVariants.length > 0) {
@@ -1790,8 +1790,8 @@ function InventoryView({ openPanel, onNavigate }) {
           console.log('No products with attributeStocks found. Total products:', products.length)
           // Log first product structure for debugging
           if (products.length > 0) {
-            console.log('Sample product structure:', { 
-              name: products[0].name, 
+            console.log('Sample product structure:', {
+              name: products[0].name,
               hasAttributeStocks: !!products[0].attributeStocks,
               attributeStocks: products[0].attributeStocks,
               keys: Object.keys(products[0])
@@ -1870,11 +1870,11 @@ function InventoryView({ openPanel, onNavigate }) {
       const existingVariantKey = JSON.stringify(p.attributes || {})
       return existingVariantKey === variantKey
     })
-    
+
     if (!exists) {
-      setSelectedProducts((prev) => [...prev, { 
-        productId, 
-        quantity: '', 
+      setSelectedProducts((prev) => [...prev, {
+        productId,
+        quantity: '',
         attributes: variantStock.attributes || {},
         attributeStock: variantStock
       }])
@@ -1904,20 +1904,20 @@ function InventoryView({ openPanel, onNavigate }) {
       if (result.data?.product) {
         const productWithVariants = result.data.product
         // Check if product actually has variants
-        const hasVariants = productWithVariants.attributeStocks && 
-                          Array.isArray(productWithVariants.attributeStocks) && 
-                          productWithVariants.attributeStocks.length > 0 &&
-                          productWithVariants.attributeStocks.some(stock => {
-                            if (!stock) return false
-                            if (stock.attributes && typeof stock.attributes === 'object') {
-                              const attrKeys = Object.keys(stock.attributes)
-                              if (attrKeys.length > 0) {
-                                return attrKeys.some(key => stock.attributes[key] != null && stock.attributes[key] !== '')
-                              }
-                            }
-                            return false
-                          })
-        
+        const hasVariants = productWithVariants.attributeStocks &&
+          Array.isArray(productWithVariants.attributeStocks) &&
+          productWithVariants.attributeStocks.length > 0 &&
+          productWithVariants.attributeStocks.some(stock => {
+            if (!stock) return false
+            if (stock.attributes && typeof stock.attributes === 'object') {
+              const attrKeys = Object.keys(stock.attributes)
+              if (attrKeys.length > 0) {
+                return attrKeys.some(key => stock.attributes[key] != null && stock.attributes[key] !== '')
+              }
+            }
+            return false
+          })
+
         // Cache the product (even if no variants, cache it to avoid re-fetching)
         setProductsWithVariants(prev => ({
           ...prev,
@@ -1926,14 +1926,14 @@ function InventoryView({ openPanel, onNavigate }) {
         // Update the products list with variant info
         setProductsData(prev => {
           if (!prev || !prev.products) return prev
-          const updatedProducts = prev.products.map(p => 
-            (p.id || p._id)?.toString() === productId 
+          const updatedProducts = prev.products.map(p =>
+            (p.id || p._id)?.toString() === productId
               ? { ...p, attributeStocks: productWithVariants.attributeStocks || [] }
               : p
           )
           return { ...prev, products: updatedProducts }
         })
-        
+
         // Only expand if product has variants
         if (hasVariants) {
           setExpandedProductId(productId)
@@ -2022,19 +2022,19 @@ function InventoryView({ openPanel, onNavigate }) {
 
   const handleOrderSubmit = async () => {
     if (!selectedProduct) return
-    
+
     // Check if product has attributes and if they're selected
-    const hasAttributes = selectedProduct.attributeStocks && 
-                         Array.isArray(selectedProduct.attributeStocks) && 
-                         selectedProduct.attributeStocks.length > 0
-    
+    const hasAttributes = selectedProduct.attributeStocks &&
+      Array.isArray(selectedProduct.attributeStocks) &&
+      selectedProduct.attributeStocks.length > 0
+
     if (hasAttributes && Object.keys(selectedProductAttributes).length === 0) {
       setOrderError('Please select a variant before ordering.')
       return
     }
-    
+
     // Use attribute-specific stock/price if available, otherwise use main product values
-    const adminStock = selectedProductAttributeStock 
+    const adminStock = selectedProductAttributeStock
       ? (selectedProductAttributeStock.displayStock || 0)
       : (selectedProduct.adminStock ?? selectedProduct.displayStock ?? selectedProduct.stock ?? 0)
     const pricePerUnit = selectedProductAttributeStock
@@ -2075,7 +2075,7 @@ function InventoryView({ openPanel, onNavigate }) {
         quantity: quantityNumber,
         pricePerUnit,
       }
-      
+
       // Add attribute combination if product has attributes
       if (hasAttributes && Object.keys(selectedProductAttributes).length > 0) {
         itemPayload.attributeCombination = selectedProductAttributes
@@ -2149,37 +2149,37 @@ function InventoryView({ openPanel, onNavigate }) {
       // Check if product has attributes - check both product data and cached variant data
       // Also check if selected.attributeStock exists (indicates variant was selected, so product has variants)
       const productWithVariants = productsWithVariants[selected.productId] || product
-      const hasAttributesInProduct = productWithVariants.attributeStocks && 
-                           Array.isArray(productWithVariants.attributeStocks) && 
-                           productWithVariants.attributeStocks.length > 0 &&
-                           productWithVariants.attributeStocks.some(stock => {
-                             if (!stock) return false
-                             if (stock.attributes && typeof stock.attributes === 'object') {
-                               const attrKeys = Object.keys(stock.attributes)
-                               if (attrKeys.length > 0) {
-                                 return attrKeys.some(key => stock.attributes[key] != null && stock.attributes[key] !== '')
-                               }
-                             }
-                             return false
-                           })
-      
+      const hasAttributesInProduct = productWithVariants.attributeStocks &&
+        Array.isArray(productWithVariants.attributeStocks) &&
+        productWithVariants.attributeStocks.length > 0 &&
+        productWithVariants.attributeStocks.some(stock => {
+          if (!stock) return false
+          if (stock.attributes && typeof stock.attributes === 'object') {
+            const attrKeys = Object.keys(stock.attributes)
+            if (attrKeys.length > 0) {
+              return attrKeys.some(key => stock.attributes[key] != null && stock.attributes[key] !== '')
+            }
+          }
+          return false
+        })
+
       // If selected.attributeStock exists, product definitely has variants
       const hasVariantSelected = selected.attributeStock && selected.attributeStock.attributes
       const hasAttributes = hasAttributesInProduct || hasVariantSelected
-      
+
       // If product has variants, ensure attributes are selected
       // Check both selected.attributes and selected.attributeStock as indicators
       if (hasAttributes) {
         // Check if variant was selected - attributeStock exists (with attributes) OR attributes object is present and not empty
-        const hasAttributeStock = selected.attributeStock && 
-                                selected.attributeStock.attributes && 
-                                typeof selected.attributeStock.attributes === 'object' &&
-                                Object.keys(selected.attributeStock.attributes).length > 0
-        const hasAttributesObject = selected.attributes && 
-                                   typeof selected.attributes === 'object' && 
-                                   Object.keys(selected.attributes).length > 0
+        const hasAttributeStock = selected.attributeStock &&
+          selected.attributeStock.attributes &&
+          typeof selected.attributeStock.attributes === 'object' &&
+          Object.keys(selected.attributeStock.attributes).length > 0
+        const hasAttributesObject = selected.attributes &&
+          typeof selected.attributes === 'object' &&
+          Object.keys(selected.attributes).length > 0
         const hasSelectedAttributes = hasAttributeStock || hasAttributesObject
-        
+
         if (!hasSelectedAttributes) {
           setOrderRequestError(`Product ${product.name} requires attribute selection.`)
           return
@@ -2196,7 +2196,7 @@ function InventoryView({ openPanel, onNavigate }) {
       const adminStock = selected.attributeStock
         ? (selected.attributeStock.displayStock || 0)
         : (product.adminStock ?? product.displayStock ?? product.stock ?? 0)
-      
+
       if (quantityNumber > adminStock) {
         setOrderRequestError(`Requested quantity for ${product.name} exceeds admin stock (${adminStock}).`)
         return
@@ -2214,7 +2214,7 @@ function InventoryView({ openPanel, onNavigate }) {
         quantity: quantityNumber,
         pricePerUnit,
       }
-      
+
       // Add attribute combination if product has attributes and variant was selected
       // Use attributes from selected.attributes or from selected.attributeStock.attributes
       if (hasAttributes && (selected.attributeStock || (selected.attributes && Object.keys(selected.attributes).length > 0))) {
@@ -2236,9 +2236,11 @@ function InventoryView({ openPanel, onNavigate }) {
       setOrderRequestError(`Maximum order value is ₹${MAX_PURCHASE_VALUE.toLocaleString('en-IN')}. Your request: ₹${totalAmount.toLocaleString('en-IN')}.`)
       return
     }
+    // For now, we allow submission but recording the outstanding dues via backend.
+    // The previous hard block is removed.
+    let duesWarning = '';
     if (hasUnpaidCredits) {
-      setOrderRequestError('You have unpaid credits from previous purchase requests. Please clear your outstanding payments before making a new request. Failure to repay may result in account suspension or permanent ban.')
-      return
+      duesWarning = 'Warning: You have unpaid credits. While you can still submit a request, Admin approval will depend on your repayment history.';
     }
     if (!orderRequestForm.reason || orderRequestForm.reason.trim().length < 10) {
       setOrderRequestError('Please provide a reason (at least 10 characters).')
@@ -2289,7 +2291,7 @@ function InventoryView({ openPanel, onNavigate }) {
 
       const result = await requestCreditPurchase(payload)
       if (result.data) {
-        success(`Order request submitted successfully! Request ID: ${result.data.purchase?.creditPurchaseId || 'N/A'}. Admin will review shortly.`)
+        success(`Order request submitted successfully! Request ID: ${result.data.purchase?.creditPurchaseId || 'N/A'}. Admin will review shortly.${hasUnpaidCredits ? ' Warning: You have unpaid past dues which may affect approval.' : ''}`)
         resetOrderRequestForm()
         setShowOrderRequestScreen(false)
         loadPurchaseRequests()
@@ -2328,7 +2330,7 @@ function InventoryView({ openPanel, onNavigate }) {
 
   // Get products from backend
   const products = productsData?.products || []
-  
+
   const totalProducts = products.length
   // Count products where vendor has stock assigned (vendorStock > 0)
   const inStockCount = products.filter((p) => (p.vendorStock ?? 0) > 0).length
@@ -2363,7 +2365,7 @@ function InventoryView({ openPanel, onNavigate }) {
   // Generate dynamic alerts based on low stock items from dashboard
   const lowStockItems = dashboard.overview?.inventory?.lowStockItems || []
   const alerts = []
-  
+
   // Add alert for low stock items if any exist
   if (lowStockItems.length > 0) {
     const lowStockCount = lowStockItems.length
@@ -2375,7 +2377,7 @@ function InventoryView({ openPanel, onNavigate }) {
       action: 'Raise request',
     })
   }
-  
+
   // Calculate stock progress from actual inventory data
   const stockProgress = {
     Healthy: products.filter(p => {
@@ -2394,7 +2396,7 @@ function InventoryView({ openPanel, onNavigate }) {
 
   if (selectedProduct) {
     // Use attribute-specific values if available, otherwise use main product values
-    const adminStock = selectedProductAttributeStock 
+    const adminStock = selectedProductAttributeStock
       ? (selectedProductAttributeStock.displayStock || 0)
       : (selectedProduct.adminStock ?? selectedProduct.displayStock ?? selectedProduct.stock ?? 0)
     const vendorStock = selectedProduct.vendorStock ?? 0
@@ -2405,11 +2407,11 @@ function InventoryView({ openPanel, onNavigate }) {
       : (selectedProduct.pricePerUnit || selectedProduct.priceToVendor || 0)
     const quantityNumber = parseFloat(orderQuantity) || 0
     const orderTotal = quantityNumber * pricePerUnit
-    
+
     // Check if product has attributes and if they're selected
-    const hasAttributes = selectedProduct.attributeStocks && 
-                         Array.isArray(selectedProduct.attributeStocks) && 
-                         selectedProduct.attributeStocks.length > 0
+    const hasAttributes = selectedProduct.attributeStocks &&
+      Array.isArray(selectedProduct.attributeStocks) &&
+      selectedProduct.attributeStocks.length > 0
     const attributesSelected = hasAttributes ? Object.keys(selectedProductAttributes).length > 0 : true
     const creditInfo = dashboard.credit || {}
     const creditRemaining = creditInfo.remaining || 0
@@ -2485,10 +2487,10 @@ function InventoryView({ openPanel, onNavigate }) {
                     vendorStockStatus.tone === 'success'
                       ? 'text-green-700'
                       : vendorStockStatus.tone === 'teal'
-                      ? 'text-blue-700'
-                      : vendorStockStatus.tone === 'warn'
-                      ? 'text-yellow-700'
-                      : 'text-red-700',
+                        ? 'text-blue-700'
+                        : vendorStockStatus.tone === 'warn'
+                          ? 'text-yellow-700'
+                          : 'text-red-700',
                   )}
                 >
                   {vendorStockStatus.label}
@@ -2512,7 +2514,7 @@ function InventoryView({ openPanel, onNavigate }) {
                   ₹{pricePerUnit.toLocaleString('en-IN')}
                 </p>
               </div>
-              
+
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <p className="text-xs text-gray-600">Orders fulfilled</p>
                 <p className="text-lg font-bold text-gray-900">{ordersCount}</p>
@@ -2544,15 +2546,15 @@ function InventoryView({ openPanel, onNavigate }) {
       )
       if (!product) return null
       const quantity = parseFloat(selected.quantity) || 0
-      
+
       // Use variant-specific price if available, otherwise use main product price
       const pricePerUnit = selected.attributeStock
         ? (selected.attributeStock.vendorPrice || 0)
         : (product.pricePerUnit || product.priceToVendor || 0)
-      
+
       const itemTotal = quantity * pricePerUnit
       billingTotal += itemTotal
-      
+
       return {
         product,
         quantity,
@@ -2661,35 +2663,35 @@ function InventoryView({ openPanel, onNavigate }) {
                   const productId = (product.id || product._id)?.toString()
                   const isSelected = selectedProducts.some((p) => p.productId === productId)
                   const isExpanded = expandedProductId === productId
-                  
+
                   // Check if product has variants (either from list or from cached details)
                   // Use cached variant details if available, otherwise check product.attributeStocks
                   const productWithVariants = productsWithVariants[productId] || product
-                  const hasVariants = productWithVariants.attributeStocks && 
-                                    Array.isArray(productWithVariants.attributeStocks) && 
-                                    productWithVariants.attributeStocks.length > 0 &&
-                                    productWithVariants.attributeStocks.some(stock => {
-                                      if (!stock) return false
-                                      // Check if stock has attributes object with at least one key
-                                      if (stock.attributes && typeof stock.attributes === 'object') {
-                                        const attrKeys = Object.keys(stock.attributes)
-                                        if (attrKeys.length > 0) {
-                                          // Check if at least one attribute value is not empty
-                                          return attrKeys.some(key => stock.attributes[key] != null && stock.attributes[key] !== '')
-                                        }
-                                      }
-                                      return false
-                                    })
-                  
+                  const hasVariants = productWithVariants.attributeStocks &&
+                    Array.isArray(productWithVariants.attributeStocks) &&
+                    productWithVariants.attributeStocks.length > 0 &&
+                    productWithVariants.attributeStocks.some(stock => {
+                      if (!stock) return false
+                      // Check if stock has attributes object with at least one key
+                      if (stock.attributes && typeof stock.attributes === 'object') {
+                        const attrKeys = Object.keys(stock.attributes)
+                        if (attrKeys.length > 0) {
+                          // Check if at least one attribute value is not empty
+                          return attrKeys.some(key => stock.attributes[key] != null && stock.attributes[key] !== '')
+                        }
+                      }
+                      return false
+                    })
+
                   // Use product with variants for rendering
                   const productToRender = hasVariants && isExpanded ? productWithVariants : product
-                  
+
                   // Check if any variants of this product are selected
                   const hasSelectedVariants = selectedProducts.some(p => p.productId === productId && p.attributes && Object.keys(p.attributes).length > 0)
-                  
+
                   const adminStock = product.adminStock ?? product.displayStock ?? product.stock ?? 0
                   const pricePerUnit = product.pricePerUnit || product.priceToVendor || 0
-                  
+
                   // Format attribute label
                   const formatAttributeLabel = (key) => {
                     return key
@@ -2697,7 +2699,7 @@ function InventoryView({ openPanel, onNavigate }) {
                       .replace(/^./, str => str.toUpperCase())
                       .trim()
                   }
-                  
+
                   return (
                     <div
                       key={product.id || product._id}
@@ -2725,7 +2727,7 @@ function InventoryView({ openPanel, onNavigate }) {
                           </div>
                         )}
                       </div>
-                      
+
                       {/* Show common info only if no variants */}
                       {!hasVariants && (
                         <div className="space-y-2 mb-3">
@@ -2811,7 +2813,7 @@ function InventoryView({ openPanel, onNavigate }) {
                             const variantAdminStock = variantStock.displayStock || variantStock.actualStock || 0
                             const variantPrice = variantStock.vendorPrice || 0
                             const variantUnit = variantStock.stockUnit || product.unit || 'kg'
-                            
+
                             // Check if this variant is already added
                             const variantKey = JSON.stringify(variantAttrs)
                             const isVariantAdded = selectedProducts.some((p) => {
@@ -2819,7 +2821,7 @@ function InventoryView({ openPanel, onNavigate }) {
                               const existingVariantKey = JSON.stringify(p.attributes || {})
                               return existingVariantKey === variantKey
                             })
-                            
+
                             return (
                               <div
                                 key={idx}
@@ -2840,7 +2842,7 @@ function InventoryView({ openPanel, onNavigate }) {
                                       </div>
                                     ))}
                                   </div>
-                                  
+
                                   {/* Variant Stock and Price */}
                                   <div className="grid grid-cols-2 gap-2 text-xs">
                                     <div>
@@ -2856,7 +2858,7 @@ function InventoryView({ openPanel, onNavigate }) {
                                       </span>
                                     </div>
                                   </div>
-                                  
+
                                   {/* Add to Order Button */}
                                   {!isVariantAdded ? (
                                     <button
@@ -2910,12 +2912,12 @@ function InventoryView({ openPanel, onNavigate }) {
                       (p) => (p.id || p._id)?.toString() === selected.productId
                     )
                     if (!product) return null
-                    
+
                     // Check if product has attributes
-                    const hasAttributes = product.attributeStocks && 
-                                         Array.isArray(product.attributeStocks) && 
-                                         product.attributeStocks.length > 0
-                    
+                    const hasAttributes = product.attributeStocks &&
+                      Array.isArray(product.attributeStocks) &&
+                      product.attributeStocks.length > 0
+
                     // Use attribute-specific stock/price if available, otherwise use main product values
                     const adminStock = selected.attributeStock
                       ? (selected.attributeStock.displayStock || 0)
@@ -2925,7 +2927,7 @@ function InventoryView({ openPanel, onNavigate }) {
                       : (product.pricePerUnit || product.priceToVendor || 0)
                     const stockUnit = selected.attributeStock?.stockUnit || product.unit || 'kg'
                     const quantity = parseFloat(selected.quantity) || 0
-                    
+
                     return (
                       <div
                         key={selected.productId}
@@ -2957,20 +2959,20 @@ function InventoryView({ openPanel, onNavigate }) {
                             </p>
                           </div>
                         </div>
-                        
+
                         {/* Attribute Selection - Only show if product has attributes but no variant is selected yet */}
                         {hasAttributes && (!selected.attributes || Object.keys(selected.attributes).length === 0) && (
                           <ProductAttributeSelector
                             product={product}
                             selectedAttributes={selected.attributes || {}}
                             onAttributesChange={(attributes, attributeStock) => {
-                              setSelectedProducts(prev => prev.map(p => 
+                              setSelectedProducts(prev => prev.map(p =>
                                 p.productId === selected.productId
                                   ? { ...p, attributes, attributeStock }
                                   : p
                               ))
                               // Reset quantity when variant changes
-                              setSelectedProducts(prev => prev.map(p => 
+                              setSelectedProducts(prev => prev.map(p =>
                                 p.productId === selected.productId
                                   ? { ...p, quantity: '' }
                                   : p
@@ -2978,7 +2980,7 @@ function InventoryView({ openPanel, onNavigate }) {
                             }}
                           />
                         )}
-                        
+
                         <div className="flex items-center gap-2">
                           <input
                             type="number"
@@ -3426,7 +3428,7 @@ function InventoryView({ openPanel, onNavigate }) {
             <p className="text-sm text-gray-600 mt-1">Use the View details button to inspect and order stock</p>
           </div>
         </div>
-        
+
         {loading ? (
           <div className="text-center py-12 text-gray-500">
             <p>Loading products...</p>
@@ -3440,7 +3442,7 @@ function InventoryView({ openPanel, onNavigate }) {
               const vendorStockStatus = getVendorStockStatus(vendorStock)
               const adminStockStatus = product.stockStatus || (adminStock > 0 ? 'in_stock' : 'out_of_stock')
               const isArriving = product.isArrivingWithin24Hours || false
-              
+
               return (
                 <div
                   key={product.id || product._id}
@@ -3460,12 +3462,12 @@ function InventoryView({ openPanel, onNavigate }) {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Product Info */}
                   <div className="space-y-2">
                     <h4 className="font-bold text-gray-900 line-clamp-1">{product.name}</h4>
                     <p className="text-xs text-gray-600 line-clamp-2">{shortDescription}...</p>
-                    
+
                     {/* Arriving Notification */}
                     {isArriving && (
                       <div className="rounded-lg border border-orange-200 bg-orange-50 p-2">
@@ -3477,7 +3479,7 @@ function InventoryView({ openPanel, onNavigate }) {
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Stock Status */}
                     <div className="flex items-center gap-2">
                       <span
@@ -3486,10 +3488,10 @@ function InventoryView({ openPanel, onNavigate }) {
                           vendorStockStatus.tone === 'success'
                             ? 'bg-green-100 text-green-700'
                             : vendorStockStatus.tone === 'teal'
-                            ? 'bg-blue-100 text-blue-700'
-                            : vendorStockStatus.tone === 'warn'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-red-100 text-red-700',
+                              ? 'bg-blue-100 text-blue-700'
+                              : vendorStockStatus.tone === 'warn'
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-red-100 text-red-700',
                         )}
                       >
                         Vendor stock • {vendorStockStatus.label}
@@ -3498,7 +3500,7 @@ function InventoryView({ openPanel, onNavigate }) {
                         {vendorStock} {product.unit || 'kg'} with you
                       </span>
                     </div>
-                    
+
                     {/* Price */}
                     <div className="pt-2 flex flex-col gap-3">
                       <p className="text-sm font-bold text-purple-600">
@@ -3625,7 +3627,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
   console.log('📦 OrdersView: backendOrders count:', backendOrders.length)
   console.log('📦 OrdersView: ordersData:', ordersData)
   console.log('📦 OrdersView: dashboard.orders:', dashboard.orders)
-  
+
   const totals = backendOrders.reduce(
     (acc, order) => {
       const normalizedStatus = normalizeStatus(order.status)
@@ -3644,7 +3646,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
     },
     { awaiting: 0, accepted: 0, dispatched: 0, delivered: 0 },
   )
-  
+
   // Filter out orders that already completed their workflow
   const activeOrders = backendOrders.filter((order) => {
     const normalizedStatus = normalizeStatus(order.status)
@@ -3655,7 +3657,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
     return normalizedStatus !== 'delivered'
   })
   const totalOrders = activeOrders.length
-  
+
   // Apply client-side status filter based on selectedFilter
   let filteredOrders = activeOrders
   if (selectedFilter !== 'all') {
@@ -3667,16 +3669,16 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
       return normalized === selectedFilter
     })
   }
-  
+
   // Helper function to map order to display format
   const mapOrderToDisplay = (order) => {
     const isFullyPaid = order.paymentStatus === 'fully_paid'
     const isDelivered = order.status === 'delivered'
     // Check if order is escalated
-    const isEscalated = order.assignedTo === 'admin' || 
-                        order.escalation?.isEscalated === true || 
-                        order.status === 'rejected'
-    
+    const isEscalated = order.assignedTo === 'admin' ||
+      order.escalation?.isEscalated === true ||
+      order.status === 'rejected'
+
     // Determine next message based on status and payment
     let nextMessage = null
     if (order.status === 'pending') {
@@ -3697,7 +3699,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
         nextMessage = 'Mark payment as done'
       }
     }
-    
+
     return {
       id: order._id || order.id,
       orderNumber: order.orderNumber,
@@ -3722,7 +3724,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
 
   // Map filtered orders for display (for main orders list)
   const orders = filteredOrders.map(mapOrderToDisplay)
-  
+
   // Get 3 most recent orders for tracker section (regardless of status)
   // Keep original order objects but sort by date
   const recentOrdersForTrackerRaw = backendOrders
@@ -3733,7 +3735,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
       return dateB - dateA // Descending order (most recent first)
     })
     .slice(0, 3)
-  
+
   // Map to display format for tracker
   const recentOrdersForTracker = recentOrdersForTrackerRaw.map(mapOrderToDisplay)
 
@@ -3871,9 +3873,9 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
             </p>
           </div>
           <div className="orders-hero__filters" role="group" aria-label="Filter orders">
-          {filterChips.map((chip) => (
+            {filterChips.map((chip) => (
               <button
-              key={chip.id}
+                key={chip.id}
                 type="button"
                 className={cn('orders-hero__filter', selectedFilter === chip.id && 'is-active')}
                 aria-pressed={selectedFilter === chip.id}
@@ -3888,18 +3890,18 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
             {heroStats.map((stat) => (
               <div
                 key={stat.label}
-              className={cn(
+                className={cn(
                   'orders-hero__stat',
                   stat.tone === 'warn' ? 'is-warn' : stat.tone === 'teal' ? 'is-teal' : 'is-success',
-              )}
-            >
+                )}
+              >
                 <small>{stat.label}</small>
                 <span>{stat.value}</span>
                 <p>{stat.meta}</p>
               </div>
-          ))}
+            ))}
+          </div>
         </div>
-                </div>
       </section>
 
       <section id="orders-tracker" className="orders-section">
@@ -3909,9 +3911,9 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             {onShowAllOrders && backendOrders.length > 0 && (
-              <button 
-                type="button" 
-                className="orders-section__cta" 
+              <button
+                type="button"
+                className="orders-section__cta"
                 onClick={onShowAllOrders}
               >
                 See All
@@ -3927,7 +3929,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
             // Map to display format for this order
             const orderDisplay = recentOrdersForTracker[index]
             const order = originalOrder // Use original order for all status/grace period checks
-            
+
             const normalizedStatus = normalizeStatus(order.status)
             // Check if order is in acceptance grace period
             const isInGracePeriod = order.acceptanceGracePeriod?.isActive
@@ -3966,289 +3968,289 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                             : 'Update order status')
 
             return (
-            <article key={orderDisplay.id} className="orders-card">
-              <header className="orders-card__header">
-                <div className="orders-card__identity">
-                  <span className="orders-card__icon">
-                    <TruckIcon className="h-5 w-5" />
-                  </span>
-                  <div className="orders-card__details">
-                    <p className="orders-card__name">{orderDisplay.farmer}</p>
-                    <p className="orders-card__value">{orderDisplay.value}</p>
-                    {orderDisplay.orderNumber && (
-                      <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>{orderDisplay.orderNumber}</p>
-                    )}
-              </div>
-            </div>
-                <div className="orders-card__status">
-                  <span className={cn(
-                    'orders-card__payment',
-                    paymentStatus === 'fully_paid' && 'is-paid'
-                  )}>
-                    {orderDisplay.payment}
-                  </span>
-                  <span className="orders-card__stage-label" style={
-                    normalizedStatus === 'delivered' && isPartialPayment && !paymentCompleted 
-                      ? { display: 'flex', flexDirection: 'column', gap: '2px' } 
-                      : normalizedStatus === 'fully_paid' 
-                        ? { display: 'flex', flexDirection: 'column', gap: '2px' } 
-                        : isEscalated
-                          ? { display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }
-                          : {}
-                  }>
-                    {normalizedStatus === 'awaiting'
-                      ? 'Awaiting'
-                      : normalizedStatus === 'accepted'
-                        ? 'Accepted'
-                        : normalizedStatus === 'dispatched'
-                          ? 'Dispatched'
-                          : normalizedStatus === 'delivered'
-                            ? (isPartialPayment && !paymentCompleted ? (
+              <article key={orderDisplay.id} className="orders-card">
+                <header className="orders-card__header">
+                  <div className="orders-card__identity">
+                    <span className="orders-card__icon">
+                      <TruckIcon className="h-5 w-5" />
+                    </span>
+                    <div className="orders-card__details">
+                      <p className="orders-card__name">{orderDisplay.farmer}</p>
+                      <p className="orders-card__value">{orderDisplay.value}</p>
+                      {orderDisplay.orderNumber && (
+                        <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>{orderDisplay.orderNumber}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="orders-card__status">
+                    <span className={cn(
+                      'orders-card__payment',
+                      paymentStatus === 'fully_paid' && 'is-paid'
+                    )}>
+                      {orderDisplay.payment}
+                    </span>
+                    <span className="orders-card__stage-label" style={
+                      normalizedStatus === 'delivered' && isPartialPayment && !paymentCompleted
+                        ? { display: 'flex', flexDirection: 'column', gap: '2px' }
+                        : normalizedStatus === 'fully_paid'
+                          ? { display: 'flex', flexDirection: 'column', gap: '2px' }
+                          : isEscalated
+                            ? { display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }
+                            : {}
+                    }>
+                      {normalizedStatus === 'awaiting'
+                        ? 'Awaiting'
+                        : normalizedStatus === 'accepted'
+                          ? 'Accepted'
+                          : normalizedStatus === 'dispatched'
+                            ? 'Dispatched'
+                            : normalizedStatus === 'delivered'
+                              ? (isPartialPayment && !paymentCompleted ? (
                                 <>
                                   <span>Delivered</span>
                                   <span>Awaiting Payment</span>
                                 </>
                               ) : 'Delivered')
-                            : normalizedStatus === 'fully_paid'
-                              ? (
-                                <>
-                                  <span>Delivered</span>
-                                  <span>Paid</span>
-                                </>
-                              )
-                              : order.status}
-                    {isEscalated && (
-                      <span style={{ 
-                        padding: '2px 8px',
-                        backgroundColor: '#FEF3C7',
-                        color: '#92400E',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        textTransform: 'uppercase'
-                      }}>
-                        Escalated
-                      </span>
-                    )}
-                  </span>
-            </div>
-              </header>
+                              : normalizedStatus === 'fully_paid'
+                                ? (
+                                  <>
+                                    <span>Delivered</span>
+                                    <span>Paid</span>
+                                  </>
+                                )
+                                : order.status}
+                      {isEscalated && (
+                        <span style={{
+                          padding: '2px 8px',
+                          backgroundColor: '#FEF3C7',
+                          color: '#92400E',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          textTransform: 'uppercase'
+                        }}>
+                          Escalated
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </header>
                 <div className="orders-card__next">
                   <span className="orders-card__next-label">Next</span>
                   <span className="orders-card__next-value">{nextMessage}</span>
                 </div>
-              <div className="orders-card__stages">
-              {STAGES.map((stage, stageIdx) => (
-                  <div
-                    key={stage}
-                    className={cn('orders-card__stage', stageIdx <= stageIndex(order.status) && 'is-active')}
-                  >
-                    <span className="orders-card__stage-index">{stageIdx + 1}</span>
-                    <span className="orders-card__stage-text">{stage}</span>
-                </div>
-              ))}
-            </div>
-              <div className="orders-card__actions">
-                {isInGracePeriod ? (
-                  <>
-                    <div className="orders-card__grace-period-notice" style={{ 
-                      padding: '8px 12px', 
-                      marginBottom: '8px', 
-                      backgroundColor: '#FEF3C7', 
-                      border: '1px solid #FCD34D', 
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      color: '#92400E'
-                    }}>
-                      ⏰ Grace Period: {timeRemaining} minutes remaining. Confirm or escalate now.
+                <div className="orders-card__stages">
+                  {STAGES.map((stage, stageIdx) => (
+                    <div
+                      key={stage}
+                      className={cn('orders-card__stage', stageIdx <= stageIndex(order.status) && 'is-active')}
+                    >
+                      <span className="orders-card__stage-index">{stageIdx + 1}</span>
+                      <span className="orders-card__stage-text">{stage}</span>
                     </div>
-                    <button
-                      type="button"
-                      className="orders-card__action is-primary"
-                      onClick={() => openPanel('confirm-acceptance', { orderId: orderDisplay.id })}
-                    >
-                      Confirm Acceptance
-                    </button>
-                    <button
-                      type="button"
-                      className="orders-card__action is-secondary"
-                      onClick={() => openPanel('cancel-acceptance', { orderId: orderDisplay.id })}
-                    >
-                      Cancel & Escalate
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {/* Show status update grace period notice if active */}
-                    {isInStatusUpdateGracePeriod && (
-                      <div className="orders-card__grace-period-notice" style={{ 
-                        padding: '8px 12px', 
-                        marginBottom: '8px', 
-                        backgroundColor: '#DBEAFE', 
-                        border: '1px solid #93C5FD', 
+                  ))}
+                </div>
+                <div className="orders-card__actions">
+                  {isInGracePeriod ? (
+                    <>
+                      <div className="orders-card__grace-period-notice" style={{
+                        padding: '8px 12px',
+                        marginBottom: '8px',
+                        backgroundColor: '#FEF3C7',
+                        border: '1px solid #FCD34D',
                         borderRadius: '8px',
                         fontSize: '12px',
-                        color: '#1E40AF'
+                        color: '#92400E'
                       }}>
-                        ⏰ Status Update Grace Period: {statusUpdateTimeRemaining} minutes remaining. You can revert to "{previousStatus}" status or confirm now.
+                        ⏰ Grace Period: {timeRemaining} minutes remaining. Confirm or escalate now.
                       </div>
-                    )}
-                    {/* Show update status button for accepted orders (not pending, not paid, not in grace period) - Hide for escalated orders */}
-                    {canShowStatusUpdate && !isEscalated && (
                       <button
                         type="button"
                         className="orders-card__action is-primary"
-                        onClick={() =>
-                          openPanel('update-order-status', {
-                            orderId: orderDisplay.id,
-                            status: normalizedStatus,
-                          })
-                        }
+                        onClick={() => openPanel('confirm-acceptance', { orderId: orderDisplay.id })}
                       >
-                        Update status
+                        Confirm Acceptance
                       </button>
-                    )}
-                    {/* Show confirm and revert buttons during grace period - Hide for escalated orders */}
-                    {!workflowCompleted && isInStatusUpdateGracePeriod && !isEscalated && (
-                      <>
+                      <button
+                        type="button"
+                        className="orders-card__action is-secondary"
+                        onClick={() => openPanel('cancel-acceptance', { orderId: orderDisplay.id })}
+                      >
+                        Cancel & Escalate
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* Show status update grace period notice if active */}
+                      {isInStatusUpdateGracePeriod && (
+                        <div className="orders-card__grace-period-notice" style={{
+                          padding: '8px 12px',
+                          marginBottom: '8px',
+                          backgroundColor: '#DBEAFE',
+                          border: '1px solid #93C5FD',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          color: '#1E40AF'
+                        }}>
+                          ⏰ Status Update Grace Period: {statusUpdateTimeRemaining} minutes remaining. You can revert to "{previousStatus}" status or confirm now.
+                        </div>
+                      )}
+                      {/* Show update status button for accepted orders (not pending, not paid, not in grace period) - Hide for escalated orders */}
+                      {canShowStatusUpdate && !isEscalated && (
                         <button
                           type="button"
                           className="orders-card__action is-primary"
-                          onClick={async () => {
-                            const result = await updateOrderStatus(orderDisplay.id, { finalizeGracePeriod: true })
-                            if (result.data) {
-                              success(result.data.message || 'Status update confirmed successfully!')
-                              // Refresh orders list
-                              getOrders().then((result) => {
-                                if (result.data) {
-                                  dispatch({ type: 'SET_ORDERS_DATA', payload: result.data })
-                                  // If order details view is open, refresh it
-                                  const updatedOrder = result.data.orders?.find(o => 
-                                    (o._id && orderDisplay.id && o._id.toString() === orderDisplay.id.toString()) ||
-                                    (o.id && orderDisplay.id && o.id.toString() === orderDisplay.id.toString())
-                                  )
-                                  if (updatedOrder && onViewOrderDetails) {
-                                    // Trigger refresh by calling onViewOrderDetails with updated order
-                                    getOrderDetails(orderDisplay.id).then((detailsResult) => {
-                                      if (detailsResult.data?.order) {
-                                        onViewOrderDetails(detailsResult.data.order)
-                                      }
-                                    })
-                                  }
-                                }
-                              })
-                              fetchDashboardData()
-                              // Trigger OrdersView refresh (only once)
-                              if (onRefresh) {
-                                onRefresh()
-                              }
-                            } else if (result.error) {
-                              error(result.error.message || 'Failed to confirm status update')
-                            }
-                          }}
+                          onClick={() =>
+                            openPanel('update-order-status', {
+                              orderId: orderDisplay.id,
+                              status: normalizedStatus,
+                            })
+                          }
                         >
-                          Confirm Status Update
+                          Update status
                         </button>
-                        {previousStatus && (
+                      )}
+                      {/* Show confirm and revert buttons during grace period - Hide for escalated orders */}
+                      {!workflowCompleted && isInStatusUpdateGracePeriod && !isEscalated && (
+                        <>
+                          <button
+                            type="button"
+                            className="orders-card__action is-primary"
+                            onClick={async () => {
+                              const result = await updateOrderStatus(orderDisplay.id, { finalizeGracePeriod: true })
+                              if (result.data) {
+                                success(result.data.message || 'Status update confirmed successfully!')
+                                // Refresh orders list
+                                getOrders().then((result) => {
+                                  if (result.data) {
+                                    dispatch({ type: 'SET_ORDERS_DATA', payload: result.data })
+                                    // If order details view is open, refresh it
+                                    const updatedOrder = result.data.orders?.find(o =>
+                                      (o._id && orderDisplay.id && o._id.toString() === orderDisplay.id.toString()) ||
+                                      (o.id && orderDisplay.id && o.id.toString() === orderDisplay.id.toString())
+                                    )
+                                    if (updatedOrder && onViewOrderDetails) {
+                                      // Trigger refresh by calling onViewOrderDetails with updated order
+                                      getOrderDetails(orderDisplay.id).then((detailsResult) => {
+                                        if (detailsResult.data?.order) {
+                                          onViewOrderDetails(detailsResult.data.order)
+                                        }
+                                      })
+                                    }
+                                  }
+                                })
+                                fetchDashboardData()
+                                // Trigger OrdersView refresh (only once)
+                                if (onRefresh) {
+                                  onRefresh()
+                                }
+                              } else if (result.error) {
+                                error(result.error.message || 'Failed to confirm status update')
+                              }
+                            }}
+                          >
+                            Confirm Status Update
+                          </button>
+                          {previousStatus && (
+                            <button
+                              type="button"
+                              className="orders-card__action is-secondary"
+                              onClick={() =>
+                                openPanel('update-order-status', {
+                                  orderId: orderDisplay.id,
+                                  status: previousStatus,
+                                  revert: true,
+                                })
+                              }
+                            >
+                              Revert to {previousStatus}
+                            </button>
+                          )}
+                        </>
+                      )}
+                      {/* Show paid badge if order is fully paid */}
+                      {(normalizedStatus === 'fully_paid' || (!isPartialPayment && paymentCompleted && normalizedStatus === 'delivered')) && (
+                        <div className="orders-card__action is-success" style={{
+                          padding: '8px 16px',
+                          borderRadius: '8px',
+                          backgroundColor: '#D1FAE5',
+                          color: '#065F46',
+                          fontWeight: '600',
+                          fontSize: '14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          ✓ Paid
+                        </div>
+                      )}
+                      {showAvailabilityActions && (
+                        <>
+                          <button
+                            type="button"
+                            className="orders-card__action is-primary"
+                            onClick={() => openPanel('order-available', { orderId: orderDisplay.id })}
+                          >
+                            Accept Order
+                          </button>
                           <button
                             type="button"
                             className="orders-card__action is-secondary"
-                            onClick={() =>
-                              openPanel('update-order-status', {
-                                orderId: orderDisplay.id,
-                                status: previousStatus,
-                                revert: true,
-                              })
-                            }
+                            onClick={async () => {
+                              const details = await getOrderDetails(orderDisplay.id)
+                              if (details.data?.order) {
+                                onOpenEscalationModal?.(details.data.order)
+                              }
+                            }}
                           >
-                            Revert to {previousStatus}
+                            Escalate All
                           </button>
-                        )}
-                      </>
-                    )}
-                    {/* Show paid badge if order is fully paid */}
-                    {(normalizedStatus === 'fully_paid' || (!isPartialPayment && paymentCompleted && normalizedStatus === 'delivered')) && (
-                      <div className="orders-card__action is-success" style={{ 
-                        padding: '8px 16px', 
-                        borderRadius: '8px',
-                        backgroundColor: '#D1FAE5',
-                        color: '#065F46',
-                        fontWeight: '600',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        ✓ Paid
-                      </div>
-                    )}
-                    {showAvailabilityActions && (
-                      <>
-                        <button
-                          type="button"
-                          className="orders-card__action is-primary"
-                          onClick={() => openPanel('order-available', { orderId: orderDisplay.id })}
-                        >
-                          Accept Order
-                        </button>
-                        <button
-                          type="button"
-                          className="orders-card__action is-secondary"
-                          onClick={async () => {
-                            const details = await getOrderDetails(orderDisplay.id)
-                            if (details.data?.order) {
-                              onOpenEscalationModal?.(details.data.order)
-                            }
-                          }}
-                        >
-                          Escalate All
-                        </button>
-                        <button
-                          type="button"
-                          className="orders-card__action is-secondary"
-                          onClick={async () => {
-                            const details = await getOrderDetails(orderDisplay.id)
-                            if (details.data?.order) {
-                              onOpenPartialEscalationModal?.(details.data.order, 'items')
-                            }
-                          }}
-                        >
-                          Partial Items
-                        </button>
-                        <button
-                          type="button"
-                          className="orders-card__action is-secondary"
-                          onClick={async () => {
-                            const details = await getOrderDetails(orderDisplay.id)
-                            if (details.data?.order) {
-                              onOpenPartialEscalationModal?.(details.data.order, 'quantities')
-                            }
-                          }}
-                        >
-                          Partial Qty
-                        </button>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-              {/* View Details Button */}
-              <div style={{ padding: '0 16px 12px', borderTop: '1px solid #E5E7EB', marginTop: '12px', paddingTop: '12px' }}>
-                <button
-                  type="button"
-                  className="orders-card__action is-secondary"
-                  style={{ width: '100%', justifyContent: 'center' }}
-                  onClick={async () => {
-                    const details = await getOrderDetails(orderDisplay.id)
-                    if (details.data?.order) {
-                      onViewOrderDetails?.(details.data.order)
-                    }
-                  }}
-                >
-                  View Details
-                </button>
-              </div>
-            </article>
+                          <button
+                            type="button"
+                            className="orders-card__action is-secondary"
+                            onClick={async () => {
+                              const details = await getOrderDetails(orderDisplay.id)
+                              if (details.data?.order) {
+                                onOpenPartialEscalationModal?.(details.data.order, 'items')
+                              }
+                            }}
+                          >
+                            Partial Items
+                          </button>
+                          <button
+                            type="button"
+                            className="orders-card__action is-secondary"
+                            onClick={async () => {
+                              const details = await getOrderDetails(orderDisplay.id)
+                              if (details.data?.order) {
+                                onOpenPartialEscalationModal?.(details.data.order, 'quantities')
+                              }
+                            }}
+                          >
+                            Partial Qty
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+                {/* View Details Button */}
+                <div style={{ padding: '0 16px 12px', borderTop: '1px solid #E5E7EB', marginTop: '12px', paddingTop: '12px' }}>
+                  <button
+                    type="button"
+                    className="orders-card__action is-secondary"
+                    style={{ width: '100%', justifyContent: 'center' }}
+                    onClick={async () => {
+                      const details = await getOrderDetails(orderDisplay.id)
+                      if (details.data?.order) {
+                        onViewOrderDetails?.(details.data.order)
+                      }
+                    }}
+                  >
+                    View Details
+                  </button>
+                </div>
+              </article>
             )
           }) : (
             <div className="orders-card">
@@ -4257,27 +4259,27 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
               </div>
             </div>
           )}
-      </div>
+        </div>
       </section>
 
       <section id="orders-fallback" className="orders-section">
         <div className="overview-section__header">
           <div>
             <h3 className="overview-section__title">Backup delivery</h3>
-            
+
           </div>
         </div>
         <div className="orders-fallback-card">
           <p className="orders-fallback-card__body">
-              Western hub reporting a mild delay. Send low-priority orders to Admin delivery if it takes more than 24 hours.
-            </p>
+            Western hub reporting a mild delay. Send low-priority orders to Admin delivery if it takes more than 24 hours.
+          </p>
           <div className="orders-fallback-card__footer">
             <span className="orders-fallback-card__badge">Delay • Western hub</span>
             <button type="button" className="orders-fallback-card__cta" onClick={() => openPanel('escalate-to-admin')}>
-            Send to admin
-          </button>
+              Send to admin
+            </button>
+          </div>
         </div>
-      </div>
       </section>
     </div>
   )
@@ -4305,7 +4307,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
   const fetchOrders = useCallback(async () => {
     setIsLoading(true)
     const params = {}
-    
+
     // Handle escalated filter
     if (selectedFilter === 'escalated') {
       params.escalated = true
@@ -4317,7 +4319,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
         params.status = selectedFilter
       }
     }
-    
+
     // Add search query (only if not empty)
     const trimmedSearch = searchQuery.trim()
     if (trimmedSearch) {
@@ -4378,15 +4380,15 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
   }
 
   const backendOrders = ordersData?.orders || dashboard.orders?.orders || []
-  
+
   const orders = backendOrders.map((order) => {
     const normalizedStatus = normalizeStatus(order.status)
     const isPartialPayment = order.paymentPreference !== 'full'
     const paymentStatus = order.paymentStatus || 'pending'
     // Check if order is escalated
-    const isEscalated = order.assignedTo === 'admin' || 
-                        order.escalation?.isEscalated === true || 
-                        order.status === 'rejected'
+    const isEscalated = order.assignedTo === 'admin' ||
+      order.escalation?.isEscalated === true ||
+      order.status === 'rejected'
     const next =
       normalizedStatus === 'awaiting'
         ? 'Accept or escalate this order'
@@ -4441,7 +4443,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
             type="button"
             onClick={onBack}
             className="orders-section__cta"
-            style={{ 
+            style={{
               fontSize: '14px',
               fontWeight: '500',
               textDecoration: 'none'
@@ -4474,7 +4476,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
       </div>
 
       {/* Filter tabs */}
-      <div className="orders-hero__filters" role="group" aria-label="Filter orders" style={{ 
+      <div className="orders-hero__filters" role="group" aria-label="Filter orders" style={{
         marginBottom: '24px',
         overflowX: 'auto',
         WebkitOverflowScrolling: 'touch',
@@ -4559,10 +4561,10 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                     {order.payment}
                   </span>
                   <span className="orders-card__stage-label" style={
-                    normalizedStatus === 'delivered' && isPartialPayment && !paymentCompleted 
-                      ? { display: 'flex', flexDirection: 'column', gap: '2px' } 
-                      : normalizedStatus === 'fully_paid' 
-                        ? { display: 'flex', flexDirection: 'column', gap: '2px' } 
+                    normalizedStatus === 'delivered' && isPartialPayment && !paymentCompleted
+                      ? { display: 'flex', flexDirection: 'column', gap: '2px' }
+                      : normalizedStatus === 'fully_paid'
+                        ? { display: 'flex', flexDirection: 'column', gap: '2px' }
                         : isEscalated
                           ? { display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }
                           : {}
@@ -4575,11 +4577,11 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                           ? 'Dispatched'
                           : normalizedStatus === 'delivered'
                             ? (isPartialPayment && !paymentCompleted ? (
-                                <>
-                                  <span>Delivered</span>
-                                  <span>Awaiting Payment</span>
-                                </>
-                              ) : 'Delivered')
+                              <>
+                                <span>Delivered</span>
+                                <span>Awaiting Payment</span>
+                              </>
+                            ) : 'Delivered')
                             : normalizedStatus === 'fully_paid'
                               ? (
                                 <>
@@ -4589,7 +4591,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                               )
                               : order.status}
                     {isEscalated && (
-                      <span style={{ 
+                      <span style={{
                         padding: '2px 8px',
                         backgroundColor: '#FEF3C7',
                         color: '#92400E',
@@ -4622,11 +4624,11 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
               <div className="orders-card__actions">
                 {isInGracePeriod ? (
                   <>
-                    <div className="orders-card__grace-period-notice" style={{ 
-                      padding: '8px 12px', 
-                      marginBottom: '8px', 
-                      backgroundColor: '#FEF3C7', 
-                      border: '1px solid #FCD34D', 
+                    <div className="orders-card__grace-period-notice" style={{
+                      padding: '8px 12px',
+                      marginBottom: '8px',
+                      backgroundColor: '#FEF3C7',
+                      border: '1px solid #FCD34D',
                       borderRadius: '8px',
                       fontSize: '12px',
                       color: '#92400E'
@@ -4651,11 +4653,11 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                 ) : (
                   <>
                     {isInStatusUpdateGracePeriod && (
-                      <div className="orders-card__grace-period-notice" style={{ 
-                        padding: '8px 12px', 
-                        marginBottom: '8px', 
-                        backgroundColor: '#DBEAFE', 
-                        border: '1px solid #93C5FD', 
+                      <div className="orders-card__grace-period-notice" style={{
+                        padding: '8px 12px',
+                        marginBottom: '8px',
+                        backgroundColor: '#DBEAFE',
+                        border: '1px solid #93C5FD',
                         borderRadius: '8px',
                         fontSize: '12px',
                         color: '#1E40AF'
@@ -4695,8 +4697,8 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                       </button>
                     )}
                     {(normalizedStatus === 'fully_paid' || (!isPartialPayment && paymentCompleted && normalizedStatus === 'delivered')) && (
-                      <div className="orders-card__action is-success" style={{ 
-                        padding: '8px 16px', 
+                      <div className="orders-card__action is-success" style={{
+                        padding: '8px 16px',
                         borderRadius: '8px',
                         backgroundColor: '#D1FAE5',
                         color: '#065F46',
@@ -4800,7 +4802,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
   const refreshOrder = useCallback(async () => {
     const orderId = initialOrder?.id || initialOrder?._id || order?.id || order?._id
     if (!orderId) return
-    
+
     setIsLoading(true)
     try {
       const result = await getOrderDetails(orderId)
@@ -4820,10 +4822,10 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
     if (initialOrder) {
       const currentStatus = initialOrder.status
       const previousRefreshedStatus = lastRefreshedStatusRef.current
-      
+
       // Update local state with initialOrder
       setOrder(initialOrder)
-      
+
       // Refresh if status changed (only refresh once per status change)
       if (currentStatus !== previousRefreshedStatus) {
         refreshOrder()
@@ -4868,9 +4870,9 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
   const paymentStatus = order?.paymentStatus || 'pending'
   const paymentCompleted = paymentStatus === 'fully_paid'
   // Check if order is escalated
-  const isEscalated = order?.assignedTo === 'admin' || 
-                      order?.escalation?.isEscalated === true || 
-                      order?.status === 'rejected'
+  const isEscalated = order?.assignedTo === 'admin' ||
+    order?.escalation?.isEscalated === true ||
+    order?.status === 'rejected'
   const showAvailabilityActions = normalizedStatus === 'awaiting' && !isInGracePeriod && !isEscalated
   const workflowCompleted = isPartialPayment ? normalizedStatus === 'fully_paid' : normalizedStatus === 'delivered'
   const isApproved = normalizedStatus !== 'awaiting'
@@ -4926,10 +4928,10 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
               {order?.paymentStatus === 'fully_paid' ? 'Paid' : order?.paymentStatus === 'partial_paid' ? 'Partial' : 'Pending'}
             </span>
             <span className="orders-card__stage-label" style={
-              normalizedStatus === 'delivered' && isPartialPayment && !paymentCompleted 
-                ? { display: 'flex', flexDirection: 'column', gap: '2px' } 
-                : normalizedStatus === 'fully_paid' 
-                  ? { display: 'flex', flexDirection: 'column', gap: '2px' } 
+              normalizedStatus === 'delivered' && isPartialPayment && !paymentCompleted
+                ? { display: 'flex', flexDirection: 'column', gap: '2px' }
+                : normalizedStatus === 'fully_paid'
+                  ? { display: 'flex', flexDirection: 'column', gap: '2px' }
                   : isEscalated
                     ? { display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }
                     : {}
@@ -4942,11 +4944,11 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                     ? 'Dispatched'
                     : normalizedStatus === 'delivered'
                       ? (isPartialPayment && !paymentCompleted ? (
-                          <>
-                            <span>Delivered</span>
-                            <span>Awaiting Payment</span>
-                          </>
-                        ) : 'Delivered')
+                        <>
+                          <span>Delivered</span>
+                          <span>Awaiting Payment</span>
+                        </>
+                      ) : 'Delivered')
                       : normalizedStatus === 'fully_paid'
                         ? (
                           <>
@@ -4956,7 +4958,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                         )
                         : order?.status}
               {isEscalated && (
-                <span style={{ 
+                <span style={{
                   padding: '2px 8px',
                   backgroundColor: '#FEF3C7',
                   color: '#92400E',
@@ -4993,9 +4995,9 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
             <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: '#1F2937' }}>Order Items</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {order.items.map((item, index) => (
-                <div key={index} style={{ 
-                  padding: '12px', 
-                  backgroundColor: '#F9FAFB', 
+                <div key={index} style={{
+                  padding: '12px',
+                  backgroundColor: '#F9FAFB',
                   borderRadius: '8px',
                   fontSize: '14px'
                 }}>
@@ -5024,11 +5026,11 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
         <div className="orders-card__actions" style={{ padding: '16px', borderTop: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* Grace Period Notices */}
           {isInGracePeriod && (
-            <div className="orders-card__grace-period-notice" style={{ 
-              padding: '8px 12px', 
-              marginBottom: '8px', 
-              backgroundColor: '#FEF3C7', 
-              border: '1px solid #FCD34D', 
+            <div className="orders-card__grace-period-notice" style={{
+              padding: '8px 12px',
+              marginBottom: '8px',
+              backgroundColor: '#FEF3C7',
+              border: '1px solid #FCD34D',
               borderRadius: '8px',
               fontSize: '12px',
               color: '#92400E'
@@ -5037,11 +5039,11 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
             </div>
           )}
           {isInStatusUpdateGracePeriod && (
-            <div className="orders-card__grace-period-notice" style={{ 
-              padding: '8px 12px', 
-              marginBottom: '8px', 
-              backgroundColor: '#DBEAFE', 
-              border: '1px solid #93C5FD', 
+            <div className="orders-card__grace-period-notice" style={{
+              padding: '8px 12px',
+              marginBottom: '8px',
+              backgroundColor: '#DBEAFE',
+              border: '1px solid #93C5FD',
               borderRadius: '8px',
               fontSize: '12px',
               color: '#1E40AF'
@@ -5086,7 +5088,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                 onClick={async () => {
                   const orderId = order.id || order._id
                   if (!orderId) return
-                  
+
                   const result = await updateOrderStatus(orderId, { finalizeGracePeriod: true })
                   if (result.data) {
                     success(result.data.message || 'Status update confirmed successfully!')
@@ -5172,8 +5174,8 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
 
           {/* Paid Badge */}
           {(normalizedStatus === 'fully_paid' || (!isPartialPayment && paymentCompleted && normalizedStatus === 'delivered')) && (
-            <div className="orders-card__action is-success" style={{ 
-              padding: '8px 16px', 
+            <div className="orders-card__action is-success" style={{
+              padding: '8px 16px',
               borderRadius: '8px',
               backgroundColor: '#D1FAE5',
               color: '#065F46',
@@ -5215,7 +5217,7 @@ function CreditView({ openPanel }) {
         dispatch({ type: 'SET_CREDIT_DATA', payload: result.data })
       }
     })
-    
+
     // Fetch repayment history
     refreshRepaymentHistory()
   }, [getCreditInfo, refreshRepaymentHistory, dispatch, repaymentRefreshKey])
@@ -5225,7 +5227,7 @@ function CreditView({ openPanel }) {
     const handleRepaymentSuccess = () => {
       setRepaymentRefreshKey(prev => prev + 1)
     }
-    
+
     window.addEventListener('repayment-success', handleRepaymentSuccess)
     return () => {
       window.removeEventListener('repayment-success', handleRepaymentSuccess)
@@ -5238,15 +5240,15 @@ function CreditView({ openPanel }) {
   const creditData = dashboard.credit || {}
   const creditInfo = creditData.credit || {}
   const creditStatus = creditData.status || {}
-  
+
   const creditUsed = creditInfo.used || dashboard.overview?.credit?.used || 0
   const penalty = creditStatus.penalty || dashboard.overview?.credit?.penalty || 0
-  
+
   // Calculate total repaid from repayment history
   const totalRepaid = repaymentHistory
     .filter(r => r.status === 'completed')
     .reduce((sum, r) => sum + (r.amount || 0), 0)
-  
+
   // Get last repayment date
   const lastRepayment = repaymentHistory
     .filter(r => r.status === 'completed')
@@ -5255,17 +5257,17 @@ function CreditView({ openPanel }) {
       const dateB = new Date(b.paidAt || b.transactionDate || b.createdAt || 0)
       return dateB - dateA
     })[0]
-  
+
   // Calculate repayment count
   const repaymentCount = repaymentHistory.filter(r => r.status === 'completed').length
-  
+
   // Format currency helper
   const formatCurrency = (amount) => {
     if (amount === 0) return '₹0'
     if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`
     return `₹${Math.round(amount).toLocaleString('en-IN')}`
   }
-  
+
   const credit = {
     outstanding: creditUsed > 0 ? formatCurrency(creditUsed) : '₹0',
     repaid: totalRepaid > 0 ? formatCurrency(totalRepaid) : '₹0',
@@ -5282,25 +5284,25 @@ function CreditView({ openPanel }) {
 
   // Get penalty rate for display
   const penaltyRate = creditInfo.penaltyRate || creditStatus.penaltyRate || dashboard?.overview?.credit?.penaltyRate || 2
-  
+
   const penaltyTimeline = [
-    { 
-      period: 'Days 0-5', 
+    {
+      period: 'Days 0-5',
       title: 'Grace Period',
       description: 'No penalties applied. Automated reminders will be sent.',
-      tone: 'success' 
+      tone: 'success'
     },
-    { 
-      period: 'Days 6-10', 
+    {
+      period: 'Days 6-10',
       title: 'Penalty Period',
       description: `${penaltyRate}% daily penalty applied. Finance team notified.`,
-      tone: 'warn' 
+      tone: 'warn'
     },
-    { 
-      period: 'Days 11+', 
+    {
+      period: 'Days 11+',
       title: 'Restrictions Active',
       description: 'New credit orders blocked. Daily penalties continue until repayment.',
-      tone: 'critical' 
+      tone: 'critical'
     },
   ]
 
@@ -5310,31 +5312,31 @@ function CreditView({ openPanel }) {
       <section id="credit-status" className="credit-status-section">
         <div className="credit-status-card">
           <div className="credit-status-card__main">
-              <div className="credit-status-card__details">
-                <div className="credit-status-card__amount">
-                  <span className="credit-status-card__amount-value">{credit.outstanding}</span>
-                  <span className="credit-status-card__amount-label">Outstanding Credit</span>
-            </div>
-                <div className="credit-status-card__quick-info">
+            <div className="credit-status-card__details">
+              <div className="credit-status-card__amount">
+                <span className="credit-status-card__amount-value">{credit.outstanding}</span>
+                <span className="credit-status-card__amount-label">Outstanding Credit</span>
+              </div>
+              <div className="credit-status-card__quick-info">
+                <div className="credit-status-card__info-item">
+                  <span className="credit-status-card__info-label">To Repay</span>
+                  <span className="credit-status-card__info-value">{credit.outstanding}</span>
+                </div>
+                {totalRepaid > 0 && (
                   <div className="credit-status-card__info-item">
-                    <span className="credit-status-card__info-label">To Repay</span>
-                    <span className="credit-status-card__info-value">{credit.outstanding}</span>
+                    <span className="credit-status-card__info-label">Total Repaid</span>
+                    <span className="credit-status-card__info-value">{credit.repaid}</span>
                   </div>
-                  {totalRepaid > 0 && (
-                    <div className="credit-status-card__info-item">
-                      <span className="credit-status-card__info-label">Total Repaid</span>
-                      <span className="credit-status-card__info-value">{credit.repaid}</span>
-                    </div>
-                  )}
-                  {repaymentCount > 0 && (
-                    <div className="credit-status-card__info-item">
-                      <span className="credit-status-card__info-label">Repayments</span>
-                      <span className="credit-status-card__info-value">{repaymentCount}</span>
-                    </div>
-                  )}
+                )}
+                {repaymentCount > 0 && (
+                  <div className="credit-status-card__info-item">
+                    <span className="credit-status-card__info-label">Repayments</span>
+                    <span className="credit-status-card__info-value">{repaymentCount}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
           <div className="credit-status-card__footer">
             <div className="credit-status-card__status-badge">
               <span className="credit-status-card__status-text">{credit.penalty === 'No penalty' ? 'No fine' : credit.penalty}</span>
@@ -5372,7 +5374,7 @@ function CreditView({ openPanel }) {
 
       <section id="credit-actions" className="credit-section">
         <div className="overview-section__header">
-            <div>
+          <div>
             <h3 className="overview-section__title">Credit management</h3>
           </div>
         </div>
@@ -5388,16 +5390,16 @@ function CreditView({ openPanel }) {
               <p className="credit-action-card__body">
                 Repay your outstanding credit to avoid penalties. Ensure you have added bank account details before proceeding.
               </p>
-              <button 
-                type="button" 
-                className="credit-action-card__cta" 
+              <button
+                type="button"
+                className="credit-action-card__cta"
                 onClick={async () => {
                   // Refresh credit info to get latest creditUsed value
                   const latestCreditResult = await getCreditInfo()
                   const latestCreditUsed = latestCreditResult.data?.credit?.used || creditUsed
-                  
-                    openPanel('repay-credit', { 
-                      creditUsed: latestCreditUsed, 
+
+                  openPanel('repay-credit', {
+                    creditUsed: latestCreditUsed,
                   })
                 }}
               >
@@ -5412,8 +5414,8 @@ function CreditView({ openPanel }) {
         <div className="overview-section__header">
           <div>
             <h3 className="overview-section__title">Fine timeline</h3>
-              </div>
           </div>
+        </div>
         <div className="credit-timeline">
           {penaltyTimeline.map((item) => (
             <div
@@ -5445,10 +5447,10 @@ function CreditView({ openPanel }) {
           <div className="overview-activity__list">
             {repaymentHistory.slice(0, 5).map((repayment) => {
               const repaymentDate = repayment.paidAt || repayment.createdAt || repayment.transactionDate
-              const formattedDate = repaymentDate 
+              const formattedDate = repaymentDate
                 ? new Date(repaymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                 : 'N/A'
-              
+
               return (
                 <div key={repayment.id || repayment._id} className="overview-activity__item">
                   <div className="overview-activity__avatar">RP</div>
@@ -5501,7 +5503,7 @@ function ReportsView() {
       'all': '3650', // ~10 years for "all time"
     }
     const periodDays = periodMap[timePeriod] || '30'
-    
+
     // Fetch both reports and earnings summary
     Promise.all([
       getReports({ period: periodDays }),
@@ -5558,7 +5560,7 @@ function ReportsView() {
         orders: breakdown.map(b => b.count || 0),
       }
     }
-    
+
     // Fallback to empty data if no backend data
     return {
       labels: [],
@@ -5568,7 +5570,7 @@ function ReportsView() {
   }
 
   const chartData = getRevenueData(timePeriod)
-  
+
   // Get revenue data from backend (backend returns 'revenue', not 'sales')
   const revenueData = reportsData?.revenue || {}
   // Use earnings summary for total earnings (vendor earnings), fallback to revenue if not available
@@ -5591,22 +5593,22 @@ function ReportsView() {
             <div className="reports-summary-card__main">
               <div className="reports-summary-card__icon">
                 <ChartIcon className="h-6 w-6" />
-            </div>
+              </div>
               <div className="reports-summary-card__stats">
                 <div className="reports-summary-card__stat">
                   <span className="reports-summary-card__stat-label">Total Earnings</span>
                   <span className="reports-summary-card__stat-value">
-                    {totalEarnings >= 100000 
-                      ? `₹${(totalEarnings / 100000).toFixed(1)}L` 
-                      : totalEarnings > 0 
-                        ? `₹${Math.round(totalEarnings).toLocaleString('en-IN')}` 
+                    {totalEarnings >= 100000
+                      ? `₹${(totalEarnings / 100000).toFixed(1)}L`
+                      : totalEarnings > 0
+                        ? `₹${Math.round(totalEarnings).toLocaleString('en-IN')}`
                         : '₹0'}
                   </span>
-            </div>
+                </div>
                 <div className="reports-summary-card__stat">
                   <span className="reports-summary-card__stat-label">Total Orders</span>
                   <span className="reports-summary-card__stat-value">{orderCount}</span>
-          </div>
+                </div>
               </div>
             </div>
             <div className="reports-summary-card__insights">
@@ -5617,16 +5619,16 @@ function ReportsView() {
                 </div>
               )}
               {averageOrderValue > 0 && (
-              <div className="reports-summary-card__insight">
-                <span className="reports-summary-card__insight-icon">📈</span>
+                <div className="reports-summary-card__insight">
+                  <span className="reports-summary-card__insight-icon">📈</span>
                   <span className="reports-summary-card__insight-text">Average order value: ₹{averageOrderValue.toLocaleString('en-IN')}</span>
-              </div>
+                </div>
               )}
               {orderCount === 0 && (
-              <div className="reports-summary-card__insight">
+                <div className="reports-summary-card__insight">
                   <span className="reports-summary-card__insight-icon">ℹ️</span>
                   <span className="reports-summary-card__insight-text">No orders data available for this period</span>
-              </div>
+                </div>
               )}
             </div>
           </div>
@@ -5635,10 +5637,10 @@ function ReportsView() {
 
       <section id="reports-metrics" className="reports-section">
         <div className="overview-section__header">
-        <div>
+          <div>
             <h3 className="overview-section__title">Performance metrics</h3>
           </div>
-          </div>
+        </div>
         <div className="reports-metric-grid">
           {[
             { label: 'Avg Order Value', value: averageOrderValue > 0 ? `₹${averageOrderValue.toLocaleString('en-IN')}` : '₹0', meta: 'Per order', icon: WalletIcon },
@@ -5655,7 +5657,7 @@ function ReportsView() {
                   <p>{metric.label}</p>
                   <span>{metric.value}</span>
                   <small>{metric.meta}</small>
-        </div>
+                </div>
               </div>
             )
           })}
@@ -5672,7 +5674,7 @@ function ReportsView() {
               onClick={() => navigateToTab(tab.id)}
             >
               {tab.label}
-          </button>
+            </button>
           ))}
         </div>
         <div className="reports-tab-content">
@@ -6200,17 +6202,17 @@ function EarningsView({ openPanel, onNavigate }) {
                   error('Please add a bank account before requesting withdrawal')
                   return
                 }
-                
+
                 // Prepare bank account options for the select field
                 const bankAccountOptions = bankAccounts.map((account) => ({
                   value: account._id || account.id,
                   label: `${account.accountHolderName} - ${account.bankName} (${account.accountNumber.slice(-4)})${account.isPrimary ? ' - Primary' : ''}`,
                 }))
-                
+
                 // Set default to primary account if available
                 const primaryAccount = bankAccounts.find((acc) => acc.isPrimary)
                 const defaultBankAccountId = primaryAccount?._id || primaryAccount?.id || bankAccounts[0]?._id || bankAccounts[0]?.id
-                
+
                 // Update the field options dynamically
                 openPanel('request-withdrawal', {
                   availableBalance: summary.availableBalance,
@@ -6453,15 +6455,15 @@ function EarningsView({ openPanel, onNavigate }) {
             <div className="credit-usage-card">
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {withdrawals.map((withdrawal) => {
-                  const statusColor = withdrawal.status === 'approved' || withdrawal.status === 'completed' 
-                    ? '#10b981' 
-                    : withdrawal.status === 'rejected' 
-                    ? '#ef4444' 
-                    : '#f59e0b'
-                  const statusText = withdrawal.status === 'approved' ? 'Approved' 
-                    : withdrawal.status === 'completed' ? 'Completed' 
-                    : withdrawal.status === 'rejected' ? 'Rejected' 
-                    : 'Pending'
+                  const statusColor = withdrawal.status === 'approved' || withdrawal.status === 'completed'
+                    ? '#10b981'
+                    : withdrawal.status === 'rejected'
+                      ? '#ef4444'
+                      : '#f59e0b'
+                  const statusText = withdrawal.status === 'approved' ? 'Approved'
+                    : withdrawal.status === 'completed' ? 'Completed'
+                      : withdrawal.status === 'rejected' ? 'Rejected'
+                        : 'Pending'
                   return (
                     <div
                       key={withdrawal._id || withdrawal.id}
@@ -6503,7 +6505,7 @@ function EarningsView({ openPanel, onNavigate }) {
           )}
         </section>
       )}
-      
+
       {/* Bank Account Form */}
       {showBankAccountForm ? (
         <div ref={bankAccountFormRef}>

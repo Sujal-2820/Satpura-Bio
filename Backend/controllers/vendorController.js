@@ -25,6 +25,7 @@ const { OTP_EXPIRY_MINUTES, MIN_VENDOR_PURCHASE, MAX_VENDOR_PURCHASE, VENDOR_COV
 const { checkPhoneExists, checkPhoneInRole, isSpecialBypassNumber, SPECIAL_BYPASS_OTP } = require('../utils/phoneValidation');
 const { generateUniqueId } = require('../utils/generateUniqueId');
 const { createPaymentHistory, createBankAccount } = require('../utils/createWithId');
+const adminTaskController = require('./adminTaskController');
 
 const DELIVERY_WINDOW_HOURS = DELIVERY_TIMELINE_HOURS || 24;
 const DELIVERY_WINDOW_MS = DELIVERY_WINDOW_HOURS * 60 * 60 * 1000;
@@ -118,6 +119,70 @@ async function processPendingDeliveries(vendorId) {
     }
   } catch (error) {
     console.error(`Failed to process pending deliveries for vendor ${vendorId}:`, error);
+  }
+}
+
+/**
+ * Helper: Deduct stock from vendor inventory for an order
+ * @param {Object} order - The order document
+ * @param {String} vendorId - Vendor ID
+ */
+async function deductStockFromInventory(order, vendorId) {
+  try {
+    if (order.stockDeducted) {
+      console.log(`ℹ️ Stock already deducted for order ${order.orderNumber}`);
+      return true;
+    }
+
+    const ProductAssignment = require('../models/ProductAssignment');
+
+    for (const item of order.items) {
+      const assignment = await ProductAssignment.findOne({
+        vendorId,
+        productId: item.productId,
+      });
+
+      if (assignment) {
+        // Deduct Global Stock
+        assignment.stock = Math.max(0, (assignment.stock || 0) - item.quantity);
+
+        // Deduct Attribute Stock if variant
+        let itemAttrs = null;
+        if (item.variantAttributes) {
+          itemAttrs = item.variantAttributes instanceof Map
+            ? Object.fromEntries(item.variantAttributes)
+            : item.variantAttributes;
+        }
+
+        if (itemAttrs && Object.keys(itemAttrs).length > 0 && assignment.attributeStocks) {
+          const matchingVariant = assignment.attributeStocks.find(variant => {
+            if (!variant.attributes) return false;
+            const variantAttrs = variant.attributes instanceof Map
+              ? Object.fromEntries(variant.attributes)
+              : variant.attributes;
+            const keys = Object.keys(itemAttrs);
+            return keys.every(key => String(variantAttrs[key]) === String(itemAttrs[key]));
+          });
+
+          if (matchingVariant) {
+            matchingVariant.stock = Math.max(0, (matchingVariant.stock || 0) - item.quantity);
+            console.log(`📦 Vendor Variant Stock reduced for ${item.productName}: ${item.quantity}`);
+          }
+        }
+
+        await assignment.save();
+        console.log(`📦 Vendor Global Stock reduced for ${item.productName}: ${item.quantity}`);
+      } else {
+        console.warn(`⚠️ No product assignment found for product ${item.productName} and vendor ${vendorId}. Cannot deduct stock.`);
+      }
+    }
+
+    order.stockDeducted = true;
+    await order.save();
+    return true;
+  } catch (error) {
+    console.error(`❌ Failed to deduct stock for order ${order.orderNumber}:`, error);
+    return false;
   }
 }
 
@@ -420,7 +485,6 @@ exports.register = async (req, res, next) => {
     } catch (error) {
       console.error('Failed to send OTP:', error);
     }
-
     res.status(201).json({
       success: true,
       data: {
@@ -429,6 +493,25 @@ exports.register = async (req, res, next) => {
         expiresIn: OTP_EXPIRY_MINUTES * 60, // seconds
       },
     });
+
+    // Create Admin TODO Task
+    try {
+      await adminTaskController.createTaskInternal({
+        title: 'New Vendor Application',
+        description: `A new vendor "${name}" (${phone}) has registered and is waiting for approval in ${location.city}, ${location.state}.`,
+        category: 'vendor',
+        priority: 'high',
+        link: '/vendors',
+        relatedId: vendor._id,
+        metadata: {
+          vendorName: name,
+          phone: phone,
+          city: location.city
+        }
+      });
+    } catch (taskError) {
+      console.error('Failed to create admin task:', taskError);
+    }
   } catch (error) {
     next(error);
   }
@@ -970,6 +1053,10 @@ async function processExpiredAcceptances(vendorId) {
       });
 
       await order.save();
+
+      // Deduct stock from inventory
+      await deductStockFromInventory(order, vendorId);
+
       console.log(`✅ Order ${order.orderNumber} auto-confirmed after grace period expired`);
     }
   } catch (error) {
@@ -1495,7 +1582,8 @@ exports.confirmOrderAcceptance = async (req, res, next) => {
 
     await order.save();
 
-    // TODO: Send notification to user and admin
+    // Deduct stock from inventory
+    await deductStockFromInventory(order, vendor._id);
 
     console.log(`✅ Order ${order.orderNumber} acceptance confirmed by vendor ${vendor.name}`);
 
@@ -1506,6 +1594,7 @@ exports.confirmOrderAcceptance = async (req, res, next) => {
           id: order._id,
           orderNumber: order.orderNumber,
           status: order.status,
+          stockDeducted: order.stockDeducted
         },
         message: 'Order acceptance confirmed successfully',
       },
@@ -1619,8 +1708,13 @@ exports.autoConfirmExpiredAcceptances = async () => {
       });
 
       await order.save();
-      confirmedCount++;
 
+      // Deduct stock from inventory
+      if (order.vendorId) {
+        await deductStockFromInventory(order, order.vendorId);
+      }
+
+      confirmedCount++;
       console.log(`✅ Order ${order.orderNumber} auto-confirmed after grace period expired`);
     }
 
@@ -1779,6 +1873,25 @@ exports.rejectOrder = async (req, res, next) => {
         message: 'Order rejected and escalated to admin',
       },
     });
+
+    // Create Admin TODO Task
+    try {
+      await adminTaskController.createTaskInternal({
+        title: 'Order Escalated: Rejection',
+        description: `Order #${order.orderNumber} was rejected by vendor "${vendor.name}". Reason: ${reason}. Admin needs to fulfill from warehouse or reassign.`,
+        category: 'order',
+        priority: 'high',
+        link: `/orders/${order._id}`,
+        relatedId: order._id,
+        metadata: {
+          orderNumber: order.orderNumber,
+          vendorName: vendor.name,
+          reason: reason
+        }
+      });
+    } catch (taskError) {
+      console.error('Failed to create admin task:', taskError);
+    }
   } catch (error) {
     next(error);
   }
@@ -1891,6 +2004,9 @@ exports.acceptOrderPartially = async (req, res, next) => {
     });
 
     await order.save();
+
+    // Deduct stock from inventory for the accepted portion
+    await deductStockFromInventory(order, vendor._id);
 
     // Save vendor order first to get original items
     const originalOrder = await Order.findById(orderId).lean();
@@ -2017,6 +2133,25 @@ exports.acceptOrderPartially = async (req, res, next) => {
         message: 'Order partially accepted. Rejected items escalated to admin.',
       },
     });
+
+    // Create Admin TODO Task
+    try {
+      await adminTaskController.createTaskInternal({
+        title: 'Order Escalated: Partial Items Rejected',
+        description: `Order #${order.orderNumber} was partially accepted by vendor "${vendor.name}". Some items were rejected and escalated to Admin order #${adminOrder.orderNumber}.`,
+        category: 'order',
+        priority: 'high',
+        link: `/orders/${adminOrder._id}`,
+        relatedId: adminOrder._id,
+        metadata: {
+          originalOrderNumber: order.orderNumber,
+          adminOrderNumber: adminOrder.orderNumber,
+          vendorName: vendor.name
+        }
+      });
+    } catch (taskError) {
+      console.error('Failed to create admin task:', taskError);
+    }
   } catch (error) {
     next(error);
   }
@@ -2086,7 +2221,7 @@ exports.escalateOrderPartial = async (req, res, next) => {
           productId: orderItem.productId,
           vendorId: vendor._id,
         });
-        const availableStock = assignment?.vendorStock || 0;
+        const availableStock = assignment?.stock || 0;
         const requestedQty = orderItem.quantity;
         const escalatedQty = escalatedItem.escalatedQuantity || requestedQty;
         const acceptedQty = requestedQty - escalatedQty;
@@ -2252,6 +2387,9 @@ exports.escalateOrderPartial = async (req, res, next) => {
 
     await order.save();
 
+    // Deduct stock from inventory for the accepted portion
+    await deductStockFromInventory(order, vendor._id);
+
     console.log(`⚠️ Order ${order.orderNumber} partially escalated by vendor ${vendor.name}. Escalated order: ${escalatedOrder.orderNumber}`);
 
     res.status(200).json({
@@ -2262,6 +2400,26 @@ exports.escalateOrderPartial = async (req, res, next) => {
         message: 'Order partially accepted. Escalated quantities sent to admin.',
       },
     });
+
+    // Create Admin TODO Task
+    try {
+      await adminTaskController.createTaskInternal({
+        title: 'Order Escalated: Partial Quantity Rejected',
+        description: `Order #${order.orderNumber} was partially accepted by vendor "${vendor.name}". Some quantities were rejected and escalated to Admin order #${escalatedOrder.orderNumber}.`,
+        category: 'order',
+        priority: 'high',
+        link: `/orders/${escalatedOrder._id}`,
+        relatedId: escalatedOrder._id,
+        metadata: {
+          originalOrderNumber: order.orderNumber,
+          adminOrderNumber: escalatedOrder.orderNumber,
+          vendorName: vendor.name,
+          reason: reason
+        }
+      });
+    } catch (taskError) {
+      console.error('Failed to create admin task:', taskError);
+    }
   } catch (error) {
     next(error);
   }
@@ -3062,21 +3220,30 @@ exports.updateInventoryStock = async (req, res, next) => {
       });
     }
 
-    // TODO: When stock tracking is added to ProductAssignment model
-    // assignment.stock = stock;
-    // assignment.lastStockUpdate = new Date();
-    // if (notes) {
-    //   assignment.stockNotes = `${assignment.stockNotes || ''}\n[${new Date().toISOString()}] ${notes}`.trim();
-    // }
-    // await assignment.save();
+    // Support for both global stock and attribute-specific stock if provided
+    const { attributeStocks: updatedAttributeStocks } = req.body;
 
-    // For now, return a placeholder response
+    if (stock !== undefined) {
+      assignment.stock = stock;
+      assignment.lastManualStockUpdate = new Date();
+    }
+
+    if (updatedAttributeStocks && Array.isArray(updatedAttributeStocks)) {
+      assignment.attributeStocks = updatedAttributeStocks;
+      assignment.lastManualStockUpdate = new Date();
+    }
+
+    if (notes) {
+      assignment.notes = `${assignment.notes || ''}\n[${new Date().toISOString()}] ${notes}`.trim();
+    }
+
+    await assignment.save();
+
     res.status(200).json({
       success: true,
       data: {
-        message: 'Stock update functionality will be available when inventory model is enhanced',
+        message: 'Stock updated successfully',
         assignment,
-        // stock: assignment.stock, // Will be available after model update
       },
     });
   } catch (error) {
@@ -3449,23 +3616,6 @@ exports.requestCreditPurchase = async (req, res, next) => {
     const hasUnpaidCredits = unpaidPurchases.length > 0;
     const totalUnpaidAmount = unpaidPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
 
-    if (hasUnpaidCredits) {
-      return res.status(400).json({
-        success: false,
-        message: 'You have unpaid credits from previous purchase requests. Please clear your outstanding payments before making a new request. Failure to repay may result in account suspension or permanent ban.',
-        unpaidCredits: {
-          count: unpaidPurchases.length,
-          totalAmount: totalUnpaidAmount,
-          purchases: unpaidPurchases.map((p) => ({
-            amount: p.totalAmount,
-            deliveredAt: p.deliveredAt,
-            deliveryStatus: p.deliveryStatus,
-            createdAt: p.createdAt,
-          })),
-        },
-      });
-    }
-
     // Generate unique credit purchase ID
     const creditPurchaseId = await generateUniqueId(CreditPurchase, 'CRP', 'creditPurchaseId', 101);
 
@@ -3480,6 +3630,8 @@ exports.requestCreditPurchase = async (req, res, next) => {
       bankDetails: sanitizedBankDetails,
       confirmationText: confirmationText.trim(),
       deliveryStatus: 'pending',
+      hasOutstandingDues: hasUnpaidCredits,
+      outstandingDuesAmount: totalUnpaidAmount,
     });
 
     console.log(`✅ Credit purchase requested: ₹${totalAmount} by vendor ${vendor.name} - ${vendor._id}`);
@@ -3491,6 +3643,25 @@ exports.requestCreditPurchase = async (req, res, next) => {
         message: 'Credit purchase request submitted successfully. Awaiting admin approval.',
       },
     });
+
+    // Create Admin TODO Task
+    try {
+      await adminTaskController.createTaskInternal({
+        title: 'New Credit Purchase Request',
+        description: `Vendor "${vendor.name}" (${vendor.phone}) requested stock worth ₹${totalAmount.toLocaleString('en-IN')}. Reason: ${reason.substring(0, 100)}...`,
+        category: 'finance',
+        priority: 'high',
+        link: '/vendors/purchase-requests',
+        relatedId: purchase._id,
+        metadata: {
+          vendorName: vendor.name,
+          amount: totalAmount,
+          purchaseId: purchase.creditPurchaseId
+        }
+      });
+    } catch (taskError) {
+      console.error('Failed to create admin task:', taskError);
+    }
   } catch (error) {
     if (error.message && error.message.includes('exceeds admin stock')) {
       return res.status(400).json({
@@ -4371,6 +4542,25 @@ exports.requestWithdrawal = async (req, res, next) => {
       },
       message: 'Withdrawal request submitted successfully. Awaiting admin approval.',
     });
+
+    // Create Admin TODO Task
+    try {
+      await adminTaskController.createTaskInternal({
+        title: 'New Withdrawal Request',
+        description: `Vendor "${vendor.name}" (${vendor.phone}) requested withdrawal of ₹${amount.toLocaleString('en-IN')}.`,
+        category: 'finance',
+        priority: 'high',
+        link: '/vendor-withdrawals',
+        relatedId: withdrawal._id,
+        metadata: {
+          vendorName: vendor.name,
+          amount: amount,
+          withdrawalId: withdrawal.withdrawalId
+        }
+      });
+    } catch (taskError) {
+      console.error('Failed to create admin task:', taskError);
+    }
   } catch (error) {
     next(error);
   }

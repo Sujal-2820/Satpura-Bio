@@ -218,6 +218,31 @@ export function useAdminApi() {
     [callApi, dispatch],
   )
 
+  const sendVendorPurchaseStock = useCallback(
+    (requestId, deliveryData) => {
+      return callApi(adminApi.sendVendorPurchaseStock, requestId, deliveryData).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_FINANCE_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const confirmVendorPurchaseDelivery = useCallback(
+    (requestId, deliveryData) => {
+      return callApi(adminApi.confirmVendorPurchaseDelivery, requestId, deliveryData).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_FINANCE_UPDATED', payload: true })
+          dispatch({ type: 'SET_VENDORS_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
   const getVendorPurchaseRequests = useCallback((params) => callApi(adminApi.getVendorPurchaseRequests, params), [callApi])
 
   const banVendor = useCallback(
@@ -755,9 +780,9 @@ export function useAdminApi() {
 
   // Review Management APIs
   const getReviews = useCallback((params) => callApi(adminApi.getReviews, params), [callApi])
-  
+
   const getReviewDetails = useCallback((reviewId) => callApi(adminApi.getReviewDetails, reviewId), [callApi])
-  
+
   const respondToReview = useCallback(
     (reviewId, data) => {
       return callApi(adminApi.respondToReview, reviewId, data).then((result) => {
@@ -769,7 +794,7 @@ export function useAdminApi() {
     },
     [callApi],
   )
-  
+
   const updateReviewResponse = useCallback(
     (reviewId, data) => {
       return callApi(adminApi.updateReviewResponse, reviewId, data).then((result) => {
@@ -781,7 +806,7 @@ export function useAdminApi() {
     },
     [callApi],
   )
-  
+
   const deleteReviewResponse = useCallback(
     (reviewId) => {
       return callApi(adminApi.deleteReviewResponse, reviewId).then((result) => {
@@ -793,7 +818,7 @@ export function useAdminApi() {
     },
     [callApi],
   )
-  
+
   const moderateReview = useCallback(
     (reviewId, data) => {
       return callApi(adminApi.moderateReview, reviewId, data).then((result) => {
@@ -805,7 +830,7 @@ export function useAdminApi() {
     },
     [callApi],
   )
-  
+
   const deleteReview = useCallback(
     (reviewId) => {
       return callApi(adminApi.deleteReview, reviewId).then((result) => {
@@ -816,6 +841,43 @@ export function useAdminApi() {
       })
     },
     [callApi],
+  )
+
+  // Task Management APIs
+  const fetchTasks = useCallback(
+    (params) => {
+      return callApi(adminApi.getAdminTasks, params).then((result) => {
+        if (result.data) {
+          dispatch({ type: 'SET_TASKS_DATA', payload: result.data })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const markTaskViewed = useCallback(
+    (taskId) => {
+      return callApi(adminApi.markTaskAsViewed, taskId).then((result) => {
+        if (result.success) {
+          dispatch({ type: 'SET_TASKS_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
+  )
+
+  const markTaskCompleted = useCallback(
+    (taskId) => {
+      return callApi(adminApi.markTaskAsCompleted, taskId).then((result) => {
+        if (result.success) {
+          dispatch({ type: 'SET_TASKS_UPDATED', payload: true })
+        }
+        return result
+      })
+    },
+    [callApi, dispatch],
   )
 
   return {
@@ -843,6 +905,8 @@ export function useAdminApi() {
     updateVendorCreditPolicy,
     approveVendorPurchase,
     rejectVendorPurchase,
+    sendVendorPurchaseStock,
+    confirmVendorPurchaseDelivery,
     getVendorPurchaseRequests,
     banVendor,
     unbanVendor,
@@ -925,6 +989,10 @@ export function useAdminApi() {
     deleteReviewResponse,
     moderateReview,
     deleteReview,
+    // Tasks
+    fetchTasks,
+    markTaskViewed,
+    markTaskCompleted,
   }
 }
 

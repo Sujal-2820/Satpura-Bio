@@ -18,6 +18,7 @@ import { PaymentHistoryPage } from '../pages/PaymentHistory'
 import { OffersPage } from '../pages/Offers'
 import { RepaymentsPage } from '../pages/Repayments'
 import { ReviewsPage } from '../pages/Reviews'
+import TasksPage from '../pages/Tasks'
 
 const routeConfig = [
   { id: 'dashboard', element: DashboardPage },
@@ -35,6 +36,7 @@ const routeConfig = [
   { id: 'offers', element: OffersPage },
   { id: 'repayments', element: RepaymentsPage },
   { id: 'reviews', element: ReviewsPage },
+  { id: 'tasks', element: TasksPage },
 ]
 
 function AdminDashboardContent({ activeRoute, setActiveRoute, onExit }) {
@@ -72,10 +74,10 @@ export function AdminDashboardRoute({ onExit }) {
   return (
     <AdminProvider>
       <ToastProvider>
-        <AdminDashboardContent 
-          activeRoute={activeRoute} 
-          setActiveRoute={setActiveRoute} 
-          onExit={onExit} 
+        <AdminDashboardContent
+          activeRoute={activeRoute}
+          setActiveRoute={setActiveRoute}
+          onExit={onExit}
         />
       </ToastProvider>
     </AdminProvider>

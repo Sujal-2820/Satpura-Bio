@@ -16,9 +16,9 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
  */
 async function handleResponse(response) {
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ 
+    const error = await response.json().catch(() => ({
       success: false,
-      message: `HTTP error! status: ${response.status}` 
+      message: `HTTP error! status: ${response.status}`
     }))
     const errorObj = {
       success: false,
@@ -38,7 +38,7 @@ async function handleResponse(response) {
  */
 async function apiRequest(endpoint, options = {}) {
   const token = localStorage.getItem('admin_token') // Admin authentication token
-  
+
   const config = {
     headers: {
       'Content-Type': 'application/json',
@@ -219,7 +219,7 @@ function transformDashboardData(backendData) {
   // TODO: Enhance backend to provide actual advance vs remaining breakdown from orders
   const pendingPaymentsAmount = overview.payments.pendingAmount || 0
   const totalRevenue = overview.revenue.total || 0
-  
+
   // Estimate: Assuming orders with partial payment, calculate 30% advance from revenue
   // This is an approximation - backend should ideally aggregate from Order.upfrontAmount and Order.remainingAmount
   const estimatedAdvanceAmount = Math.round(totalRevenue * 0.3) // Estimate: 30% of revenue as advance
@@ -253,7 +253,7 @@ export async function getDashboardData(params = {}) {
   try {
     const queryParams = new URLSearchParams(params).toString()
     const response = await apiRequest(`/admin/dashboard?${queryParams}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       return {
@@ -261,7 +261,7 @@ export async function getDashboardData(params = {}) {
         data: transformDashboardData(response.data),
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -311,14 +311,14 @@ export async function getProducts(params = {}) {
   try {
     // Convert frontend params to backend query params
     const queryParams = new URLSearchParams()
-    
+
     if (params.page) queryParams.append('page', params.page)
     if (params.limit) queryParams.append('limit', params.limit)
     if (params.category) queryParams.append('category', params.category)
     if (params.status || params.isActive !== undefined) {
       // Frontend uses 'status' (active/inactive), backend uses 'isActive' (true/false)
-      const isActive = params.isActive !== undefined 
-        ? params.isActive 
+      const isActive = params.isActive !== undefined
+        ? params.isActive
         : (params.status === 'active' ? true : params.status === 'inactive' ? false : undefined)
       if (isActive !== undefined) queryParams.append('isActive', isActive.toString())
     }
@@ -333,7 +333,7 @@ export async function getProducts(params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/products${queryString ? `?${queryString}` : ''}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       const transformedProducts = response.data.products.map(transformProduct)
@@ -346,7 +346,7 @@ export async function getProducts(params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -362,7 +362,7 @@ export async function getProducts(params = {}) {
  */
 export async function getProductDetails(productId) {
   const response = await apiRequest(`/admin/products/${productId}`)
-  
+
   // Transform backend response to frontend format
   if (response.success && response.data) {
     return {
@@ -373,7 +373,7 @@ export async function getProductDetails(productId) {
       },
     }
   }
-  
+
   return response
 }
 
@@ -384,22 +384,22 @@ function transformProductForBackend(frontendData) {
   // Handle both naming conventions: vendorPrice/userPrice or priceToVendor/priceToUser
   const vendorPrice = frontendData.priceToVendor ?? frontendData.vendorPrice
   const userPrice = frontendData.priceToUser ?? frontendData.userPrice
-  
+
   // Parse prices - ensure they are valid numbers
   const parsedVendorPrice = vendorPrice != null && vendorPrice !== '' ? parseFloat(vendorPrice) : null
   const parsedUserPrice = userPrice != null && userPrice !== '' ? parseFloat(userPrice) : null
-  
+
   const backendData = {
     name: frontendData.name,
     description: frontendData.description || frontendData.longDescription || frontendData.name, // Use name as description if not provided
     shortDescription: frontendData.shortDescription || frontendData.description?.substring(0, 150) || frontendData.name.substring(0, 150),
     category: frontendData.category || 'fertilizer', // Default category
     // Only set isActive if visibility is explicitly provided, otherwise default to true (active)
-    isActive: frontendData.visibility !== undefined 
+    isActive: frontendData.visibility !== undefined
       ? (frontendData.visibility === 'active' || frontendData.visibility === 'Active')
       : true, // Default to active
   }
-  
+
   // Handle stock fields - prioritize actualStock/displayStock over legacy stock
   // Always include actualStock and displayStock if they exist (even if 0)
   if (frontendData.actualStock !== undefined && frontendData.actualStock !== null) {
@@ -428,7 +428,7 @@ function transformProductForBackend(frontendData) {
       }
     }
   }
-  
+
   // Only add prices if they are valid positive numbers
   if (parsedVendorPrice != null && !isNaN(parsedVendorPrice) && parsedVendorPrice > 0) {
     backendData.priceToVendor = parsedVendorPrice
@@ -445,12 +445,12 @@ function transformProductForBackend(frontendData) {
       unit: frontendData.stockUnit.toLowerCase(),
     }
   }
-  
+
   // Add expiry date if provided
   if (frontendData.expiry) {
     backendData.expiry = frontendData.expiry
   }
-  
+
   // Add batchNumber if provided
   if (frontendData.batchNumber !== undefined && frontendData.batchNumber !== null && frontendData.batchNumber !== '') {
     backendData.batchNumber = frontendData.batchNumber.trim()
@@ -470,7 +470,7 @@ function transformProductForBackend(frontendData) {
   }
   if (frontendData.specifications) backendData.specifications = frontendData.specifications
   if (frontendData.images && Array.isArray(frontendData.images)) backendData.images = frontendData.images
-  
+
   // Add attributeStocks if provided
   if (frontendData.attributeStocks && Array.isArray(frontendData.attributeStocks) && frontendData.attributeStocks.length > 0) {
     backendData.attributeStocks = frontendData.attributeStocks
@@ -659,7 +659,7 @@ export async function getVendors(params = {}) {
   try {
     // Convert frontend params to backend query params
     const queryParams = new URLSearchParams()
-    
+
     if (params.page) queryParams.append('page', params.page)
     if (params.limit) queryParams.append('limit', params.limit)
     if (params.status) queryParams.append('status', params.status)
@@ -675,7 +675,7 @@ export async function getVendors(params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/vendors${queryString ? `?${queryString}` : ''}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       const transformedVendors = response.data.vendors.map(transformVendor)
@@ -688,7 +688,7 @@ export async function getVendors(params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -704,7 +704,7 @@ export async function getVendors(params = {}) {
  */
 export async function getVendorDetails(vendorId) {
   const response = await apiRequest(`/admin/vendors/${vendorId}`)
-  
+
   // Transform backend response to frontend format
   if (response.success && response.data) {
     return {
@@ -717,7 +717,7 @@ export async function getVendorDetails(vendorId) {
       },
     }
   }
-  
+
   return response
 }
 
@@ -848,7 +848,7 @@ export async function updateVendor(vendorId, vendorData) {
   if (vendorData.name) backendData.name = vendorData.name
   if (vendorData.phone) backendData.phone = vendorData.phone
   if (vendorData.email) backendData.email = vendorData.email
-  
+
   // Handle location update
   if (vendorData.location) {
     backendData.location = {
@@ -857,7 +857,7 @@ export async function updateVendor(vendorId, vendorData) {
       state: vendorData.location.state,
       pincode: vendorData.location.pincode,
     }
-    
+
     // Add coordinates if provided
     if (vendorData.location.lat && vendorData.location.lng) {
       backendData.location.coordinates = {
@@ -991,10 +991,10 @@ export async function deleteVendor(vendorId, deleteData = {}) {
  */
 function transformPurchaseRequest(backendPurchase) {
   // Handle populated vendorId (object) or vendorId (string)
-  const vendorName = typeof backendPurchase.vendorId === 'object' 
-    ? backendPurchase.vendorId?.name 
+  const vendorName = typeof backendPurchase.vendorId === 'object'
+    ? backendPurchase.vendorId?.name
     : backendPurchase.vendor?.name || backendPurchase.vendorName || ''
-  
+
   const vendorId = typeof backendPurchase.vendorId === 'object'
     ? backendPurchase.vendorId?._id?.toString() || backendPurchase.vendorId?.id
     : backendPurchase.vendorId?.toString() || backendPurchase.vendorId
@@ -1015,7 +1015,7 @@ function transformPurchaseRequest(backendPurchase) {
       const productName = typeof item.productId === 'object'
         ? item.productId?.name
         : item.productName || 'Unknown Product'
-      
+
       // Handle attributeCombination (variants)
       let attributeCombination = null
       if (item.attributeCombination) {
@@ -1026,7 +1026,7 @@ function transformPurchaseRequest(backendPurchase) {
           attributeCombination = item.attributeCombination
         }
       }
-      
+
       return {
         name: productName,
         quantity: item.quantity || 0,
@@ -1037,8 +1037,13 @@ function transformPurchaseRequest(backendPurchase) {
     }) || [],
     documents: [], // Backend doesn't store documents yet
     vendorPerformance: {
-      creditUtilization: 0, // Will be calculated from vendor data
-      repaymentHistory: 'On Time', // Default
+      creditUsed: typeof backendPurchase.vendorId === 'object' ? backendPurchase.vendorId?.creditUsed || 0 : 0,
+      creditLimit: typeof backendPurchase.vendorId === 'object' ? backendPurchase.vendorId?.creditLimit || 0 : 0,
+      creditUtilization: (typeof backendPurchase.vendorId === 'object' && backendPurchase.vendorId?.creditLimit > 0)
+        ? (backendPurchase.vendorId.creditUsed / backendPurchase.vendorId.creditLimit) * 100
+        : 0,
+      hasOutstandingDues: backendPurchase.hasOutstandingDues || false,
+      outstandingAmount: backendPurchase.outstandingDuesAmount || 0,
     },
     // Keep all original fields for reference
     ...backendPurchase,
@@ -1064,27 +1069,27 @@ export async function approveVendorPurchase(requestId, shortDescription = '') {
       }
     }
   }
-  
+
   const requestBody = { shortDescription: trimmedDesc }
   const bodyString = JSON.stringify(requestBody)
-  console.log('Sending approve request:', { 
-    requestId, 
-    shortDescription: trimmedDesc, 
-    body: requestBody, 
+  console.log('Sending approve request:', {
+    requestId,
+    shortDescription: trimmedDesc,
+    body: requestBody,
     stringified: bodyString,
     bodyLength: bodyString.length
   })
-  
+
   const response = await apiRequest(`/admin/vendors/purchases/${requestId}/approve`, {
     method: 'POST',
     body: bodyString,
   })
-  
+
   console.log('Approve response received:', response)
   console.log('Response success:', response.success)
   console.log('Response error:', response.error)
   console.log('Response message:', response.message)
-  
+
   // Check for error response
   if (!response.success) {
     return {
@@ -1140,6 +1145,62 @@ export async function rejectVendorPurchase(requestId, rejectionData) {
 }
 
 /**
+ * Send Stock for Vendor Purchase
+ * POST /admin/vendors/purchases/:requestId/send
+ * 
+ * @param {string} requestId - Purchase request ID
+ * @param {Object} deliveryData - { deliveryNotes?: string }
+ * @returns {Promise<Object>} - { message: string, purchase: Object }
+ */
+export async function sendVendorPurchaseStock(requestId, deliveryData) {
+  const response = await apiRequest(`/admin/vendors/purchases/${requestId}/send`, {
+    method: 'POST',
+    body: JSON.stringify(deliveryData || {}),
+  })
+
+  // Transform backend response to frontend format
+  if (response.success && response.data) {
+    return {
+      success: true,
+      data: {
+        purchase: response.data.purchase ? transformPurchaseRequest(response.data.purchase) : undefined,
+        message: response.data.message || 'Stock marked as sent',
+      },
+    }
+  }
+
+  return response
+}
+
+/**
+ * Confirm Delivery for Vendor Purchase
+ * POST /admin/vendors/purchases/:requestId/confirm-delivery
+ * 
+ * @param {string} requestId - Purchase request ID
+ * @param {Object} deliveryData - { deliveryNotes?: string }
+ * @returns {Promise<Object>} - { message: string, purchase: Object }
+ */
+export async function confirmVendorPurchaseDelivery(requestId, deliveryData) {
+  const response = await apiRequest(`/admin/vendors/purchases/${requestId}/confirm-delivery`, {
+    method: 'POST',
+    body: JSON.stringify(deliveryData || {}),
+  })
+
+  // Transform backend response to frontend format
+  if (response.success && response.data) {
+    return {
+      success: true,
+      data: {
+        purchase: response.data.purchase ? transformPurchaseRequest(response.data.purchase) : undefined,
+        message: response.data.message || 'Delivery confirmed and inventory updated',
+      },
+    }
+  }
+
+  return response
+}
+
+/**
  * Get Vendor Purchase Requests
  * GET /admin/vendors/purchases (global) or GET /admin/vendors/:vendorId/purchases (vendor-specific)
  * 
@@ -1157,7 +1218,7 @@ export async function rejectVendorPurchase(requestId, rejectionData) {
 export async function getVendorPurchaseRequests(params = {}) {
   try {
     const queryParams = new URLSearchParams()
-    
+
     if (params.status) queryParams.append('status', params.status)
     if (params.page) queryParams.append('page', params.page)
     if (params.limit) queryParams.append('limit', params.limit)
@@ -1236,19 +1297,19 @@ function transformWithdrawalRequest(backendWithdrawal) {
   // Extract bank details from bankAccountId if populated, otherwise use paymentDetails
   const bankDetails = backendWithdrawal.bankAccountId
     ? {
-        accountHolderName: backendWithdrawal.bankAccountId.accountHolderName || '',
-        accountNumber: backendWithdrawal.bankAccountId.accountNumber || '',
-        ifscCode: backendWithdrawal.bankAccountId.ifscCode || '',
-        bankName: backendWithdrawal.bankAccountId.bankName || '',
-      }
+      accountHolderName: backendWithdrawal.bankAccountId.accountHolderName || '',
+      accountNumber: backendWithdrawal.bankAccountId.accountNumber || '',
+      ifscCode: backendWithdrawal.bankAccountId.ifscCode || '',
+      bankName: backendWithdrawal.bankAccountId.bankName || '',
+    }
     : backendWithdrawal.paymentDetails || {}
 
   // Extract seller name from populated sellerId or direct field
-  const sellerName = backendWithdrawal.sellerId?.name || 
-                     backendWithdrawal.sellerId?.sellerId || 
-                     backendWithdrawal.seller?.name || 
-                     backendWithdrawal.sellerName || 
-                     ''
+  const sellerName = backendWithdrawal.sellerId?.name ||
+    backendWithdrawal.sellerId?.sellerId ||
+    backendWithdrawal.seller?.name ||
+    backendWithdrawal.sellerName ||
+    ''
 
   return {
     id: backendWithdrawal._id?.toString() || backendWithdrawal.id,
@@ -1283,7 +1344,7 @@ export async function getSellers(params = {}) {
   try {
     // Convert frontend params to backend query params
     const queryParams = new URLSearchParams()
-    
+
     if (params.page) queryParams.append('page', params.page)
     if (params.limit) queryParams.append('limit', params.limit)
     if (params.status) queryParams.append('status', params.status)
@@ -1299,7 +1360,7 @@ export async function getSellers(params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/sellers${queryString ? `?${queryString}` : ''}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       const transformedSellers = response.data.sellers.map(transformSeller)
@@ -1312,7 +1373,7 @@ export async function getSellers(params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -1328,7 +1389,7 @@ export async function getSellers(params = {}) {
  */
 export async function getSellerDetails(sellerId) {
   const response = await apiRequest(`/admin/sellers/${sellerId}`)
-  
+
   // Transform backend response to frontend format
   if (response.success && response.data) {
     return {
@@ -1340,7 +1401,7 @@ export async function getSellerDetails(sellerId) {
       },
     }
   }
-  
+
   return response
 }
 
@@ -1353,7 +1414,7 @@ function transformSellerForBackend(frontendData) {
     phone: frontendData.phone,
     email: frontendData.email,
   }
-  
+
   // Optional fields - only include if provided
   if (frontendData.area !== undefined) backendData.area = frontendData.area
   if (frontendData.monthlyTarget !== undefined) {
@@ -1625,7 +1686,7 @@ function transformVendorWithdrawalRequest(backendWithdrawal) {
 export async function getVendorWithdrawalRequests(params = {}) {
   try {
     const queryParams = new URLSearchParams()
-    
+
     if (params.status) queryParams.append('status', params.status)
     if (params.page) queryParams.append('page', params.page)
     if (params.limit) queryParams.append('limit', params.limit)
@@ -1781,7 +1842,7 @@ export async function completeVendorWithdrawal(requestId, completionData) {
 export async function getSellerWithdrawalRequests(params = {}) {
   try {
     const queryParams = new URLSearchParams()
-    
+
     if (params.status) queryParams.append('status', params.status)
     if (params.page) queryParams.append('page', params.page)
     if (params.limit) queryParams.append('limit', params.limit)
@@ -1908,7 +1969,7 @@ export async function rejectSellerChangeRequest(requestId, rejectionData = {}) {
 export async function getPaymentHistory(params = {}) {
   try {
     const queryParams = new URLSearchParams()
-    
+
     if (params.activityType) queryParams.append('activityType', params.activityType)
     if (params.userId) queryParams.append('userId', params.userId)
     if (params.vendorId) queryParams.append('vendorId', params.vendorId)
@@ -1947,7 +2008,7 @@ export async function getPaymentHistory(params = {}) {
 export async function getPaymentHistoryStats(params = {}) {
   try {
     const queryParams = new URLSearchParams()
-    
+
     if (params.startDate) queryParams.append('startDate', params.startDate)
     if (params.endDate) queryParams.append('endDate', params.endDate)
 
@@ -1970,7 +2031,7 @@ export async function getPaymentHistoryStats(params = {}) {
 function transformUser(backendUser) {
   const isBlocked = backendUser.isBlocked || false
   const isActive = backendUser.isActive && !isBlocked
-  
+
   return {
     id: backendUser._id?.toString() || backendUser.id,
     name: backendUser.name,
@@ -2002,7 +2063,7 @@ export async function getUsers(params = {}) {
   try {
     // Convert frontend params to backend query params
     const queryParams = new URLSearchParams()
-    
+
     if (params.page) queryParams.append('page', params.page)
     if (params.limit) queryParams.append('limit', params.limit)
     if (params.isActive !== undefined) queryParams.append('isActive', params.isActive.toString())
@@ -2031,7 +2092,7 @@ export async function getUsers(params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/users${queryString ? `?${queryString}` : ''}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       const transformedUsers = response.data.users.map(transformUser)
@@ -2044,7 +2105,7 @@ export async function getUsers(params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -2060,7 +2121,7 @@ export async function getUsers(params = {}) {
  */
 export async function getUserDetails(userId) {
   const response = await apiRequest(`/admin/users/${userId}`)
-  
+
   // Transform backend response to frontend format
   if (response.success && response.data) {
     const user = transformUser(response.data.user)
@@ -2073,7 +2134,7 @@ export async function getUserDetails(userId) {
       },
     }
   }
-  
+
   return response
 }
 
@@ -2148,10 +2209,10 @@ export async function activateUser(userId) {
  */
 function transformOrder(backendOrder) {
   const isEscalated = backendOrder.assignedTo === 'admin'
-  const region = backendOrder.vendorId?.location?.state || 
-                 backendOrder.vendorId?.location?.city || 
-                 backendOrder.userId?.location?.state || 
-                 'Unknown'
+  const region = backendOrder.vendorId?.location?.state ||
+    backendOrder.vendorId?.location?.city ||
+    backendOrder.userId?.location?.state ||
+    'Unknown'
 
   // User location details
   const userLocation = backendOrder.userId?.location || {}
@@ -2176,8 +2237,8 @@ function transformOrder(backendOrder) {
     region,
     value: backendOrder.totalAmount || 0,
     advance: backendOrder.upfrontAmount || 0,
-    advanceStatus: backendOrder.paymentStatus === 'fully_paid' ? 'paid' : 
-                   backendOrder.paymentStatus === 'partial_paid' ? 'partial' : 'pending',
+    advanceStatus: backendOrder.paymentStatus === 'fully_paid' ? 'paid' :
+      backendOrder.paymentStatus === 'partial_paid' ? 'partial' : 'pending',
     pending: backendOrder.remainingAmount || (backendOrder.totalAmount - (backendOrder.upfrontAmount || 0)),
     status: backendOrder.status || 'pending',
     paymentStatus: backendOrder.paymentStatus || 'pending',
@@ -2205,7 +2266,7 @@ export async function getOrders(params = {}) {
   try {
     // Convert frontend params to backend query params
     const queryParams = new URLSearchParams()
-    
+
     if (params.page) queryParams.append('page', params.page)
     if (params.limit) queryParams.append('limit', params.limit)
     if (params.status) queryParams.append('status', params.status)
@@ -2232,7 +2293,7 @@ export async function getOrders(params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/orders${queryString ? `?${queryString}` : ''}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       const transformedOrders = response.data.orders.map(transformOrder)
@@ -2245,7 +2306,7 @@ export async function getOrders(params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -2261,15 +2322,15 @@ export async function getOrders(params = {}) {
  */
 export async function getOrderDetails(orderId) {
   const response = await apiRequest(`/admin/orders/${orderId}`)
-  
+
   // Transform backend response to frontend format
   if (response.success && response.data) {
     const order = response.data.order
     const isEscalated = order.assignedTo === 'admin'
-    const region = order.vendorId?.location?.state || 
-                   order.vendorId?.location?.city || 
-                   order.userId?.location?.state || 
-                   'Unknown'
+    const region = order.vendorId?.location?.state ||
+      order.vendorId?.location?.city ||
+      order.userId?.location?.state ||
+      'Unknown'
 
     return {
       success: true,
@@ -2283,8 +2344,8 @@ export async function getOrderDetails(orderId) {
         date: order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         value: order.totalAmount || 0,
         advance: order.upfrontAmount || 0,
-        advanceStatus: order.paymentStatus === 'fully_paid' ? 'paid' : 
-                       order.paymentStatus === 'partial_paid' ? 'partial' : 'pending',
+        advanceStatus: order.paymentStatus === 'fully_paid' ? 'paid' :
+          order.paymentStatus === 'partial_paid' ? 'partial' : 'pending',
         pending: response.data.paymentSummary?.remaining || order.remainingAmount || 0,
         status: order.status || 'pending',
         items: order.items?.map(item => ({
@@ -2297,8 +2358,8 @@ export async function getOrderDetails(orderId) {
         paymentHistory: response.data.payments?.map(payment => ({
           id: payment._id?.toString() || payment.id,
           paymentId: payment.paymentId,
-          type: payment.paymentType === 'advance' ? 'Advance Payment' : 
-                payment.paymentType === 'remaining' ? 'Remaining Payment' : 'Full Payment',
+          type: payment.paymentType === 'advance' ? 'Advance Payment' :
+            payment.paymentType === 'remaining' ? 'Remaining Payment' : 'Full Payment',
           amount: payment.amount,
           date: payment.createdAt ? new Date(payment.createdAt).toISOString().split('T')[0] : null,
           status: payment.status === 'fully_paid' ? 'completed' : payment.status,
@@ -2313,7 +2374,7 @@ export async function getOrderDetails(orderId) {
       },
     }
   }
-  
+
   return response
 }
 
@@ -2391,7 +2452,7 @@ export async function generateInvoice(orderId) {
       if (contentType && contentType.includes('application/json')) {
         errorData = await response.json().catch(() => null)
       }
-      
+
       if (!errorData) {
         // If not JSON, create error object from status
         if (response.status === 401) {
@@ -2402,7 +2463,7 @@ export async function generateInvoice(orderId) {
           errorData = { message: `Failed to generate invoice: ${response.statusText || 'Unknown error'}` }
         }
       }
-      
+
       return {
         success: false,
         error: errorData,
@@ -2411,11 +2472,11 @@ export async function generateInvoice(orderId) {
 
     // Get the HTML content
     const htmlContent = await response.text()
-    
+
     // Create a blob from the HTML content
     const blob = new Blob([htmlContent], { type: 'text/html' })
     const url = window.URL.createObjectURL(blob)
-    
+
     // Open in new tab for viewing and printing to PDF
     const printWindow = window.open('', '_blank')
     if (!printWindow) {
@@ -2426,7 +2487,7 @@ export async function generateInvoice(orderId) {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      
+
       return {
         success: true,
         data: {
@@ -2436,11 +2497,11 @@ export async function generateInvoice(orderId) {
         },
       }
     }
-    
+
     // Write HTML content to new window
     printWindow.document.write(htmlContent)
     printWindow.document.close()
-    
+
     // Wait for content to load, then trigger print dialog (with slight delay to ensure content is rendered)
     setTimeout(() => {
       try {
@@ -2579,7 +2640,7 @@ export async function getFinanceData() {
  */
 export async function getFinancialParameters() {
   const response = await apiRequest('/admin/finance/parameters')
-  
+
   // Backend returns: { userAdvancePaymentPercent, minimumUserOrder, minimumVendorPurchase }
   return response
 }
@@ -2635,7 +2696,7 @@ export async function getVendorCreditBalances(params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/finance/credits${queryString ? `?${queryString}` : ''}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       const credits = response.data.credits?.map(credit => ({
@@ -2646,8 +2707,8 @@ export async function getVendorCreditBalances(params = {}) {
         usedCredit: credit.creditUsed || 0,
         overdue: credit.isOverdue ? credit.creditUsed : 0,
         penalty: credit.penalty || 0,
-        status: credit.status === 'overdue' ? 'warning' : 
-                credit.status === 'dueSoon' ? 'warning' : 'success',
+        status: credit.status === 'overdue' ? 'warning' :
+          credit.status === 'dueSoon' ? 'warning' : 'success',
         // Keep all original fields for reference
         ...credit,
       })) || []
@@ -2661,7 +2722,7 @@ export async function getVendorCreditBalances(params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -2697,7 +2758,7 @@ export async function getOutstandingCredits() {
   // Use getCredits endpoint and transform to outstanding credits format
   try {
     const response = await apiRequest('/admin/finance/credits')
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data?.summary) {
       const summary = response.data.summary
@@ -2736,7 +2797,7 @@ export async function getOutstandingCredits() {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -2757,12 +2818,12 @@ export async function getRecoveryStatus(params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/finance/recovery${queryString ? `?${queryString}` : ''}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       const recovery = response.data.recovery || {}
       const stats = response.data.statistics || {}
-      
+
       // Calculate progress from recovery data
       const total = recovery.totalOutstanding || 0
       const collected = recovery.recoveredAmount || 0
@@ -2805,7 +2866,7 @@ export async function getRecoveryStatus(params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -2850,7 +2911,7 @@ export async function applyVendorPenalty(vendorId, penaltyData) {
  */
 export async function getLogisticsSettings() {
   const response = await apiRequest('/admin/operations/logistics-settings')
-  
+
   // Transform backend response to frontend format
   if (response.success && response.data) {
     return {
@@ -2858,7 +2919,7 @@ export async function getLogisticsSettings() {
       data: response.data,
     }
   }
-  
+
   return response
 }
 
@@ -2910,7 +2971,7 @@ export async function getEscalatedOrders(params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/orders/escalated${queryString ? `?${queryString}` : ''}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       return {
@@ -2936,7 +2997,7 @@ export async function getEscalatedOrders(params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -3033,7 +3094,7 @@ export async function updateOrderStatus(orderId, statusData = {}) {
       method: 'PUT',
       body: JSON.stringify(requestBody),
     })
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       return {
@@ -3044,7 +3105,7 @@ export async function updateOrderStatus(orderId, statusData = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -3059,7 +3120,7 @@ export async function updateOrderStatus(orderId, statusData = {}) {
  */
 export async function getNotifications() {
   const response = await apiRequest('/admin/operations/notifications')
-  
+
   // Transform backend response to frontend format
   if (response.success && response.data) {
     return {
@@ -3080,7 +3141,7 @@ export async function getNotifications() {
       },
     }
   }
-  
+
   return response
 }
 
@@ -3205,7 +3266,7 @@ export async function getVendorCreditHistory(vendorId, params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/finance/vendors/${vendorId}/history${queryString ? `?${queryString}` : ''}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       // Transform history items
@@ -3240,7 +3301,7 @@ export async function getVendorCreditHistory(vendorId, params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -3273,7 +3334,7 @@ export async function getRepayments(params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/finance/repayments${queryString ? `?${queryString}` : ''}`)
-    
+
     if (response.success && response.data) {
       return {
         success: true,
@@ -3285,7 +3346,7 @@ export async function getRepayments(params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -3302,7 +3363,7 @@ export async function getRepayments(params = {}) {
 export async function getRepaymentDetails(repaymentId) {
   try {
     const response = await apiRequest(`/admin/finance/repayments/${repaymentId}`)
-    
+
     if (response.success && response.data) {
       return {
         success: true,
@@ -3311,7 +3372,7 @@ export async function getRepaymentDetails(repaymentId) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -3335,7 +3396,7 @@ export async function getVendorRepayments(vendorId, params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/finance/vendors/${vendorId}/repayments${queryString ? `?${queryString}` : ''}`)
-    
+
     if (response.success && response.data) {
       return {
         success: true,
@@ -3347,7 +3408,7 @@ export async function getVendorRepayments(vendorId, params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -3378,13 +3439,13 @@ export async function getAnalyticsData(params = {}) {
     const queryParams = new URLSearchParams()
     if (params.period) {
       // Convert period string to days if needed
-      const periodDays = typeof params.period === 'number' 
-        ? params.period 
-        : params.period === 'day' ? 1 
-        : params.period === 'week' ? 7
-        : params.period === 'month' ? 30
-        : params.period === 'year' ? 365
-        : 30
+      const periodDays = typeof params.period === 'number'
+        ? params.period
+        : params.period === 'day' ? 1
+          : params.period === 'week' ? 7
+            : params.period === 'month' ? 30
+              : params.period === 'year' ? 365
+                : 30
       queryParams.append('period', periodDays.toString())
     } else {
       queryParams.append('period', '30') // Default 30 days
@@ -3392,17 +3453,17 @@ export async function getAnalyticsData(params = {}) {
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/analytics${queryString ? `?${queryString}` : ''}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data?.analytics) {
       const analytics = response.data.analytics
-      
+
       // Calculate highlights from analytics data
       const totalOrders = analytics.orderTrends?.reduce((sum, day) => sum + (day.count || 0), 0) || 0
       const totalRevenue = analytics.revenueTrends?.reduce((sum, day) => sum + (day.revenue || 0), 0) || 0
       const topVendor = analytics.topVendors?.[0]
       const topSeller = analytics.topSellers?.[0]
-      
+
       // Calculate region-wise data (simplified - would need region aggregation in backend)
       // For now, using mock data structure but placeholder for future enhancement
       const regionWise = [] // TODO: Backend needs to provide region-wise aggregation
@@ -3474,7 +3535,7 @@ export async function getAnalyticsData(params = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -3498,14 +3559,14 @@ export async function getAnalyticsData(params = {}) {
 export async function exportReports(exportData = {}) {
   try {
     const queryParams = new URLSearchParams()
-    
+
     queryParams.append('format', exportData.format || 'json')
     queryParams.append('period', exportData.period || 'monthly')
     queryParams.append('type', exportData.type || 'summary')
 
     const queryString = queryParams.toString()
     const response = await apiRequest(`/admin/reports${queryString ? `?${queryString}` : ''}`)
-    
+
     // Transform backend response to frontend format
     if (response.success && response.data) {
       // If CSV/PDF, backend returns 501 - handle gracefully
@@ -3533,7 +3594,7 @@ export async function exportReports(exportData = {}) {
         },
       }
     }
-    
+
     return response
   } catch (error) {
     throw error
@@ -3826,6 +3887,48 @@ export async function moderateReview(reviewId, data) {
 export async function deleteReview(reviewId) {
   return apiRequest(`/admin/reviews/${reviewId}`, {
     method: 'DELETE',
+  })
+}
+
+// ============================================================================
+// TASK (TODO) MANAGEMENT APIs
+// ============================================================================
+
+/**
+ * Get All Admin Tasks
+ * GET /admin/tasks
+ * 
+ * @param {Object} params - { status, category, priority, limit }
+ * @returns {Promise<Object>} - { tasks: Array, totalPending: number }
+ */
+export async function getAdminTasks(params = {}) {
+  const queryParams = new URLSearchParams(params).toString()
+  return apiRequest(`/admin/tasks?${queryParams}`)
+}
+
+/**
+ * Mark Task as Viewed
+ * PUT /admin/tasks/:taskId/view
+ * 
+ * @param {string} taskId - Task ID
+ * @returns {Promise<Object>} - { success: true, data: Object }
+ */
+export async function markTaskAsViewed(taskId) {
+  return apiRequest(`/admin/tasks/${taskId}/view`, {
+    method: 'PUT',
+  })
+}
+
+/**
+ * Mark Task as Completed
+ * PUT /admin/tasks/:taskId/complete
+ * 
+ * @param {string} taskId - Task ID
+ * @returns {Promise<Object>} - { success: true, data: Object }
+ */
+export async function markTaskAsCompleted(taskId) {
+  return apiRequest(`/admin/tasks/${taskId}/complete`, {
+    method: 'PUT',
   })
 }
 

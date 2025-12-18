@@ -11,7 +11,7 @@ const rowHoverColors = [
 
 export function DataTable({ columns = [], rows = [], emptyState = 'No data available', className }) {
   return (
-    <div className={cn('overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]', className)}>
+    <div className={cn('overflow-visible rounded-3xl border border-gray-200 bg-white shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]', className)}>
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gradient-to-r from-blue-500 to-blue-600 text-left text-xs font-bold uppercase tracking-wide text-white">
           <tr>

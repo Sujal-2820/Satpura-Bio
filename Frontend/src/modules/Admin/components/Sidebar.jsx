@@ -1,21 +1,30 @@
 import { useState } from 'react'
-import { BarChart3, Building2, Factory, Home, Layers3, ShieldCheck, Users2, Wallet, Settings, ArrowRightLeft, IndianRupee, History, ChevronDown, ChevronRight, ImageIcon, Star } from 'lucide-react'
+import { BarChart3, Building2, Factory, Home, Layers3, ShieldCheck, Users2, Wallet, Settings, ArrowRightLeft, IndianRupee, History, ChevronDown, ChevronRight, ImageIcon, Star, ListTodo } from 'lucide-react'
 import { cn } from '../../../lib/cn'
+import { useAdminState } from '../context/AdminContext'
 
 const links = [
-  { 
-    id: 'dashboard', 
-    label: 'Dashboard', 
-    icon: Home, 
-    description: 'Overview & important updates', 
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: Home,
+    description: 'Overview & important updates',
     color: 'blue',
     suboptions: []
   },
-  { 
-    id: 'products', 
-    label: 'Products', 
-    icon: Layers3, 
-    description: 'All products list', 
+  {
+    id: 'tasks',
+    label: 'TODO Tasks',
+    icon: ListTodo,
+    description: 'Operational tasks and priorities',
+    color: 'orange',
+    suboptions: []
+  },
+  {
+    id: 'products',
+    label: 'Products',
+    icon: Layers3,
+    description: 'All products list',
     color: 'purple',
     suboptions: [
       { id: 'products/add', label: 'Add Products' },
@@ -23,27 +32,27 @@ const links = [
       { id: 'products/inactive', label: 'Inactive Products' },
     ]
   },
-  { 
-    id: 'offers', 
-    label: 'Offers', 
-    icon: ImageIcon, 
-    description: 'Manage carousels and special offers', 
+  {
+    id: 'offers',
+    label: 'Offers',
+    icon: ImageIcon,
+    description: 'Manage carousels and special offers',
     color: 'purple',
     suboptions: []
   },
-  { 
-    id: 'reviews', 
-    label: 'Reviews', 
-    icon: Star, 
-    description: 'Manage product reviews and ratings', 
+  {
+    id: 'reviews',
+    label: 'Reviews',
+    icon: Star,
+    description: 'Manage product reviews and ratings',
     color: 'purple',
     suboptions: []
   },
-  { 
-    id: 'orders', 
-    label: 'Orders', 
-    icon: Building2, 
-    description: 'Approvals & delivery', 
+  {
+    id: 'orders',
+    label: 'Orders',
+    icon: Building2,
+    description: 'Approvals & delivery',
     color: 'red',
     suboptions: [
       { id: 'orders/all', label: 'ALL' },
@@ -52,11 +61,11 @@ const links = [
       { id: 'orders/completed', label: 'Completed' },
     ]
   },
-  { 
-    id: 'vendors', 
-    label: 'Vendors', 
-    icon: Factory, 
-    description: 'Payment & how well they are doing', 
+  {
+    id: 'vendors',
+    label: 'Vendors',
+    icon: Factory,
+    description: 'Payment & how well they are doing',
     color: 'green',
     suboptions: [
       { id: 'vendors/on-track', label: 'On Track Vendors' },
@@ -64,22 +73,22 @@ const links = [
       { id: 'vendors/purchase-requests', label: 'Purchase Requests' },
     ]
   },
-  { 
-    id: 'sellers', 
-    label: 'IRA Partners', 
-    icon: ShieldCheck, 
-    description: 'Goals & earnings', 
+  {
+    id: 'sellers',
+    label: 'IRA Partners',
+    icon: ShieldCheck,
+    description: 'Goals & earnings',
     color: 'yellow',
     suboptions: [
       { id: 'sellers/active', label: 'Active IRA Partners' },
       { id: 'sellers/inactive', label: 'Inactive IRA Partners' },
     ]
   },
-  { 
-    id: 'users', 
-    label: 'Users', 
-    icon: Users2, 
-    description: 'User status & help requests', 
+  {
+    id: 'users',
+    label: 'Users',
+    icon: Users2,
+    description: 'User status & help requests',
     color: 'orange',
     suboptions: [
       { id: 'users/all', label: 'ALL' },
@@ -87,11 +96,11 @@ const links = [
       { id: 'users/inactive', label: 'Inactive' },
     ]
   },
-  { 
-    id: 'finance', 
-    label: 'Credits', 
-    icon: Wallet, 
-    description: 'Advance payments & pending amounts', 
+  {
+    id: 'finance',
+    label: 'Credits',
+    icon: Wallet,
+    description: 'Advance payments & pending amounts',
     color: 'pink',
     suboptions: [
       { id: 'finance/overview', label: 'Overview' },
@@ -99,46 +108,46 @@ const links = [
       { id: 'repayments', label: 'Repayments' },
     ]
   },
-  { 
-    id: 'vendor-withdrawals', 
-    label: 'Vendor Withdrawals', 
-    icon: Factory, 
-    description: 'Manage vendor withdrawal requests', 
+  {
+    id: 'vendor-withdrawals',
+    label: 'Vendor Withdrawals',
+    icon: Factory,
+    description: 'Manage vendor withdrawal requests',
     color: 'green',
     suboptions: []
   },
-  { 
-    id: 'seller-withdrawals', 
-    label: 'IRA Partner Withdrawals', 
-    icon: ShieldCheck, 
-    description: 'Manage seller withdrawal requests', 
+  {
+    id: 'seller-withdrawals',
+    label: 'IRA Partner Withdrawals',
+    icon: ShieldCheck,
+    description: 'Manage seller withdrawal requests',
     color: 'yellow',
     suboptions: []
   },
-  { 
-    id: 'payment-history', 
-    label: 'Payment History', 
-    icon: History, 
-    description: 'Complete audit log of all transactions', 
+  {
+    id: 'payment-history',
+    label: 'Payment History',
+    icon: History,
+    description: 'Complete audit log of all transactions',
     color: 'indigo',
     suboptions: []
   },
-  { 
-    id: 'operations', 
-    label: 'Operations', 
-    icon: Settings, 
-    description: 'Logistics, escalations & notifications', 
+  {
+    id: 'operations',
+    label: 'Operations',
+    icon: Settings,
+    description: 'Logistics, escalations & notifications',
     color: 'teal',
     suboptions: [
       { id: 'operations/notifications/add', label: 'Add Notifications' },
       { id: 'operations/delivery-timeline/update', label: 'Update Delivery Timeline' },
     ]
   },
-  { 
-    id: 'analytics', 
-    label: 'Analytics', 
-    icon: BarChart3, 
-    description: 'Area & group patterns', 
+  {
+    id: 'analytics',
+    label: 'Analytics',
+    icon: BarChart3,
+    description: 'Area & group patterns',
     color: 'indigo',
     suboptions: [
       { id: 'analytics/sales', label: 'Sales Analytics' },
@@ -216,6 +225,7 @@ const colorStyles = {
 }
 
 export function Sidebar({ active, onNavigate, condensed = false, onSignOut }) {
+  const { tasks } = useAdminState?.() || { tasks: { pendingCount: 0 } }
   const [expandedItems, setExpandedItems] = useState(new Set())
 
   const toggleExpand = (id) => {
@@ -233,13 +243,17 @@ export function Sidebar({ active, onNavigate, condensed = false, onSignOut }) {
   const isParentActive = (id, suboptions) => {
     if (active === id) return true
     if (suboptions && suboptions.length > 0) {
-      return suboptions.some((sub) => active === sub.id || active.startsWith(`${id}/`))
+      return suboptions.some((sub) => {
+        if (sub.id === active) return true
+        if (active.startsWith(sub.id + '/')) return true
+        return false
+      })
     }
-    return false
+    return active.startsWith(id + '/')
   }
 
   const isSuboptionActive = (subId) => {
-    return active === subId || active.startsWith(subId)
+    return active === subId || active.startsWith(subId + '/')
   }
 
   return (
@@ -264,13 +278,22 @@ export function Sidebar({ active, onNavigate, condensed = false, onSignOut }) {
                 isActive
                   ? 'bg-[#2271b1] text-white border-l-4 border-[#2271b1]'
                   : 'text-[#b4b9be] hover:bg-[#32373c] hover:text-white',
+                id === 'tasks' && tasks?.pendingCount > 0 && !isActive && 'animate-pulse bg-orange-900/40 text-orange-400 font-bold',
                 condensed && 'justify-center'
               )}
             >
-              <Icon className={cn('h-5 w-5 flex-shrink-0', isActive ? 'text-white' : 'text-[#b4b9be]')} />
+              <div className="relative">
+                <Icon className={cn('h-5 w-5 flex-shrink-0', isActive ? 'text-white' : 'text-[#b4b9be]')} />
+                {id === 'tasks' && tasks?.pendingCount > 0 && !isActive && (
+                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500 shadow-sm border border-white"></span>
+                  </span>
+                )}
+              </div>
               {!condensed && (
                 <>
-                  <span className={cn('text-sm', isActive ? 'text-white font-medium' : 'text-[#b4b9be]')}>
+                  <span className={cn('text-sm', isActive ? 'text-white font-medium' : (id === 'tasks' && tasks?.pendingCount > 0 ? 'text-orange-400' : 'text-[#b4b9be]'))}>
                     {label}
                   </span>
                   {hasSuboptions && (
@@ -314,4 +337,3 @@ export function Sidebar({ active, onNavigate, condensed = false, onSignOut }) {
     </nav>
   )
 }
-

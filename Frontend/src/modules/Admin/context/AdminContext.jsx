@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, useReducer, useEffect } from 'react
 import { initializeRealtimeConnection, handleRealtimeNotification } from '../services/adminApi'
 
 const AdminStateContext = createContext(null)
-const AdminDispatchContext = createContext(() => {})
+const AdminDispatchContext = createContext(() => { })
 
 const initialState = {
   activeTenant: 'IRA Sathi Super Admin',
@@ -49,6 +49,11 @@ const initialState = {
   analytics: {
     data: null,
   },
+  tasks: {
+    data: null,
+    pendingCount: 0,
+    updated: false,
+  },
   realtimeConnected: false,
 }
 
@@ -90,6 +95,7 @@ function reducer(state, action) {
         orders: initialState.orders,
         finance: initialState.finance,
         analytics: initialState.analytics,
+        tasks: initialState.tasks,
       }
     case 'SET_DASHBOARD_DATA':
       return {
@@ -205,6 +211,24 @@ function reducer(state, action) {
           data: action.payload,
         },
       }
+    case 'SET_TASKS_DATA':
+      return {
+        ...state,
+        tasks: {
+          ...state.tasks,
+          data: action.payload.tasks,
+          pendingCount: action.payload.totalPending,
+          updated: false,
+        },
+      }
+    case 'SET_TASKS_UPDATED':
+      return {
+        ...state,
+        tasks: {
+          ...state.tasks,
+          updated: action.payload,
+        },
+      }
     case 'ADD_NOTIFICATION':
       // Check if notification already exists (prevent duplicates)
       const existingIndex = state.notifications.findIndex(
@@ -249,29 +273,29 @@ function reducer(state, action) {
 
 export function AdminProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
-  
+
   // Get toast functions from context (if available)
   let showToast = (message, type) => {
     // Fallback if toast is not available
     console.log(`[${type.toUpperCase()}] ${message}`)
   }
-  
+
   // Initialize real-time connection when authenticated
   useEffect(() => {
     if (state.authenticated && state.profile.id) {
       const cleanup = initializeRealtimeConnection((notification) => {
         handleRealtimeNotification(notification, dispatch, showToast)
       })
-      
+
       dispatch({ type: 'SET_REALTIME_CONNECTED', payload: true })
-      
+
       return () => {
         cleanup()
         dispatch({ type: 'SET_REALTIME_CONNECTED', payload: false })
       }
     }
   }, [state.authenticated, state.profile.id, dispatch])
-  
+
   const value = useMemo(() => state, [state])
 
   return (

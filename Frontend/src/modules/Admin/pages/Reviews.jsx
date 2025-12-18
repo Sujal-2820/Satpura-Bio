@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Star, MessageSquare, Eye, EyeOff, CheckCircle, XCircle, Send, Edit2, Trash2, Filter, Search } from 'lucide-react'
+import { Star, MessageSquare, Eye, EyeOff, CheckCircle, XCircle, Send, Edit2, Trash2, Filter, Search, MoreVertical } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { FilterBar } from '../components/FilterBar'
@@ -28,6 +28,7 @@ export function ReviewsPage({ subRoute = null, navigate }) {
   const [showResponseModal, setShowResponseModal] = useState(false)
   const [responseText, setResponseText] = useState('')
   const [editingResponse, setEditingResponse] = useState(false)
+  const [activeDropdown, setActiveDropdown] = useState(null)
   const [filters, setFilters] = useState({
     productId: '',
     userId: '',
@@ -38,7 +39,16 @@ export function ReviewsPage({ subRoute = null, navigate }) {
     search: '',
   })
 
-  // Fetch reviews
+  // Fetch reviews - only when server-side filters change
+  const serverFilters = JSON.stringify({
+    productId: filters.productId,
+    userId: filters.userId,
+    rating: filters.rating,
+    hasResponse: filters.hasResponse,
+    isApproved: filters.isApproved,
+    isVisible: filters.isVisible
+  })
+
   const fetchReviews = useCallback(async () => {
     try {
       const params = {}
@@ -50,23 +60,18 @@ export function ReviewsPage({ subRoute = null, navigate }) {
       if (filters.isVisible !== '' && filters.isVisible !== undefined) params.isVisible = filters.isVisible
 
       const result = await getReviews(params)
-      // callApi returns { data, error } format, not { success, data }
       if (result.data?.reviews) {
         const formatted = result.data.reviews.map(formatReviewForDisplay)
         setAllReviewsList(formatted)
-        console.log(`Loaded ${formatted.length} reviews`)
       } else if (result.error) {
-        console.error('Error fetching reviews:', result.error)
         showError(result.error.message || 'Failed to fetch reviews')
       } else {
-        // No reviews found
         setAllReviewsList([])
       }
     } catch (error) {
-      console.error('Error fetching reviews:', error)
       showError(error.message || 'Failed to fetch reviews')
     }
-  }, [getReviews, filters, showError])
+  }, [getReviews, serverFilters, showError])
 
   // Format review for display
   const formatReviewForDisplay = (review) => {
@@ -80,7 +85,7 @@ export function ReviewsPage({ subRoute = null, navigate }) {
       month: 'short',
       day: 'numeric'
     }) : 'N/A'
-    
+
     const status = []
     if (review.isApproved) status.push('Approved')
     else status.push('Pending')
@@ -180,7 +185,7 @@ export function ReviewsPage({ subRoute = null, navigate }) {
   // Moderate review
   const handleModerateReview = async (review, action) => {
     let updateData = {}
-    
+
     if (action === 'approve') {
       updateData.isApproved = true
     } else if (action === 'reject') {
@@ -320,57 +325,104 @@ export function ReviewsPage({ subRoute = null, navigate }) {
         ...column,
         Cell: (row) => {
           const review = reviewsList.find(r => (r._id || r.id) === row.id) || row
+          const isOpen = activeDropdown === row.id
+
           return (
-            <div className="flex items-center gap-2">
+            <div className={cn("relative", isOpen ? "z-50" : "z-0")}>
               <button
-                onClick={() => handleRespondToReview(review)}
-                className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                title={review.hasResponse === 'Yes' ? 'Edit Response' : 'Respond'}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveDropdown(isOpen ? null : row.id)
+                }}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
+                title="View Actions"
               >
-                <MessageSquare className="h-4 w-4" />
+                <MoreVertical className="h-5 w-5" />
               </button>
-              {review.hasResponse === 'Yes' && (
-                <button
-                  onClick={() => handleDeleteResponse(review)}
-                  className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                  title="Delete Response"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+
+              {isOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setActiveDropdown(null)}
+                  />
+                  <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white shadow-xl ring-1 ring-black ring-opacity-5 z-50 py-2 overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
+                    <button
+                      onClick={() => {
+                        handleRespondToReview(review)
+                        setActiveDropdown(null)
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      {review.hasResponse === 'Yes' ? 'Edit Response' : 'Respond'}
+                    </button>
+
+                    {review.hasResponse === 'Yes' && (
+                      <button
+                        onClick={() => {
+                          handleDeleteResponse(review)
+                          setActiveDropdown(null)
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete Response
+                      </button>
+                    )}
+
+                    <div className="h-px bg-gray-100 my-1" />
+
+                    {review.isVisible ? (
+                      <button
+                        onClick={() => {
+                          handleModerateReview(review, 'hide')
+                          setActiveDropdown(null)
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                      >
+                        <EyeOff className="h-4 w-4" />
+                        Hide Review
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          handleModerateReview(review, 'show')
+                          setActiveDropdown(null)
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Show Review
+                      </button>
+                    )}
+
+                    {!review.isApproved && (
+                      <button
+                        onClick={() => {
+                          handleModerateReview(review, 'approve')
+                          setActiveDropdown(null)
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-green-700 hover:bg-green-50 flex items-center gap-2 transition-colors"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        Approve Review
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        handleDeleteReview(review)
+                        setActiveDropdown(null)
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete Review
+                    </button>
+                  </div>
+                </>
               )}
-              {review.isVisible ? (
-                <button
-                  onClick={() => handleModerateReview(review, 'hide')}
-                  className="p-2 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
-                  title="Hide Review"
-                >
-                  <EyeOff className="h-4 w-4" />
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleModerateReview(review, 'show')}
-                  className="p-2 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
-                  title="Show Review"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
-              )}
-              {!review.isApproved && (
-                <button
-                  onClick={() => handleModerateReview(review, 'approve')}
-                  className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
-                  title="Approve Review"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                </button>
-              )}
-              <button
-                onClick={() => handleDeleteReview(review)}
-                className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                title="Delete Review"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
             </div>
           )
         },

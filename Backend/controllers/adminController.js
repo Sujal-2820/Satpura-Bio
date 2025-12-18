@@ -1889,7 +1889,7 @@ exports.getAllVendorPurchases = async (req, res, next) => {
 
     // Execute query with vendor population
     const purchases = await CreditPurchase.find(query)
-      .populate('vendorId', 'name phone email location')
+      .populate('vendorId', 'name phone email location creditUsed creditLimit creditPolicy')
       .populate('items.productId', 'name sku category priceToVendor')
       .populate('reviewedBy', 'name email')
       .sort(sort)
@@ -2167,9 +2167,10 @@ exports.approveVendorPurchase = async (req, res, next) => {
     purchase.status = 'approved';
     purchase.reviewedBy = req.admin._id;
     purchase.reviewedAt = new Date();
-    purchase.deliveryStatus = 'scheduled';
+    purchase.reviewedAt = new Date();
+    purchase.deliveryStatus = 'pending';
     purchase.expectedDeliveryAt = expectedDeliveryAt;
-    purchase.deliveryNotes = `Stock scheduled for delivery within ${DELIVERY_TIMELINE_HOURS || 24} hours.`;
+    purchase.deliveryNotes = `Purchase approved. Awaiting stock dispatch.`;
     await purchase.save();
 
     // Update vendor credit
@@ -2262,6 +2263,146 @@ exports.rejectVendorPurchase = async (req, res, next) => {
         purchase,
         message: 'Purchase request rejected successfully',
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Mark stock as sent (in transit)
+ * @route   POST /api/admin/vendors/purchases/:requestId/send
+ * @access  Private (Admin)
+ */
+exports.sendVendorPurchaseStock = async (req, res, next) => {
+  try {
+    const { requestId } = req.params;
+    const { deliveryNotes } = req.body;
+
+    const purchase = await CreditPurchase.findById(requestId);
+
+    if (!purchase) {
+      return res.status(404).json({
+        success: false,
+        message: 'Purchase request not found',
+      });
+    }
+
+    if (purchase.status !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: `Stock can only be sent for approved requests. Current status: ${purchase.status}`,
+      });
+    }
+
+    purchase.deliveryStatus = 'in_transit';
+    if (deliveryNotes) {
+      purchase.deliveryNotes = deliveryNotes;
+    }
+    await purchase.save();
+
+    res.status(200).json({
+      success: true,
+      data: { purchase, message: 'Stock marked as in-transit' },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Confirm delivery and update vendor inventory
+ * @route   POST /api/admin/vendors/purchases/:requestId/confirm-delivery
+ * @access  Private (Admin)
+ */
+exports.confirmVendorPurchaseDelivery = async (req, res, next) => {
+  try {
+    const { requestId } = req.params;
+    const { deliveryNotes } = req.body;
+
+    const purchase = await CreditPurchase.findById(requestId);
+
+    if (!purchase) {
+      return res.status(404).json({
+        success: false,
+        message: 'Purchase request not found',
+      });
+    }
+
+    if (purchase.deliveryStatus === 'delivered') {
+      return res.status(400).json({
+        success: false,
+        message: 'Purchase is already marked as delivered',
+      });
+    }
+
+    // Logic to update vendor inventory (ProductAssignment)
+    const ProductAssignment = require('../models/ProductAssignment');
+
+    for (const item of purchase.items) {
+      let assignment = await ProductAssignment.findOne({
+        vendorId: purchase.vendorId,
+        productId: item.productId,
+      });
+
+      if (!assignment) {
+        assignment = await ProductAssignment.create({
+          vendorId: purchase.vendorId,
+          productId: item.productId,
+          assignedBy: req.admin._id,
+          assignedAt: new Date(),
+          stock: 0,
+          isActive: true,
+          notes: 'Auto-created during confirmed stock delivery',
+        });
+      }
+
+      // Update Global Stock
+      assignment.stock += (Number(item.quantity) || 0);
+
+      // Update Attribute Stock if variants exist
+      const attributeCombination = item.attributeCombination instanceof Map
+        ? Object.fromEntries(item.attributeCombination)
+        : item.attributeCombination || {};
+
+      const hasVariants = Object.keys(attributeCombination).length > 0;
+
+      if (hasVariants) {
+        if (!assignment.attributeStocks) assignment.attributeStocks = [];
+
+        const matchingVariant = assignment.attributeStocks.find(variant => {
+          if (!variant.attributes) return false;
+          const variantAttrs = variant.attributes instanceof Map
+            ? Object.fromEntries(variant.attributes)
+            : variant.attributes;
+
+          return Object.keys(attributeCombination).every(key => String(variantAttrs[key]) === String(attributeCombination[key]));
+        });
+
+        if (matchingVariant) {
+          matchingVariant.stock = (matchingVariant.stock || 0) + (Number(item.quantity) || 0);
+        } else {
+          assignment.attributeStocks.push({
+            attributes: attributeCombination,
+            stock: Number(item.quantity) || 0,
+            isActive: true
+          });
+        }
+      }
+
+      await assignment.save();
+    }
+
+    purchase.deliveryStatus = 'delivered';
+    purchase.deliveredAt = new Date();
+    if (deliveryNotes) {
+      purchase.deliveryNotes = deliveryNotes;
+    }
+    await purchase.save();
+
+    res.status(200).json({
+      success: true,
+      data: { purchase, message: 'Stock delivery confirmed and inventory updated' },
     });
   } catch (error) {
     next(error);
