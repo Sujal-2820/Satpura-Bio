@@ -2762,9 +2762,8 @@ function InventoryView({ openPanel, onNavigate }) {
                       {/* Only hide button if non-variant product is selected */}
                       {!isSelected && (
                         <>
-                          {/* If we know product has variants, show "View Variants", otherwise show "Add to Order" */}
-                          {/* If product hasn't been checked yet (no cached data), show "View Variants" to check */}
-                          {hasVariants || !productsWithVariants[productId] ? (
+                          {/* If product has variants, show "View Variants", otherwise show "Add to Order" */}
+                          {hasVariants ? (
                             <button
                               type="button"
                               onClick={() => handleViewVariants(productId)}
@@ -2790,7 +2789,15 @@ function InventoryView({ openPanel, onNavigate }) {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => handleAddProduct(productId)}
+                              onClick={() => {
+                                handleAddProduct(productId)
+                                // Scroll to order form after adding
+                                setTimeout(() => {
+                                  if (orderFormRef.current) {
+                                    orderFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                                  }
+                                }, 100)
+                              }}
                               disabled={adminStock === 0}
                               className={cn(
                                 'w-full rounded-lg px-4 py-2 text-xs font-semibold transition-all',

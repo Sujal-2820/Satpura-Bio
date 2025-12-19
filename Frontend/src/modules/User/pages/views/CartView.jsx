@@ -8,7 +8,7 @@ import { getPrimaryImageUrl } from '../../utils/productImages'
 import { Trans } from '../../../../components/Trans'
 import { TransText } from '../../../../components/TransText'
 
-export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }) {
+export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart, onNavigateToProduct }) {
   const { cart } = useUserState()
   const [suggestedProducts, setSuggestedProducts] = useState([])
   const [cartProducts, setCartProducts] = useState({})
@@ -465,25 +465,35 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart }
         <div className="user-cart-suggested">
           <h3 className="text-base font-bold text-[#172022] mb-3"><Trans>You might also like</Trans></h3>
           <div className="user-cart-suggested__rail">
-            {suggestedProducts.map((product, index) => (
-              <div key={product._id || product.id || `suggested-${index}`} className="user-cart-suggested__card">
-                <div className="user-cart-suggested__image-wrapper">
-                  <img src={getPrimaryImageUrl(product)} alt={product.name} className="user-cart-suggested__image" />
+            {suggestedProducts.map((product, index) => {
+              // Check if product has variants
+              const hasVariants = product.variants && Array.isArray(product.variants) && product.variants.length > 0
+
+              return (
+                <div key={product._id || product.id || `suggested-${index}`} className="user-cart-suggested__card">
+                  <div className="user-cart-suggested__image-wrapper">
+                    <img src={getPrimaryImageUrl(product)} alt={product.name} className="user-cart-suggested__image" />
+                  </div>
+                  <div className="user-cart-suggested__content">
+                    <h4 className="user-cart-suggested__title"><TransText>{product.name}</TransText></h4>
+                    {/* Variant indicator */}
+                    {hasVariants && (
+                      <p className="text-[0.65rem] text-[rgba(27,143,91,0.75)] font-medium mb-1">
+                        <Trans>Variants available</Trans>
+                      </p>
+                    )}
+                    <div className="user-cart-suggested__price">₹{(product.priceToUser || product.price || 0).toLocaleString('en-IN')}</div>
+                    <button
+                      type="button"
+                      className="user-cart-suggested__add-btn"
+                      onClick={() => onNavigateToProduct?.(product._id || product.id)}
+                    >
+                      <Trans>View Details</Trans>
+                    </button>
+                  </div>
                 </div>
-                <div className="user-cart-suggested__content">
-                  <h4 className="user-cart-suggested__title"><TransText>{product.name}</TransText></h4>
-                  <div className="user-cart-suggested__price">₹{(product.priceToUser || product.price || 0).toLocaleString('en-IN')}</div>
-                  <button
-                    type="button"
-                    className="user-cart-suggested__add-btn"
-                    onClick={() => onAddToCart?.(product._id || product.id, 1)}
-                  >
-                    <PlusIcon className="h-4 w-4" />
-                    <span><Trans>Add</Trans></span>
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

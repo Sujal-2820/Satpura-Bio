@@ -1228,6 +1228,10 @@ function UserDashboardContent({ onLogout }) {
               onRemove={handleRemoveFromCart}
               onCheckout={handleProceedToCheckout}
               onAddToCart={handleAddToCart}
+              onNavigateToProduct={(productId) => {
+                setSelectedProduct(productId)
+                navigateToTab('product-detail')
+              }}
             />
           )}
           {orderConfirmation ? (
