@@ -99,7 +99,7 @@ function UserDashboardContent({ onLogout }) {
     const tab = urlTab || 'home'
     if (validTabs.includes(tab)) {
       setActiveTab(tab)
-      
+
       // Extract category ID from URL search params for category-products page
       if (tab === 'category-products') {
         const categoryIdFromUrl = searchParams.get('category')
@@ -176,14 +176,14 @@ function UserDashboardContent({ onLogout }) {
                 location: userData.location || null,
               },
             })
-            
+
             // Set vendor availability status from profile
             if (result.data?.vendorAvailability) {
               dispatch({
                 type: 'SET_VENDOR_AVAILABILITY',
                 payload: result.data.vendorAvailability,
               })
-              
+
               // Set assigned vendor if available
               if (result.data.vendorAvailability.assignedVendor) {
                 dispatch({
@@ -252,29 +252,29 @@ function UserDashboardContent({ onLogout }) {
 
   const mapCartItemsFromResponse = useCallback((cartData) => {
     console.log('🔄 Mapping Cart Items from Response:', cartData)
-    
+
     if (!cartData?.items) {
       console.log('⚠️ No items in cart data')
       return []
     }
-    
+
     const mappedItems = cartData.items
       .map((item, index) => {
         console.log(`\n🔄 Mapping Item ${index + 1}:`, item)
-        
+
         const cartItemId = resolveId(item.id || item._id)
         const product = item.product || item.productId || {}
         const productId = resolveId(product.id || product._id || item.productId)
-        
+
         console.log(`🔄 Item IDs:`, { cartItemId, productId })
         console.log(`🔄 Product:`, product)
         console.log(`🔄 Variant Attributes (raw):`, item.variantAttributes)
-        
+
         if (!productId) {
           console.log(`⚠️ Skipping item - no productId`)
           return null
         }
-        
+
         // Use variant-specific price (unitPrice) if available, otherwise fallback
         const price =
           typeof item.unitPrice === 'number'
@@ -284,10 +284,10 @@ function UserDashboardContent({ onLogout }) {
               : typeof product.price === 'number'
                 ? product.price
                 : 0
-        
+
         // Extract variant attributes if present
         const variantAttributes = item.variantAttributes || null
-        
+
         console.log(`💰 Price Calculation:`, {
           'item.unitPrice': item.unitPrice,
           'product.priceToUser': product.priceToUser,
@@ -296,7 +296,7 @@ function UserDashboardContent({ onLogout }) {
           'final unitPrice': item.unitPrice || price
         })
         console.log(`🔖 Variant Attributes (final):`, variantAttributes)
-        
+
         const mappedItem = {
           id: cartItemId, // Add id field for compatibility
           cartItemId,
@@ -310,15 +310,15 @@ function UserDashboardContent({ onLogout }) {
           deliveryTime: product.deliveryTime || null,
           variantAttributes: variantAttributes, // Include variant attributes
         }
-        
+
         console.log(`✅ Mapped Item:`, mappedItem)
-        
+
         return mappedItem
       })
       .filter(Boolean)
-    
+
     console.log(`\n✅ Final Mapped Cart Items (${mappedItems.length} items):`, mappedItems)
-    
+
     return mappedItems
   }, [resolveId])
 
@@ -417,9 +417,9 @@ function UserDashboardContent({ onLogout }) {
                 dispatched: 'Your order has been dispatched and is on the way',
                 delivered: 'Your order has been delivered successfully',
               }
-              
+
               const message = statusMessages[order.status] || `Your order status has been updated to ${order.status}`
-              
+
               dispatch({
                 type: 'ADD_NOTIFICATION',
                 payload: {
@@ -471,7 +471,7 @@ function UserDashboardContent({ onLogout }) {
           const activeCarousels = (offersResult.data.carousels || [])
             .filter(c => c.isActive !== false)
           const specialOffers = offersResult.data.specialOffers || []
-          
+
           // Check for new offers (created in last 24 hours)
           const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
           const newCarousels = activeCarousels.filter(c => {
@@ -482,13 +482,13 @@ function UserDashboardContent({ onLogout }) {
             const createdAt = new Date(o.createdAt)
             return createdAt > oneDayAgo
           })
-          
+
           // Send notification for new offers (only once per day)
           if (newCarousels.length > 0 || newSpecialOffers.length > 0) {
             const lastOfferCheck = localStorage.getItem('lastOfferCheckTime')
             const now = Date.now()
             const oneDayInMs = 24 * 60 * 60 * 1000
-            
+
             if (!lastOfferCheck || (now - parseInt(lastOfferCheck)) > oneDayInMs) {
               const offerCount = newCarousels.length + newSpecialOffers.length
               dispatch({
@@ -539,17 +539,17 @@ function UserDashboardContent({ onLogout }) {
   const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart])
   const favouritesCount = useMemo(() => favourites.length, [favourites])
   const unreadNotificationsCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications])
-  
+
   // Translate navigation items
   const translatedNavItems = useTranslatedNavItems(NAV_ITEMS)
-  
+
   const tabLabels = useMemo(() => {
     return translatedNavItems.reduce((acc, item) => {
       acc[item.id] = item.label
       return acc
     }, {})
   }, [translatedNavItems])
-  
+
   const searchCatalog = useMemo(
     () =>
       [
@@ -615,9 +615,9 @@ function UserDashboardContent({ onLogout }) {
       })),
     [tabLabels],
   )
-  
+
   const [pendingScroll, setPendingScroll] = useState(null)
-  
+
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     if (!query) {
@@ -637,7 +637,7 @@ function UserDashboardContent({ onLogout }) {
       .sort((a, b) => b.score - a.score)
     return results.length ? results : searchCatalog.slice(0, 5)
   }, [searchCatalog, searchQuery])
-  
+
   const handleSearchNavigate = (item) => {
     if (!item) return
     const delay = item.tab === activeTab ? 150 : 420
@@ -647,7 +647,7 @@ function UserDashboardContent({ onLogout }) {
     }
     closeSearch()
   }
-  
+
   const handleSearchSubmit = () => {
     if (searchResults.length) {
       handleSearchNavigate(searchResults[0])
@@ -656,7 +656,7 @@ function UserDashboardContent({ onLogout }) {
       closeSearch()
     }
   }
-  
+
   useEffect(() => {
     if (!pendingScroll) return
     const { id, delay } = pendingScroll
@@ -687,20 +687,20 @@ function UserDashboardContent({ onLogout }) {
 
     try {
       console.log('🛒 handleAddToCart called:', { productId, quantity, variantAttributes })
-      
+
       // Fetch product details from API
       const result = await userApi.getProductDetails(productId)
       if (!result.success || !result.data?.product) {
         error('Product not found')
         return
       }
-      
+
       const product = result.data.product
       if (product.stock === 0) {
         error('Product is out of stock')
         return
       }
-      
+
       // Prepare cart payload with variant attributes if provided
       const cartPayload = { productId, quantity }
       if (variantAttributes && Object.keys(variantAttributes).length > 0) {
@@ -709,7 +709,7 @@ function UserDashboardContent({ onLogout }) {
       } else {
         console.log('🛒 Adding product without variants to cart:', cartPayload)
       }
-      
+
       // Add to cart via API and sync state
       const cartResult = await userApi.addToCart(cartPayload)
       if (cartResult?.data?.cart) {
@@ -727,10 +727,10 @@ function UserDashboardContent({ onLogout }) {
     // itemId can be either cartItemId (string) or productId
     // First, try to find by cartItemId (for variant-based removal)
     let cartItemId = itemId
-    let cartItem = cart.find((item) => 
+    let cartItem = cart.find((item) =>
       (item.id || item._id || item.cartItemId) === itemId
     )
-    
+
     // If not found by ID, try to find by productId (for backward compatibility)
     if (!cartItem) {
       cartItem = cart.find((item) => item.productId === itemId)
@@ -740,12 +740,12 @@ function UserDashboardContent({ onLogout }) {
     } else {
       cartItemId = cartItem.cartItemId || cartItem.id || cartItem._id
     }
-    
+
     if (!cartItemId) {
       error('Unable to remove item from cart')
       return
     }
-    
+
     try {
       const result = await userApi.removeFromCart(cartItemId)
       if (result?.data?.cart) {
@@ -765,17 +765,17 @@ function UserDashboardContent({ onLogout }) {
   const handleUpdateCartQuantity = async (itemId, quantity) => {
     // itemId can be either cartItemId (string) or cart item object with id
     const cartItemId = typeof itemId === 'string' ? itemId : (itemId?.id || itemId?._id || itemId?.cartItemId)
-    
+
     if (!cartItemId) {
       error('Unable to update cart item')
       return
     }
-    
+
     if (quantity <= 0) {
       await handleRemoveFromCart(itemId)
       return
     }
-    
+
     try {
       const result = await userApi.updateCartItem(cartItemId, { quantity })
       if (result?.data?.cart) {
@@ -801,6 +801,66 @@ function UserDashboardContent({ onLogout }) {
     }
     setShowCheckout(true)
     navigateToTab('checkout')
+  }
+
+  const handleBuyNow = async (productsData) => {
+    // productsData is an array of { productId, quantity, attributes }
+    // Check if user is authenticated
+    if (!authenticated) {
+      if (isLaptopView) {
+        setAuthActionType('cart')
+        setShowAuthPromptLaptop(true)
+      } else {
+        setAuthActionType('cart')
+        setShowAuthModal(true)
+      }
+      return
+    }
+
+    try {
+      // Add all products to cart first
+      for (const item of productsData) {
+        const { productId, quantity, attributes } = item
+
+        // Fetch product details to validate
+        const result = await userApi.getProductDetails(productId)
+        if (!result.success || !result.data?.product) {
+          error('Product not found')
+          return
+        }
+
+        const product = result.data.product
+        if (product.stock === 0) {
+          error('Product is out of stock')
+          return
+        }
+
+        // Prepare cart payload
+        const cartPayload = { productId, quantity }
+        if (attributes && Object.keys(attributes).length > 0) {
+          cartPayload.variantAttributes = attributes
+        }
+
+        // Add to cart via API
+        const cartResult = await userApi.addToCart(cartPayload)
+        if (cartResult?.data?.cart) {
+          syncCartState(cartResult.data.cart)
+        }
+      }
+
+      // Navigate to checkout after adding all items
+      const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      if (cartTotal < MIN_ORDER_VALUE) {
+        warning(`Minimum order value is ₹${MIN_ORDER_VALUE.toLocaleString('en-IN')}`)
+        return
+      }
+
+      setShowCheckout(true)
+      navigateToTab('checkout')
+    } catch (err) {
+      error(err?.error?.message || err.message || 'Failed to process Buy Now')
+      console.error('Error in Buy Now:', err)
+    }
   }
 
   const handleToggleFavourite = (productId) => {
@@ -887,13 +947,13 @@ function UserDashboardContent({ onLogout }) {
     // Use visualViewport API for better keyboard detection (modern browsers)
     const handleViewportResize = () => {
       if (rafId) cancelAnimationFrame(rafId)
-      
+
       rafId = requestAnimationFrame(() => {
         if (window.visualViewport) {
           const viewportHeight = window.visualViewport.height
           const windowHeight = window.innerHeight
           const keyboardHeight = windowHeight - viewportHeight
-          
+
           // Only adjust if keyboard is significantly open (more than 150px)
           if (keyboardHeight > 150) {
             // Smooth adjustment - only move panel slightly up to prevent hang
@@ -908,12 +968,12 @@ function UserDashboardContent({ onLogout }) {
     // Fallback for browsers without visualViewport
     const handleResize = () => {
       if (rafId) cancelAnimationFrame(rafId)
-      
+
       rafId = requestAnimationFrame(() => {
         if (!window.visualViewport) {
           const currentHeight = window.innerHeight
           const heightDiff = initialViewportHeight - currentHeight
-          
+
           if (heightDiff > 150) {
             // Smooth adjustment - only move panel slightly up
             setKeyboardHeight(Math.min(heightDiff * 0.25, 80))
@@ -990,7 +1050,7 @@ function UserDashboardContent({ onLogout }) {
         console.error('Error fetching user profile after login:', error)
       }
     }
-    
+
     // Close modal on mobile, redirect to home on laptop
     if (isLaptopView) {
       navigateToTab('home')
@@ -1149,6 +1209,9 @@ function UserDashboardContent({ onLogout }) {
             <ProductDetailView
               productId={selectedProduct}
               onAddToCart={handleAddToCart}
+              onBuyNow={handleBuyNow}
+              onToggleFavourite={handleToggleFavourite}
+              favourites={favourites}
               onBack={() => {
                 navigateToTab('home')
               }}
@@ -1246,15 +1309,15 @@ function UserDashboardContent({ onLogout }) {
       {searchMounted ? (
         <div className={cn('user-search-sheet', searchOpen && 'is-open')}>
           <div className={cn('user-search-sheet__overlay', searchOpen && 'is-open')} onClick={closeSearch} />
-          <div 
+          <div
             ref={searchPanelRef}
             className={cn('user-search-sheet__panel', searchOpen && 'is-open')}
             style={{
-              transform: keyboardHeight > 0 
-                ? `translateY(0) translateY(-${Math.min(keyboardHeight * 0.15, 60)}px)` 
+              transform: keyboardHeight > 0
+                ? `translateY(0) translateY(-${Math.min(keyboardHeight * 0.15, 60)}px)`
                 : undefined,
-              transition: keyboardHeight > 0 
-                ? 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)' 
+              transition: keyboardHeight > 0
+                ? 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                 : undefined,
             }}
           >

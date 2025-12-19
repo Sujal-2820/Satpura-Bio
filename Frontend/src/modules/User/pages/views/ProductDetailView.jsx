@@ -26,7 +26,7 @@ function AddVariantToCartText({ count, price }) {
   return <>{text} • ₹{price.toLocaleString('en-IN')}</>
 }
 
-export function ProductDetailView({ productId, onAddToCart, onBack, onProductClick }) {
+export function ProductDetailView({ productId, onAddToCart, onBuyNow, onToggleFavourite, favourites = [], onBack, onProductClick }) {
   const { translate } = useTranslation()
   const [product, setProduct] = useState(null)
   const [similarProducts, setSimilarProducts] = useState([])
@@ -46,12 +46,12 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
   const imageGalleryRef = useRef(null) // Ref for image gallery
   const productInfoRef = useRef(null) // Ref for product info section
   const [stickyTop, setStickyTop] = useState(100) // Dynamic top value for sticky positioning
-  
+
   // Initialize sticky top on mount
   useEffect(() => {
     setStickyTop(100)
   }, [])
-  
+
   // Review states
   const [reviews, setReviews] = useState([])
   const [reviewStats, setReviewStats] = useState({ averageRating: 0, totalReviews: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } })
@@ -80,7 +80,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
         setLoading(false)
         return
       }
-      
+
       setLoading(true)
       try {
         // Fetch product details
@@ -88,20 +88,19 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
         if (result.success && result.data?.product) {
           const productData = result.data.product
           setProduct(productData)
-          setIsWishlisted(productData.isWishlisted || false)
-          
+
           // Fetch similar products (same category)
           if (productData.category) {
-            const similarResult = await userApi.getProducts({ 
-              category: productData.category, 
-              limit: 10 
+            const similarResult = await userApi.getProducts({
+              category: productData.category,
+              limit: 10
             })
             if (similarResult.success && similarResult.data?.products) {
               const similar = similarResult.data.products
                 .filter((p) => (p._id || p.id) !== productId)
                 .slice(0, 10)
               setSimilarProducts(similar)
-              
+
               // Fetch suggested products (different category)
               const suggestedResult = await userApi.getProducts({ limit: 20 })
               if (suggestedResult.success && suggestedResult.data?.products) {
@@ -120,7 +119,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
         setLoading(false)
       }
     }
-    
+
     if (productId) {
       loadProduct()
     }
@@ -130,7 +129,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
   useEffect(() => {
     const loadReviews = async () => {
       if (!productId || productId === 'all') return
-      
+
       setReviewsLoading(true)
       try {
         const result = await userApi.getProductReviews(productId, { page: 1, limit: 10 })
@@ -150,7 +149,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
     // Fetch my review if authenticated
     const loadMyReview = async () => {
       if (!isAuthenticated || !productId || productId === 'all') return
-      
+
       try {
         const result = await userApi.getMyReview(productId)
         if (result.success && result.data?.review) {
@@ -295,8 +294,8 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
 
     // Try to find attribute name field (case-insensitive check)
     let attributeNameKey = null
-    const possibleNameKeys = Array.from(allKeys).filter(key => 
-      key.toLowerCase().includes('name') || 
+    const possibleNameKeys = Array.from(allKeys).filter(key =>
+      key.toLowerCase().includes('name') ||
       key.toLowerCase().includes('attribute') ||
       key.toLowerCase() === 'type' && Array.from(allKeys).length > 2
     )
@@ -320,7 +319,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
       const sortedKeys = Object.entries(keyValueCounts)
         .sort((a, b) => b[1] - a[1])
         .filter(([_, count]) => count < product.attributeStocks.length) // Exclude keys where every entry is unique
-      
+
       attributeNameKey = sortedKeys.length > 0 ? sortedKeys[0][0] : Array.from(allKeys)[0]
     }
 
@@ -336,9 +335,9 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
     const attributeProperties = {}
     Array.from(attributeNames).forEach(attrName => {
       attributeProperties[attrName] = {}
-      
+
       // Get all stocks for this attribute name
-      const relevantStocks = product.attributeStocks.filter(stock => 
+      const relevantStocks = product.attributeStocks.filter(stock =>
         stock.attributes && stock.attributes[attributeNameKey] === attrName
       )
 
@@ -401,7 +400,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
       return Object.keys(selectedAttributes).every(key => {
         const stockValue = stock.attributes[key]
         const selectedValue = selectedAttributes[key]
-        
+
         // If stock has array value, check if selected value is in array
         if (Array.isArray(stockValue)) {
           return stockValue.includes(selectedValue)
@@ -442,6 +441,13 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
     }
   }, [productId, product])
 
+  // Sync isWishlisted with favourites array
+  useEffect(() => {
+    if (productId) {
+      setIsWishlisted(favourites.includes(productId))
+    }
+  }, [productId, favourites])
+
   // Get images array - handle both new format (images array) and legacy formats
   // This hook must be called before any conditional returns
   const images = useMemo(() => {
@@ -454,10 +460,10 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
         .filter(url => url && url !== '')
         .sort((a, b) => {
           // Sort by order if available
-          const aIndex = product.images.findIndex(i => 
+          const aIndex = product.images.findIndex(i =>
             (typeof i === 'string' ? i === a : i.url === a)
           )
-          const bIndex = product.images.findIndex(i => 
+          const bIndex = product.images.findIndex(i =>
             (typeof i === 'string' ? i === b : i.url === b)
           )
           const aOrder = typeof product.images[aIndex] === 'object' ? (product.images[aIndex].order ?? aIndex) : aIndex
@@ -506,10 +512,10 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
     // Check if attributeStocks exists and has valid entries with attributes
     if (product.attributeStocks && Array.isArray(product.attributeStocks) && product.attributeStocks.length > 0) {
       // Check if at least one entry has valid attributes
-      return product.attributeStocks.some(stock => 
-        stock && 
-        stock.attributes && 
-        typeof stock.attributes === 'object' && 
+      return product.attributeStocks.some(stock =>
+        stock &&
+        stock.attributes &&
+        typeof stock.attributes === 'object' &&
         Object.keys(stock.attributes).length > 0
       )
     }
@@ -518,7 +524,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
 
   // Get variant key for quantity tracking - MUST be before conditional returns
   const getVariantKey = useCallback((variantStock) => {
-    const stockAttrs = variantStock.attributes instanceof Map 
+    const stockAttrs = variantStock.attributes instanceof Map
       ? Object.fromEntries(variantStock.attributes)
       : variantStock.attributes || {}
     return JSON.stringify(stockAttrs)
@@ -554,31 +560,31 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
 
       const imageGallery = imageGalleryRef.current
       const productInfo = productInfoRef.current
-      
+
       // Get bounding rectangles (viewport coordinates)
       const imageGalleryRect = imageGallery.getBoundingClientRect()
       const productInfoRect = productInfo.getBoundingClientRect()
-      
+
       // Get heights
       const imageGalleryHeight = imageGallery.offsetHeight
       const productInfoHeight = productInfo.offsetHeight
-      
+
       // Base sticky top value
       const baseStickyTop = 100
-      
+
       // If product info is shorter or equal to image gallery, use base sticky top
       if (productInfoHeight <= imageGalleryHeight) {
         setStickyTop(baseStickyTop)
         return
       }
-      
+
       // Calculate the adjusted top value to keep bottoms aligned
       // We want: imageGalleryRect.bottom = productInfoRect.bottom
       // Since imageGalleryRect.top = stickyTop (when sticky)
       // We need: stickyTop + imageGalleryHeight = productInfoRect.bottom
       // So: stickyTop = productInfoRect.bottom - imageGalleryHeight
       const adjustedTop = productInfoRect.bottom - imageGalleryHeight
-      
+
       // Only adjust if we've scrolled enough that bottoms would align
       // This happens when adjustedTop becomes less than baseStickyTop
       if (adjustedTop < baseStickyTop && adjustedTop >= 0) {
@@ -591,7 +597,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
 
     // Only run on laptop/bigger screens
     const mediaQuery = window.matchMedia('(min-width: 1024px)')
-    
+
     if (mediaQuery.matches) {
       // Use requestAnimationFrame for smooth updates
       let ticking = false
@@ -604,22 +610,22 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
           ticking = true
         }
       }
-      
+
       // Initial calculation with a small delay to ensure DOM is ready
       setTimeout(() => {
         handleScroll()
       }, 200)
-      
+
       window.addEventListener('scroll', optimizedHandleScroll, { passive: true })
-      
+
       // Also recalculate on resize and when content changes
       window.addEventListener('resize', handleScroll, { passive: true })
-      
+
       // Use MutationObserver to detect content changes
       const observer = new MutationObserver(() => {
         setTimeout(handleScroll, 100)
       })
-      
+
       if (productInfoRef.current) {
         observer.observe(productInfoRef.current, {
           childList: true,
@@ -628,7 +634,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
           attributeFilter: ['style', 'class']
         })
       }
-      
+
       if (imageGalleryRef.current) {
         observer.observe(imageGalleryRef.current, {
           childList: true,
@@ -637,7 +643,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
           attributeFilter: ['style', 'class']
         })
       }
-      
+
       return () => {
         window.removeEventListener('scroll', optimizedHandleScroll)
         window.removeEventListener('resize', handleScroll)
@@ -695,13 +701,13 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
   const handleAttributeChange = (attributeKey, value) => {
     setSelectedAttributes(prev => {
       const newSelection = { ...prev, [attributeKey]: value }
-      
+
       // If attribute name is changed, clear all property selections
       if (attributeKey === attributeStructure.attributeNameKey) {
         // Keep only the attribute name selection
         return { [attributeKey]: value }
       }
-      
+
       return newSelection
     })
     // Clear error when user makes a selection
@@ -711,20 +717,20 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
   // Handle variant selection - toggle variant in/out of selection
   const handleVariantToggle = (variantStock) => {
     const variantKey = getVariantKey(variantStock)
-    
+
     setSelectedVariants(prev => {
       // Normalize attributes for comparison
-      const stockAttrs = variantStock.attributes instanceof Map 
+      const stockAttrs = variantStock.attributes instanceof Map
         ? Object.fromEntries(variantStock.attributes)
         : variantStock.attributes || {}
-      
+
       const exists = prev.find(v => {
-        const vAttrs = v.attributes instanceof Map 
+        const vAttrs = v.attributes instanceof Map
           ? Object.fromEntries(v.attributes)
           : v.attributes || {}
         return JSON.stringify(vAttrs) === JSON.stringify(stockAttrs)
       })
-      
+
       if (exists) {
         // Remove variant and its quantity
         setVariantQuantities(prevQty => {
@@ -733,7 +739,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
           return newQty
         })
         return prev.filter(v => {
-          const vAttrs = v.attributes instanceof Map 
+          const vAttrs = v.attributes instanceof Map
             ? Object.fromEntries(v.attributes)
             : v.attributes || {}
           return JSON.stringify(vAttrs) !== JSON.stringify(stockAttrs)
@@ -755,7 +761,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
     const variantKey = getVariantKey(variantStock)
     const currentQty = variantQuantities[variantKey] || 1
     const maxQty = variantStock.displayStock || variantStock.actualStock || 999
-    
+
     const newQty = Math.max(1, Math.min(maxQty, currentQty + delta))
     setVariantQuantities(prev => ({
       ...prev,
@@ -794,7 +800,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
 
     // Clear error if validation passes
     setVariantError('')
-    
+
     // Add each selected variant to cart separately with variant-specific quantities
     if (selectedVariants.length > 0) {
       // Handle multiple variants - add each variant separately with its own quantity
@@ -809,6 +815,52 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
       })
     } else {
       onAddToCart(productId, quantity)
+    }
+  }
+
+  const handleBuyNow = () => {
+    if (!inStock) {
+      return
+    }
+
+    // Validate variant selection if product has attributes
+    if (hasAttributes && attributeStructure.attributeNames.length > 0) {
+      if (selectedVariants.length === 0) {
+        setVariantError('Please select at least one variant to proceed')
+        // Scroll to variant section
+        setTimeout(() => {
+          if (variantSectionRef.current) {
+            variantSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }, 100)
+        return
+      }
+    }
+
+    // Clear error if validation passes
+    setVariantError('')
+
+    // Prepare product data for buy now
+    if (onBuyNow) {
+      if (selectedVariants.length > 0) {
+        // Handle multiple variants
+        const variantsData = selectedVariants.map(variant => {
+          const variantAttrs = variant.attributes instanceof Map
+            ? Object.fromEntries(variant.attributes)
+            : variant.attributes || {}
+          const variantKey = getVariantKey(variant)
+          const variantQty = variantQuantities[variantKey] || 1
+          return {
+            productId,
+            quantity: variantQty,
+            attributes: variantAttrs
+          }
+        })
+        onBuyNow(variantsData)
+      } else {
+        // No variants, just quantity
+        onBuyNow([{ productId, quantity }])
+      }
     }
   }
 
@@ -853,924 +905,949 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
 
         {/* Product Info - Redesigned Layout */}
         <div ref={productInfoRef} className="user-product-info space-y-5">
-         {/* Title and Wishlist */}
-         <div className="flex items-start justify-between gap-3">
-           <div className="flex-1">
-             <h1 className="text-xl font-bold text-[#172022] leading-tight mb-1.5"><TransText>{product.name}</TransText></h1>
-             {/* Rating */}
-             <div className="flex items-center gap-2">
-               <div className="flex items-center gap-0.5">
-                 {[1, 2, 3, 4, 5].map((star) => (
-                   <StarIcon
-                     key={star}
-                     className="h-3.5 w-3.5 text-yellow-400"
-                     filled={star <= Math.round(product.rating || 0)}
-                   />
-                 ))}
-               </div>
-               <span className="text-xs text-[rgba(26,42,34,0.65)]">
-                 {product.rating || 0} ({product.reviews || 0} <Trans>reviews</Trans>)
-               </span>
-             </div>
-           </div>
-           <button
-             type="button"
-             className={cn(
-               "flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all shadow-sm",
-               isWishlisted 
-                 ? "border-red-300 bg-red-50 text-red-600" 
-                 : "border-[rgba(34,94,65,0.15)] bg-white text-gray-600 hover:border-red-200 hover:bg-red-50"
-             )}
-             onClick={() => setIsWishlisted(!isWishlisted)}
-           >
-             <HeartIcon className="h-4 w-4" filled={isWishlisted} />
-           </button>
-         </div>
-
-         {/* Price - Prominent Display */}
-         <div className="bg-gradient-to-br from-[#1b8f5b]/10 to-[#2a9d61]/5 rounded-xl p-3 border border-[#1b8f5b]/20">
-           <div className="flex items-baseline gap-2.5">
-             <span className="text-2xl font-bold text-[#1b8f5b]">₹{currentPrice.toLocaleString('en-IN')}</span>
-             {product.originalPrice && product.originalPrice > currentPrice && (
-               <>
-                 <span className="text-base text-[rgba(26,42,34,0.5)] line-through">₹{product.originalPrice.toLocaleString('en-IN')}</span>
-                 {product.discount && (
-                   <span className="px-2 py-0.5 rounded-lg text-[0.65rem] font-bold text-white bg-red-500 shadow-sm">
-                     -{product.discount}% OFF
-                   </span>
-                 )}
-               </>
-             )}
-           </div>
-           {selectedAttributeStock && (
-             <p className="text-[0.65rem] text-[rgba(26,42,34,0.6)] mt-1.5 font-medium">
-               Price for selected variant
-             </p>
-           )}
-         </div>
-
-         {/* Dynamic Attribute Selection - Smart hierarchical display */}
-         {hasAttributes && attributeStructure.attributeNames.length > 0 && (
-           <div 
-             ref={variantSectionRef}
-             className="space-y-3 p-3 rounded-xl border-2 border-blue-200/50 bg-gradient-to-br from-blue-50/50 to-purple-50/30"
-           >
-             <div className="flex items-center justify-between mb-2">
-               <div className="flex items-center gap-2">
-                 <PackageIcon className="h-4 w-4 text-blue-600" />
-                 <h3 className="text-sm font-bold text-[#172022]"><Trans>Select Variant</Trans></h3>
-               </div>
-               {selectedVariants.length === 0 && (
-                 <span className="text-xs font-bold text-red-500 animate-pulse" style={{ animationDuration: '2s' }}>
-                   <Trans>Required</Trans>
-                 </span>
-               )}
-             </div>
-             {variantError && (
-               <div className="p-2.5 rounded-lg bg-red-50 border-2 border-red-300">
-                 <p className="text-xs font-semibold text-red-600 flex items-center gap-1.5">
-                   <span>⚠️</span>
-                   {variantError}
-                 </p>
-               </div>
-             )}
-             <div className="space-y-3">
-               {/* Step 1: Select Attribute Name */}
-               <div>
-                 <label className="block text-xs font-semibold text-[#172022] mb-1.5">
-                   <Trans>{formatAttributeLabel(attributeStructure.attributeNameKey || 'Attribute Name')}</Trans>
-                 </label>
-                 <div className="flex flex-wrap gap-1.5">
-                   {attributeStructure.attributeNames.map((attrName) => {
-                     const isSelected = selectedAttributes[attributeStructure.attributeNameKey] === attrName
-                     return (
-                       <button
-                         key={attrName}
-                         type="button"
-                         onClick={() => handleAttributeChange(attributeStructure.attributeNameKey, attrName)}
-                         className={cn(
-                           'px-3 py-2 rounded-lg text-xs font-semibold transition-all border-2',
-                           isSelected
-                             ? 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-md scale-105'
-                             : 'bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]'
-                         )}
-                       >
-                         {isSelected && <CheckCircleIcon className="inline h-3 w-3 mr-1" />}
-                         {attrName}
-                       </button>
-                     )
-                   })}
-                 </div>
-               </div>
-
-               {/* Step 2: Show Properties only for selected Attribute Name */}
-               {selectedAttributes[attributeStructure.attributeNameKey] && Object.keys(availableProperties).length > 0 && (
-                 <div className="space-y-3 pt-2 border-t border-blue-200">
-                   {Object.keys(availableProperties).map((propKey) => (
-                     <div key={propKey}>
-                       <label className="block text-xs font-semibold text-[#172022] mb-1.5">
-                         <Trans>{formatAttributeLabel(propKey)}</Trans>
-                       </label>
-                       <div className="flex flex-wrap gap-1.5">
-                         {availableProperties[propKey].map((value) => {
-                           const isSelected = selectedAttributes[propKey] === value
-                           return (
-                             <button
-                               key={value}
-                               type="button"
-                               onClick={() => handleAttributeChange(propKey, value)}
-                               className={cn(
-                                 'px-3 py-2 rounded-lg text-xs font-semibold transition-all border-2',
-                                 isSelected
-                                   ? 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-md scale-105'
-                                   : 'bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]'
-                               )}
-                             >
-                               {isSelected && <CheckCircleIcon className="inline h-3 w-3 mr-1" />}
-                               {value}
-                             </button>
-                           )
-                         })}
-                       </div>
-                     </div>
-                   ))}
-                 </div>
-               )}
-             </div>
-             
-             {/* Show all available variants for selection */}
-             {selectedAttributes[attributeStructure.attributeNameKey] && (
-               <div className="mt-3 space-y-2">
-                 <p className="text-xs font-semibold text-[#172022] mb-2">
-                   <Trans>Available Variants (Select one or more):</Trans>
-                 </p>
-                 {product.attributeStocks
-                   .filter(stock => {
-                     // Filter stocks that match the selected attribute name
-                     if (!stock.attributes || !stock.attributes[attributeStructure.attributeNameKey]) return false
-                     const stockAttrs = stock.attributes instanceof Map 
-                       ? Object.fromEntries(stock.attributes)
-                       : stock.attributes
-                     return stockAttrs[attributeStructure.attributeNameKey] === selectedAttributes[attributeStructure.attributeNameKey]
-                   })
-                   .map((variantStock, idx) => {
-                     const stockAttrs = variantStock.attributes instanceof Map 
-                       ? Object.fromEntries(variantStock.attributes)
-                       : variantStock.attributes || {}
-                     
-                     const isSelected = selectedVariants.some(v => {
-                       const vAttrs = v.attributes instanceof Map 
-                         ? Object.fromEntries(v.attributes)
-                         : v.attributes || {}
-                       return JSON.stringify(vAttrs) === JSON.stringify(stockAttrs)
-                     })
-                     
-                     const variantAttributes = Object.entries(stockAttrs)
-                       .filter(([key]) => key !== attributeStructure.attributeNameKey)
-                       .map(([key, value]) => ({ key, value, formattedKey: formatAttributeLabel(key) }))
-                     
-                     const variantKey = getVariantKey(variantStock)
-                     const variantQty = variantQuantities[variantKey] || 1
-                     const maxQty = variantStock.displayStock || variantStock.actualStock || 999
-                     
-                     return (
-                       <div
-                         key={idx}
-                         className={cn(
-                           "w-full p-3 rounded-lg border-2 transition-all",
-                           isSelected
-                             ? "bg-gradient-to-r from-[#1b8f5b]/10 to-[#2a9d61]/10 border-[#1b8f5b] shadow-md"
-                             : "bg-white border-gray-200"
-                         )}
-                       >
-                         <div className="flex items-start justify-between gap-2 mb-3">
-                           <div className="flex-1">
-                             <div className="flex items-center gap-2 mb-1">
-                               {isSelected && <CheckCircleIcon className="h-4 w-4 text-[#1b8f5b]" />}
-                               <span className="text-xs font-bold text-[#172022]">
-                                 {stockAttrs[attributeStructure.attributeNameKey] || `Variant ${idx + 1}`}
-                               </span>
-                             </div>
-                             <p className="text-xs text-[rgba(26,42,34,0.7)] mb-2">
-                               {variantAttributes && variantAttributes.length > 0 ? (
-                                 variantAttributes.map((attr, attrIdx) => (
-                                   <span key={attrIdx}>
-                                     <Trans>{attr.formattedKey}</Trans>: {attr.value}
-                                     {attrIdx < variantAttributes.length - 1 && ', '}
-                                   </span>
-                                 ))
-                               ) : (
-                                 <Trans>No additional attributes</Trans>
-                               )}
-                             </p>
-                             <div className="grid grid-cols-2 gap-2 text-xs">
-                               <div>
-                                 <span className="text-[rgba(26,42,34,0.6)]"><Trans>Stock:</Trans></span>
-                                 <span className="ml-1 font-semibold text-[#172022]">
-                                   {variantStock.displayStock || 0} {variantStock.stockUnit || 'kg'}
-                                 </span>
-                               </div>
-                               <div>
-                                 <span className="text-[rgba(26,42,34,0.6)]"><Trans>Price:</Trans></span>
-                                 <span className="ml-1 font-bold text-[#1b8f5b]">
-                                   ₹{(variantStock.userPrice || 0).toLocaleString('en-IN')}
-                                 </span>
-                               </div>
-                             </div>
-                           </div>
-                           <button
-                             type="button"
-                             onClick={() => handleVariantToggle(variantStock)}
-                             className={cn(
-                               "w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all",
-                               isSelected
-                                 ? "bg-[#1b8f5b] border-[#1b8f5b]"
-                                 : "bg-white border-gray-300 hover:border-[#1b8f5b]"
-                             )}
-                           >
-                             {isSelected && <CheckCircleIcon className="h-3 w-3 text-white" />}
-                           </button>
-                         </div>
-                         
-                         {/* Variant-specific Quantity Control - Only show if selected */}
-                         {isSelected && (
-                           <div className="mt-3 pt-3 border-t border-[rgba(34,94,65,0.2)]">
-                             <label className="block text-xs font-semibold text-[#172022] mb-2"><Trans>Quantity</Trans></label>
-                             <div className="flex items-center justify-between gap-3">
-                               <div className="flex items-center gap-2 border border-[rgba(34,94,65,0.2)] rounded-lg bg-white p-1.5">
-                                 <button
-                                   type="button"
-                                   className="flex items-center justify-center w-7 h-7 rounded-md border border-[rgba(34,94,65,0.2)] bg-white hover:bg-[rgba(240,245,242,0.8)] transition-all"
-                                   onClick={(e) => {
-                                     e.stopPropagation()
-                                     handleVariantQuantityChange(variantStock, -1)
-                                   }}
-                                   disabled={variantQty <= 1}
-                                 >
-                                   <MinusIcon className="h-3.5 w-3.5" />
-                                 </button>
-                                 <span className="px-2 text-sm font-semibold text-[#172022] min-w-[2rem] text-center">{variantQty}</span>
-                                 <button
-                                   type="button"
-                                   className="flex items-center justify-center w-7 h-7 rounded-md border border-[rgba(34,94,65,0.2)] bg-white hover:bg-[rgba(240,245,242,0.8)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                   onClick={(e) => {
-                                     e.stopPropagation()
-                                     handleVariantQuantityChange(variantStock, 1)
-                                   }}
-                                   disabled={variantQty >= maxQty}
-                                 >
-                                   <PlusIcon className="h-3.5 w-3.5" />
-                                 </button>
-                               </div>
-                               <div className="text-right">
-                                 <p className="text-[0.65rem] text-[rgba(26,42,34,0.6)]">Available: {maxQty}</p>
-                                 <p className="text-xs font-bold text-[#1b8f5b]">
-                                   Total: ₹{((variantStock.userPrice || 0) * variantQty).toLocaleString('en-IN')}
-                                 </p>
-                               </div>
-                             </div>
-                           </div>
-                         )}
-                       </div>
-                     )
-                   })}
-               </div>
-             )}
+          {/* Title and Wishlist */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <h1 className="text-xl font-bold text-[#172022] leading-tight mb-1.5"><TransText>{product.name}</TransText></h1>
+              {/* Rating */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <StarIcon
+                      key={star}
+                      className="h-3.5 w-3.5 text-yellow-400"
+                      filled={star <= Math.round(product.rating || 0)}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-[rgba(26,42,34,0.65)]">
+                  {product.rating || 0} ({product.reviews || 0} <Trans>reviews</Trans>)
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className={cn(
+                "flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all shadow-sm",
+                isWishlisted
+                  ? "border-red-300 bg-red-50 text-red-600"
+                  : "border-[rgba(34,94,65,0.15)] bg-white text-gray-600 hover:border-red-200 hover:bg-red-50"
+              )}
+              onClick={() => {
+                if (onToggleFavourite) {
+                  onToggleFavourite(productId)
+                }
+                setIsWishlisted(!isWishlisted)
+              }}
+            >
+              <HeartIcon className="h-4 w-4" filled={isWishlisted} />
+            </button>
           </div>
-        )}
 
-         {/* Vendor Info - Keep separate */}
-         {product.vendor && (
-           <div className="flex items-start gap-2.5 p-2.5 rounded-lg border-l-4 border-[#1b8f5b] bg-gradient-to-r from-[rgba(240,245,242,0.6)] to-[rgba(240,245,242,0.3)]">
-             <MapPinIcon className="h-4 w-4 text-[#1b8f5b] shrink-0 mt-0.5" />
-             <div className="flex-1 min-w-0">
-               <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.5)] uppercase tracking-wide mb-0.5"><Trans>Vendor</Trans></p>
-               <p className="text-xs font-bold text-[#172022] mb-0.5"><TransText>{product.vendor.name}</TransText></p>
-               <p className="text-[0.65rem] text-[rgba(26,42,34,0.65)]"><TransText>{product.vendor.location}</TransText></p>
-             </div>
-           </div>
-         )}
-
-        {/* Add to Cart Button - Enhanced */}
-        <div className="sticky bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-[rgba(34,94,65,0.15)] -mx-5 mt-6 shadow-lg backdrop-blur-sm bg-white/95 user-product-info__add-to-cart-container">
-          <button
-            type="button"
-            className={cn(
-              'w-full py-4 px-6 rounded-2xl text-base font-bold transition-all shadow-lg',
-              inStock
-                ? 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]'
-                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          {/* Price - Prominent Display */}
+          <div className="bg-gradient-to-br from-[#1b8f5b]/10 to-[#2a9d61]/5 rounded-xl p-3 border border-[#1b8f5b]/20">
+            <div className="flex items-baseline gap-2.5">
+              <span className="text-2xl font-bold text-[#1b8f5b]">₹{currentPrice.toLocaleString('en-IN')}</span>
+              {product.originalPrice && product.originalPrice > currentPrice && (
+                <>
+                  <span className="text-base text-[rgba(26,42,34,0.5)] line-through">₹{product.originalPrice.toLocaleString('en-IN')}</span>
+                  {product.discount && (
+                    <span className="px-2 py-0.5 rounded-lg text-[0.65rem] font-bold text-white bg-red-500 shadow-sm">
+                      -{product.discount}% OFF
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+            {selectedAttributeStock && (
+              <p className="text-[0.65rem] text-[rgba(26,42,34,0.6)] mt-1.5 font-medium">
+                Price for selected variant
+              </p>
             )}
-            onClick={handleAddToCart}
-             disabled={!inStock || (hasAttributes && selectedVariants.length === 0)}
-           >
-             {!inStock ? (
-               <Trans>Out of Stock</Trans>
-             ) : hasAttributes && selectedVariants.length === 0 ? (
-               <Trans>Please select at least one variant</Trans>
-             ) : hasAttributes && selectedVariants.length > 0 ? (
-               <AddVariantToCartText count={selectedVariants.length} price={totalVariantPrice} />
-             ) : (
-               <>
-                 <Trans>Add to Cart</Trans> • ₹{(currentPrice * quantity).toLocaleString('en-IN')}
-               </>
-             )}
-          </button>
-        </div>
+          </div>
+
+          {/* Dynamic Attribute Selection - Smart hierarchical display */}
+          {hasAttributes && attributeStructure.attributeNames.length > 0 && (
+            <div
+              ref={variantSectionRef}
+              className="space-y-3 p-3 rounded-xl border-2 border-blue-200/50 bg-gradient-to-br from-blue-50/50 to-purple-50/30"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <PackageIcon className="h-4 w-4 text-blue-600" />
+                  <h3 className="text-sm font-bold text-[#172022]"><Trans>Select Variant</Trans></h3>
+                </div>
+                {selectedVariants.length === 0 && (
+                  <span className="text-xs font-bold text-red-500 animate-pulse" style={{ animationDuration: '2s' }}>
+                    <Trans>Required</Trans>
+                  </span>
+                )}
+              </div>
+              {variantError && (
+                <div className="p-2.5 rounded-lg bg-red-50 border-2 border-red-300">
+                  <p className="text-xs font-semibold text-red-600 flex items-center gap-1.5">
+                    <span>⚠️</span>
+                    {variantError}
+                  </p>
+                </div>
+              )}
+              <div className="space-y-3">
+                {/* Step 1: Select Attribute Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#172022] mb-1.5">
+                    <Trans>{formatAttributeLabel(attributeStructure.attributeNameKey || 'Attribute Name')}</Trans>
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {attributeStructure.attributeNames.map((attrName) => {
+                      const isSelected = selectedAttributes[attributeStructure.attributeNameKey] === attrName
+                      return (
+                        <button
+                          key={attrName}
+                          type="button"
+                          onClick={() => handleAttributeChange(attributeStructure.attributeNameKey, attrName)}
+                          className={cn(
+                            'px-3 py-2 rounded-lg text-xs font-semibold transition-all border-2',
+                            isSelected
+                              ? 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-md scale-105'
+                              : 'bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]'
+                          )}
+                        >
+                          {isSelected && <CheckCircleIcon className="inline h-3 w-3 mr-1" />}
+                          {attrName}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Step 2: Show Properties only for selected Attribute Name */}
+                {selectedAttributes[attributeStructure.attributeNameKey] && Object.keys(availableProperties).length > 0 && (
+                  <div className="space-y-3 pt-2 border-t border-blue-200">
+                    {Object.keys(availableProperties).map((propKey) => (
+                      <div key={propKey}>
+                        <label className="block text-xs font-semibold text-[#172022] mb-1.5">
+                          <Trans>{formatAttributeLabel(propKey)}</Trans>
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {availableProperties[propKey].map((value) => {
+                            const isSelected = selectedAttributes[propKey] === value
+                            return (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => handleAttributeChange(propKey, value)}
+                                className={cn(
+                                  'px-3 py-2 rounded-lg text-xs font-semibold transition-all border-2',
+                                  isSelected
+                                    ? 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-md scale-105'
+                                    : 'bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]'
+                                )}
+                              >
+                                {isSelected && <CheckCircleIcon className="inline h-3 w-3 mr-1" />}
+                                {value}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Show all available variants for selection */}
+              {selectedAttributes[attributeStructure.attributeNameKey] && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs font-semibold text-[#172022] mb-2">
+                    <Trans>Available Variants (Select one or more):</Trans>
+                  </p>
+                  {product.attributeStocks
+                    .filter(stock => {
+                      // Filter stocks that match the selected attribute name
+                      if (!stock.attributes || !stock.attributes[attributeStructure.attributeNameKey]) return false
+                      const stockAttrs = stock.attributes instanceof Map
+                        ? Object.fromEntries(stock.attributes)
+                        : stock.attributes
+                      return stockAttrs[attributeStructure.attributeNameKey] === selectedAttributes[attributeStructure.attributeNameKey]
+                    })
+                    .map((variantStock, idx) => {
+                      const stockAttrs = variantStock.attributes instanceof Map
+                        ? Object.fromEntries(variantStock.attributes)
+                        : variantStock.attributes || {}
+
+                      const isSelected = selectedVariants.some(v => {
+                        const vAttrs = v.attributes instanceof Map
+                          ? Object.fromEntries(v.attributes)
+                          : v.attributes || {}
+                        return JSON.stringify(vAttrs) === JSON.stringify(stockAttrs)
+                      })
+
+                      const variantAttributes = Object.entries(stockAttrs)
+                        .filter(([key]) => key !== attributeStructure.attributeNameKey)
+                        .map(([key, value]) => ({ key, value, formattedKey: formatAttributeLabel(key) }))
+
+                      const variantKey = getVariantKey(variantStock)
+                      const variantQty = variantQuantities[variantKey] || 1
+                      const maxQty = variantStock.displayStock || variantStock.actualStock || 999
+
+                      return (
+                        <div
+                          key={idx}
+                          className={cn(
+                            "w-full p-3 rounded-lg border-2 transition-all",
+                            isSelected
+                              ? "bg-gradient-to-r from-[#1b8f5b]/10 to-[#2a9d61]/10 border-[#1b8f5b] shadow-md"
+                              : "bg-white border-gray-200"
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                {isSelected && <CheckCircleIcon className="h-4 w-4 text-[#1b8f5b]" />}
+                                <span className="text-xs font-bold text-[#172022]">
+                                  {stockAttrs[attributeStructure.attributeNameKey] || `Variant ${idx + 1}`}
+                                </span>
+                              </div>
+                              <p className="text-xs text-[rgba(26,42,34,0.7)] mb-2">
+                                {variantAttributes && variantAttributes.length > 0 ? (
+                                  variantAttributes.map((attr, attrIdx) => (
+                                    <span key={attrIdx}>
+                                      <Trans>{attr.formattedKey}</Trans>: {attr.value}
+                                      {attrIdx < variantAttributes.length - 1 && ', '}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <Trans>No additional attributes</Trans>
+                                )}
+                              </p>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-[rgba(26,42,34,0.6)]"><Trans>Stock:</Trans></span>
+                                  <span className="ml-1 font-semibold text-[#172022]">
+                                    {variantStock.displayStock || 0} {variantStock.stockUnit || 'kg'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-[rgba(26,42,34,0.6)]"><Trans>Price:</Trans></span>
+                                  <span className="ml-1 font-bold text-[#1b8f5b]">
+                                    ₹{(variantStock.userPrice || 0).toLocaleString('en-IN')}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleVariantToggle(variantStock)}
+                              className={cn(
+                                "w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all",
+                                isSelected
+                                  ? "bg-[#1b8f5b] border-[#1b8f5b]"
+                                  : "bg-white border-gray-300 hover:border-[#1b8f5b]"
+                              )}
+                            >
+                              {isSelected && <CheckCircleIcon className="h-3 w-3 text-white" />}
+                            </button>
+                          </div>
+
+                          {/* Variant-specific Quantity Control - Only show if selected */}
+                          {isSelected && (
+                            <div className="mt-3 pt-3 border-t border-[rgba(34,94,65,0.2)]">
+                              <label className="block text-xs font-semibold text-[#172022] mb-2"><Trans>Quantity</Trans></label>
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 border border-[rgba(34,94,65,0.2)] rounded-lg bg-white p-1.5">
+                                  <button
+                                    type="button"
+                                    className="flex items-center justify-center w-7 h-7 rounded-md border border-[rgba(34,94,65,0.2)] bg-white hover:bg-[rgba(240,245,242,0.8)] transition-all"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleVariantQuantityChange(variantStock, -1)
+                                    }}
+                                    disabled={variantQty <= 1}
+                                  >
+                                    <MinusIcon className="h-3.5 w-3.5" />
+                                  </button>
+                                  <span className="px-2 text-sm font-semibold text-[#172022] min-w-[2rem] text-center">{variantQty}</span>
+                                  <button
+                                    type="button"
+                                    className="flex items-center justify-center w-7 h-7 rounded-md border border-[rgba(34,94,65,0.2)] bg-white hover:bg-[rgba(240,245,242,0.8)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleVariantQuantityChange(variantStock, 1)
+                                    }}
+                                    disabled={variantQty >= maxQty}
+                                  >
+                                    <PlusIcon className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-[0.65rem] text-[rgba(26,42,34,0.6)]">Available: {maxQty}</p>
+                                  <p className="text-xs font-bold text-[#1b8f5b]">
+                                    Total: ₹{((variantStock.userPrice || 0) * variantQty).toLocaleString('en-IN')}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Vendor Info - Keep separate */}
+          {product.vendor && (
+            <div className="flex items-start gap-2.5 p-2.5 rounded-lg border-l-4 border-[#1b8f5b] bg-gradient-to-r from-[rgba(240,245,242,0.6)] to-[rgba(240,245,242,0.3)]">
+              <MapPinIcon className="h-4 w-4 text-[#1b8f5b] shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.5)] uppercase tracking-wide mb-0.5"><Trans>Vendor</Trans></p>
+                <p className="text-xs font-bold text-[#172022] mb-0.5"><TransText>{product.vendor.name}</TransText></p>
+                <p className="text-[0.65rem] text-[rgba(26,42,34,0.65)]"><TransText>{product.vendor.location}</TransText></p>
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons - Add to Cart and Buy Now */}
+          <div className="sticky bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-[rgba(34,94,65,0.15)] -mx-5 mt-6 shadow-lg backdrop-blur-sm bg-white/95 user-product-info__add-to-cart-container">
+            <div className="flex gap-3">
+              {/* Add to Cart Button */}
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 py-4 px-4 rounded-2xl text-base font-bold transition-all shadow-lg',
+                  inStock
+                    ? 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                )}
+                onClick={handleAddToCart}
+                disabled={!inStock || (hasAttributes && selectedVariants.length === 0)}
+              >
+                {!inStock ? (
+                  <Trans>Out of Stock</Trans>
+                ) : hasAttributes && selectedVariants.length === 0 ? (
+                  <Trans>Select Variant</Trans>
+                ) : (
+                  <Trans>Add to Cart</Trans>
+                )}
+              </button>
+
+              {/* Buy Now Button */}
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 py-4 px-4 rounded-2xl text-base font-bold transition-all shadow-lg',
+                  inStock
+                    ? 'bg-gradient-to-r from-[#f59e0b] to-[#d97706] text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                )}
+                onClick={handleBuyNow}
+                disabled={!inStock || (hasAttributes && selectedVariants.length === 0)}
+              >
+                {!inStock ? (
+                  <Trans>Out of Stock</Trans>
+                ) : hasAttributes && selectedVariants.length === 0 ? (
+                  <Trans>Select Variant</Trans>
+                ) : (
+                  <Trans>Buy Now</Trans>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Tabbed Content: Description, Stock, Delivery Time - Full Width Below 2-Column Layout */}
       <div className="user-product-detail-view__tabs-section space-y-4">
-          {/* Horizontal Scrollable Tab Menu */}
-          <div>
-            <style>{`
+        {/* Horizontal Scrollable Tab Menu */}
+        <div>
+          <style>{`
               .tab-scroll-container::-webkit-scrollbar {
                 display: none;
               }
             `}</style>
-            <div 
-              className="overflow-x-auto pb-2 tab-scroll-container" 
-              style={{ 
-                scrollbarWidth: 'none', 
-                msOverflowStyle: 'none'
-              }}
-            >
-              <div className="flex gap-2 min-w-max user-product-detail-view__tabs-container">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('description')}
-                  className={cn(
-                    "px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 min-w-[120px] flex items-center justify-center gap-2",
-                    activeTab === 'description'
-                      ? "bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-lg scale-105"
-                      : "bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]"
-                  )}
-                >
-                  <PackageIcon className="h-3.5 w-3.5" />
-                  <Trans>Description</Trans>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('stock')}
-                  className={cn(
-                    "px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 min-w-[120px] flex items-center justify-center gap-2",
-                    activeTab === 'stock'
-                      ? "bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-lg scale-105"
-                      : "bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]"
-                  )}
-                >
-                  <div className={cn(
-                    "w-2.5 h-2.5 rounded-full",
-                    inStock ? "bg-[#1b8f5b]" : "bg-red-500"
-                  )} />
-                  <Trans>Stock</Trans>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('delivery')}
-                  className={cn(
-                    "px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 min-w-[120px] flex items-center justify-center gap-2",
-                    activeTab === 'delivery'
-                      ? "bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-lg scale-105"
-                      : "bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]"
-                  )}
-                >
-                  <TruckIcon className="h-3.5 w-3.5" />
-                  <Trans>Delivery Time</Trans>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('reviews')}
-                  className={cn(
-                    "px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 min-w-[120px] flex items-center justify-center gap-2",
-                    activeTab === 'reviews'
-                      ? "bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-lg scale-105"
-                      : "bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]"
-                  )}
-                >
-                  <StarIcon className="h-3.5 w-3.5" />
-                  <Trans>Reviews & Ratings</Trans>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Tab Content */}
-          <div className="min-h-[200px]">
-             {/* Description Tab */}
-             {activeTab === 'description' && (
-               <div className="relative p-6 rounded-2xl bg-gradient-to-br from-[#f0f9f4] via-[#e8f5ed] to-[#d4ede0] border-2 border-[#1b8f5b]/30 shadow-xl overflow-hidden">
-                 {/* Decorative background elements */}
-                 <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[#1b8f5b]/10 to-transparent rounded-full blur-3xl"></div>
-                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-[#2a9d61]/10 to-transparent rounded-full blur-3xl"></div>
-                 
-                 <div className="relative z-10">
-                   <div className="flex items-center gap-3 mb-5">
-                     <div className="w-1.5 h-8 bg-gradient-to-b from-[#1b8f5b] to-[#2a9d61] rounded-full shadow-md"></div>
-                     <div>
-                       <h3 className="text-lg font-bold text-[#172022] mb-1"><Trans>About this Product</Trans></h3>
-                       <div className="h-0.5 w-16 bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] rounded-full"></div>
-                     </div>
-                   </div>
-                   
-                   <div className="pl-4 space-y-4">
-                     {(product.longDescription || product.description) ? (
-                       <div className="prose prose-sm max-w-none">
-                         {(() => {
-                           const description = product.longDescription || product.description
-                           // Split by double line breaks first, then by single line breaks
-                           const paragraphs = description
-                             .split(/\n\n+/)
-                             .flatMap(p => p.split(/\n/))
-                             .map(p => p.trim())
-                             .filter(p => p.length > 0)
-                           
-                           return paragraphs.map((paragraph, idx) => {
-                             // Check if paragraph looks like a heading (short and bold)
-                             const isHeading = paragraph.length < 80 && !paragraph.includes('.') && paragraph.split(' ').length < 10
-                             
-                             // Check if paragraph contains usage instructions
-                             const isUsage = paragraph.toLowerCase().includes('usage:') || paragraph.toLowerCase().includes('how to use') || paragraph.toLowerCase().startsWith('usage')
-                             
-                             // Check if paragraph contains benefits/features
-                             const isFeature = paragraph.toLowerCase().includes('suitable') || paragraph.toLowerCase().includes('contains') || paragraph.toLowerCase().includes('enhance') || paragraph.toLowerCase().includes('designed')
-                             
-                             return (
-                               <div
-                                 key={idx}
-                                 className={cn(
-                                   "mb-4 p-4 rounded-xl border-l-4 transition-all hover:shadow-md",
-                                   isHeading
-                                     ? "bg-white border-[#1b8f5b] shadow-sm"
-                                     : isUsage
-                                     ? "bg-gradient-to-r from-blue-50/90 to-indigo-50/90 border-blue-500 shadow-sm"
-                                     : isFeature
-                                     ? "bg-white border-[#1b8f5b] shadow-sm"
-                                     : "bg-white border-[#1b8f5b]/40 shadow-sm"
-                                 )}
-                               >
-                                 {isHeading ? (
-                                   <h4 className="text-base font-bold text-[#1b8f5b] mb-2 flex items-center gap-2">
-                                     <div className="w-2 h-2 rounded-full bg-[#1b8f5b]"></div>
-                                     <TransText>{paragraph}</TransText>
-                                   </h4>
-                                 ) : isUsage ? (
-                                   <div>
-                                     <div className="flex items-center gap-2 mb-2">
-                                       <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
-                                         <span className="text-white text-xs font-bold">!</span>
-                                       </div>
-                                       <span className="text-sm font-bold text-blue-700 uppercase tracking-wide"><Trans>Usage Instructions</Trans></span>
-                                     </div>
-                                     <p className="text-sm text-[rgba(26,42,34,0.85)] leading-relaxed ml-8">
-                                       <TransText>{paragraph.replace(/^(usage|how to use):\s*/i, '').trim()}</TransText>
-                                     </p>
-                                   </div>
-                                 ) : (
-                                   <p className="text-sm text-[rgba(26,42,34,0.85)] leading-relaxed">
-                                     <TransText>{paragraph}</TransText>
-                                   </p>
-                                 )}
-                               </div>
-                             )
-                           })
-                         })()}
-                       </div>
-                     ) : (
-                       <div className="p-6 bg-white/60 rounded-xl border-2 border-dashed border-[#1b8f5b]/30 text-center">
-                         <p className="text-sm text-[rgba(26,42,34,0.6)]">No description available for this product.</p>
-                       </div>
-                     )}
-                   </div>
-                 </div>
-               </div>
-             )}
-
-             {/* Stock Tab */}
-             {activeTab === 'stock' && (
-               <div className={cn(
-                 "p-5 rounded-2xl border-2 shadow-lg",
-                 inStock 
-                   ? "bg-gradient-to-br from-[rgba(240,245,242,0.6)] to-[rgba(240,245,242,0.3)] border-[#1b8f5b]" 
-                   : "bg-gradient-to-br from-[rgba(254,242,242,0.6)] to-[rgba(254,242,242,0.3)] border-red-500"
-               )}>
-                 <div className="flex items-center gap-2.5 mb-3">
-                   <div className={cn(
-                     "w-4 h-4 rounded-full shadow-md",
-                     inStock ? "bg-[#1b8f5b]" : "bg-red-500"
-                   )} />
-                   <h3 className="text-base font-bold text-[#172022]">Stock Availability</h3>
-                 </div>
-                 <div className="pl-3 space-y-3">
-                   <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 border-[rgba(34,94,65,0.1)]">
-                     <div>
-                       <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.6)] uppercase tracking-wide mb-0.5">Status</p>
-                       <p className={cn(
-                         "text-base font-bold",
-                         inStock ? "text-[#1b8f5b]" : "text-red-600"
-                       )}>
-                         {stockStatus}
-                       </p>
-                     </div>
-                     <div className="text-right">
-                       <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.6)] uppercase tracking-wide mb-0.5">Available Quantity</p>
-                       <p className="text-base font-bold text-[#172022]">
-                         {currentStock.toLocaleString('en-IN')} {currentStockUnit}
-                       </p>
-                     </div>
-                   </div>
-                   {inStock && (
-                     <div className="p-3 bg-white rounded-xl border-2 border-[rgba(34,94,65,0.1)]">
-                       {currentStock > 10 ? (
-                         <div className="flex items-center gap-2">
-                           <CheckCircleIcon className="h-4 w-4 text-[#1b8f5b]" />
-                           <p className="text-xs font-semibold text-[#172022]">
-                             Product is in stock and ready for delivery
-                           </p>
-                         </div>
-                       ) : (
-                         <div className="flex items-center gap-2">
-                           <div className="w-4 h-4 rounded-full bg-orange-500"></div>
-                           <p className="text-xs font-semibold text-orange-600">
-                             Limited stock available • Only {currentStock} {currentStockUnit} left!
-                           </p>
-                         </div>
-                       )}
-                     </div>
-                   )}
-                   {!inStock && (
-                     <div className="p-3 bg-white rounded-xl border-2 border-red-200">
-                       <p className="text-xs font-semibold text-red-600">
-                         This product is currently out of stock. Please check back later.
-                       </p>
-                     </div>
-                   )}
-                 </div>
-               </div>
-             )}
-
-             {/* Delivery Time Tab */}
-             {activeTab === 'delivery' && (
-               <div className="p-5 rounded-2xl bg-gradient-to-br from-[rgba(239,246,255,0.6)] to-[rgba(239,246,255,0.3)] border-2 border-blue-500 shadow-lg">
-                 <div className="flex items-center gap-2.5 mb-3">
-                   <TruckIcon className="h-5 w-5 text-blue-500" />
-                   <h3 className="text-base font-bold text-[#172022]">Delivery Information</h3>
-                 </div>
-                 <div className="pl-3 space-y-3">
-                   <div className="p-4 bg-white rounded-xl border-2 border-blue-200 shadow-sm">
-                     <div className="flex items-start gap-3">
-                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shrink-0">
-                         <TruckIcon className="h-5 w-5 text-blue-600" />
-                       </div>
-                       <div className="flex-1">
-                         <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.6)] uppercase tracking-wide mb-1.5">Estimated Delivery Time</p>
-                         <p className="text-xl font-bold text-[#172022] mb-1.5">
-                           {product.deliveryTime || 'Within 24 hours'}
-                         </p>
-                         <p className="text-xs text-[rgba(26,42,34,0.7)]">
-                           Fast and reliable delivery to your doorstep
-                         </p>
-                       </div>
-                     </div>
-                   </div>
-                   <div className="grid grid-cols-2 gap-2.5">
-                     <div className="p-3 bg-white rounded-xl border border-blue-200">
-                       <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.6)] mb-0.5">Delivery Type</p>
-                       <p className="text-xs font-bold text-[#172022]">Standard</p>
-                     </div>
-                     <div className="p-3 bg-white rounded-xl border border-blue-200">
-                       <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.6)] mb-0.5">Tracking</p>
-                       <p className="text-xs font-bold text-[#172022]">Available</p>
-                     </div>
-                   </div>
-                 </div>
-               </div>
-             )}
-
-             {/* Reviews Tab */}
-             {activeTab === 'reviews' && (
-               <div className="space-y-6 p-6 rounded-2xl bg-gradient-to-br from-[rgba(240,245,242,0.4)] via-[rgba(248,250,249,0.3)] to-white border-2 border-[#1b8f5b]/20 shadow-sm">
-                 <div className="flex items-center justify-between">
-                   <div>
-                     <h3 className="text-lg font-bold text-[#172022] mb-1"><Trans>Reviews & Ratings</Trans></h3>
-                     <p className="text-sm text-[rgba(26,42,34,0.65)]">
-                       {reviewStats.totalReviews} {reviewStats.totalReviews === 1 ? <Trans>review</Trans> : <Trans>reviews</Trans>}
-                     </p>
-                   </div>
-                   {reviewStats.averageRating > 0 && (
-                     <div className="flex items-center gap-2">
-                       <div className="flex items-center gap-0.5">
-                         {[1, 2, 3, 4, 5].map((star) => (
-                           <StarIcon
-                             key={star}
-                             className="h-4 w-4 text-yellow-400"
-                             filled={star <= Math.round(reviewStats.averageRating)}
-                           />
-                         ))}
-                       </div>
-                       <span className="text-base font-bold text-[#172022]">
-                         {reviewStats.averageRating.toFixed(1)}
-                       </span>
-                     </div>
-                   )}
-                 </div>
-
-        {/* Rating Distribution */}
-        {reviewStats.totalReviews > 0 && (
-          <div className="p-4 rounded-xl bg-gradient-to-br from-[rgba(240,245,242,0.6)] to-[rgba(240,245,242,0.3)] border border-[#1b8f5b]/20">
-            <div className="space-y-2">
-              {[5, 4, 3, 2, 1].map((rating) => {
-                const count = reviewStats.distribution[rating] || 0
-                const percentage = reviewStats.totalReviews > 0 ? (count / reviewStats.totalReviews) * 100 : 0
-                return (
-                  <div key={rating} className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 w-16">
-                      <span className="text-xs font-semibold text-[#172022]">{rating}</span>
-                      <StarIcon className="h-3 w-3 text-yellow-400" filled={true} />
-                    </div>
-                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] transition-all duration-300"
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-semibold text-[rgba(26,42,34,0.7)] w-8 text-right">
-                      {count}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Review Form (if authenticated) */}
-        {isAuthenticated && (
-          <div className="p-4 rounded-xl border-2 border-[#1b8f5b]/30 bg-gradient-to-br from-[rgba(240,245,242,0.4)] to-white">
-            {!showReviewForm && !myReview ? (
+          <div
+            className="overflow-x-auto pb-2 tab-scroll-container"
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
+            }}
+          >
+            <div className="flex gap-2 min-w-max user-product-detail-view__tabs-container">
               <button
                 type="button"
-                onClick={() => setShowReviewForm(true)}
-                className="w-full py-3 px-4 rounded-lg bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white text-sm font-semibold hover:shadow-md transition-all"
+                onClick={() => setActiveTab('description')}
+                className={cn(
+                  "px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 min-w-[120px] flex items-center justify-center gap-2",
+                  activeTab === 'description'
+                    ? "bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-lg scale-105"
+                    : "bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]"
+                )}
               >
-                <Trans>Write a Review</Trans>
+                <PackageIcon className="h-3.5 w-3.5" />
+                <Trans>Description</Trans>
               </button>
-            ) : myReview && !showReviewForm ? (
-              // Collapsed state - show dropdown button
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setShowReviewForm(true)}
-                  className="w-full flex items-center justify-between py-3 px-4 rounded-lg bg-white border-2 border-[rgba(34,94,65,0.2)] hover:bg-[rgba(240,245,242,0.5)] transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <StarIcon
-                          key={star}
-                          className="h-4 w-4"
-                          filled={star <= myReview.rating}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-sm font-semibold text-[#172022]"><Trans>Edit Your Review</Trans></span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteReviewClick()
-                      }}
-                      className="text-xs text-red-600 font-semibold hover:underline px-2 py-1"
-                    >
-                      <Trans>Delete Review</Trans>
-                    </button>
-                    <ChevronDownIcon className="h-5 w-5 text-[#172022]" />
-                  </div>
-                </button>
-              </div>
-            ) : showReviewForm ? (
-              // Expanded state - show full form
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-base font-bold text-[#172022]">
-                    {myReview ? <Trans>Edit Your Review</Trans> : <Trans>Write a Review</Trans>}
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    {myReview && (
-                      <button
-                        type="button"
-                        onClick={handleDeleteReviewClick}
-                        className="text-xs text-red-600 font-semibold hover:underline px-2 py-1"
-                      >
-                        Delete Review
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowReviewForm(false)
-                        if (myReview) {
-                          setReviewFormData({ rating: myReview.rating, comment: myReview.comment || '' })
-                        }
-                      }}
-                      className="text-[#172022] hover:text-[#1b8f5b] transition-colors"
-                    >
-                      <ChevronDownIcon className="h-5 w-5 rotate-180" />
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Star Rating Input */}
-                <div>
-                  <label className="block text-sm font-semibold text-[#172022] mb-2">
-                    <Trans>Rating</Trans> <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setReviewFormData(prev => ({ ...prev, rating: star }))}
-                        className="focus:outline-none"
-                      >
-                        <StarIcon
-                          className="h-6 w-6 transition-all hover:scale-110"
-                          filled={star <= reviewFormData.rating}
-                          style={{ color: star <= reviewFormData.rating ? '#fbbf24' : '#d1d5db' }}
-                        />
-                      </button>
-                    ))}
-                    {reviewFormData.rating > 0 && (
-                      <span className="text-sm font-semibold text-[#172022] ml-2">
-                        {reviewFormData.rating} {reviewFormData.rating === 1 ? <Trans>star</Trans> : <Trans>stars</Trans>}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Comment Input */}
-                <div>
-                  <label className="block text-sm font-semibold text-[#172022] mb-2">
-                    <Trans>Your Review</Trans>
-                  </label>
-                  <textarea
-                    value={reviewFormData.comment}
-                    onChange={(e) => setReviewFormData(prev => ({ ...prev, comment: e.target.value }))}
-                    placeholder="Share your experience with this product..."
-                    className="w-full px-4 py-3 rounded-lg border-2 border-[rgba(34,94,65,0.2)] focus:border-[#1b8f5b] focus:outline-none resize-none"
-                    rows={4}
-                    maxLength={1000}
-                  />
-                  <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">
-                    {reviewFormData.comment.length}/1000 <Trans>characters</Trans>
-                  </p>
-                </div>
-
-                {/* Submit Buttons */}
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleSubmitReview}
-                    disabled={submittingReview || reviewFormData.rating === 0}
-                    className={cn(
-                      'flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all',
-                      submittingReview || reviewFormData.rating === 0
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white hover:shadow-md'
-                    )}
-                  >
-                    {submittingReview ? <Trans>Submitting...</Trans> : myReview ? <Trans>Update Review</Trans> : <Trans>Submit Review</Trans>}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowReviewForm(false)
-                      if (myReview) {
-                        // Reset to original review data when canceling edit
-                        setReviewFormData({ rating: myReview.rating, comment: myReview.comment || '' })
-                      } else {
-                        // Clear form when canceling new review
-                        setReviewFormData({ rating: 0, comment: '' })
-                      }
-                    }}
-                    className="py-3 px-4 rounded-lg border-2 border-[rgba(34,94,65,0.2)] text-sm font-semibold text-[#172022] hover:bg-[rgba(240,245,242,0.5)] transition-all"
-                  >
-                    {myReview ? <Trans>Collapse</Trans> : <Trans>Cancel</Trans>}
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {/* Reviews List */}
-        {reviewsLoading && reviews.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-sm text-[rgba(26,42,34,0.65)]"><Trans>Loading reviews...</Trans></p>
-          </div>
-        ) : reviews.length === 0 ? (
-          <div className="text-center py-8 p-4 rounded-xl bg-gray-50 border border-gray-200">
-            <p className="text-sm text-[rgba(26,42,34,0.65)]"><Trans>No reviews yet. Be the first to review this product!</Trans></p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {reviews.map((review) => (
-              <div
-                key={review._id || review.id}
-                className="p-4 rounded-xl border-2 border-[rgba(34,94,65,0.15)] bg-white hover:shadow-md transition-all"
+              <button
+                type="button"
+                onClick={() => setActiveTab('stock')}
+                className={cn(
+                  "px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 min-w-[120px] flex items-center justify-center gap-2",
+                  activeTab === 'stock'
+                    ? "bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-lg scale-105"
+                    : "bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]"
+                )}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-bold text-[#172022]">
-                        {review.userId?.name || 'Anonymous User'}
-                      </span>
-                      <div className="flex items-center gap-0.5">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <StarIcon
-                            key={star}
-                            className="h-3.5 w-3.5 text-yellow-400"
-                            filled={star <= review.rating}
-                          />
-                        ))}
-                      </div>
+                <div className={cn(
+                  "w-2.5 h-2.5 rounded-full",
+                  inStock ? "bg-[#1b8f5b]" : "bg-red-500"
+                )} />
+                <Trans>Stock</Trans>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('delivery')}
+                className={cn(
+                  "px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 min-w-[120px] flex items-center justify-center gap-2",
+                  activeTab === 'delivery'
+                    ? "bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-lg scale-105"
+                    : "bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]"
+                )}
+              >
+                <TruckIcon className="h-3.5 w-3.5" />
+                <Trans>Delivery Time</Trans>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('reviews')}
+                className={cn(
+                  "px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border-2 min-w-[120px] flex items-center justify-center gap-2",
+                  activeTab === 'reviews'
+                    ? "bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white border-[#1b8f5b] shadow-lg scale-105"
+                    : "bg-white text-[#172022] border-gray-200 hover:border-[#1b8f5b]/50 hover:bg-[rgba(27,143,91,0.05)]"
+                )}
+              >
+                <StarIcon className="h-3.5 w-3.5" />
+                <Trans>Reviews & Ratings</Trans>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="min-h-[200px]">
+          {/* Description Tab */}
+          {activeTab === 'description' && (
+            <div className="relative p-6 rounded-2xl bg-gradient-to-br from-[#f0f9f4] via-[#e8f5ed] to-[#d4ede0] border-2 border-[#1b8f5b]/30 shadow-xl overflow-hidden">
+              {/* Decorative background elements */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[#1b8f5b]/10 to-transparent rounded-full blur-3xl"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-[#2a9d61]/10 to-transparent rounded-full blur-3xl"></div>
+
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-1.5 h-8 bg-gradient-to-b from-[#1b8f5b] to-[#2a9d61] rounded-full shadow-md"></div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[#172022] mb-1"><Trans>About this Product</Trans></h3>
+                    <div className="h-0.5 w-16 bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] rounded-full"></div>
+                  </div>
+                </div>
+
+                <div className="pl-4 space-y-4">
+                  {(product.longDescription || product.description) ? (
+                    <div className="prose prose-sm max-w-none">
+                      {(() => {
+                        const description = product.longDescription || product.description
+                        // Split by double line breaks first, then by single line breaks
+                        const paragraphs = description
+                          .split(/\n\n+/)
+                          .flatMap(p => p.split(/\n/))
+                          .map(p => p.trim())
+                          .filter(p => p.length > 0)
+
+                        return paragraphs.map((paragraph, idx) => {
+                          // Check if paragraph looks like a heading (short and bold)
+                          const isHeading = paragraph.length < 80 && !paragraph.includes('.') && paragraph.split(' ').length < 10
+
+                          // Check if paragraph contains usage instructions
+                          const isUsage = paragraph.toLowerCase().includes('usage:') || paragraph.toLowerCase().includes('how to use') || paragraph.toLowerCase().startsWith('usage')
+
+                          // Check if paragraph contains benefits/features
+                          const isFeature = paragraph.toLowerCase().includes('suitable') || paragraph.toLowerCase().includes('contains') || paragraph.toLowerCase().includes('enhance') || paragraph.toLowerCase().includes('designed')
+
+                          return (
+                            <div
+                              key={idx}
+                              className={cn(
+                                "mb-4 p-4 rounded-xl border-l-4 transition-all hover:shadow-md",
+                                isHeading
+                                  ? "bg-white border-[#1b8f5b] shadow-sm"
+                                  : isUsage
+                                    ? "bg-gradient-to-r from-blue-50/90 to-indigo-50/90 border-blue-500 shadow-sm"
+                                    : isFeature
+                                      ? "bg-white border-[#1b8f5b] shadow-sm"
+                                      : "bg-white border-[#1b8f5b]/40 shadow-sm"
+                              )}
+                            >
+                              {isHeading ? (
+                                <h4 className="text-base font-bold text-[#1b8f5b] mb-2 flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-[#1b8f5b]"></div>
+                                  <TransText>{paragraph}</TransText>
+                                </h4>
+                              ) : isUsage ? (
+                                <div>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                                      <span className="text-white text-xs font-bold">!</span>
+                                    </div>
+                                    <span className="text-sm font-bold text-blue-700 uppercase tracking-wide"><Trans>Usage Instructions</Trans></span>
+                                  </div>
+                                  <p className="text-sm text-[rgba(26,42,34,0.85)] leading-relaxed ml-8">
+                                    <TransText>{paragraph.replace(/^(usage|how to use):\s*/i, '').trim()}</TransText>
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-sm text-[rgba(26,42,34,0.85)] leading-relaxed">
+                                  <TransText>{paragraph}</TransText>
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })
+                      })()}
                     </div>
-                    <p className="text-xs text-[rgba(26,42,34,0.6)]">
-                      {new Date(review.createdAt).toLocaleDateString('en-IN', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
+                  ) : (
+                    <div className="p-6 bg-white/60 rounded-xl border-2 border-dashed border-[#1b8f5b]/30 text-center">
+                      <p className="text-sm text-[rgba(26,42,34,0.6)]">No description available for this product.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Stock Tab */}
+          {activeTab === 'stock' && (
+            <div className={cn(
+              "p-5 rounded-2xl border-2 shadow-lg",
+              inStock
+                ? "bg-gradient-to-br from-[rgba(240,245,242,0.6)] to-[rgba(240,245,242,0.3)] border-[#1b8f5b]"
+                : "bg-gradient-to-br from-[rgba(254,242,242,0.6)] to-[rgba(254,242,242,0.3)] border-red-500"
+            )}>
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className={cn(
+                  "w-4 h-4 rounded-full shadow-md",
+                  inStock ? "bg-[#1b8f5b]" : "bg-red-500"
+                )} />
+                <h3 className="text-base font-bold text-[#172022]">Stock Availability</h3>
+              </div>
+              <div className="pl-3 space-y-3">
+                <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 border-[rgba(34,94,65,0.1)]">
+                  <div>
+                    <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.6)] uppercase tracking-wide mb-0.5">Status</p>
+                    <p className={cn(
+                      "text-base font-bold",
+                      inStock ? "text-[#1b8f5b]" : "text-red-600"
+                    )}>
+                      {stockStatus}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.6)] uppercase tracking-wide mb-0.5">Available Quantity</p>
+                    <p className="text-base font-bold text-[#172022]">
+                      {currentStock.toLocaleString('en-IN')} {currentStockUnit}
                     </p>
                   </div>
                 </div>
-                
-                {review.comment && (
-                  <p className="text-sm text-[rgba(26,42,34,0.85)] leading-relaxed mb-3">
-                    <TransText>{review.comment}</TransText>
-                  </p>
+                {inStock && (
+                  <div className="p-3 bg-white rounded-xl border-2 border-[rgba(34,94,65,0.1)]">
+                    {currentStock > 10 ? (
+                      <div className="flex items-center gap-2">
+                        <CheckCircleIcon className="h-4 w-4 text-[#1b8f5b]" />
+                        <p className="text-xs font-semibold text-[#172022]">
+                          Product is in stock and ready for delivery
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-full bg-orange-500"></div>
+                        <p className="text-xs font-semibold text-orange-600">
+                          Limited stock available • Only {currentStock} {currentStockUnit} left!
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
+                {!inStock && (
+                  <div className="p-3 bg-white rounded-xl border-2 border-red-200">
+                    <p className="text-xs font-semibold text-red-600">
+                      This product is currently out of stock. Please check back later.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-                {/* Admin Response */}
-                {review.adminResponse?.response && (
-                  <div className="mt-3 pt-3 border-t border-[rgba(34,94,65,0.15)]">
-                    <div className="flex items-start gap-2">
-                      <div className="w-1 h-full bg-gradient-to-b from-[#1b8f5b] to-[#2a9d61] rounded-full mt-1" />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-bold text-[#1b8f5b]"><Trans>Admin Response</Trans></span>
-                          {review.adminResponse.respondedBy?.name && (
-                            <span className="text-xs text-[rgba(26,42,34,0.6)]">
-                              <Trans>by</Trans> {review.adminResponse.respondedBy.name}
+          {/* Delivery Time Tab */}
+          {activeTab === 'delivery' && (
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-[rgba(239,246,255,0.6)] to-[rgba(239,246,255,0.3)] border-2 border-blue-500 shadow-lg">
+              <div className="flex items-center gap-2.5 mb-3">
+                <TruckIcon className="h-5 w-5 text-blue-500" />
+                <h3 className="text-base font-bold text-[#172022]">Delivery Information</h3>
+              </div>
+              <div className="pl-3 space-y-3">
+                <div className="p-4 bg-white rounded-xl border-2 border-blue-200 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shrink-0">
+                      <TruckIcon className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.6)] uppercase tracking-wide mb-1.5">Estimated Delivery Time</p>
+                      <p className="text-xl font-bold text-[#172022] mb-1.5">
+                        {product.deliveryTime || 'Within 24 hours'}
+                      </p>
+                      <p className="text-xs text-[rgba(26,42,34,0.7)]">
+                        Fast and reliable delivery to your doorstep
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="p-3 bg-white rounded-xl border border-blue-200">
+                    <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.6)] mb-0.5">Delivery Type</p>
+                    <p className="text-xs font-bold text-[#172022]">Standard</p>
+                  </div>
+                  <div className="p-3 bg-white rounded-xl border border-blue-200">
+                    <p className="text-[0.65rem] font-semibold text-[rgba(26,42,34,0.6)] mb-0.5">Tracking</p>
+                    <p className="text-xs font-bold text-[#172022]">Available</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reviews Tab */}
+          {activeTab === 'reviews' && (
+            <div className="space-y-6 p-6 rounded-2xl bg-gradient-to-br from-[rgba(240,245,242,0.4)] via-[rgba(248,250,249,0.3)] to-white border-2 border-[#1b8f5b]/20 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-[#172022] mb-1"><Trans>Reviews & Ratings</Trans></h3>
+                  <p className="text-sm text-[rgba(26,42,34,0.65)]">
+                    {reviewStats.totalReviews} {reviewStats.totalReviews === 1 ? <Trans>review</Trans> : <Trans>reviews</Trans>}
+                  </p>
+                </div>
+                {reviewStats.averageRating > 0 && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <StarIcon
+                          key={star}
+                          className="h-4 w-4 text-yellow-400"
+                          filled={star <= Math.round(reviewStats.averageRating)}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-base font-bold text-[#172022]">
+                      {reviewStats.averageRating.toFixed(1)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Rating Distribution */}
+              {reviewStats.totalReviews > 0 && (
+                <div className="p-4 rounded-xl bg-gradient-to-br from-[rgba(240,245,242,0.6)] to-[rgba(240,245,242,0.3)] border border-[#1b8f5b]/20">
+                  <div className="space-y-2">
+                    {[5, 4, 3, 2, 1].map((rating) => {
+                      const count = reviewStats.distribution[rating] || 0
+                      const percentage = reviewStats.totalReviews > 0 ? (count / reviewStats.totalReviews) * 100 : 0
+                      return (
+                        <div key={rating} className="flex items-center gap-3">
+                          <div className="flex items-center gap-1 w-16">
+                            <span className="text-xs font-semibold text-[#172022]">{rating}</span>
+                            <StarIcon className="h-3 w-3 text-yellow-400" filled={true} />
+                          </div>
+                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] transition-all duration-300"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-semibold text-[rgba(26,42,34,0.7)] w-8 text-right">
+                            {count}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Review Form (if authenticated) */}
+              {isAuthenticated && (
+                <div className="p-4 rounded-xl border-2 border-[#1b8f5b]/30 bg-gradient-to-br from-[rgba(240,245,242,0.4)] to-white">
+                  {!showReviewForm && !myReview ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowReviewForm(true)}
+                      className="w-full py-3 px-4 rounded-lg bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white text-sm font-semibold hover:shadow-md transition-all"
+                    >
+                      <Trans>Write a Review</Trans>
+                    </button>
+                  ) : myReview && !showReviewForm ? (
+                    // Collapsed state - show dropdown button
+                    <div className="space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowReviewForm(true)}
+                        className="w-full flex items-center justify-between py-3 px-4 rounded-lg bg-white border-2 border-[rgba(34,94,65,0.2)] hover:bg-[rgba(240,245,242,0.5)] transition-all"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <StarIcon
+                                key={star}
+                                className="h-4 w-4"
+                                filled={star <= myReview.rating}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-sm font-semibold text-[#172022]"><Trans>Edit Your Review</Trans></span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteReviewClick()
+                            }}
+                            className="text-xs text-red-600 font-semibold hover:underline px-2 py-1"
+                          >
+                            <Trans>Delete Review</Trans>
+                          </button>
+                          <ChevronDownIcon className="h-5 w-5 text-[#172022]" />
+                        </div>
+                      </button>
+                    </div>
+                  ) : showReviewForm ? (
+                    // Expanded state - show full form
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-base font-bold text-[#172022]">
+                          {myReview ? <Trans>Edit Your Review</Trans> : <Trans>Write a Review</Trans>}
+                        </h4>
+                        <div className="flex items-center gap-2">
+                          {myReview && (
+                            <button
+                              type="button"
+                              onClick={handleDeleteReviewClick}
+                              className="text-xs text-red-600 font-semibold hover:underline px-2 py-1"
+                            >
+                              Delete Review
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowReviewForm(false)
+                              if (myReview) {
+                                setReviewFormData({ rating: myReview.rating, comment: myReview.comment || '' })
+                              }
+                            }}
+                            className="text-[#172022] hover:text-[#1b8f5b] transition-colors"
+                          >
+                            <ChevronDownIcon className="h-5 w-5 rotate-180" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Star Rating Input */}
+                      <div>
+                        <label className="block text-sm font-semibold text-[#172022] mb-2">
+                          <Trans>Rating</Trans> <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setReviewFormData(prev => ({ ...prev, rating: star }))}
+                              className="focus:outline-none"
+                            >
+                              <StarIcon
+                                className="h-6 w-6 transition-all hover:scale-110"
+                                filled={star <= reviewFormData.rating}
+                                style={{ color: star <= reviewFormData.rating ? '#fbbf24' : '#d1d5db' }}
+                              />
+                            </button>
+                          ))}
+                          {reviewFormData.rating > 0 && (
+                            <span className="text-sm font-semibold text-[#172022] ml-2">
+                              {reviewFormData.rating} {reviewFormData.rating === 1 ? <Trans>star</Trans> : <Trans>stars</Trans>}
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-[rgba(26,42,34,0.85)] leading-relaxed">
-                          <TransText>{review.adminResponse.response}</TransText>
+                      </div>
+
+                      {/* Comment Input */}
+                      <div>
+                        <label className="block text-sm font-semibold text-[#172022] mb-2">
+                          <Trans>Your Review</Trans>
+                        </label>
+                        <textarea
+                          value={reviewFormData.comment}
+                          onChange={(e) => setReviewFormData(prev => ({ ...prev, comment: e.target.value }))}
+                          placeholder="Share your experience with this product..."
+                          className="w-full px-4 py-3 rounded-lg border-2 border-[rgba(34,94,65,0.2)] focus:border-[#1b8f5b] focus:outline-none resize-none"
+                          rows={4}
+                          maxLength={1000}
+                        />
+                        <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">
+                          {reviewFormData.comment.length}/1000 <Trans>characters</Trans>
                         </p>
-                        {review.adminResponse.respondedAt && (
-                          <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">
-                            {new Date(review.adminResponse.respondedAt).toLocaleDateString('en-IN', {
+                      </div>
+
+                      {/* Submit Buttons */}
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleSubmitReview}
+                          disabled={submittingReview || reviewFormData.rating === 0}
+                          className={cn(
+                            'flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all',
+                            submittingReview || reviewFormData.rating === 0
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white hover:shadow-md'
+                          )}
+                        >
+                          {submittingReview ? <Trans>Submitting...</Trans> : myReview ? <Trans>Update Review</Trans> : <Trans>Submit Review</Trans>}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowReviewForm(false)
+                            if (myReview) {
+                              // Reset to original review data when canceling edit
+                              setReviewFormData({ rating: myReview.rating, comment: myReview.comment || '' })
+                            } else {
+                              // Clear form when canceling new review
+                              setReviewFormData({ rating: 0, comment: '' })
+                            }
+                          }}
+                          className="py-3 px-4 rounded-lg border-2 border-[rgba(34,94,65,0.2)] text-sm font-semibold text-[#172022] hover:bg-[rgba(240,245,242,0.5)] transition-all"
+                        >
+                          {myReview ? <Trans>Collapse</Trans> : <Trans>Cancel</Trans>}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Reviews List */}
+              {reviewsLoading && reviews.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-sm text-[rgba(26,42,34,0.65)]"><Trans>Loading reviews...</Trans></p>
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="text-center py-8 p-4 rounded-xl bg-gray-50 border border-gray-200">
+                  <p className="text-sm text-[rgba(26,42,34,0.65)]"><Trans>No reviews yet. Be the first to review this product!</Trans></p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {reviews.map((review) => (
+                    <div
+                      key={review._id || review.id}
+                      className="p-4 rounded-xl border-2 border-[rgba(34,94,65,0.15)] bg-white hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-bold text-[#172022]">
+                              {review.userId?.name || 'Anonymous User'}
+                            </span>
+                            <div className="flex items-center gap-0.5">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <StarIcon
+                                  key={star}
+                                  className="h-3.5 w-3.5 text-yellow-400"
+                                  filled={star <= review.rating}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-xs text-[rgba(26,42,34,0.6)]">
+                            {new Date(review.createdAt).toLocaleDateString('en-IN', {
                               year: 'numeric',
                               month: 'long',
                               day: 'numeric'
                             })}
                           </p>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
 
-        {/* Load More Reviews Button */}
-        {hasMoreReviews && reviews.length > 0 && (
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={loadMoreReviews}
-              disabled={reviewsLoading}
-              className={cn(
-                'px-6 py-3 rounded-lg text-sm font-semibold transition-all',
-                reviewsLoading
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white hover:shadow-md'
+                      {review.comment && (
+                        <p className="text-sm text-[rgba(26,42,34,0.85)] leading-relaxed mb-3">
+                          <TransText>{review.comment}</TransText>
+                        </p>
+                      )}
+
+                      {/* Admin Response */}
+                      {review.adminResponse?.response && (
+                        <div className="mt-3 pt-3 border-t border-[rgba(34,94,65,0.15)]">
+                          <div className="flex items-start gap-2">
+                            <div className="w-1 h-full bg-gradient-to-b from-[#1b8f5b] to-[#2a9d61] rounded-full mt-1" />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-bold text-[#1b8f5b]"><Trans>Admin Response</Trans></span>
+                                {review.adminResponse.respondedBy?.name && (
+                                  <span className="text-xs text-[rgba(26,42,34,0.6)]">
+                                    <Trans>by</Trans> {review.adminResponse.respondedBy.name}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-[rgba(26,42,34,0.85)] leading-relaxed">
+                                <TransText>{review.adminResponse.response}</TransText>
+                              </p>
+                              {review.adminResponse.respondedAt && (
+                                <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">
+                                  {new Date(review.adminResponse.respondedAt).toLocaleDateString('en-IN', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                  })}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
-            >
-              {reviewsLoading ? <Trans>Loading...</Trans> : <Trans>Load More Reviews</Trans>}
-            </button>
-          </div>
-        )}
-               </div>
-             )}
-          </div>
+
+              {/* Load More Reviews Button */}
+              {hasMoreReviews && reviews.length > 0 && (
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={loadMoreReviews}
+                    disabled={reviewsLoading}
+                    className={cn(
+                      'px-6 py-3 rounded-lg text-sm font-semibold transition-all',
+                      reviewsLoading
+                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white hover:shadow-md'
+                    )}
+                  >
+                    {reviewsLoading ? <Trans>Loading...</Trans> : <Trans>Load More Reviews</Trans>}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+      </div>
 
       {/* Similar Products Section */}
       {similarProducts.length > 0 && (
@@ -1879,7 +1956,7 @@ export function ProductDetailView({ productId, onAddToCart, onBack, onProductCli
                 <p className="text-sm text-[rgba(26,42,34,0.7)]"><Trans>This action cannot be undone</Trans></p>
               </div>
             </div>
-            
+
             <p className="text-sm text-[rgba(26,42,34,0.85)] mb-6 pl-15">
               <Trans>Are you sure you want to delete your review? This will permanently remove your rating and comment for this product.</Trans>
             </p>

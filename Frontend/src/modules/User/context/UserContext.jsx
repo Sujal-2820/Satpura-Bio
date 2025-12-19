@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, useReducer, useEffect } from 'react
 import { initializeRealtimeConnection, handleRealtimeNotification } from '../services/userApi'
 
 const UserStateContext = createContext(null)
-const UserDispatchContext = createContext(() => {})
+const UserDispatchContext = createContext(() => { })
 
 const initialState = {
   authenticated: false,
@@ -70,10 +70,10 @@ function reducer(state, action) {
         realtimeConnected: action.payload,
       }
     case 'AUTH_LOGOUT':
-      return { 
-        ...state, 
-        authenticated: false, 
-        profile: initialState.profile, 
+      return {
+        ...state,
+        authenticated: false,
+        profile: initialState.profile,
         cart: [],
         vendorAvailability: initialState.vendorAvailability,
         assignedVendor: null,
@@ -208,13 +208,13 @@ function reducer(state, action) {
 
 export function UserProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
-  
+
   // Initialize real-time connection when authenticated
   useEffect(() => {
     if (state.authenticated && state.profile.phone) {
       const cleanup = initializeRealtimeConnection((notification) => {
         const processedNotification = handleRealtimeNotification(notification)
-        
+
         // Handle different notification types
         switch (processedNotification.type) {
           case 'payment_reminder':
@@ -231,7 +231,7 @@ export function UserProvider({ children }) {
               },
             })
             break
-            
+
           case 'delivery_update':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -256,7 +256,7 @@ export function UserProvider({ children }) {
               })
             }
             break
-            
+
           case 'order_assigned':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -270,7 +270,7 @@ export function UserProvider({ children }) {
               },
             })
             break
-            
+
           case 'order_delivered':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -295,7 +295,7 @@ export function UserProvider({ children }) {
               })
             }
             break
-            
+
           case 'offer':
           case 'announcement':
             dispatch({
@@ -309,7 +309,7 @@ export function UserProvider({ children }) {
               },
             })
             break
-            
+
           default:
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -321,16 +321,44 @@ export function UserProvider({ children }) {
             })
         }
       })
-      
+
       dispatch({ type: 'SET_REALTIME_CONNECTED', payload: true })
-      
+
       return () => {
         cleanup()
         dispatch({ type: 'SET_REALTIME_CONNECTED', payload: false })
       }
     }
   }, [state.authenticated, state.profile.phone])
-  
+
+  // Persist favourites to localStorage
+  useEffect(() => {
+    // Load favourites from localStorage on mount
+    const savedFavourites = localStorage.getItem('user_favourites')
+    if (savedFavourites) {
+      try {
+        const parsed = JSON.parse(savedFavourites)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Only load if there are no favourites in state yet (initial load)
+          if (state.favourites.length === 0) {
+            parsed.forEach(productId => {
+              dispatch({ type: 'ADD_TO_FAVOURITES', payload: { productId } })
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error loading favourites from localStorage:', error)
+      }
+    }
+  }, []) // Run only on mount
+
+  // Save favourites to localStorage whenever they change
+  useEffect(() => {
+    if (state.favourites.length >= 0) {
+      localStorage.setItem('user_favourites', JSON.stringify(state.favourites))
+    }
+  }, [state.favourites])
+
   const value = useMemo(() => state, [state])
   return (
     <UserStateContext.Provider value={value}>
