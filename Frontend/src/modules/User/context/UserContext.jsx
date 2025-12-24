@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useReducer, useEffect } from 'react'
-import { initializeRealtimeConnection, handleRealtimeNotification } from '../services/userApi'
+import { createContext, useContext, useMemo, useReducer, useEffect, useState } from 'react'
+import { initializeRealtimeConnection, handleRealtimeNotification, getUserProfile } from '../services/userApi'
 
 const UserStateContext = createContext(null)
 const UserDispatchContext = createContext(() => { })
@@ -208,6 +208,59 @@ function reducer(state, action) {
 
 export function UserProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // Initialize user session from stored token on mount
+  useEffect(() => {
+    const initializeUser = async () => {
+      const token = localStorage.getItem('user_token')
+      if (token && !state.authenticated) {
+        try {
+          const profileResult = await getUserProfile()
+
+          if (profileResult.success && profileResult.data?.user) {
+            const userData = profileResult.data.user
+            dispatch({
+              type: 'AUTH_LOGIN',
+              payload: {
+                name: userData.name || 'User',
+                phone: userData.phone || '',
+                email: userData.email || '',
+                sellerId: userData.sellerId || null,
+                location: userData.location || null,
+              },
+            })
+
+            // Set vendor availability status from profile if available
+            if (profileResult.data?.vendorAvailability) {
+              dispatch({
+                type: 'SET_VENDOR_AVAILABILITY',
+                payload: profileResult.data.vendorAvailability,
+              })
+
+              // Set assigned vendor if available
+              if (profileResult.data.vendorAvailability.assignedVendor) {
+                dispatch({
+                  type: 'SET_ASSIGNED_VENDOR',
+                  payload: profileResult.data.vendorAvailability.assignedVendor,
+                })
+              }
+            }
+          } else {
+            // Token is invalid, remove it
+            localStorage.removeItem('user_token')
+          }
+        } catch (error) {
+          console.error('Failed to initialize user session:', error)
+          // Token might be invalid or expired, remove it
+          localStorage.removeItem('user_token')
+        }
+      }
+      setIsInitialized(true)
+    }
+
+    initializeUser()
+  }, [state.authenticated]) // Re-run when authenticated state changes
 
   // Initialize real-time connection when authenticated
   useEffect(() => {
