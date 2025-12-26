@@ -7,7 +7,9 @@ import * as websiteApi from '../services/websiteApi'
 import { getPrimaryImageUrl } from '../utils/productImages'
 import { cn } from '../../../lib/cn'
 import '../styles/website.css'
-import { useTranslation, TransText, Trans } from '../../../context/TranslationContext'
+import { useTranslation } from '../../../context/TranslationContext'
+import { Trans } from '../../../components/Trans'
+import { TransText } from '../../../components/TransText'
 
 export function ProductListingPage() {
   const navigate = useNavigate()
