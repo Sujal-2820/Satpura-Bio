@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, useReducer, useEffect, useCallback 
 import { initializeRealtimeConnection, handleRealtimeNotification, getUserProfile, getCart, getOrders, getAddresses, getOffers } from '../services/websiteApi'
 
 const WebsiteStateContext = createContext(null)
-const WebsiteDispatchContext = createContext(() => {})
+const WebsiteDispatchContext = createContext(() => { })
 
 const initialState = {
   authenticated: false,
@@ -70,15 +70,15 @@ function reducer(state, action) {
         realtimeConnected: action.payload,
       }
     case 'AUTH_LOGOUT':
-      return { 
-        ...state, 
-        authenticated: false, 
-        profile: initialState.profile, 
+      return {
+        ...state,
+        authenticated: false,
+        profile: initialState.profile,
         cart: [],
         vendorAvailability: initialState.vendorAvailability,
         assignedVendor: null,
       }
-    case 'ADD_TO_CART':
+    case 'ADD_TO_CART': {
       const existingItem = state.cart.find((item) => item.productId === action.payload.productId)
       if (existingItem) {
         return {
@@ -94,6 +94,7 @@ function reducer(state, action) {
         ...state,
         cart: [...state.cart, action.payload],
       }
+    }
     case 'UPDATE_CART_ITEM':
       return {
         ...state,
@@ -208,7 +209,7 @@ function reducer(state, action) {
 
 export function WebsiteProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
-  
+
   // Helper function to resolve IDs (supports both _id and id fields)
   const resolveId = useCallback((value) => {
     if (!value) return ''
@@ -226,17 +227,17 @@ export function WebsiteProvider({ children }) {
     if (!cartData?.items) {
       return []
     }
-    
+
     const mappedItems = cartData.items
       .map((item) => {
         const cartItemId = resolveId(item.id || item._id)
         const product = item.product || item.productId || {}
         const productId = resolveId(product.id || product._id || item.productId)
-        
+
         if (!productId) {
           return null
         }
-        
+
         // Use variant-specific price (unitPrice) if available, otherwise fallback
         const price =
           typeof item.unitPrice === 'number'
@@ -246,10 +247,10 @@ export function WebsiteProvider({ children }) {
               : typeof product.price === 'number'
                 ? product.price
                 : 0
-        
+
         // Extract variant attributes if present
         const variantAttributes = item.variantAttributes || null
-        
+
         const mappedItem = {
           id: cartItemId,
           cartItemId,
@@ -263,11 +264,11 @@ export function WebsiteProvider({ children }) {
           deliveryTime: product.deliveryTime || null,
           variantAttributes: variantAttributes,
         }
-        
+
         return mappedItem
       })
       .filter(Boolean)
-    
+
     return mappedItems
   }, [resolveId])
 
@@ -298,14 +299,14 @@ export function WebsiteProvider({ children }) {
                 location: userData.location || null,
               },
             })
-            
+
             // Set vendor availability status from profile
             if (result.data?.vendorAvailability) {
               dispatch({
                 type: 'SET_VENDOR_AVAILABILITY',
                 payload: result.data.vendorAvailability,
               })
-              
+
               // Set assigned vendor if available
               if (result.data.vendorAvailability.assignedVendor) {
                 dispatch({
@@ -401,7 +402,7 @@ export function WebsiteProvider({ children }) {
   // Initialize welcome notification (only first time user enters website)
   useEffect(() => {
     if (!state.authenticated) return
-    
+
     const hasSeenWelcome = localStorage.getItem('hasSeenWelcomeNotification_website')
     if (!hasSeenWelcome && state.notifications.length === 0) {
       dispatch({
@@ -421,7 +422,7 @@ export function WebsiteProvider({ children }) {
     if (state.authenticated && state.profile.phone) {
       const cleanup = initializeRealtimeConnection((notification) => {
         const processedNotification = handleRealtimeNotification(notification)
-        
+
         // Handle different notification types
         switch (processedNotification.type) {
           case 'payment_reminder':
@@ -438,7 +439,7 @@ export function WebsiteProvider({ children }) {
               },
             })
             break
-            
+
           case 'delivery_update':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -463,7 +464,7 @@ export function WebsiteProvider({ children }) {
               })
             }
             break
-            
+
           case 'order_assigned':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -477,7 +478,7 @@ export function WebsiteProvider({ children }) {
               },
             })
             break
-            
+
           case 'order_delivered':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -502,7 +503,7 @@ export function WebsiteProvider({ children }) {
               })
             }
             break
-            
+
           case 'offer':
           case 'announcement':
             dispatch({
@@ -516,7 +517,7 @@ export function WebsiteProvider({ children }) {
               },
             })
             break
-            
+
           default:
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -528,9 +529,9 @@ export function WebsiteProvider({ children }) {
             })
         }
       })
-      
+
       dispatch({ type: 'SET_REALTIME_CONNECTED', payload: true })
-      
+
       return () => {
         cleanup()
         dispatch({ type: 'SET_REALTIME_CONNECTED', payload: false })
@@ -559,9 +560,9 @@ export function WebsiteProvider({ children }) {
                 dispatched: 'Your order has been dispatched and is on the way',
                 delivered: 'Your order has been delivered successfully',
               }
-              
+
               const message = statusMessages[order.status] || `Your order status has been updated to ${order.status}`
-              
+
               dispatch({
                 type: 'ADD_NOTIFICATION',
                 payload: {
@@ -613,7 +614,7 @@ export function WebsiteProvider({ children }) {
           const activeCarousels = (offersResult.data.carousels || [])
             .filter(c => c.isActive !== false)
           const specialOffers = offersResult.data.specialOffers || []
-          
+
           // Check for new offers (created in last 24 hours)
           const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
           const newCarousels = activeCarousels.filter(c => {
@@ -624,13 +625,13 @@ export function WebsiteProvider({ children }) {
             const createdAt = new Date(o.createdAt)
             return createdAt > oneDayAgo
           })
-          
+
           // Send notification for new offers (only once per day)
           if (newCarousels.length > 0 || newSpecialOffers.length > 0) {
             const lastOfferCheck = localStorage.getItem('lastOfferCheckTime_website')
             const now = Date.now()
             const oneDayInMs = 24 * 60 * 60 * 1000
-            
+
             if (!lastOfferCheck || (now - parseInt(lastOfferCheck)) > oneDayInMs) {
               const offerCount = newCarousels.length + newSpecialOffers.length
               dispatch({
@@ -658,7 +659,7 @@ export function WebsiteProvider({ children }) {
 
     return () => clearInterval(interval)
   }, [state.authenticated, dispatch])
-  
+
   const value = useMemo(() => state, [state])
   return (
     <WebsiteStateContext.Provider value={value}>

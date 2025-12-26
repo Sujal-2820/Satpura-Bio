@@ -31,6 +31,9 @@ import { ProductAttributeSelector } from '../../components/ProductAttributeSelec
 import { BankAccountForm } from '../../components/BankAccountForm'
 import { NotificationPanel } from '../../components/NotificationPanel'
 import { openRazorpayCheckout } from '../../../../utils/razorpay'
+import { useTranslation } from '../../../../context/TranslationContext'
+import { Trans } from '../../../../components/Trans'
+import { TransText } from '../../../../components/TransText'
 
 const NAV_ITEMS = [
   {
@@ -85,6 +88,7 @@ export function VendorDashboard({ onLogout }) {
   const [ordersViewRefreshKey, setOrdersViewRefreshKey] = useState(0)
   const welcomeName = (profile?.name || 'Partner').split(' ')[0]
   const { isOpen, isMounted, currentAction, openPanel, closePanel } = useButtonAction()
+  const { translateProduct } = useTranslation()
   const { toasts, dismissToast, success, error, info, warning } = useToast()
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false)
   const [isNotificationAnimating, setIsNotificationAnimating] = useState(false)
@@ -624,7 +628,7 @@ export function VendorDashboard({ onLogout }) {
           )}
           {activeTab === 'credit' && <CreditView openPanel={openPanel} />}
           {activeTab === 'earnings' && <EarningsView openPanel={openPanel} onNavigate={navigateTo} />}
-          {activeTab === 'reports' && <ReportsView />}
+          {activeTab === 'reports' && <ReportsView onNavigate={navigateTo} />}
         </section>
       </MobileShell>
 
@@ -1733,7 +1737,8 @@ function InventoryView({ openPanel, onNavigate }) {
   const { dashboard, profile } = useVendorState()
   const dispatch = useVendorDispatch()
   const { success, error: showError } = useToast()
-  const { getProducts, getProductDetails, requestCreditPurchase, getCreditPurchases } = useVendorApi()
+  const { getProducts, getProductDetails, requestCreditPurchase, getCreditPurchases, fetchDashboardData } = useVendorApi()
+  const { translateProduct } = useTranslation()
   const MIN_PURCHASE_VALUE = 50000
   const MAX_PURCHASE_VALUE = 100000
   const [productsData, setProductsData] = useState(null)
@@ -2712,7 +2717,7 @@ function InventoryView({ openPanel, onNavigate }) {
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
-                          <h4 className="text-sm font-bold text-gray-900 mb-1">{product.name}</h4>
+                          <h4 className="text-sm font-bold text-gray-900 mb-1"><TransText>{product.name}</TransText></h4>
                           <p className="text-xs text-gray-500">SKU: {product.sku || 'N/A'}</p>
                         </div>
                         {product.primaryImage || product.images?.[0]?.url ? (
@@ -2942,7 +2947,7 @@ function InventoryView({ openPanel, onNavigate }) {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <p className="text-sm font-semibold text-gray-900">{product.name}</p>
+                            <p className="text-sm font-semibold text-gray-900"><TransText>{product.name}</TransText></p>
                             {/* Show variant info if variant is selected */}
                             {selected.attributes && Object.keys(selected.attributes).length > 0 && (
                               <div className="mt-1 space-y-0.5">
@@ -3050,7 +3055,7 @@ function InventoryView({ openPanel, onNavigate }) {
                   {billingItems.map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between border-b border-gray-100 pb-2">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{item.product.name}</p>
+                        <p className="text-sm font-semibold text-gray-900"><TransText>{item.product.name}</TransText></p>
                         {/* Display variant attributes if present */}
                         {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
                           <div className="mt-1 space-y-0.5">
@@ -3472,7 +3477,7 @@ function InventoryView({ openPanel, onNavigate }) {
 
                   {/* Product Info */}
                   <div className="space-y-2">
-                    <h4 className="font-bold text-gray-900 line-clamp-1">{product.name}</h4>
+                    <h4 className="font-bold text-gray-900 line-clamp-1"><TransText>{product.name}</TransText></h4>
                     <p className="text-xs text-gray-600 line-clamp-2">{shortDescription}...</p>
 
                     {/* Arriving Notification */}
@@ -5492,7 +5497,7 @@ function CreditView({ openPanel }) {
   )
 }
 
-function ReportsView() {
+function ReportsView({ onNavigate }) {
   const { dashboard } = useVendorState()
   const dispatch = useVendorDispatch()
   const { getReports, getEarningsSummary } = useVendorApi()
@@ -5678,7 +5683,7 @@ function ReportsView() {
               key={tab.id}
               type="button"
               className={cn('reports-tab-button', activeTab === tab.id && 'is-active')}
-              onClick={() => navigateToTab(tab.id)}
+              onClick={() => onNavigate?.(tab.id)}
             >
               {tab.label}
             </button>

@@ -10,6 +10,7 @@ const userRoutes = require('./routes/user');
 const vendorRoutes = require('./routes/vendor');
 const sellerRoutes = require('./routes/seller');
 const adminRoutes = require('./routes/admin');
+const utilsRoutes = require('./routes/utils');
 
 // Import config
 const { connectDB } = require('./config/database');
@@ -29,7 +30,7 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     // In development, allow localhost origins even if not in CORS_ORIGINS
     if (process.env.NODE_ENV !== 'production') {
       const isLocalhost = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
@@ -37,7 +38,7 @@ app.use(cors({
         return callback(null, true);
       }
     }
-    
+
     // In production, only allow origins from CORS_ORIGINS
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
@@ -68,6 +69,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/sellers', sellerRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/utils', utilsRoutes);
 
 // 404 handler (must come before error handler)
 app.use((req, res) => {

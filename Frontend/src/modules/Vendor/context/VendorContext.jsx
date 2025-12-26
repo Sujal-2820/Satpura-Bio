@@ -157,9 +157,9 @@ function reducer(state, action) {
           ...state.dashboard,
           orders: state.dashboard.orders
             ? {
-                ...state.dashboard.orders,
-                orders: state.dashboard.orders.orders?.map(applyOrderUpdates),
-              }
+              ...state.dashboard.orders,
+              orders: state.dashboard.orders.orders?.map(applyOrderUpdates),
+            }
             : null,
         },
         ordersUpdated: true,
@@ -172,18 +172,18 @@ function reducer(state, action) {
           ...state.dashboard,
           inventory: state.dashboard.inventory
             ? {
-                ...state.dashboard.inventory,
-                items: state.dashboard.inventory.items?.map((item) =>
-                  item.id === action.payload.itemId
-                    ? { ...item, stock: action.payload.stock }
-                    : item,
-                ),
-              }
+              ...state.dashboard.inventory,
+              items: state.dashboard.inventory.items?.map((item) =>
+                item.id === action.payload.itemId
+                  ? { ...item, stock: action.payload.stock }
+                  : item,
+              ),
+            }
             : null,
         },
         inventoryUpdated: true,
       }
-    case 'UPDATE_CREDIT_BALANCE':
+    case 'UPDATE_CREDIT_BALANCE': {
       const currentCredit = state.dashboard.credit || { used: 0, remaining: 0 }
       const newUsed = action.payload.isIncrement
         ? currentCredit.used + action.payload.amount
@@ -200,6 +200,7 @@ function reducer(state, action) {
           },
         },
       }
+    }
     case 'ADD_CREDIT_PURCHASE_REQUEST':
       return {
         ...state,
@@ -224,7 +225,7 @@ function reducer(state, action) {
         ...state,
         inventoryUpdated: action.payload,
       }
-    case 'ADD_NOTIFICATION':
+    case 'ADD_NOTIFICATION': {
       // Check if notification already exists (prevent duplicates)
       const existingIndex = state.notifications.findIndex(
         (n) => n.id === action.payload.id || (n.type === action.payload.type && n.data?.orderId === action.payload.data?.orderId),
@@ -244,6 +245,7 @@ function reducer(state, action) {
           ...state.notifications,
         ],
       }
+    }
     case 'MARK_NOTIFICATION_READ':
       return {
         ...state,
@@ -274,13 +276,13 @@ function reducer(state, action) {
 export function VendorProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const [isInitialized, setIsInitialized] = useState(false)
-  
+
   // Get toast functions from context (if available)
   let showToast = (message, type) => {
     // Fallback if toast is not available
     console.log(`[${type.toUpperCase()}] ${message}`)
   }
-  
+
   // Initialize vendor profile from token on mount
   useEffect(() => {
     const initializeVendor = async () => {
@@ -288,7 +290,7 @@ export function VendorProvider({ children }) {
       if (token && !state.authenticated) {
         try {
           const profileResult = await getVendorProfile()
-          
+
           if (profileResult.success && profileResult.data?.vendor) {
             const vendor = profileResult.data.vendor
             dispatch({
@@ -315,10 +317,10 @@ export function VendorProvider({ children }) {
       }
       setIsInitialized(true)
     }
-    
+
     initializeVendor()
   }, [state.authenticated]) // Run when authenticated state changes
-  
+
   const value = useMemo(() => ({ ...state, [VENDOR_CONTEXT_SYMBOL]: true }), [state])
   const dispatchWithSymbol = useMemo(() => {
     const wrappedDispatch = (action) => dispatch(action)
@@ -335,7 +337,7 @@ export function VendorProvider({ children }) {
 export function useVendorState() {
   const context = useContext(VendorStateContext)
   if (!context || !context[VENDOR_CONTEXT_SYMBOL]) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env.DEV) {
       console.error('useVendorState must be used within VendorProvider')
       throw new Error('useVendorState must be used within VendorProvider')
     }
@@ -350,13 +352,13 @@ export function useVendorState() {
 export function useVendorDispatch() {
   const dispatch = useContext(VendorDispatchContext)
   if (!dispatch || !dispatch[VENDOR_CONTEXT_SYMBOL]) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env.DEV) {
       console.error('useVendorDispatch must be used within VendorProvider')
       throw new Error('useVendorDispatch must be used within VendorProvider')
     }
     // In production, return a no-op function to prevent crashes
     return () => {
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env.DEV) {
         console.warn('VendorDispatch called outside VendorProvider')
       }
     }

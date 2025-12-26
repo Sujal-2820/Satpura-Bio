@@ -12,14 +12,11 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
   const [orderInfo, setOrderInfo] = useState(null)
   const fileInputRef = useRef(null)
   const { getOrderDetails } = useVendorApi()
-
-  if (!action) return null
-
-  const { intent, title, data, buttonId } = action
+  const { intent, title, data, buttonId } = action || {}
 
   // Initialize formData from fields if they exist
   const initializeFormData = useCallback(() => {
-    if (intent === BUTTON_INTENT.UPDATION && data.fields) {
+    if (intent === BUTTON_INTENT.UPDATION && data?.fields) {
       return data.fields.reduce((acc, field) => {
         acc[field.name] = field.value || ''
         return acc
@@ -29,6 +26,8 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
   }, [intent, data])
 
   const [formData, setFormData] = useState(initializeFormData)
+
+
 
   // Fetch order details if orderId is present
   useEffect(() => {
@@ -87,9 +86,9 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
       }
       // Check max from field or from data (for dynamic max like availableBalance or creditUsed)
       const maxValue = field.max !== undefined ? field.max : (
-        data?.availableBalance && field.name === 'amount' ? data.availableBalance : 
-        buttonId === 'repay-credit' && data?.creditUsed && field.name === 'amount' ? data.creditUsed : 
-        undefined
+        data?.availableBalance && field.name === 'amount' ? data.availableBalance :
+          buttonId === 'repay-credit' && data?.creditUsed && field.name === 'amount' ? data.creditUsed :
+            undefined
       )
       if (maxValue !== undefined && numValue > maxValue) {
         // For repay-credit, show exact max value (can be decimal)
@@ -175,7 +174,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
       let adjustedFormData = { ...formData }
       if (buttonId === 'repay-credit' && formData.amount) {
         const numAmount = parseFloat(formData.amount)
-        
+
         // If exceeds max, set to exact max value (can be decimal)
         if (data?.creditUsed && numAmount > data.creditUsed) {
           adjustedFormData.amount = data.creditUsed.toString()
@@ -183,7 +182,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
           setFormData(adjustedFormData)
         }
       }
-      
+
       // Validate all fields using adjusted form data
       const errors = {}
       let hasErrors = false
@@ -284,6 +283,8 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
     }
   }, [isOpen])
 
+  if (!action) return null
+
   const renderContent = () => {
     // Helper to render order customer info
     const renderOrderInfo = () => {
@@ -291,7 +292,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
       const order = orderInfo || {}
       const customerName = order.userId?.name || order.farmer || 'Unknown'
       const customerPhone = order.userId?.phone || order.customerPhone || 'N/A'
-      
+
       return (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 mb-4">
           <div className="flex items-center gap-2 mb-2">
@@ -309,11 +310,11 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
     }
 
     switch (intent) {
-      case BUTTON_INTENT.UPDATION:
+      case BUTTON_INTENT.UPDATION: {
         // Check if this is a revert action
         const isRevert = data?.revert === true && buttonId === 'update-order-status'
         const previousStatus = isRevert ? (orderInfo?.statusUpdateGracePeriod?.previousStatus || data?.status || '') : null
-        
+
         // If it's a revert, show special revert confirmation UI
         if (isRevert && previousStatus) {
           const formatStatusLabel = (status) => {
@@ -326,11 +327,11 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
             if (normalized === 'awaiting' || normalized === 'pending') return 'Awaiting'
             return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')
           }
-          
+
           return (
             <div className="vendor-action-panel__form">
               {renderOrderInfo()}
-              
+
               {/* Previous Status Display */}
               <div className="vendor-action-panel__field">
                 <label className="vendor-action-panel__label">
@@ -349,7 +350,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                   {formatStatusLabel(previousStatus)}
                 </div>
               </div>
-              
+
               {/* Warning Message */}
               <div style={{
                 padding: '12px',
@@ -362,7 +363,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                   ⚠️ Do you confirm to shift the order status to <strong>{formatStatusLabel(previousStatus)}</strong>?
                 </p>
               </div>
-              
+
               {/* Notes field (optional) */}
               {data.fields?.find(f => f.name === 'notes') && (
                 <div className="vendor-action-panel__field">
@@ -381,7 +382,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                   />
                 </div>
               )}
-              
+
               <div className="vendor-action-panel__actions">
                 <button type="button" onClick={onClose} className="vendor-action-panel__button is-secondary">
                   Cancel
@@ -393,7 +394,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
             </div>
           )
         }
-        
+
         // Normal update UI (existing logic)
         return (
           <div className="vendor-action-panel__form">
@@ -424,7 +425,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                     } else if (field.options) {
                       filteredOptions = field.options
                     }
-                    
+
                     // For status field, filter to only show current and next status
                     if (field.name === 'status' && orderInfo) {
                       const normalizeStatus = (status) => {
@@ -437,18 +438,18 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                         if (normalized === 'awaiting' || normalized === 'pending') return 'awaiting'
                         return 'awaiting'
                       }
-                      
+
                       const currentStatus = normalizeStatus(orderInfo.status)
                       const paymentPreference = orderInfo.paymentPreference || 'partial'
                       const isInGracePeriod = orderInfo.statusUpdateGracePeriod?.isActive
-                      
+
                       // Define status flow based on payment preference
                       const statusFlow = paymentPreference === 'partial'
                         ? ['awaiting', 'accepted', 'dispatched', 'delivered', 'fully_paid']
                         : ['awaiting', 'accepted', 'dispatched', 'delivered']
-                      
+
                       const currentIndex = statusFlow.indexOf(currentStatus)
-                      
+
                       if (currentIndex >= 0 && !isInGracePeriod) {
                         // Only show current status and next status
                         const nextIndex = currentIndex + 1
@@ -456,7 +457,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                           statusFlow[currentIndex], // Current status
                           ...(nextIndex < statusFlow.length ? [statusFlow[nextIndex]] : []) // Next status if exists
                         ]
-                        
+
                         filteredOptions = field.options.filter((option) => {
                           const optionValue = typeof option === 'object' ? option.value : option
                           return allowedStatuses.includes(optionValue)
@@ -469,7 +470,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                         })
                       }
                     }
-                    
+
                     return (
                       <select
                         className={cn(
@@ -491,7 +492,7 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                               // Handle both string and object options
                               const optionValue = typeof option === 'object' ? option.value : option
                               const optionLabel = typeof option === 'object' ? option.label : option.charAt(0).toUpperCase() + option.slice(1)
-                              
+
                               return (
                                 <option key={optionValue} value={optionValue}>
                                   {optionLabel}
@@ -597,9 +598,9 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                       placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
                       min={field.min}
                       max={field.max !== undefined ? field.max : (
-                        data?.availableBalance && field.name === 'amount' ? data.availableBalance : 
-                        buttonId === 'repay-credit' && data?.creditUsed && field.name === 'amount' ? data.creditUsed : 
-                        undefined
+                        data?.availableBalance && field.name === 'amount' ? data.availableBalance :
+                          buttonId === 'repay-credit' && data?.creditUsed && field.name === 'amount' ? data.creditUsed :
+                            undefined
                       )}
                       required={field.required}
                     />
@@ -625,14 +626,15 @@ export function ButtonActionPanel({ action, isOpen, onClose, onAction, onShowNot
                 Cancel
               </button>
               <button type="button" onClick={handleSubmit} className="vendor-action-panel__button is-primary">
-                {data.type === 'admin_request' ? 'Send Request' : 
-                 buttonId === 'repay-credit' ? 'Repay' : 
-                 'Update'}
+                {data.type === 'admin_request' ? 'Send Request' :
+                  buttonId === 'repay-credit' ? 'Repay' :
+                    'Update'}
               </button>
             </div>
           </div>
         )
 
+      }
       case BUTTON_INTENT.INFORMATION_DISPLAY:
         return <InformationDisplayContent data={data} buttonId={buttonId} />
 
@@ -797,19 +799,19 @@ function InformationDisplayContent({ data, buttonId }) {
   const renderContentByType = () => {
     switch (data.type) {
       case 'credit_info':
-      case 'credit_details':
+      case 'credit_details': {
         // Use real credit data from backend or dashboard
         const creditInfo = creditData?.credit || dashboard?.credit?.credit || {}
         const creditStatus = creditData?.status || dashboard?.credit?.status || {}
         const creditUsed = creditInfo.used || dashboard?.overview?.credit?.used || 0
         const penalty = creditStatus.penalty || dashboard?.overview?.credit?.penalty || 0
         const dueDate = creditInfo.dueDate || dashboard?.overview?.credit?.dueDate
-        
+
         const formatCredit = (value) => {
           if (!value || value === 0) return '₹0'
           return value >= 100000 ? `₹${(value / 100000).toFixed(1)}L` : `₹${Math.round(value).toLocaleString('en-IN')}`
         }
-        
+
         const formatDate = (date) => {
           if (!date) return 'Not set'
           return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -822,7 +824,7 @@ function InformationDisplayContent({ data, buttonId }) {
         // Calculate total repaid and repayment count
         const totalRepaid = repaymentHistory.reduce((sum, r) => sum + (r.amount || 0), 0)
         const repaymentCount = repaymentHistory.filter(r => r.status === 'completed').length
-        
+
         // Get last repayment date
         const lastRepayment = repaymentHistory
           .filter(r => r.status === 'completed')
@@ -831,7 +833,7 @@ function InformationDisplayContent({ data, buttonId }) {
             const dateB = new Date(b.paidAt || b.transactionDate || b.createdAt || 0)
             return dateB - dateA
           })[0]
-        
+
         return (
           <div className="vendor-info-display">
             <div className="vendor-info-display__section">
@@ -872,7 +874,7 @@ function InformationDisplayContent({ data, buttonId }) {
                 <span className="vendor-info-display__status-badge">{penalty === 0 ? 'No penalty' : `₹${penalty.toLocaleString('en-IN')}`}</span>
               </div>
             </div>
-            
+
             {repaymentHistory.length > 0 && (
               <div className="vendor-info-display__section">
                 <h5 className="vendor-info-display__section-title">Recent Repayments</h5>
@@ -886,11 +888,11 @@ function InformationDisplayContent({ data, buttonId }) {
                         <span className="vendor-info-display__item-amount">-₹{(repayment.amount || 0).toLocaleString('en-IN')}</span>
                         <span className="vendor-info-display__item-status">{repayment.status === 'completed' ? 'Completed' : repayment.status}</span>
                         <span className="vendor-info-display__item-date">{formatDate(repaymentDate)}</span>
-                          {repayment.penaltyAmount > 0 && (
+                        {repayment.penaltyAmount > 0 && (
                           <span className="vendor-info-display__item-penalty">
-                              (Penalty: ₹{repayment.penaltyAmount.toLocaleString('en-IN')})
-                            </span>
-                          )}
+                            (Penalty: ₹{repayment.penaltyAmount.toLocaleString('en-IN')})
+                          </span>
+                        )}
                       </div>
                     )
                   })}
@@ -900,12 +902,13 @@ function InformationDisplayContent({ data, buttonId }) {
           </div>
         )
 
-      case 'payouts':
+      }
+      case 'payouts': {
         const formatCurrency = (amount) => {
           if (!amount) return '₹0'
           return `₹${Math.round(amount).toLocaleString('en-IN')}`
         }
-        
+
         const formatPayoutDate = (date) => {
           if (!date) return 'N/A'
           return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -951,8 +954,9 @@ function InformationDisplayContent({ data, buttonId }) {
             </div>
           </div>
         )
+      }
 
-      case 'reorder':
+      case 'reorder': {
         if (loading) {
           return <div className="vendor-info-display"><p>Loading reorder information...</p></div>
         }
@@ -981,8 +985,9 @@ function InformationDisplayContent({ data, buttonId }) {
             </div>
           </div>
         )
+      }
 
-      case 'stock_report':
+      case 'stock_report': {
         if (loading) {
           return <div className="vendor-info-display"><p>Loading stock report...</p></div>
         }
@@ -1014,6 +1019,7 @@ function InformationDisplayContent({ data, buttonId }) {
             </div>
           </div>
         )
+      }
 
       default:
         return <div className="vendor-info-display">Information will be displayed here.</div>

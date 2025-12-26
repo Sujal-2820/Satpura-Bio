@@ -20,6 +20,8 @@ import { ShareSellerIdPanel } from '../components/ShareSellerIdPanel'
 import { BankAccountForm } from '../components/BankAccountForm'
 import { NotificationPanel } from '../components/NotificationPanel'
 import '../seller.css'
+import { Trans } from '../../../components/Trans'
+import { TransText } from '../../../components/TransText'
 
 const NAV_ITEMS = [
   {
@@ -178,15 +180,16 @@ export function SellerDashboard({ onLogout }) {
         setPanelMounted(true)
         requestAnimationFrame(() => setActivePanel('share-seller-id'))
         break
-      case 'request-withdrawal':
+      case 'request-withdrawal': {
         const wallet = dashboard.wallet || {}
-        const balance = data?.availableBalance !== undefined 
-          ? data.availableBalance 
+        const balance = data?.availableBalance !== undefined
+          ? data.availableBalance
           : (typeof wallet.balance === 'number' ? wallet.balance : parseFloat((wallet.balance || '0').toString().replace(/[₹,\s]/g, '')) || 0)
-          setPanelData(data || {})
-          setPanelMounted(true)
-          requestAnimationFrame(() => setActivePanel('request-withdrawal'))
+        setPanelData(data || {})
+        setPanelMounted(true)
+        requestAnimationFrame(() => setActivePanel('request-withdrawal'))
         break
+      }
       case 'add-bank-account':
       case 'edit-bank-account':
       case 'delete-bank-account':
@@ -276,7 +279,7 @@ export function SellerDashboard({ onLogout }) {
       // New notification arrived
       playNotificationSound()
       setIsNotificationAnimating(true)
-      
+
       // Stop animation after 3 seconds
       const animationTimer = setTimeout(() => {
         setIsNotificationAnimating(false)
@@ -306,14 +309,14 @@ export function SellerDashboard({ onLogout }) {
   const handleMarkAllNotificationsAsRead = useCallback(() => {
     dispatch({ type: 'MARK_ALL_NOTIFICATIONS_READ' })
   }, [dispatch])
-  
+
   const tabLabels = useMemo(() => {
     return NAV_ITEMS.reduce((acc, item) => {
       acc[item.id] = item.label
       return acc
     }, {})
   }, [])
-  
+
   const searchCatalog = useMemo(
     () =>
       [
@@ -393,9 +396,9 @@ export function SellerDashboard({ onLogout }) {
       })),
     [tabLabels],
   )
-  
+
   const [pendingScroll, setPendingScroll] = useState(null)
-  
+
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     if (!query) {
@@ -415,7 +418,7 @@ export function SellerDashboard({ onLogout }) {
       .sort((a, b) => b.score - a.score)
     return results.length ? results : searchCatalog.slice(0, 5)
   }, [searchCatalog, searchQuery])
-  
+
   const handleSearchNavigate = (item) => {
     if (!item) return
     const delay = item.tab === activeTab ? 150 : 420
@@ -425,7 +428,7 @@ export function SellerDashboard({ onLogout }) {
     }
     closeSearch()
   }
-  
+
   const handleSearchSubmit = () => {
     if (searchResults.length) {
       handleSearchNavigate(searchResults[0])
@@ -433,7 +436,7 @@ export function SellerDashboard({ onLogout }) {
       closeSearch()
     }
   }
-  
+
   useEffect(() => {
     if (!pendingScroll) return
     const { id, delay } = pendingScroll

@@ -7,6 +7,7 @@ import * as websiteApi from '../services/websiteApi'
 import { getPrimaryImageUrl } from '../utils/productImages'
 import { cn } from '../../../lib/cn'
 import '../styles/website.css'
+import { useTranslation, TransText, Trans } from '../../../context/TranslationContext'
 
 export function ProductListingPage() {
   const navigate = useNavigate()
@@ -16,9 +17,10 @@ export function ProductListingPage() {
   const searchQuery = searchParams.get('search') || ''
   const categoryId = searchParams.get('category') || ''
   const carouselId = searchParams.get('carousel') || ''
-  
+
   const { fetchCategories, fetchProducts, addToCart, addToFavourites, removeFromFavourites } = useWebsiteApi()
-  
+  const { translateProduct } = useTranslation()
+
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [sortBy, setSortBy] = useState('popular')
   const [priceRange, setPriceRange] = useState({ min: 0, max: 10000 })
@@ -27,7 +29,7 @@ export function ProductListingPage() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
-  
+
   // Fetch categories
   useEffect(() => {
     const loadCategories = async () => {
@@ -52,20 +54,20 @@ export function ProductListingPage() {
           limit: 100,
           maxPrice: priceRange.max,
         }
-        
+
         if (searchQuery.trim()) {
           params.search = searchQuery.trim()
         }
-        
+
         if (selectedCategory !== 'all') {
           params.category = selectedCategory
         }
-        
+
         if (carouselId) {
           // Handle carousel products if needed
           // This might need a separate API endpoint
         }
-        
+
         // Map sortBy to API sort parameter
         if (sortBy === 'price-low') {
           params.sort = 'price_asc'
@@ -76,7 +78,7 @@ export function ProductListingPage() {
         } else {
           params.sort = 'popular'
         }
-        
+
         const result = await fetchProducts(params)
         if (result.data?.products) {
           let filteredProducts = result.data.products
@@ -108,7 +110,7 @@ export function ProductListingPage() {
         setLoading(false)
       }
     }
-    
+
     loadProducts()
   }, [searchQuery, selectedCategory, sortBy, priceRange, availabilityFilter, carouselId])
 
@@ -167,7 +169,7 @@ export function ProductListingPage() {
     <>
       {/* Category Filter */}
       <div className="product-listing__filter-group">
-        <h4>Category</h4>
+        <h4><Trans>Category</Trans></h4>
         <div className="product-listing__filter-options">
           <label className="product-listing__filter-checkbox">
             <input
@@ -177,7 +179,7 @@ export function ProductListingPage() {
               checked={selectedCategory === 'all'}
               onChange={(e) => setSelectedCategory(e.target.value)}
             />
-            <span>All Categories</span>
+            <span><Trans>All Categories</Trans></span>
           </label>
           {categories.map((category) => (
             <label key={category.id || category._id} className="product-listing__filter-checkbox">
@@ -188,7 +190,7 @@ export function ProductListingPage() {
                 checked={selectedCategory === (category.id || category._id)}
                 onChange={(e) => setSelectedCategory(e.target.value)}
               />
-              <span>{category.name}</span>
+              <span><TransText>{category.name}</TransText></span>
             </label>
           ))}
         </div>
@@ -196,7 +198,7 @@ export function ProductListingPage() {
 
       {/* Price Range */}
       <div className="product-listing__filter-group">
-        <h4>Price Range</h4>
+        <h4><Trans>Price Range</Trans></h4>
         <div className="product-listing__filter-options">
           <input
             type="range"
@@ -212,10 +214,10 @@ export function ProductListingPage() {
           </div>
         </div>
       </div>
-      
+
       {/* Availability */}
       <div className="product-listing__filter-group">
-        <h4>Availability</h4>
+        <h4><Trans>Availability</Trans></h4>
         <div className="product-listing__filter-options">
           <label className="product-listing__filter-checkbox">
             <input
@@ -225,7 +227,7 @@ export function ProductListingPage() {
               checked={availabilityFilter === 'all'}
               onChange={(e) => setAvailabilityFilter(e.target.value)}
             />
-            <span>All</span>
+            <span><Trans>All</Trans></span>
           </label>
           <label className="product-listing__filter-checkbox">
             <input
@@ -235,7 +237,7 @@ export function ProductListingPage() {
               checked={availabilityFilter === 'in-stock'}
               onChange={(e) => setAvailabilityFilter(e.target.value)}
             />
-            <span>In Stock</span>
+            <span><Trans>In Stock</Trans></span>
           </label>
           <label className="product-listing__filter-checkbox">
             <input
@@ -245,7 +247,7 @@ export function ProductListingPage() {
               checked={availabilityFilter === 'low-stock'}
               onChange={(e) => setAvailabilityFilter(e.target.value)}
             />
-            <span>Low Stock</span>
+            <span><Trans>Low Stock</Trans></span>
           </label>
         </div>
       </div>
@@ -256,23 +258,23 @@ export function ProductListingPage() {
     <Layout>
       <Container className="product-listing">
         {/* Filter Button - Mobile (sticky below header) */}
-        <button 
+        <button
           className="product-listing__filter-button-mobile"
           onClick={() => setFiltersOpen(true)}
         >
-          Filters
+          <Trans>Filters</Trans>
         </button>
 
         {/* Top Bar */}
         <div className="product-listing__topbar">
           <div className="product-listing__count">
             <span>
-              {searchQuery ? `Search: "${searchQuery}"` : 'All Products'} - {products.length} {products.length === 1 ? 'product' : 'products'}
+              {searchQuery ? <><Trans>Search: </Trans> "{searchQuery}"</> : <Trans>All Products</Trans>} - {products.length} <Trans>{products.length === 1 ? 'product' : 'products'}</Trans>
             </span>
           </div>
           <div className="product-listing__sort">
-            <select 
-              value={sortBy} 
+            <select
+              value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="product-listing__sort-select"
             >
@@ -288,8 +290,8 @@ export function ProductListingPage() {
           {/* Filters Sidebar - Desktop */}
           <aside className="product-listing__filters-desktop">
             <div className="product-listing__filters-header">
-              <h3>Filters</h3>
-              <button onClick={handleClearFilters}>Clear All</button>
+              <h3><Trans>Filters</Trans></h3>
+              <button onClick={handleClearFilters}><Trans>Clear All</Trans></button>
             </div>
             <div className="product-listing__filters-content">
               <FilterContent />
@@ -300,21 +302,22 @@ export function ProductListingPage() {
           <div className="product-listing__products">
             {loading ? (
               <div className="text-center py-12">
-                <p className="text-gray-500">Loading products...</p>
+                <p className="text-gray-500"><Trans>Loading products...</Trans></p>
               </div>
             ) : products.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-lg font-semibold text-gray-700 mb-2">No products found</p>
-                <p className="text-sm text-gray-500">Try adjusting your filters or search query</p>
+                <p className="text-lg font-semibold text-gray-700 mb-2"><Trans>No products found</Trans></p>
+                <p className="text-sm text-gray-500"><Trans>Try adjusting your filters or search query</Trans></p>
               </div>
             ) : (
               <div className="product-listing__grid">
-                {products.map((product) => {
+                {products.map((rawProduct) => {
+                  const product = translateProduct(rawProduct)
                   const productId = product._id || product.id
                   const inStock = (product.stock || 0) > 0
                   const productImage = getPrimaryImageUrl(product)
                   const isWishlisted = favourites.includes(productId)
-                  
+
                   return (
                     <div
                       key={productId}
@@ -358,7 +361,7 @@ export function ProductListingPage() {
                         onClick={(e) => handleAddToCart(e, productId)}
                         disabled={!inStock}
                       >
-                        {inStock ? 'Add to Cart' : 'Out of Stock'}
+                        {inStock ? <Trans>Add to Cart</Trans> : <Trans>Out of Stock</Trans>}
                       </button>
                     </div>
                   )
@@ -370,7 +373,7 @@ export function ProductListingPage() {
 
         {/* Filters Drawer - Mobile */}
         {filtersOpen && (
-          <div 
+          <div
             className="product-listing__filters-mobile-drawer"
             onClick={(e) => {
               if (e.target === e.currentTarget) {

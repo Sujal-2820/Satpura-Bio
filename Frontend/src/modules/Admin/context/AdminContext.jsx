@@ -229,7 +229,7 @@ function reducer(state, action) {
           updated: action.payload,
         },
       }
-    case 'ADD_NOTIFICATION':
+    case 'ADD_NOTIFICATION': {
       // Check if notification already exists (prevent duplicates)
       const existingIndex = state.notifications.findIndex(
         (n) => n.id === action.payload.id || (n.type === action.payload.type && n.data?.id === action.payload.data?.id),
@@ -249,6 +249,7 @@ function reducer(state, action) {
           ...state.notifications,
         ],
       }
+    }
     case 'MARK_NOTIFICATION_READ':
       return {
         ...state,

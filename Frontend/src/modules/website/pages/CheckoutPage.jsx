@@ -21,7 +21,7 @@ export function CheckoutPage() {
   const dispatch = useWebsiteDispatch()
   const { cart, profile, assignedVendor, vendorAvailability } = useWebsiteState()
   const { createOrder, createPaymentIntent, confirmPayment } = useWebsiteApi()
-  
+
   const [currentStep, setCurrentStep] = useState(1)
   const [summaryExpanded, setSummaryExpanded] = useState(true)
   const [shippingMethod, setShippingMethod] = useState('standard')
@@ -71,7 +71,7 @@ export function CheckoutPage() {
       }
       setCartProducts(productMap)
     }
-    
+
     if (cart.length > 0) {
       loadCartProducts()
     }
@@ -95,14 +95,14 @@ export function CheckoutPage() {
   // Group items by productId with variants
   const groupedCartItems = useMemo(() => {
     const grouped = {}
-    
+
     cartItems.forEach((item) => {
       const product = cartProducts[item.productId]
       const unitPrice = item.unitPrice || item.price || (product ? (product.priceToUser || product.price || 0) : 0)
       const variantAttrs = item.variantAttributes || {}
       const hasVariants = variantAttrs && typeof variantAttrs === 'object' && Object.keys(variantAttrs).length > 0
       const key = item.productId
-      
+
       if (!grouped[key]) {
         grouped[key] = {
           productId: item.productId,
@@ -113,7 +113,7 @@ export function CheckoutPage() {
           hasVariants: false,
         }
       }
-      
+
       const variantItem = {
         ...item,
         id: item.id || item._id || item.cartItemId,
@@ -123,14 +123,14 @@ export function CheckoutPage() {
         variantAttributes: variantAttrs,
         hasVariants,
       }
-      
+
       grouped[key].variants.push(variantItem)
-      
+
       if (hasVariants) {
         grouped[key].hasVariants = true
       }
     })
-    
+
     return Object.values(grouped)
   }, [cartItems, cartProducts])
 
@@ -165,7 +165,7 @@ export function CheckoutPage() {
         return variantSum + (itemPrice * itemQuantity)
       }, 0)
     }, 0)
-    
+
     const deliveryBeforeBenefit = subtotal >= (selectedShipping.minOrder || Infinity) ? 0 : selectedShipping.cost
     const delivery = paymentPreference === 'full' ? 0 : deliveryBeforeBenefit
     const discount = 0
@@ -226,7 +226,7 @@ export function CheckoutPage() {
       amountDueLater,
       deliveryWaived: isFullPayment && totals.deliveryBeforeBenefit > 0,
     }
-    
+
     // Store preview data (not actual order) - order will be created on confirmation
     setPendingOrder({
       preview: true, // Flag to indicate this is preview, not actual order
@@ -279,7 +279,7 @@ export function CheckoutPage() {
       }
 
       const order = orderResult.data.order
-      
+
       // Update pendingOrder with actual order data
       const updatedPendingOrder = {
         ...order,
@@ -341,9 +341,9 @@ export function CheckoutPage() {
 
         // Clear cart after successful payment
         dispatch({ type: 'CLEAR_CART' })
-        
+
         // Navigate to order confirmation
-        navigate('/order-confirmation', { 
+        navigate('/order-confirmation', {
           state: { orderId: order.id, orderNumber: order.orderNumber }
         })
       } catch (razorpayError) {
@@ -435,7 +435,7 @@ export function CheckoutPage() {
             {currentStep === 1 && (
               <div className="checkout-page__step">
                 <h2 className="checkout-page__step-title">Order Summary</h2>
-                
+
                 {/* Order Items */}
                 <div className="checkout-page__items">
                   {groupedCartItems.map((group) => (
@@ -517,7 +517,7 @@ export function CheckoutPage() {
             {currentStep === 2 && (
               <div className="checkout-page__step">
                 <h2 className="checkout-page__step-title">Delivery Address</h2>
-                
+
                 {deliveryAddress ? (
                   <div className="checkout-page__address-card">
                     <div className="checkout-page__address-header">
@@ -589,7 +589,7 @@ export function CheckoutPage() {
             {currentStep === 3 && (
               <div className="checkout-page__step">
                 <h2 className="checkout-page__step-title">Payment Method</h2>
-                
+
                 <div className="checkout-page__payment-method">
                   <div className="checkout-page__payment-method-card checkout-page__payment-method-card--active">
                     <div className="checkout-page__payment-method-icon">💳</div>
@@ -702,7 +702,7 @@ export function CheckoutPage() {
 
         {/* Payment Confirmation Modal */}
         {showPaymentConfirm && pendingOrder && (
-          <div 
+          <div
             className="checkout-page__modal"
             onClick={(e) => {
               if (e.target === e.currentTarget) {
@@ -724,16 +724,16 @@ export function CheckoutPage() {
                 <div className="checkout-page__modal-summary">
                   <div>
                     <span>Total Amount</span>
-                    <span>₹{modalOrderTotal.toLocaleString('en-IN')}</span>
+                    <span>₹{pendingOrder.total.toLocaleString('en-IN')}</span>
                   </div>
                   <div>
-                    <span>{modalDueNowLabel}</span>
-                    <span>₹{modalAmountDueNow.toLocaleString('en-IN')}</span>
+                    <span>{paymentDueNowLabel}</span>
+                    <span>₹{pendingOrder.uiPayment.amountDueNow.toLocaleString('en-IN')}</span>
                   </div>
-                  {modalAmountDueLater > 0 && (
+                  {pendingOrder.uiPayment.amountDueLater > 0 && (
                     <div>
-                      <span>{modalDueLaterLabel}</span>
-                      <span>₹{modalAmountDueLater.toLocaleString('en-IN')}</span>
+                      <span>{paymentDueLaterLabel}</span>
+                      <span>₹{pendingOrder.uiPayment.amountDueLater.toLocaleString('en-IN')}</span>
                     </div>
                   )}
                 </div>
@@ -744,8 +744,8 @@ export function CheckoutPage() {
                       setPendingOrder(null)
                     }}
                     className="checkout-page__modal-button"
-                    style={{ 
-                      background: '#f3f4f6', 
+                    style={{
+                      background: '#f3f4f6',
                       color: '#172022',
                       flex: 1
                     }}
@@ -758,7 +758,7 @@ export function CheckoutPage() {
                     className="checkout-page__modal-button"
                     style={{ flex: 1 }}
                   >
-                    {loading ? 'Processing...' : `Pay ₹${modalAmountDueNow.toLocaleString('en-IN')}`}
+                    {loading ? 'Processing...' : `Pay ₹${pendingOrder.uiPayment.amountDueNow.toLocaleString('en-IN')}`}
                   </button>
                 </div>
               </div>

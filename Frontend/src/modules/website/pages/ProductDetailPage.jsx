@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useTranslation } from '../../../context/TranslationContext'
 import { Layout, Container } from '../components/Layout'
 import { useWebsiteApi } from '../hooks/useWebsiteApi'
 import { useWebsiteState, useWebsiteDispatch } from '../context/WebsiteContext'
@@ -14,8 +15,10 @@ export function ProductDetailPage() {
   const dispatch = useWebsiteDispatch()
   const { favourites, authenticated } = useWebsiteState()
   const { addToCart, addToFavourites, removeFromFavourites, fetchProducts } = useWebsiteApi()
-  
-  const [product, setProduct] = useState(null)
+
+  const { translateProduct } = useTranslation()
+  const [rawProduct, setProduct] = useState(null)
+  const product = useMemo(() => translateProduct(rawProduct), [rawProduct, translateProduct])
   const [similarProducts, setSimilarProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
@@ -37,7 +40,7 @@ export function ProductDetailPage() {
         setLoading(false)
         return
       }
-      
+
       setLoading(true)
       try {
         const result = await websiteApi.getProductDetails(productId)
@@ -45,12 +48,12 @@ export function ProductDetailPage() {
           const productData = result.data.product
           setProduct(productData)
           setIsWishlisted(productData.isWishlisted || favourites.includes(productId))
-          
+
           // Fetch similar products (same category)
           if (productData.category) {
-            const similarResult = await websiteApi.getProducts({ 
-              category: productData.category, 
-              limit: 10 
+            const similarResult = await websiteApi.getProducts({
+              category: productData.category,
+              limit: 10
             })
             if (similarResult.success && similarResult.data?.products) {
               const similar = similarResult.data.products
@@ -66,7 +69,7 @@ export function ProductDetailPage() {
         setLoading(false)
       }
     }
-    
+
     if (productId) {
       loadProduct()
     }
@@ -86,8 +89,8 @@ export function ProductDetailPage() {
     })
 
     let attributeNameKey = null
-    const possibleNameKeys = Array.from(allKeys).filter(key => 
-      key.toLowerCase().includes('name') || 
+    const possibleNameKeys = Array.from(allKeys).filter(key =>
+      key.toLowerCase().includes('name') ||
       key.toLowerCase().includes('attribute') ||
       key.toLowerCase() === 'type' && Array.from(allKeys).length > 2
     )
@@ -108,7 +111,7 @@ export function ProductDetailPage() {
       const sortedKeys = Object.entries(keyValueCounts)
         .sort((a, b) => b[1] - a[1])
         .filter(([_, count]) => count < product.attributeStocks.length)
-      
+
       attributeNameKey = sortedKeys.length > 0 ? sortedKeys[0][0] : Array.from(allKeys)[0]
     }
 
@@ -122,8 +125,8 @@ export function ProductDetailPage() {
     const attributeProperties = {}
     Array.from(attributeNames).forEach(attrName => {
       attributeProperties[attrName] = {}
-      
-      const relevantStocks = product.attributeStocks.filter(stock => 
+
+      const relevantStocks = product.attributeStocks.filter(stock =>
         stock.attributes && stock.attributes[attributeNameKey] === attrName
       )
 
@@ -179,7 +182,7 @@ export function ProductDetailPage() {
       return Object.keys(selectedAttributes).every(key => {
         const stockValue = stock.attributes[key]
         const selectedValue = selectedAttributes[key]
-        
+
         if (Array.isArray(stockValue)) {
           return stockValue.includes(selectedValue)
         }
@@ -256,10 +259,10 @@ export function ProductDetailPage() {
   const hasAttributes = useMemo(() => {
     if (!product) return false
     if (product.attributeStocks && Array.isArray(product.attributeStocks) && product.attributeStocks.length > 0) {
-      return product.attributeStocks.some(stock => 
-        stock && 
-        stock.attributes && 
-        typeof stock.attributes === 'object' && 
+      return product.attributeStocks.some(stock =>
+        stock &&
+        stock.attributes &&
+        typeof stock.attributes === 'object' &&
         Object.keys(stock.attributes).length > 0
       )
     }
@@ -267,7 +270,7 @@ export function ProductDetailPage() {
   }, [product])
 
   const getVariantKey = useCallback((variantStock) => {
-    const stockAttrs = variantStock.attributes instanceof Map 
+    const stockAttrs = variantStock.attributes instanceof Map
       ? Object.fromEntries(variantStock.attributes)
       : variantStock.attributes || {}
     return JSON.stringify(stockAttrs)
@@ -341,19 +344,19 @@ export function ProductDetailPage() {
 
   const handleVariantToggle = (variantStock) => {
     const variantKey = getVariantKey(variantStock)
-    
+
     setSelectedVariants(prev => {
-      const stockAttrs = variantStock.attributes instanceof Map 
+      const stockAttrs = variantStock.attributes instanceof Map
         ? Object.fromEntries(variantStock.attributes)
         : variantStock.attributes || {}
-      
+
       const exists = prev.find(v => {
-        const vAttrs = v.attributes instanceof Map 
+        const vAttrs = v.attributes instanceof Map
           ? Object.fromEntries(v.attributes)
           : v.attributes || {}
         return JSON.stringify(vAttrs) === JSON.stringify(stockAttrs)
       })
-      
+
       if (exists) {
         setVariantQuantities(prevQty => {
           const newQty = { ...prevQty }
@@ -361,7 +364,7 @@ export function ProductDetailPage() {
           return newQty
         })
         return prev.filter(v => {
-          const vAttrs = v.attributes instanceof Map 
+          const vAttrs = v.attributes instanceof Map
             ? Object.fromEntries(v.attributes)
             : v.attributes || {}
           return JSON.stringify(vAttrs) !== JSON.stringify(stockAttrs)
@@ -381,7 +384,7 @@ export function ProductDetailPage() {
     const variantKey = getVariantKey(variantStock)
     const currentQty = variantQuantities[variantKey] || 1
     const maxQty = variantStock.displayStock || variantStock.actualStock || 999
-    
+
     const newQty = Math.max(1, Math.min(maxQty, currentQty + delta))
     setVariantQuantities(prev => ({
       ...prev,
@@ -419,7 +422,7 @@ export function ProductDetailPage() {
     }
 
     setVariantError('')
-    
+
     try {
       if (selectedVariants.length > 0) {
         for (const variant of selectedVariants) {
@@ -448,7 +451,7 @@ export function ProductDetailPage() {
       navigate('/login')
       return
     }
-    
+
     try {
       if (isWishlisted) {
         await removeFromFavourites(productId)
@@ -464,7 +467,7 @@ export function ProductDetailPage() {
     }
   }
 
-  const discount = originalPrice > currentPrice 
+  const discount = originalPrice > currentPrice
     ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
     : 0
 
@@ -477,7 +480,7 @@ export function ProductDetailPage() {
             <div className="product-detail__main-image">
               <img src={images[selectedImage] || images[0]} alt={product.name} />
             </div>
-            
+
             {images.length > 1 && (
               <div className="product-detail__thumbnails">
                 {images.map((img, index) => (
@@ -527,7 +530,7 @@ export function ProductDetailPage() {
                 </button>
               )}
             </div>
-            
+
             {/* Rating */}
             <div className="product-detail__rating">
               <div className="product-detail__rating-stars">
@@ -552,7 +555,7 @@ export function ProductDetailPage() {
                 {product.rating || 0} ({product.reviews || 0} reviews)
               </span>
             </div>
-            
+
             {/* Price */}
             <div className="product-detail__price">
               <span className="product-detail__price-current">
@@ -580,7 +583,7 @@ export function ProductDetailPage() {
                     <p className="text-sm font-semibold text-red-600">{variantError}</p>
                   </div>
                 )}
-                
+
                 {/* Step 1: Select Attribute Name */}
                 {attributeStructure.attributeNameKey && (
                   <div className="product-detail__variant-group">
@@ -648,33 +651,33 @@ export function ProductDetailPage() {
                     {product.attributeStocks
                       .filter(stock => {
                         if (!stock.attributes || !stock.attributes[attributeStructure.attributeNameKey]) return false
-                        const stockAttrs = stock.attributes instanceof Map 
+                        const stockAttrs = stock.attributes instanceof Map
                           ? Object.fromEntries(stock.attributes)
                           : stock.attributes
                         return stockAttrs[attributeStructure.attributeNameKey] === selectedAttributes[attributeStructure.attributeNameKey]
                       })
                       .map((variantStock, idx) => {
-                        const stockAttrs = variantStock.attributes instanceof Map 
+                        const stockAttrs = variantStock.attributes instanceof Map
                           ? Object.fromEntries(variantStock.attributes)
                           : variantStock.attributes || {}
-                        
+
                         const isSelected = selectedVariants.some(v => {
-                          const vAttrs = v.attributes instanceof Map 
+                          const vAttrs = v.attributes instanceof Map
                             ? Object.fromEntries(v.attributes)
                             : v.attributes || {}
                           return JSON.stringify(vAttrs) === JSON.stringify(stockAttrs)
                         })
-                        
+
                         const variantAttributes = Object.entries(stockAttrs)
                           .filter(([key]) => key !== attributeStructure.attributeNameKey)
                           .map(([key, value]) => `${key}: ${value}`)
                           .join(', ')
-                        
+
                         const variantKey = getVariantKey(variantStock)
                         const variantQty = variantQuantities[variantKey] || 1
                         const maxQty = variantStock.displayStock || variantStock.actualStock || 999
                         const variantPrice = variantStock.userPrice || variantStock.priceToUser || 0
-                        
+
                         return (
                           <div
                             key={idx}
@@ -716,7 +719,7 @@ export function ProductDetailPage() {
                                 )}
                               </button>
                             </div>
-                            
+
                             {isSelected && (
                               <div className="mt-3 pt-3 border-t border-gray-200">
                                 <label className="block text-xs font-semibold text-gray-700 mb-2">Quantity</label>
@@ -768,14 +771,14 @@ export function ProductDetailPage() {
               <div className="product-detail__quantity">
                 <label>Quantity</label>
                 <div className="product-detail__quantity-controls">
-                  <button 
+                  <button
                     onClick={() => setQuantity(q => Math.max(1, q - 1))}
                     disabled={quantity <= 1}
                   >
                     −
                   </button>
                   <span>{quantity}</span>
-                  <button 
+                  <button
                     onClick={() => setQuantity(q => Math.min(maxQuantity || 999, q + 1))}
                     disabled={quantity >= maxQuantity}
                   >
@@ -792,14 +795,14 @@ export function ProductDetailPage() {
 
             {/* Actions */}
             <div className="product-detail__actions">
-              <button 
+              <button
                 className="product-detail__button-add"
                 onClick={handleAddToCart}
                 disabled={!inStock || (hasAttributes && selectedVariants.length === 0)}
               >
                 Add to Cart
               </button>
-              <button 
+              <button
                 className="product-detail__button-buy"
                 onClick={handleBuyNow}
                 disabled={!inStock || (hasAttributes && selectedVariants.length === 0)}
@@ -829,26 +832,26 @@ export function ProductDetailPage() {
         {/* Tabs Section */}
         <div className="product-detail__tabs">
           <div className="product-detail__tabs-nav">
-            <button 
+            <button
               className={activeTab === 'description' ? 'active' : ''}
               onClick={() => setActiveTab('description')}
             >
               Description
             </button>
-            <button 
+            <button
               className={activeTab === 'stock' ? 'active' : ''}
               onClick={() => setActiveTab('stock')}
             >
               Stock
             </button>
-            <button 
+            <button
               className={activeTab === 'delivery' ? 'active' : ''}
               onClick={() => setActiveTab('delivery')}
             >
               Delivery
             </button>
           </div>
-          
+
           <div className="product-detail__tabs-content">
             {activeTab === 'description' && (
               <div className="product-detail__description">
@@ -934,7 +937,7 @@ export function ProductDetailPage() {
                 const similarImage = getPrimaryImageUrl(similarProduct)
                 const similarInStock = (similarProduct.stock || 0) > 0
                 const similarIsWishlisted = favourites.includes(similarProductId)
-                
+
                 return (
                   <div
                     key={similarProductId}

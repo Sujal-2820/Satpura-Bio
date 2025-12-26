@@ -3,6 +3,8 @@ import { ProductCard } from '../../components/ProductCard'
 import { ChevronLeftIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import * as userApi from '../../services/userApi'
+import { Trans } from '../../../../components/Trans'
+import { TransText } from '../../../../components/TransText'
 
 export function CarouselProductsView({ carouselId, onProductClick, onAddToCart, onBack, onToggleFavourite, favourites = [] }) {
   const [carousel, setCarousel] = useState(null)
@@ -20,21 +22,21 @@ export function CarouselProductsView({ carouselId, onProductClick, onAddToCart, 
           const foundCarousel = offersResult.data.carousels.find(c => c.id === carouselId)
           if (foundCarousel) {
             setCarousel(foundCarousel)
-            
+
             // Fetch products for the product IDs
             if (foundCarousel.productIds && foundCarousel.productIds.length > 0) {
-              const productPromises = foundCarousel.productIds.map(productId => 
+              const productPromises = foundCarousel.productIds.map(productId =>
                 userApi.getProductDetails(productId).catch(err => {
                   console.error(`Failed to load product ${productId}:`, err)
                   return null
                 })
               )
-              
+
               const productResults = await Promise.all(productPromises)
               const validProducts = productResults
                 .filter(result => result && result.success && result.data?.product)
                 .map(result => result.data.product)
-              
+
               setProducts(validProducts)
             }
           }
@@ -45,7 +47,7 @@ export function CarouselProductsView({ carouselId, onProductClick, onAddToCart, 
         setLoading(false)
       }
     }
-    
+
     if (carouselId) {
       loadCarouselProducts()
     }
@@ -63,9 +65,11 @@ export function CarouselProductsView({ carouselId, onProductClick, onAddToCart, 
           <ChevronLeftIcon className="h-5 w-5 text-gray-700" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{carousel?.title || 'Carousel Products'}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {carousel?.title ? <TransText>{carousel.title}</TransText> : <Trans>Carousel Products</Trans>}
+          </h1>
           {carousel?.description && (
-            <p className="text-sm text-gray-600 mt-1">{carousel.description}</p>
+            <p className="text-sm text-gray-600 mt-1"><TransText>{carousel.description}</TransText></p>
           )}
         </div>
       </div>
@@ -73,12 +77,12 @@ export function CarouselProductsView({ carouselId, onProductClick, onAddToCart, 
       {/* Products Grid */}
       {loading ? (
         <div className="text-center py-12">
-          <p className="text-gray-500">Loading products...</p>
+          <p className="text-gray-500"><Trans>Loading products...</Trans></p>
         </div>
       ) : products.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <p className="text-gray-600 font-medium">No products available</p>
-          <p className="text-sm text-gray-500 mt-1">This carousel doesn't have any products linked yet.</p>
+          <p className="text-gray-600 font-medium"><Trans>No products available</Trans></p>
+          <p className="text-sm text-gray-500 mt-1"><Trans>This carousel doesn't have any products linked yet.</Trans></p>
         </div>
       ) : (
         <div className="home-products-grid">

@@ -41,6 +41,7 @@ export function FinancePage({ subRoute = null, navigate }) {
     sendVendorPurchaseStock,
     confirmVendorPurchaseDelivery,
     getVendorCreditHistory,
+    getVendorRepayments,
     loading,
   } = useAdminApi()
   const { success, error: showError, warning: showWarning } = useToast()
@@ -60,6 +61,7 @@ export function FinancePage({ subRoute = null, navigate }) {
   const [selectedVendorRepayments, setSelectedVendorRepayments] = useState([])
   const [repaymentsLoading, setRepaymentsLoading] = useState(false)
   const [approvingPurchase, setApprovingPurchase] = useState(false)
+  const [purchaseRejectReasonState, setPurchaseRejectReasonState] = useState('')
 
   // Fetch purchase requests
   const fetchPurchaseRequests = useCallback(async () => {
@@ -580,7 +582,8 @@ export function FinancePage({ subRoute = null, navigate }) {
 
   if (currentView === 'purchaseRequest' && selectedPurchaseRequest) {
     const request = selectedPurchaseRequest
-    const [rejectReason, setRejectReason] = useState('')
+    const rejectReason = purchaseRejectReasonState
+    const setRejectReason = setPurchaseRejectReasonState
 
     const formatCurrency = (value) => {
       if (typeof value === 'string') return value

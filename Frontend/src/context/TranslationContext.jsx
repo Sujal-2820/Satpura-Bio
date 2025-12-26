@@ -53,16 +53,34 @@ export function TranslationProvider({ children }) {
     return await getBatchTranslations(texts, language, forceRefresh)
   }, [language])
 
+  const translateProduct = useCallback((product) => {
+    if (language === 'en' || !product) {
+      return product
+    }
+
+    // Return a new object with Hindi fields mapped to standard fields if they exist
+    return {
+      ...product,
+      name: product.name_hi || product.name,
+      description: product.description_hi || product.description,
+      shortDescription: product.shortDescription_hi || product.shortDescription,
+      category: product.category_hi || product.category,
+      brand: product.brand_hi || product.brand,
+      tags: (product.tags_hi && product.tags_hi.length > 0) ? product.tags_hi : product.tags,
+    }
+  }, [language])
+
   const value = useMemo(
     () => ({
       language,
       setLanguage,
       translate,
       translateBatch,
+      translateProduct,
       isHindi: language === 'hi',
       isEnglish: language === 'en',
     }),
-    [language, setLanguage, translate, translateBatch]
+    [language, setLanguage, translate, translateBatch, translateProduct]
   )
 
   return <TranslationContext.Provider value={value}>{children}</TranslationContext.Provider>
@@ -74,9 +92,10 @@ export function useTranslation() {
     // Return a no-op implementation if context is not available
     return {
       language: 'en',
-      setLanguage: () => {},
+      setLanguage: () => { },
       translate: (text) => Promise.resolve(text),
       translateBatch: (texts) => Promise.resolve(texts),
+      translateProduct: (product) => product,
       isHindi: false,
       isEnglish: true,
     }

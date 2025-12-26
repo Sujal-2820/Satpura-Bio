@@ -934,8 +934,6 @@ export function useAdminApi() {
     rejectSellerChangeRequest,
     getPaymentHistory,
     getPaymentHistoryStats,
-    getPaymentHistory,
-    getPaymentHistoryStats,
     // Users
     getUsers,
     getUserDetails,

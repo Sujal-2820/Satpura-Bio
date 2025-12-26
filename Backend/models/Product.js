@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { translateText } = require('../utils/translator');
 
 /**
  * Product Schema
@@ -34,6 +35,13 @@ const productSchema = new mongoose.Schema({
     lowercase: true,
     // Categories: fertilizer, pesticide, seeds, tools, equipment, etc.
   },
+  // Hindi Translations (alphabetical info)
+  name_hi: { type: String, trim: true },
+  description_hi: { type: String, trim: true },
+  shortDescription_hi: { type: String, trim: true },
+  category_hi: { type: String, trim: true, lowercase: true },
+  brand_hi: { type: String, trim: true },
+  tags_hi: [{ type: String, trim: true, lowercase: true }],
   // Pricing
   priceToVendor: {
     type: Number,
@@ -230,12 +238,61 @@ productSchema.pre('save', async function (next) {
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     this.sku = `${categoryPrefix}-${timestamp}-${random}`;
   }
-  
+
   // Sync legacy stock field with displayStock for backward compatibility
   if (this.isModified('displayStock') || this.isNew) {
     this.stock = this.displayStock;
   }
-  
+
+  // Automatic Hindi Translation for alphabetical fields
+  const needsTranslation =
+    this.isNew ||
+    this.isModified('name') ||
+    this.isModified('description') ||
+    this.isModified('shortDescription') ||
+    this.isModified('category') ||
+    this.isModified('brand') ||
+    this.isModified('tags');
+
+  if (needsTranslation) {
+    try {
+      // Collect fields to translate
+      const fields = [];
+      const keys = [];
+
+      if (this.name) { fields.push(this.name); keys.push('name'); }
+      if (this.description) { fields.push(this.description); keys.push('description'); }
+      if (this.shortDescription) { fields.push(this.shortDescription); keys.push('shortDescription'); }
+      if (this.category) { fields.push(this.category); keys.push('category'); }
+      if (this.brand) { fields.push(this.brand); keys.push('brand'); }
+
+      // Handle tags (array)
+      let tagsStartIndex = -1;
+      if (this.tags && this.tags.length > 0) {
+        tagsStartIndex = fields.length;
+        fields.push(...this.tags);
+      }
+
+      if (fields.length > 0) {
+        const translations = await translateText(fields, 'hi');
+
+        if (Array.isArray(translations)) {
+          let currentIndex = 0;
+          keys.forEach((key) => {
+            this[`${key}_hi`] = translations[currentIndex++];
+          });
+
+          if (tagsStartIndex !== -1) {
+            this.tags_hi = translations.slice(tagsStartIndex);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[Product Model] Translation hook error:', error);
+      // Don't block saving if translation fails
+    }
+  }
+
   next();
 });
 

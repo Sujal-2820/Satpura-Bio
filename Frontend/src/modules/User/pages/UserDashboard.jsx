@@ -203,22 +203,9 @@ function UserDashboardContent({ onLogout }) {
         }
       }
       fetchProfile()
-    } else {
-      // No token - redirect to login/signup based on view
-      if (!hasShownInitialModal) {
-        if (isLaptopView) {
-          // Redirect to login page on laptop
-          setActiveTab('login')
-          navigate('/user/dashboard/login', { replace: false })
-        } else {
-          // Show modal on mobile
-          setShowAuthModal(true)
-          setAuthActionType(null)
-        }
-        setHasShownInitialModal(true)
-      }
     }
-  }, [dispatch, hasShownInitialModal, isLaptopView, navigate])
+    // Allow browsing without token - authentication prompts will show when user tries to perform actions
+  }, [dispatch])
 
   // Initialize welcome notification (only first time user enters dashboard)
   useEffect(() => {

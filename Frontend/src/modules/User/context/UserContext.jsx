@@ -78,7 +78,7 @@ function reducer(state, action) {
         vendorAvailability: initialState.vendorAvailability,
         assignedVendor: null,
       }
-    case 'ADD_TO_CART':
+    case 'ADD_TO_CART': {
       const existingItem = state.cart.find((item) => item.productId === action.payload.productId)
       if (existingItem) {
         return {
@@ -94,6 +94,7 @@ function reducer(state, action) {
         ...state,
         cart: [...state.cart, action.payload],
       }
+    }
     case 'UPDATE_CART_ITEM':
       return {
         ...state,

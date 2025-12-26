@@ -27,8 +27,11 @@ function AddVariantToCartText({ count, price }) {
 }
 
 export function ProductDetailView({ productId, onAddToCart, onBuyNow, onToggleFavourite, favourites = [], onBack, onProductClick }) {
-  const { translate } = useTranslation()
-  const [product, setProduct] = useState(null)
+  const { translate, translateProduct } = useTranslation()
+  const [rawProduct, setProduct] = useState(null)
+
+  // Use pre-translated fields from DB for speed and cost savings
+  const product = useMemo(() => translateProduct(rawProduct), [rawProduct, translateProduct])
   const [similarProducts, setSimilarProducts] = useState([])
   const [suggestedProducts, setSuggestedProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -98,7 +101,6 @@ export function ProductDetailView({ productId, onAddToCart, onBuyNow, onToggleFa
             if (similarResult.success && similarResult.data?.products) {
               const similar = similarResult.data.products
                 .filter((p) => (p._id || p.id) !== productId)
-                .slice(0, 10)
               setSimilarProducts(similar)
 
               // Fetch suggested products (different category)

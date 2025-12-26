@@ -128,7 +128,7 @@ function reducer(state, action) {
         ...state,
         targetIncentives: action.payload,
       }
-    case 'ADD_NOTIFICATION':
+    case 'ADD_NOTIFICATION': {
       // Check if notification already exists (prevent duplicates)
       const existingIndex = state.notifications.findIndex(
         (n) => n.id === action.payload.id || (n.type === action.payload.type && n.orderId === action.payload.orderId),
@@ -148,6 +148,7 @@ function reducer(state, action) {
           ...state.notifications,
         ],
       }
+    }
     case 'MARK_NOTIFICATION_READ':
       return {
         ...state,
@@ -165,7 +166,7 @@ function reducer(state, action) {
         ...state,
         realtimeConnected: action.payload,
       }
-    case 'UPDATE_WALLET_BALANCE':
+    case 'UPDATE_WALLET_BALANCE': {
       const currentBalance = state.dashboard.wallet?.balance || 0
       const newBalance = action.payload.isIncrement
         ? currentBalance + action.payload.balance
@@ -181,6 +182,7 @@ function reducer(state, action) {
           },
         },
       }
+    }
     case 'UPDATE_TARGET_PROGRESS':
       return {
         ...state,
@@ -202,7 +204,7 @@ function reducer(state, action) {
 export function SellerProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const [isInitialized, setIsInitialized] = useState(false)
-  
+
   // Initialize seller profile from token on mount
   useEffect(() => {
     const initializeSeller = async () => {
@@ -210,7 +212,7 @@ export function SellerProvider({ children }) {
       if (token && !state.authenticated) {
         try {
           const profileResult = await getSellerProfile()
-          
+
           if (profileResult.success && profileResult.data?.seller) {
             const seller = profileResult.data.seller
             dispatch({
@@ -238,16 +240,16 @@ export function SellerProvider({ children }) {
       }
       setIsInitialized(true)
     }
-    
+
     initializeSeller()
   }, [state.authenticated])
-  
+
   // Initialize real-time connection when authenticated
   useEffect(() => {
     if (state.authenticated && state.profile.sellerId) {
       const cleanup = initializeRealtimeConnection((notification) => {
         const processedNotification = handleRealtimeNotification(notification)
-        
+
         // Handle different notification types
         switch (processedNotification.type) {
           case 'cashback_added':
@@ -272,7 +274,7 @@ export function SellerProvider({ children }) {
               },
             })
             break
-            
+
           case 'target_achieved':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -285,7 +287,7 @@ export function SellerProvider({ children }) {
               },
             })
             break
-            
+
           case 'announcement':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -298,7 +300,7 @@ export function SellerProvider({ children }) {
               },
             })
             break
-            
+
           case 'withdrawal_approved':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -312,7 +314,7 @@ export function SellerProvider({ children }) {
               },
             })
             break
-            
+
           case 'withdrawal_rejected':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -325,7 +327,7 @@ export function SellerProvider({ children }) {
               },
             })
             break
-            
+
           case 'commission_rate_change':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -340,7 +342,7 @@ export function SellerProvider({ children }) {
               },
             })
             break
-            
+
           case 'policy_update':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -353,7 +355,7 @@ export function SellerProvider({ children }) {
               },
             })
             break
-            
+
           case 'commission_added':
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -368,7 +370,7 @@ export function SellerProvider({ children }) {
               },
             })
             break
-            
+
           default:
             dispatch({
               type: 'ADD_NOTIFICATION',
@@ -380,23 +382,23 @@ export function SellerProvider({ children }) {
             })
         }
       })
-      
+
       dispatch({ type: 'SET_REALTIME_CONNECTED', payload: true })
-      
+
       return () => {
         cleanup()
         dispatch({ type: 'SET_REALTIME_CONNECTED', payload: false })
       }
     }
   }, [state.authenticated, state.profile.sellerId, dispatch])
-  
+
   const value = useMemo(() => ({ ...state, [SELLER_CONTEXT_SYMBOL]: true }), [state])
   const dispatchWithSymbol = useMemo(() => {
     const wrappedDispatch = (action) => dispatch(action)
     wrappedDispatch[SELLER_CONTEXT_SYMBOL] = true
     return wrappedDispatch
   }, [dispatch])
-  
+
   return (
     <SellerStateContext.Provider value={value}>
       <SellerDispatchContext.Provider value={dispatchWithSymbol}>{children}</SellerDispatchContext.Provider>
@@ -407,7 +409,7 @@ export function SellerProvider({ children }) {
 export function useSellerState() {
   const context = useContext(SellerStateContext)
   if (!context || !context[SELLER_CONTEXT_SYMBOL]) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env.DEV) {
       console.error('useSellerState must be used within SellerProvider')
       throw new Error('useSellerState must be used within SellerProvider')
     }
@@ -422,26 +424,26 @@ export function useSellerState() {
 export function useSellerDispatch() {
   const dispatch = useContext(SellerDispatchContext)
   if (!dispatch) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env.DEV) {
       console.error('useSellerDispatch must be used within SellerProvider')
       throw new Error('useSellerDispatch must be used within SellerProvider')
     }
     // In production, return a no-op function to prevent crashes
     return () => {
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env.DEV) {
         console.warn('SellerDispatch called outside SellerProvider')
       }
     }
   }
   // Check for symbol to ensure it's the wrapped dispatch
   if (!dispatch[SELLER_CONTEXT_SYMBOL]) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env.DEV) {
       console.error('useSellerDispatch must be used within SellerProvider')
       throw new Error('useSellerDispatch must be used within SellerProvider')
     }
     // In production, return a no-op function to prevent crashes
     return () => {
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env.DEV) {
         console.warn('SellerDispatch called outside SellerProvider')
       }
     }

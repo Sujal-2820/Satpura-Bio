@@ -4,11 +4,16 @@ import { getPrimaryImageUrl } from '../utils/productImages'
 import { TransText } from '../../../components/TransText'
 import { Trans } from '../../../components/Trans'
 
-export function ProductCard({ product, onAddToCart, onWishlist, onNavigate, className }) {
+import { useTranslation } from '../../../context/TranslationContext'
+
+export function ProductCard({ product: rawProduct, onAddToCart, onWishlist, onNavigate, className }) {
+  const { translateProduct } = useTranslation()
+  const product = translateProduct(rawProduct)
+
   const inStock = product.stock > 0
   const stockStatus = product.stock > 10 ? 'In Stock' : product.stock > 0 ? 'Low Stock' : 'Out of Stock'
   const productImage = getPrimaryImageUrl(product)
-  
+
   // Translate stock status
   const stockStatusText = stockStatus === 'In Stock' ? 'In Stock' : stockStatus === 'Low Stock' ? 'Low Stock' : 'Out of Stock'
 
@@ -37,10 +42,10 @@ export function ProductCard({ product, onAddToCart, onWishlist, onNavigate, clas
       </div>
       <div className="product-card-wrapper__content">
         <div className="product-card-wrapper__header">
-          <h3 className="product-card-wrapper__title"><TransText>{product.name}</TransText></h3>
+          <h3 className="product-card-wrapper__title">{product.name}</h3>
           {(product.shortDescription || product.description) && (
             <p className="product-card-wrapper__description">
-              <TransText>{product.shortDescription || product.description}</TransText>
+              {product.shortDescription || product.description}
             </p>
           )}
           {product.vendor && (
@@ -49,24 +54,24 @@ export function ProductCard({ product, onAddToCart, onWishlist, onNavigate, clas
         </div>
         <div className="product-card-wrapper__rating">
           <div className="product-card-wrapper__stars">
-              {[1, 2, 3, 4, 5].map((star) => {
-                // Get rating from product.rating or product.averageRating
-                const rating = product.rating ?? product.averageRating ?? 0
-                return (
-                  <StarIcon
-                    key={star}
-                    className="h-3 w-3 text-yellow-400"
-                    filled={star <= Math.round(rating)}
-                  />
-                )
-              })}
-            </div>
+            {[1, 2, 3, 4, 5].map((star) => {
+              // Get rating from product.rating or product.averageRating
+              const rating = product.rating ?? product.averageRating ?? 0
+              return (
+                <StarIcon
+                  key={star}
+                  className="h-3 w-3 text-yellow-400"
+                  filled={star <= Math.round(rating)}
+                />
+              )
+            })}
+          </div>
           <span className="product-card-wrapper__rating-value">
             {(() => {
               // Get rating from product.rating or product.averageRating
               const rating = product.rating ?? product.averageRating ?? 0
-              return typeof rating === 'number' 
-                ? rating.toFixed(1) 
+              return typeof rating === 'number'
+                ? rating.toFixed(1)
                 : parseFloat(rating || 0).toFixed(1)
             })()}
           </span>
@@ -77,23 +82,23 @@ export function ProductCard({ product, onAddToCart, onWishlist, onNavigate, clas
               return `${reviewCount} ${reviewCount === 1 ? 'review' : 'reviews'}`
             })()})
           </span>
-          </div>
+        </div>
         <div className="product-card-wrapper__price-section">
           <span className="product-card-wrapper__price">₹{(product.priceToUser || product.price || 0).toLocaleString('en-IN')}</span>
-            {product.originalPrice && product.originalPrice > (product.priceToUser || product.price || 0) && (
+          {product.originalPrice && product.originalPrice > (product.priceToUser || product.price || 0) && (
             <span className="product-card-wrapper__original-price">₹{product.originalPrice.toLocaleString('en-IN')}</span>
-            )}
-          </div>
+          )}
+        </div>
         <div className="product-card-wrapper__stock">
-            <span className={cn(
+          <span className={cn(
             'product-card-wrapper__stock-badge',
             inStock ? 'product-card-wrapper__stock-badge--in-stock' : 'product-card-wrapper__stock-badge--out-of-stock'
-            )}>
-              <TransText>{stockStatus}</TransText>
-            </span>
-            {inStock && product.stock <= 10 && (
+          )}>
+            <TransText>{stockStatus}</TransText>
+          </span>
+          {inStock && product.stock <= 10 && (
             <span className="product-card-wrapper__stock-warning"><Trans>Only</Trans> {product.stock} <Trans>left!</Trans></span>
-            )}
+          )}
         </div>
         <button
           type="button"

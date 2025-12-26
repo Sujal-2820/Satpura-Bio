@@ -13,11 +13,6 @@ import { useTranslation } from '../context/TranslationContext'
  */
 export function Trans({ children, forceRefresh = false }) {
   const { translate, isEnglish, language } = useTranslation()
-  
-  // If children is not a string, render it directly without translation
-  if (typeof children !== 'string') {
-    return <>{children}</>
-  }
 
   const [translatedText, setTranslatedText] = useState(children)
   const [isTranslating, setIsTranslating] = useState(false)
@@ -25,8 +20,9 @@ export function Trans({ children, forceRefresh = false }) {
   const previousLanguageRef = useRef(language)
 
   useEffect(() => {
+    if (typeof children !== 'string') return
     const text = children.trim()
-    
+
     // Skip if text and language haven't changed
     if (text === previousTextRef.current && language === previousLanguageRef.current) {
       return
@@ -40,16 +36,16 @@ export function Trans({ children, forceRefresh = false }) {
       setIsTranslating(false)
       return
     }
-    
+
     // Don't translate if it's an entity ID
     if (/^[A-Z]{2,4}-[\dA-Z-]+$/i.test(text)) {
       setTranslatedText(text)
       setIsTranslating(false)
       return
     }
-    
+
     setIsTranslating(true)
-    
+
     translate(text, forceRefresh)
       .then((translated) => {
         console.log(`[Trans] Translated: "${text}" → "${translated}"`)
