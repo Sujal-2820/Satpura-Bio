@@ -680,14 +680,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
                   ⏰ {statusUpdateTimeRemaining}m to revert
                 </div>
               )}
-              {isPaid && (
-                <div className="mb-1">
-                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
-                    <CheckCircle className="h-3.5 w-3.5" />
-                    Paid
-                  </span>
-                </div>
-              )}
+
               <div className="relative">
                 <button
                   type="button"
