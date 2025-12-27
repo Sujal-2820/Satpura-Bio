@@ -111,7 +111,7 @@ const productSchema = new mongoose.Schema({
     },
     unit: {
       type: String,
-      enum: ['kg', 'g', 'l', 'ml'],
+      enum: ['mg', 'g', 'kg', 'ml', 'L', 'l', 'bag', 'bags', 'unit', 'units', 'packet', 'bottle'],
       default: 'kg',
     },
   },
@@ -177,7 +177,7 @@ const productSchema = new mongoose.Schema({
     },
     stockUnit: {
       type: String,
-      enum: ['kg', 'L', 'bags', 'units'],
+      enum: ['mg', 'g', 'kg', 'ml', 'L', 'bag', 'bags', 'unit', 'units', 'packet', 'bottle'],
       default: 'kg',
     },
     vendorPrice: {

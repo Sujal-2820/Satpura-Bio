@@ -4,7 +4,7 @@ import { cn } from '../../../lib/cn'
 import { ImageUpload } from './ImageUpload'
 import { AttributeStockForm } from './AttributeStockForm'
 
-const STOCK_UNITS = ['kg', 'L', 'bags', 'units']
+const STOCK_UNITS = ['mg', 'g', 'kg', 'ml', 'L', 'bag', 'unit', 'packet', 'bottle']
 
 // Fertilizer Categories (This platform is for fertilizers only)
 const FERTILIZER_CATEGORIES = [
@@ -117,7 +117,7 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       let actualStockValue = ''
       let displayStockValue = ''
       let stockUnit = 'kg'
-      
+
       // Check for actualStock and displayStock first
       if (product.actualStock != null && product.actualStock !== undefined) {
         actualStockValue = String(product.actualStock)
@@ -125,7 +125,7 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       if (product.displayStock != null && product.displayStock !== undefined) {
         displayStockValue = String(product.displayStock)
       }
-      
+
       // Fallback to legacy stock field if new fields not available
       if (!actualStockValue && product.stock != null && product.stock !== undefined) {
         if (typeof product.stock === 'number') {
@@ -151,22 +151,22 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
           }
         }
       }
-      
+
       if (product.stockUnit) {
         stockUnit = product.stockUnit
       }
-      
+
       // Also check weight.unit as fallback
       if (product.weight?.unit) {
         stockUnit = product.weight.unit
       }
-      
+
       // Convert prices to string if they're numbers
       const vendorPriceString = product.vendorPrice != null ? String(product.vendorPrice) : ''
       const userPriceString = product.userPrice != null ? String(product.userPrice) : ''
       const vendorPriceValue = vendorPriceString.replace(/[₹,]/g, '') || ''
       const userPriceValue = userPriceString.replace(/[₹,]/g, '') || ''
-      
+
       // Parse expiry date (assuming format like "Aug 2026" or ISO date)
       let expiryDate = ''
       if (product.expiry) {
@@ -234,28 +234,28 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
         tags: product.tags && Array.isArray(product.tags) ? product.tags : [],
         attributes: attributes,
         images: productImages,
-        attributeStocks: product.attributeStocks && Array.isArray(product.attributeStocks) 
+        attributeStocks: product.attributeStocks && Array.isArray(product.attributeStocks)
           ? product.attributeStocks.map((stock, index) => {
-              // Convert attributes Map to plain object if needed
-              let attributesObj = {}
-              if (stock.attributes) {
-                if (stock.attributes instanceof Map) {
-                  stock.attributes.forEach((value, key) => {
-                    attributesObj[key] = value
-                  })
-                } else if (typeof stock.attributes === 'object') {
-                  attributesObj = stock.attributes
-                }
+            // Convert attributes Map to plain object if needed
+            let attributesObj = {}
+            if (stock.attributes) {
+              if (stock.attributes instanceof Map) {
+                stock.attributes.forEach((value, key) => {
+                  attributesObj[key] = value
+                })
+              } else if (typeof stock.attributes === 'object') {
+                attributesObj = stock.attributes
               }
-              
-              return {
-                ...stock,
-                attributes: attributesObj,
-                vendorPrice: stock.vendorPrice != null ? String(stock.vendorPrice) : '',
-                userPrice: stock.userPrice != null ? String(stock.userPrice) : '',
-                id: stock.id || stock._id || Date.now() + index, // Ensure each has an ID
-              }
-            })
+            }
+
+            return {
+              ...stock,
+              attributes: attributesObj,
+              vendorPrice: stock.vendorPrice != null ? String(stock.vendorPrice) : '',
+              userPrice: stock.userPrice != null ? String(stock.userPrice) : '',
+              id: stock.id || stock._id || Date.now() + index, // Ensure each has an ID
+            }
+          })
           : [],
       })
     }
@@ -268,7 +268,7 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }))
     }
-    
+
     // Reset attributes when category changes
     if (name === 'category') {
       setFormData((prev) => ({ ...prev, attributes: {} }))
@@ -367,7 +367,7 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
 
     setErrors(newErrors)
     const isValid = Object.keys(newErrors).length === 0
-    
+
     // Scroll to first error if validation fails
     if (!isValid) {
       setTimeout(() => {
@@ -381,7 +381,7 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
         }
       }, 100)
     }
-    
+
     return isValid
   }
 
@@ -392,11 +392,11 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     }
 
     // Ensure prices are valid numbers (only if not using attributeStocks)
-    const vendorPrice = (!formData.attributeStocks || formData.attributeStocks.length === 0) 
-      ? parseFloat(formData.vendorPrice) 
+    const vendorPrice = (!formData.attributeStocks || formData.attributeStocks.length === 0)
+      ? parseFloat(formData.vendorPrice)
       : 0
-    const userPrice = (!formData.attributeStocks || formData.attributeStocks.length === 0) 
-      ? parseFloat(formData.userPrice) 
+    const userPrice = (!formData.attributeStocks || formData.attributeStocks.length === 0)
+      ? parseFloat(formData.userPrice)
       : 0
 
     // Build specifications object from attributes (only include non-empty values)
@@ -415,29 +415,29 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     let userPriceValue = 0
     let expiryValue = ''
     let batchNumberValue = ''
-    
+
     if (formData.attributeStocks && formData.attributeStocks.length > 0) {
       // Sum up all attributeStocks
       actualStockValue = formData.attributeStocks.reduce((sum, stock) => sum + (parseFloat(stock.actualStock) || 0), 0)
       displayStockValue = formData.attributeStocks.reduce((sum, stock) => sum + (parseFloat(stock.displayStock) || 0), 0)
-      
+
       // Calculate weighted average prices based on stock quantities
       let totalStock = 0
       let weightedVendorPrice = 0
       let weightedUserPrice = 0
-      
+
       formData.attributeStocks.forEach(stock => {
         const stockQty = parseFloat(stock.displayStock) || 0
         totalStock += stockQty
         weightedVendorPrice += (parseFloat(stock.vendorPrice) || 0) * stockQty
         weightedUserPrice += (parseFloat(stock.userPrice) || 0) * stockQty
       })
-      
+
       if (totalStock > 0) {
         vendorPriceValue = weightedVendorPrice / totalStock
         userPriceValue = weightedUserPrice / totalStock
       }
-      
+
       // Use first entry's expiry and batchNumber as defaults (or leave empty)
       const firstEntry = formData.attributeStocks[0]
       expiryValue = firstEntry.expiry || ''
@@ -469,7 +469,7 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       tags: formData.tags.filter((tag) => tag.trim() !== ''),
       ...(Object.keys(specifications).length > 0 && { specifications }),
       ...(formData.images && formData.images.length > 0 && { images: formData.images }),
-      ...(formData.attributeStocks && formData.attributeStocks.length > 0 && { 
+      ...(formData.attributeStocks && formData.attributeStocks.length > 0 && {
         attributeStocks: formData.attributeStocks.map(({ id, ...stock }) => stock) // Remove temporary IDs
       }),
     }
@@ -799,7 +799,7 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
             )}
           </button>
         </div>
-        
+
         {/* Display existing attribute stocks summary when form is closed */}
         {!showAttributeStockForm && formData.attributeStocks && formData.attributeStocks.length > 0 && (
           <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4">
@@ -812,10 +812,10 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
                   .filter(([_, value]) => value && value !== '')
                   .map(([key, value]) => `${key}: ${value}`)
                   .join(', ')
-                
+
                 return (
                   <div key={stock.id || index} className="text-xs text-gray-600 bg-white rounded-lg px-3 py-2">
-                    <span className="font-semibold">Entry #{index + 1}:</span> {attributeSummary || 'No attributes'} 
+                    <span className="font-semibold">Entry #{index + 1}:</span> {attributeSummary || 'No attributes'}
                     {' - '}
                     <span className="font-semibold">Stock:</span> {stock.displayStock || 0} {stock.stockUnit || formData.stockUnit}
                   </div>

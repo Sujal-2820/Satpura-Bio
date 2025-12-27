@@ -442,7 +442,7 @@ function transformProductForBackend(frontendData) {
     backendData.stockUnit = frontendData.stockUnit
     backendData.weight = {
       value: backendData.actualStock || backendData.displayStock || 0,
-      unit: frontendData.stockUnit.toLowerCase(),
+      unit: frontendData.stockUnit,
     }
   }
 
