@@ -257,7 +257,7 @@ export default function TasksPage({ navigate }) {
                 ))}
             </div>
 
-            <div className="bg-white rounded-3xl border border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="bg-white rounded-3xl border border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.05)] overflow-visible">
                 {loading && !tasks.data ? (
                     <div className="p-20 text-center">
                         <div className="inline-block animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
