@@ -4,6 +4,8 @@ import { useSellerApi } from '../../hooks/useSellerApi'
 import { cn } from '../../../../lib/cn'
 import { UsersIcon, WalletIcon, ChartIcon, SparkIcon, ShareIcon, TrendingUpIcon } from '../../components/icons'
 import * as sellerApi from '../../services/sellerApi'
+import { Trans } from '../../../../components/Trans'
+import { TransText } from '../../../../components/TransText'
 
 export function OverviewView({ onNavigate, openPanel }) {
   const { profile, dashboard } = useSellerState()
@@ -38,18 +40,18 @@ export function OverviewView({ onNavigate, openPanel }) {
           const transformedActivities = activityResult.data.activities.map((activity) => {
             const isWithdrawal = activity.type === 'withdrawal'
             return {
-            id: activity.id || activity._id,
-            type: activity.type || 'commission',
-            action: activity.title || activity.message || 'Activity',
-            amount: activity.amount || 0,
-            date: activity.timestamp || activity.createdAt,
-            createdAt: activity.timestamp || activity.createdAt,
+              id: activity.id || activity._id,
+              type: activity.type || 'commission',
+              action: activity.title || activity.message || <Trans>Activity</Trans>,
+              amount: activity.amount || 0,
+              date: activity.timestamp || activity.createdAt,
+              createdAt: activity.timestamp || activity.createdAt,
               // For withdrawals, don't set userName (will show "Withdrawal" in display)
-              userName: isWithdrawal ? null : (activity.userName || activity.user?.name || 'User'),
-              user: isWithdrawal ? null : (activity.userName || activity.user?.name || 'User'),
-            orderId: activity.orderId,
-            orderNumber: activity.orderNumber,
-            status: activity.status,
+              userName: isWithdrawal ? null : (activity.userName || activity.user?.name || <Trans>User</Trans>),
+              user: isWithdrawal ? null : (activity.userName || activity.user?.name || <Trans>User</Trans>),
+              orderId: activity.orderId,
+              orderNumber: activity.orderNumber,
+              status: activity.status,
               title: activity.title, // Preserve title for withdrawal display
             }
           })
@@ -75,11 +77,13 @@ export function OverviewView({ onNavigate, openPanel }) {
   // Get data from context or use defaults
   const overview = dashboard.overview || {}
   const wallet = dashboard.wallet || {}
-  
+
   // Format wallet balance
   const formatCurrency = (amount) => {
     if (typeof amount === 'number') {
-      return amount >= 100000 ? `₹${(amount / 100000).toFixed(1)} L` : `₹${amount.toLocaleString('en-IN')}`
+      return amount >= 100000
+        ? <><Trans>₹</Trans>{(amount / 100000).toFixed(1)} <Trans>L</Trans></>
+        : `₹${amount.toLocaleString('en-IN')}`
     }
     return amount || '₹0'
   }
@@ -87,7 +91,7 @@ export function OverviewView({ onNavigate, openPanel }) {
   // Format overview data - use actual values from backend
   // Calculate total commission from sales (average 2.5% commission rate)
   const totalCommission = overview.totalCommission || (overview.currentMonthSales || 0) * 0.025
-  
+
   const overviewData = {
     walletBalance: formatCurrency(wallet.balance || 0),
     totalReferrals: overview.totalReferrals || 0,
@@ -97,31 +101,31 @@ export function OverviewView({ onNavigate, openPanel }) {
   }
 
   const services = [
-    { label: 'Share ID', note: 'Share your Seller ID', tone: 'success', icon: ShareIcon, action: 'share-seller-id' },
-    { label: 'Referrals', note: 'View all referrals', tone: 'success', target: 'referrals', icon: UsersIcon, action: null },
-    { label: 'Wallet', note: 'View balance', tone: 'success', target: 'wallet', icon: WalletIcon, action: null },
-    { label: 'Performance', note: 'View analytics', tone: 'success', icon: ChartIcon, action: 'view-performance' },
+    { label: <Trans>Share ID</Trans>, note: <Trans>Share your Seller ID</Trans>, tone: 'success', icon: ShareIcon, action: 'share-seller-id' },
+    { label: <Trans>Referrals</Trans>, note: <Trans>View all referrals</Trans>, tone: 'success', target: 'referrals', icon: UsersIcon, action: null },
+    { label: <Trans>Wallet</Trans>, note: <Trans>View balance</Trans>, tone: 'success', target: 'wallet', icon: WalletIcon, action: null },
+    { label: <Trans>Performance</Trans>, note: <Trans>View analytics</Trans>, tone: 'success', icon: ChartIcon, action: 'view-performance' },
   ]
 
   const quickActions = [
     {
-      label: 'Share Seller ID',
-      description: 'Copy your unique Seller ID',
+      label: <Trans>Share Seller ID</Trans>,
+      description: <Trans>Copy your unique Seller ID</Trans>,
       icon: ShareIcon,
       tone: 'green',
       action: 'share-seller-id',
     },
     {
-      label: 'View Referrals',
-      description: 'See all your referrals',
+      label: <Trans>View Referrals</Trans>,
+      description: <Trans>See all your referrals</Trans>,
       target: 'referrals',
       icon: UsersIcon,
       tone: 'green',
       action: null,
     },
     {
-      label: 'Request Withdrawal',
-      description: 'Withdraw from wallet',
+      label: <Trans>Request Withdrawal</Trans>,
+      description: <Trans>Withdraw from wallet</Trans>,
       target: 'wallet',
       icon: WalletIcon,
       tone: 'teal',
@@ -156,14 +160,14 @@ export function OverviewView({ onNavigate, openPanel }) {
         <div className="seller-hero__card">
           <div className="seller-hero__meta">
             <span className="seller-chip seller-chip--success">
-              Seller ID • {profile.sellerId || 'N/A'}
+              <Trans>{`Seller ID • ${profile.sellerId || 'N/A'}`}</Trans>
             </span>
-            <span className="seller-chip seller-chip--warn">Today {new Date().toLocaleDateString('en-GB')}</span>
+            <span className="seller-chip seller-chip--warn"><Trans>{`Today ${new Date().toLocaleDateString('en-GB')}`}</Trans></span>
           </div>
           <div className="seller-hero__core">
             <div className="seller-hero__identity">
-              <span className="seller-hero__greeting">Your performance</span>
-              <h2 className="seller-hero__welcome">{(profile.name || 'Seller').split(' ')[0]}</h2>
+              <span className="seller-hero__greeting"><Trans>Your performance</Trans></span>
+              <h2 className="seller-hero__welcome">{(profile.name || <Trans>Seller</Trans>).split(' ')[0]}</h2>
             </div>
             <div className="seller-hero__badge">
               <SparkIcon className="h-6 w-6 text-white" />
@@ -171,19 +175,19 @@ export function OverviewView({ onNavigate, openPanel }) {
           </div>
           <div className="seller-hero__balance">
             <div>
-              <p className="seller-hero__label">Wallet Balance</p>
+              <p className="seller-hero__label"><Trans>Wallet Balance</Trans></p>
               <p className="seller-hero__value">{overviewData.walletBalance}</p>
             </div>
             <button type="button" onClick={() => onNavigate('wallet')} className="seller-hero__cta">
-              View wallet
+              <Trans>View wallet</Trans>
             </button>
           </div>
           <div className="seller-hero__stats">
             {[
-              { label: 'Total Referrals', value: overviewData.totalReferrals.toString() },
-              { label: 'Active Users', value: overviewData.activeReferrals.toString() },
-              { label: 'This Month Sales', value: overviewData.thisMonthSales },
-              { label: 'Total Commission', value: overviewData.totalCommission },
+              { label: <Trans>Total Referrals</Trans>, value: overviewData.totalReferrals.toString() },
+              { label: <Trans>Active Users</Trans>, value: overviewData.activeReferrals.toString() },
+              { label: <Trans>This Month Sales</Trans>, value: overviewData.thisMonthSales },
+              { label: <Trans>Total Commission</Trans>, value: overviewData.totalCommission },
             ].map((item) => (
               <div key={item.label} className="seller-stat-card">
                 <p>{item.label}</p>
@@ -198,7 +202,7 @@ export function OverviewView({ onNavigate, openPanel }) {
       <section id="seller-overview-services" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Shortcuts</h3>
+            <h3 className="seller-section__title"><Trans>Shortcuts</Trans></h3>
           </div>
         </div>
         <div ref={servicesRef} className="seller-services__rail">
@@ -237,48 +241,48 @@ export function OverviewView({ onNavigate, openPanel }) {
       <section id="seller-overview-activity" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Recent activity</h3>
+            <h3 className="seller-section__title"><Trans>Recent activity</Trans></h3>
           </div>
         </div>
         <div className="seller-activity__list">
           {loading ? (
             <div className="seller-activity__item">
-              <p className="text-sm text-gray-500">Loading activity...</p>
+              <p className="text-sm text-gray-500"><Trans>Loading activity...</Trans></p>
             </div>
           ) : recentActivity.length === 0 ? (
             <div className="seller-activity__item">
-              <p className="text-sm text-gray-500">No recent activity</p>
+              <p className="text-sm text-gray-500"><Trans>No recent activity</Trans></p>
             </div>
           ) : (
             recentActivity.slice(0, 3).map((item) => {
               // For withdrawals, show "WD" avatar, otherwise use user initials
               const isWithdrawal = item.type === 'withdrawal'
-              const avatar = isWithdrawal 
-                ? 'WD' 
+              const avatar = isWithdrawal
+                ? 'WD'
                 : (item.userName ? item.userName.substring(0, 2).toUpperCase() : 'U')
-              
+
               // Format amount: positive amounts show +₹, negative show -₹
-              const amount = item.amount 
-                ? (item.amount > 0 
-                    ? `+₹${item.amount.toLocaleString('en-IN')}` 
-                    : `-₹${Math.abs(item.amount).toLocaleString('en-IN')}`)
+              const amount = item.amount
+                ? (item.amount > 0
+                  ? `+₹${item.amount.toLocaleString('en-IN')}`
+                  : `-₹${Math.abs(item.amount).toLocaleString('en-IN')}`)
                 : '₹0'
-              
-              const date = item.date || item.createdAt 
-                ? new Date(item.date || item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) 
-                : 'Recently'
-              
+
+              const date = item.date || item.createdAt
+                ? new Date(item.date || item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                : <Trans>Recently</Trans>
+
               // For withdrawals, show "Withdrawal" instead of user name
-              const displayName = isWithdrawal 
-                ? 'Withdrawal' 
-                : (item.userName || item.user || 'User')
-              
+              const displayName = isWithdrawal
+                ? <Trans>Withdrawal</Trans>
+                : (item.userName || item.user || <Trans>User</Trans>)
+
               return (
                 <div key={item.id || item._id} className="seller-activity__item">
                   <div className="seller-activity__avatar">{avatar}</div>
                   <div className="seller-activity__details">
                     <div className="seller-activity__row">
-                      <span className="seller-activity__name">{displayName}</span>
+                      <span className="seller-activity__name"><TransText>{displayName}</TransText></span>
                       <span
                         className={cn(
                           'seller-activity__amount',
@@ -289,7 +293,7 @@ export function OverviewView({ onNavigate, openPanel }) {
                       </span>
                     </div>
                     <div className="seller-activity__meta">
-                      <span>{item.action || item.title || item.type || 'Activity'}</span>
+                      <span><TransText>{item.action || item.title || item.type || 'Activity'}</TransText></span>
                       <span>{date}</span>
                     </div>
                   </div>
@@ -304,27 +308,27 @@ export function OverviewView({ onNavigate, openPanel }) {
       <section id="seller-overview-snapshot" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Quick summary</h3>
+            <h3 className="seller-section__title"><Trans>Quick summary</Trans></h3>
           </div>
         </div>
         <div className="seller-metric-grid">
           {highlights.length === 0 ? (
             <div className="seller-metric-card">
-              <p className="text-sm text-gray-500">No highlights available</p>
+              <p className="text-sm text-gray-500"><Trans>No highlights available</Trans></p>
             </div>
           ) : (
             highlights.map((item) => {
-              const progress = item.id === 'referrals' 
+              const progress = item.id === 'referrals'
                 ? Math.min((overviewData.totalReferrals / 100) * 100, 100)
                 : item.id === 'sales'
-                ? Math.min((overviewData.totalReferrals * 0.7), 100)
-                : item.progress || 0
-              
+                  ? Math.min((overviewData.totalReferrals * 0.7), 100)
+                  : item.progress || 0
+
               return (
                 <div key={item.id || item.label} className="seller-metric-card">
                   <div className="seller-metric-card__head">
-                    <p>{item.label}</p>
-                    <span>{item.trend || item.meta || ''}</span>
+                    <p><Trans>{item.label}</Trans></p>
+                    <span><TransText>{item.trend || item.meta || ''}</TransText></span>
                   </div>
                   <h4>{item.value || formatCurrency(item.amount || 0)}</h4>
                   <div className="seller-metric-card__bar">
@@ -342,47 +346,47 @@ export function OverviewView({ onNavigate, openPanel }) {
       <section id="seller-overview-commission" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Commission Structure</h3>
-            <p className="seller-section__subtitle">Understand how you earn commissions</p>
+            <h3 className="seller-section__title"><Trans>Commission Structure</Trans></h3>
+            <p className="seller-section__subtitle"><Trans>Understand how you earn commissions</Trans></p>
           </div>
         </div>
         <div className="seller-commission-policy">
           <div className="seller-commission-policy__card">
             <div className="seller-commission-policy__header">
               <WalletIcon className="h-5 w-5 text-[#1b8f5b]" />
-              <h4 className="seller-commission-policy__title">Your Commission Rates</h4>
+              <h4 className="seller-commission-policy__title"><Trans>Your Commission Rates</Trans></h4>
             </div>
             <div className="seller-commission-policy__content">
               <div className="seller-commission-policy__slab">
                 <div className="seller-commission-policy__slab-header">
                   <span className="seller-commission-policy__slab-rate">2%</span>
-                  <span className="seller-commission-policy__slab-label">Standard Rate</span>
+                  <span className="seller-commission-policy__slab-label"><Trans>Standard Rate</Trans></span>
                 </div>
                 <p className="seller-commission-policy__slab-desc">
-                  Applied when a user's monthly purchases are up to ₹50,000
+                  <Trans>Applied when a user's monthly purchases are up to ₹50,000</Trans>
                 </p>
                 <div className="seller-commission-policy__slab-example">
-                  <span className="text-xs text-[rgba(26,42,34,0.6)]">Example: ₹30,000 purchase = ₹600 commission</span>
+                  <span className="text-xs text-[rgba(26,42,34,0.6)]"><Trans>Example: ₹30,000 purchase = ₹600 commission</Trans></span>
                 </div>
               </div>
               <div className="seller-commission-policy__divider" />
               <div className="seller-commission-policy__slab seller-commission-policy__slab--premium">
                 <div className="seller-commission-policy__slab-header">
                   <span className="seller-commission-policy__slab-rate seller-commission-policy__slab-rate--premium">3%</span>
-                  <span className="seller-commission-policy__slab-label">Premium Rate</span>
+                  <span className="seller-commission-policy__slab-label"><Trans>Premium Rate</Trans></span>
                 </div>
                 <p className="seller-commission-policy__slab-desc">
-                  Applied when a user's monthly purchases exceed ₹50,000
+                  <Trans>Applied when a user's monthly purchases exceed ₹50,000</Trans>
                 </p>
                 <div className="seller-commission-policy__slab-example">
-                  <span className="text-xs text-[rgba(26,42,34,0.6)]">Example: ₹75,000 purchase = ₹2,250 commission</span>
+                  <span className="text-xs text-[rgba(26,42,34,0.6)]"><Trans>Example: ₹75,000 purchase = ₹2,250 commission</Trans></span>
                 </div>
               </div>
             </div>
             <div className="seller-commission-policy__footer">
               <p className="seller-commission-policy__note">
-                <span className="font-semibold">Note:</span> Commission rates are calculated per user, per month. 
-                The rate resets on the 1st of each month based on that user's purchase amount.
+                <span className="font-semibold"><Trans>Note:</Trans></span> <Trans>Commission rates are calculated per user, per month.
+                  The rate resets on the 1st of each month based on that user's purchase amount.</Trans>
               </p>
             </div>
           </div>
@@ -393,7 +397,7 @@ export function OverviewView({ onNavigate, openPanel }) {
       <section id="seller-overview-quick-actions" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Quick actions</h3>
+            <h3 className="seller-section__title"><Trans>Quick actions</Trans></h3>
           </div>
         </div>
         <div className="seller-callout-grid">
@@ -413,8 +417,8 @@ export function OverviewView({ onNavigate, openPanel }) {
                 action.tone === 'orange'
                   ? 'is-warn'
                   : action.tone === 'teal'
-                  ? 'is-teal'
-                  : 'is-success',
+                    ? 'is-teal'
+                    : 'is-success',
               )}
             >
               <span className="seller-callout__icon">
@@ -429,4 +433,3 @@ export function OverviewView({ onNavigate, openPanel }) {
     </div>
   )
 }
-

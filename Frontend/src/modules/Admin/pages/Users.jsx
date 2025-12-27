@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Ban, Search, UserCheck, Eye, MessageSquare, ArrowLeft, User, Hash, MapPin, ShoppingBag, CreditCard, CheckCircle, Calendar, Send, XCircle } from 'lucide-react'
+import { Ban, Search, UserCheck, Eye, MessageSquare, ArrowLeft, User, Hash, MapPin, ShoppingBag, CreditCard, CheckCircle, Calendar, Send, XCircle, MoreVertical } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { Timeline } from '../components/Timeline'
@@ -35,7 +35,7 @@ export function UsersPage({ subRoute = null, navigate }) {
 
   const [usersList, setUsersList] = useState([])
   const [allUsersList, setAllUsersList] = useState([])
-  
+
   // View states (replacing modals with full-screen views)
   const [currentView, setCurrentView] = useState(null) // 'userDetail', 'supportTickets', 'blockUser', 'deactivateUser', 'activateUser'
   const [selectedUserForDetail, setSelectedUserForDetail] = useState(null)
@@ -47,6 +47,7 @@ export function UsersPage({ subRoute = null, navigate }) {
   const [deactivateReason, setDeactivateReason] = useState('')
   const [selectedTicket, setSelectedTicket] = useState(null)
   const [replyText, setReplyText] = useState('')
+  const [openActionsDropdown, setOpenActionsDropdown] = useState(null)
 
   // Fetch users
   const fetchUsers = useCallback(async () => {
@@ -94,20 +95,20 @@ export function UsersPage({ subRoute = null, navigate }) {
   const handleViewUserDetails = async (user) => {
     const originalUser = usersState.data?.users?.find((u) => u.id === user.id) || user
     setSelectedUserForDetail(originalUser)
-    
+
     // Fetch detailed user data
     const details = await fetchUserDetails(user.id)
     if (details) {
       setUserDetails(details)
     }
-    
+
     setCurrentView('userDetail')
   }
 
   const handleViewSupportTickets = async (user) => {
     const originalUser = usersState.data?.users?.find((u) => u.id === user.id) || user
     setSelectedUserForTickets(originalUser)
-    
+
     // Fetch user details to get tickets
     const details = await fetchUserDetails(user.id)
     if (details && details.supportTickets) {
@@ -129,7 +130,7 @@ export function UsersPage({ subRoute = null, navigate }) {
         },
       ])
     }
-    
+
     setSelectedTicket(null)
     setReplyText('')
     setCurrentView('supportTickets')
@@ -285,25 +286,79 @@ export function UsersPage({ subRoute = null, navigate }) {
         ...column,
         Cell: (row) => {
           const originalUser = usersState.data?.users?.find((u) => u.id === row.id) || row
+          const isDropdownOpen = openActionsDropdown === row.id
+
+          const actionItems = [
+            {
+              label: 'View details',
+              icon: Eye,
+              onClick: () => {
+                handleViewUserDetails(originalUser)
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            }
+          ]
+
+          if (row.supportTickets > 0) {
+            actionItems.push({
+              label: 'View support tickets',
+              icon: MessageSquare,
+              onClick: () => {
+                handleViewSupportTickets(originalUser)
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-orange-600 hover:bg-orange-50'
+            })
+          }
+
           return (
-            <div className="flex items-center gap-2">
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => handleViewUserDetails(originalUser)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpenActionsDropdown(isDropdownOpen ? null : row.id)
+                }}
                 className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-orange-500 hover:bg-orange-50 hover:text-orange-700"
-                title="View details"
+                title="Actions"
               >
-                <Eye className="h-4 w-4" />
+                <MoreVertical className="h-4 w-4" />
               </button>
-              {row.supportTickets > 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleViewSupportTickets(originalUser)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-orange-600 transition-all hover:border-orange-500 hover:bg-orange-50"
-                  title="View support tickets"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                </button>
+
+              {isDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setOpenActionsDropdown(null)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                    {actionItems.map((item, index) => {
+                      const Icon = item.icon
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!item.disabled) {
+                              item.onClick()
+                            }
+                          }}
+                          disabled={item.disabled}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
+                            item.className,
+                            item.disabled && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )
@@ -542,9 +597,9 @@ export function UsersPage({ subRoute = null, navigate }) {
                   }}
                   className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)]"
                 >
-                    <CheckCircle className="h-4 w-4" />
-                    Activate User
-                  </button>
+                  <CheckCircle className="h-4 w-4" />
+                  Activate User
+                </button>
               )}
             </div>
           </div>

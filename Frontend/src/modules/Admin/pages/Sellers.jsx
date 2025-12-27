@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Award, Gift, Users, Edit2, Eye, Wallet, CheckCircle, XCircle, ArrowLeft, User, Hash, Percent, Target, IndianRupee, TrendingUp, Calendar, Search, Phone, FileText } from 'lucide-react'
+import { Award, Gift, Users, Edit2, Eye, Wallet, CheckCircle, XCircle, ArrowLeft, User, Hash, Percent, Target, IndianRupee, TrendingUp, Calendar, Search, Phone, FileText, MoreVertical } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { ProgressList } from '../components/ProgressList'
@@ -49,7 +49,7 @@ export function SellersPage({ subRoute = null, navigate }) {
   const [allSellersList, setAllSellersList] = useState([])
   const [withdrawalRequests, setWithdrawalRequests] = useState([])
   const [changeRequests, setChangeRequests] = useState([])
-  
+
   // View states (replacing modals with full-screen views)
   const [currentView, setCurrentView] = useState(null) // 'sellerForm', 'sellerDetail', 'withdrawalRequest', 'approveSeller', 'rejectSeller', 'editSeller', 'changeRequest', 'approveChangeRequest', 'rejectChangeRequest'
   const [selectedSeller, setSelectedSeller] = useState(null)
@@ -63,6 +63,7 @@ export function SellersPage({ subRoute = null, navigate }) {
   const [changeRequestRejectReason, setChangeRequestRejectReason] = useState(null) // null = not showing, '' = showing input, string = has value
   const [changeRequestLoading, setChangeRequestLoading] = useState(false) // Local loading state for change request operations
   const [searchQuery, setSearchQuery] = useState('')
+  const [openActionsDropdown, setOpenActionsDropdown] = useState(null)
 
   // Format seller data for display
   const formatSellerForDisplay = (seller) => {
@@ -77,8 +78,8 @@ export function SellersPage({ subRoute = null, navigate }) {
     const achieved = typeof seller.achieved === 'number'
       ? seller.achieved
       : typeof seller.progress === 'number'
-      ? seller.progress
-      : monthlyTarget > 0 ? ((totalSales / monthlyTarget) * 100).toFixed(1) : 0
+        ? seller.progress
+        : monthlyTarget > 0 ? ((totalSales / monthlyTarget) * 100).toFixed(1) : 0
 
     const cashbackRate = typeof seller.cashbackRate === 'number'
       ? seller.cashbackRate
@@ -140,11 +141,11 @@ export function SellersPage({ subRoute = null, navigate }) {
         const email = (s.email || '').toLowerCase()
         const sellerId = (s.sellerId || s.id || '').toLowerCase()
         const searchPhone = query.replace(/\D/g, '')
-        
-        return name.includes(query) || 
-               phone.includes(searchPhone) || 
-               email.includes(query) ||
-               sellerId.includes(query)
+
+        return name.includes(query) ||
+          phone.includes(searchPhone) ||
+          email.includes(query) ||
+          sellerId.includes(query)
       })
     }
 
@@ -446,8 +447,8 @@ export function SellersPage({ subRoute = null, navigate }) {
                   row.achieved >= 100
                     ? 'bg-gradient-to-r from-green-500 to-green-600'
                     : row.achieved >= 80
-                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
-                    : 'bg-gradient-to-r from-orange-500 to-orange-600',
+                      ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                      : 'bg-gradient-to-r from-orange-500 to-orange-600',
                 )}
                 style={{ width: `${Math.min(row.achieved, 100)}%` }}
               />
@@ -480,61 +481,110 @@ export function SellersPage({ subRoute = null, navigate }) {
           const originalSeller = sellersState.data?.sellers?.find((s) => s.id === row.id) || row
           const sellerStatus = originalSeller.status || row.status || 'unknown'
           const isPending = sellerStatus === 'pending'
-          
+          const isDropdownOpen = openActionsDropdown === row.id
+
+          const actionItems = [
+            {
+              label: 'View details',
+              icon: Eye,
+              onClick: () => {
+                handleViewSellerDetails(originalSeller)
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            },
+            {
+              label: 'Edit IRA partner info',
+              icon: Edit2,
+              onClick: () => {
+                handleEditSellerBasicInfo(originalSeller)
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            }
+          ]
+
+          if (isPending) {
+            actionItems.push({
+              label: 'Approve seller',
+              icon: CheckCircle,
+              onClick: () => {
+                setSelectedSellerForAction(originalSeller)
+                setCurrentView('approveSeller')
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-green-700 hover:bg-green-50'
+            })
+            actionItems.push({
+              label: 'Reject seller',
+              icon: XCircle,
+              onClick: () => {
+                setSelectedSellerForAction(originalSeller)
+                setRejectReason('')
+                setCurrentView('rejectSeller')
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-red-700 hover:bg-red-50'
+            })
+          } else {
+            actionItems.push({
+              label: 'Edit seller',
+              icon: Edit2,
+              onClick: () => {
+                handleEditSeller(originalSeller)
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            })
+          }
+
           return (
-            <div className="flex items-center gap-2">
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => handleViewSellerDetails(originalSeller)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpenActionsDropdown(isDropdownOpen ? null : row.id)
+                }}
                 className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
-                title="View details"
+                title="Actions"
               >
-                <Eye className="h-4 w-4" />
+                <MoreVertical className="h-4 w-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => handleEditSellerBasicInfo(originalSeller)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-yellow-500 hover:bg-yellow-50 hover:text-yellow-700"
-                title="Edit IRA partner information"
-              >
-                <Edit2 className="h-4 w-4" />
-              </button>
-              {isPending && (
+
+              {isDropdownOpen && (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedSellerForAction(originalSeller)
-                      setCurrentView('approveSeller')
-                    }}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-50 text-green-700 transition-all hover:border-green-500 hover:bg-green-100"
-                    title="Approve seller"
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedSellerForAction(originalSeller)
-                      setRejectReason('')
-                      setCurrentView('rejectSeller')
-                    }}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition-all hover:border-red-500 hover:bg-red-100"
-                    title="Reject seller"
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </button>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setOpenActionsDropdown(null)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                    {actionItems.map((item, index) => {
+                      const Icon = item.icon
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!item.disabled) {
+                              item.onClick()
+                            }
+                          }}
+                          disabled={item.disabled}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
+                            item.className,
+                            item.disabled && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </>
-              )}
-              {!isPending && (
-                <button
-                  type="button"
-                  onClick={() => handleEditSeller(originalSeller)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-yellow-500 hover:bg-yellow-50 hover:text-yellow-700"
-                  title="Edit seller"
-                >
-                  <Edit2 className="h-4 w-4" />
-                </button>
               )}
             </div>
           )
@@ -655,8 +705,8 @@ export function SellersPage({ subRoute = null, navigate }) {
     const achieved = typeof seller.achieved === 'number'
       ? seller.achieved
       : typeof seller.progress === 'number'
-      ? seller.progress
-      : monthlyTarget > 0 ? ((totalSales / monthlyTarget) * 100).toFixed(1) : 0
+        ? seller.progress
+        : monthlyTarget > 0 ? ((totalSales / monthlyTarget) * 100).toFixed(1) : 0
 
     const cashbackRate = typeof seller.cashbackRate === 'number'
       ? seller.cashbackRate
@@ -767,8 +817,8 @@ export function SellersPage({ subRoute = null, navigate }) {
                   parseFloat(achieved) >= 100
                     ? 'bg-gradient-to-r from-green-500 to-green-600'
                     : parseFloat(achieved) >= 80
-                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
-                    : 'bg-gradient-to-r from-orange-500 to-orange-600',
+                      ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                      : 'bg-gradient-to-r from-orange-500 to-orange-600',
                 )}
                 style={{ width: `${Math.min(achieved, 100)}%` }}
               />
@@ -858,11 +908,11 @@ export function SellersPage({ subRoute = null, navigate }) {
                     <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
                       <Calendar className="h-3.5 w-3.5" />
                       <span>
-                        {request.date 
+                        {request.date
                           ? (typeof request.date === 'string' ? request.date : new Date(request.date).toLocaleDateString('en-IN'))
-                          : request.createdAt 
-                          ? (typeof request.createdAt === 'string' ? request.createdAt : new Date(request.createdAt).toLocaleDateString('en-IN'))
-                          : ''}
+                          : request.createdAt
+                            ? (typeof request.createdAt === 'string' ? request.createdAt : new Date(request.createdAt).toLocaleDateString('en-IN'))
+                            : ''}
                       </span>
                     </div>
                   )}
@@ -1039,7 +1089,7 @@ export function SellersPage({ subRoute = null, navigate }) {
               const seller = request.sellerId || {}
               const isNameChange = request.changeType === 'name'
               const requestId = request._id || request.id
-              
+
               return (
                 <div
                   key={requestId}
@@ -1048,9 +1098,8 @@ export function SellersPage({ subRoute = null, navigate }) {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                          isNameChange ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'
-                        }`}>
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${isNameChange ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'
+                          }`}>
                           {isNameChange ? <User className="h-5 w-5" /> : <Phone className="h-5 w-5" />}
                         </div>
                         <div>
@@ -1074,12 +1123,12 @@ export function SellersPage({ subRoute = null, navigate }) {
                         <div className="flex items-center gap-2 text-xs text-gray-400">
                           <Calendar className="h-3 w-3" />
                           <span>
-                            {request.createdAt ? new Date(request.createdAt).toLocaleDateString('en-IN', { 
-                              day: 'numeric', 
-                              month: 'short', 
-                              year: 'numeric', 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
+                            {request.createdAt ? new Date(request.createdAt).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
                             }) : 'N/A'}
                           </span>
                         </div>
@@ -1447,9 +1496,9 @@ export function SellersPage({ subRoute = null, navigate }) {
             onClick={handleCreateSeller}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-yellow-500 to-yellow-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(234,179,8,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(234,179,8,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]"
           >
-          <Award className="h-4 w-4" />
-          Create IRA Partner Profile
-        </button>
+            <Award className="h-4 w-4" />
+            Create IRA Partner Profile
+          </button>
         </div>
       </header>
 
@@ -1532,13 +1581,13 @@ export function SellersPage({ subRoute = null, navigate }) {
         </div>
         <ProgressList
           items={[
-            { 
-              label: 'Seller Wallet Requests', 
-              progress: withdrawalRequests.length > 0 ? Math.min((withdrawalRequests.length / 10) * 100, 100) : 42, 
-              tone: 'warning', 
-              meta: withdrawalRequests.length > 0 
-                ? `${withdrawalRequests.length} requests (${totalPendingWithdrawals >= 100000 ? `₹${(totalPendingWithdrawals / 100000).toFixed(1)} L` : `₹${totalPendingWithdrawals.toLocaleString('en-IN')}`} pending)` 
-                : '₹8.2 L awaiting admin approval' 
+            {
+              label: 'Seller Wallet Requests',
+              progress: withdrawalRequests.length > 0 ? Math.min((withdrawalRequests.length / 10) * 100, 100) : 42,
+              tone: 'warning',
+              meta: withdrawalRequests.length > 0
+                ? `${withdrawalRequests.length} requests (${totalPendingWithdrawals >= 100000 ? `₹${(totalPendingWithdrawals / 100000).toFixed(1)} L` : `₹${totalPendingWithdrawals.toLocaleString('en-IN')}`} pending)`
+                : '₹8.2 L awaiting admin approval'
             },
             { label: 'Monthly Target Achievement', progress: 68, tone: 'success', meta: 'Average across all sellers' },
             { label: 'Top Performer Retention', progress: 92, tone: 'success', meta: 'Proactive incentives reduce attrition' },

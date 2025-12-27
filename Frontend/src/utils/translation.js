@@ -8,6 +8,8 @@
 import hiDictionary from '../locales/hi.json';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
+const GOOGLE_TRANSLATE_API_KEY = import.meta.env.VITE_GOOGLE_TRANSLATE_API_KEY || '';
+const GOOGLE_TRANSLATE_API_URL = 'https://translation.googleapis.com/language/translate/v2';
 const TRANSLATION_CACHE_KEY = 'ira_sathi_translation_cache';
 const CACHE_EXPIRY = 30 * 24 * 60 * 60 * 1000; // 30 days
 const MAX_CACHE_SIZE = 1000; // Max number of entries to avoid 5MB limit
@@ -89,34 +91,39 @@ export async function getTranslation(text, targetLang = 'hi', forceRefresh = fal
     if (isCacheValid(cached)) return cached.translated;
   }
 
-  try {
-    // 3. Call Backend Proxy (HIDDEN API KEY)
-    const response = await fetch(`${API_URL}/api/utils/translate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: trimmedText, target: targetLang }),
-    });
+  // 3. Call Google Translate API directly if key is available
+  if (GOOGLE_TRANSLATE_API_KEY) {
+    try {
+      const response = await fetch(`${GOOGLE_TRANSLATE_API_URL}?key=${GOOGLE_TRANSLATE_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          q: trimmedText,
+          target: targetLang,
+          format: 'text',
+          source: 'en'
+        }),
+      });
 
-    if (!response.ok) {
-      console.warn(`[Translation] Proxy returned ${response.status}, falling back to original text`);
-      return text; // Fallback immediately on non-200 status
+      if (response.ok) {
+        const data = await response.json();
+        const translated = data.data.translations[0].translatedText;
+
+        // Save to cache
+        const cache = getCache();
+        const cacheKey = getCacheKey(trimmedText, targetLang);
+        cache[cacheKey] = { translated, timestamp: Date.now() };
+        saveCache(cache);
+
+        return translated;
+      }
+    } catch (apiError) {
+      console.warn('[Translation] Direct API call failed:', apiError);
     }
-
-    const data = await response.json();
-    const translated = data.translated;
-
-    // 4. Save to self-cleaning cache
-    const cache = getCache();
-    const cacheKey = getCacheKey(trimmedText, targetLang);
-    cache[cacheKey] = { translated, timestamp: Date.now() };
-    saveCache(cache);
-
-    return translated;
-  } catch (error) {
-    // Silent fallback - don't log errors to avoid console spam
-    console.warn('[Translation] Proxy unavailable, using original text');
-    return text; // Fallback
   }
+
+  // 4. Fallback: Return original text if direct API fails or key is missing
+  return text;
 }
 
 /**
@@ -143,14 +150,12 @@ export async function getBatchTranslations(texts, targetLang = 'hi', forceRefres
       return;
     }
 
-    // Check Dictionary
     const dictMatch = checkDictionary(trimmedText, targetLang);
     if (dictMatch) {
       results[index] = dictMatch;
       return;
     }
 
-    // Check Cache
     if (!forceRefresh) {
       const cacheKey = getCacheKey(trimmedText, targetLang);
       const cached = cache[cacheKey];
@@ -166,35 +171,42 @@ export async function getBatchTranslations(texts, targetLang = 'hi', forceRefres
 
   if (textsToTranslate.length === 0) return results;
 
-  try {
-    const response = await fetch(`${API_URL}/api/utils/translate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: textsToTranslate, target: targetLang }),
-    });
-
-    if (!response.ok) throw new Error('Batch proxy translation failed');
-    const data = await response.json();
-    const translations = data.translated;
-
-    if (Array.isArray(translations)) {
-      translations.forEach((translated, i) => {
-        const originalIndex = indices[i];
-        const originalText = textsToTranslate[i];
-        results[originalIndex] = translated;
-
-        const cacheKey = getCacheKey(originalText, targetLang);
-        cache[cacheKey] = { translated, timestamp: Date.now() };
+  // 1. Try Direct API if key available
+  if (GOOGLE_TRANSLATE_API_KEY) {
+    try {
+      const response = await fetch(`${GOOGLE_TRANSLATE_API_URL}?key=${GOOGLE_TRANSLATE_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          q: textsToTranslate,
+          target: targetLang,
+          format: 'text',
+          source: 'en'
+        }),
       });
-      saveCache(cache);
-      return results;
+
+      if (response.ok) {
+        const data = await response.json();
+        const translations = data.data.translations;
+
+        translations.forEach((t, i) => {
+          const originalIndex = indices[i];
+          const translated = t.translatedText;
+          results[originalIndex] = translated;
+
+          const cacheKey = getCacheKey(textsToTranslate[i], targetLang);
+          cache[cacheKey] = { translated, timestamp: Date.now() };
+        });
+        saveCache(cache);
+        return results;
+      }
+    } catch (apiError) {
+      console.warn('[Translation] Direct batch API call failed:', apiError);
     }
-    throw new Error('Invalid batch translation format');
-  } catch (error) {
-    console.error('[Translation] Batch translation error:', error);
-    // Fallback: translate individually or return original
-    return results.map((r, i) => r === undefined ? texts[i] : r);
   }
+
+  // 2. Fallback: Return original texts if direct API fails
+  return results.map((r, i) => r === undefined ? texts[i] : r);
 }
 
 export function clearTranslationCache() {

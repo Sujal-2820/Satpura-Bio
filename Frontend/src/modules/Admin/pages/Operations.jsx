@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Settings, Truck, Package, Bell, Plus, Edit2, Trash2, AlertCircle, Recycle, ArrowLeft, Eye, RefreshCw, CheckCircle } from 'lucide-react'
+import { Settings, Truck, Package, Bell, Plus, Edit2, Trash2, AlertCircle, Recycle, ArrowLeft, Eye, RefreshCw, CheckCircle, MoreVertical } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { LogisticsSettingsForm } from '../components/LogisticsSettingsForm'
@@ -48,7 +48,7 @@ export function OperationsPage({ subRoute = null, navigate }) {
   const [logisticsSettings, setLogisticsSettings] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [escalatedOrders, setEscalatedOrders] = useState([])
-  
+
   // View states (replacing modals with full-screen views)
   const [currentView, setCurrentView] = useState(null) // 'logistics', 'notification', 'escalation', 'revertEscalation', 'statusUpdate'
   const [selectedNotification, setSelectedNotification] = useState(null)
@@ -57,12 +57,14 @@ export function OperationsPage({ subRoute = null, navigate }) {
   const [selectedOrderForStatusUpdate, setSelectedOrderForStatusUpdate] = useState(null)
   const [revertReason, setRevertReason] = useState('')
   const [fulfillmentNote, setFulfillmentNote] = useState('')
-  
+
   // Status update form states
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('')
   const [statusUpdateNotes, setStatusUpdateNotes] = useState('')
   const [isRevert, setIsRevert] = useState(false)
+  const [openNotificationsDropdown, setOpenNotificationsDropdown] = useState(null)
+  const [openEscalationsDropdown, setOpenEscalationsDropdown] = useState(null)
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -305,7 +307,7 @@ export function OperationsPage({ subRoute = null, navigate }) {
     const normalizedCurrentStatus = normalizeOrderStatus(currentStatus)
     const isInStatusUpdateGracePeriod = order?.statusUpdateGracePeriod?.isActive
     const previousStatus = order?.statusUpdateGracePeriod?.previousStatus
-    
+
     if (isInStatusUpdateGracePeriod && previousStatus) {
       const normalizedPrevious = normalizeOrderStatus(previousStatus)
       setSelectedStatus(normalizedPrevious)
@@ -383,27 +385,78 @@ export function OperationsPage({ subRoute = null, navigate }) {
       return {
         ...column,
         Cell: (row) => {
+          const isDropdownOpen = openNotificationsDropdown === row.id
+
+          const actionItems = [
+            {
+              label: 'Edit notification',
+              icon: Edit2,
+              onClick: () => {
+                setSelectedNotification(row)
+                setCurrentView('notification')
+                setOpenNotificationsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            },
+            {
+              label: 'Delete notification',
+              icon: Trash2,
+              onClick: () => {
+                handleDeleteNotification(row.id)
+                setOpenNotificationsDropdown(null)
+              },
+              className: 'text-red-600 hover:bg-red-50'
+            }
+          ]
+
           return (
-            <div className="flex items-center gap-2">
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedNotification(row)
-                  setCurrentView('notification')
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpenNotificationsDropdown(isDropdownOpen ? null : row.id)
                 }}
                 className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
-                title="Edit notification"
+                title="Actions"
               >
-                <Edit2 className="h-4 w-4" />
+                <MoreVertical className="h-4 w-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteNotification(row.id)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-red-600 transition-all hover:border-red-500 hover:bg-red-50"
-                title="Delete notification"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+
+              {isDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setOpenNotificationsDropdown(null)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                    {actionItems.map((item, index) => {
+                      const Icon = item.icon
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!item.disabled) {
+                              item.onClick()
+                            }
+                          }}
+                          disabled={item.disabled}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
+                            item.className,
+                            item.disabled && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )
         },
@@ -421,7 +474,7 @@ export function OperationsPage({ subRoute = null, navigate }) {
           const rawStatus = row.status || ''
           const currentStatus = rawStatus.toLowerCase()
           const normalizedStatus = normalizeOrderStatus(currentStatus)
-          
+
           // Explicitly check for 'rejected' status - always show as "Awaiting" for escalated orders
           if (currentStatus === 'rejected' || rawStatus.toLowerCase() === 'rejected') {
             return (
@@ -431,16 +484,16 @@ export function OperationsPage({ subRoute = null, navigate }) {
               </div>
             )
           }
-          
+
           // Check if order is fulfilled (accepted or beyond)
           const isFulfilled = normalizedStatus === 'accepted' || normalizedStatus === 'dispatched' || normalizedStatus === 'delivered' || normalizedStatus === 'fully_paid'
-          
+
           if (isFulfilled) {
             // Show the actual status for fulfilled orders
-            const displayStatus = normalizedStatus === 'accepted' ? 'Accepted' : 
-                                 normalizedStatus === 'dispatched' ? 'Dispatched' :
-                                 normalizedStatus === 'delivered' ? 'Delivered' :
-                                 normalizedStatus === 'fully_paid' ? 'Fully Paid' : 'Accepted'
+            const displayStatus = normalizedStatus === 'accepted' ? 'Accepted' :
+              normalizedStatus === 'dispatched' ? 'Dispatched' :
+                normalizedStatus === 'delivered' ? 'Delivered' :
+                  normalizedStatus === 'fully_paid' ? 'Fully Paid' : 'Accepted'
             return (
               <div className="flex flex-col gap-1">
                 <StatusBadge tone="success">Accepted</StatusBadge>
@@ -448,7 +501,7 @@ export function OperationsPage({ subRoute = null, navigate }) {
               </div>
             )
           }
-          
+
           // For escalated orders not yet fulfilled (including 'awaiting', 'pending', etc.),
           // ALWAYS show "Awaiting" regardless of actual status value
           return (
@@ -485,94 +538,139 @@ export function OperationsPage({ subRoute = null, navigate }) {
           const previousStatus = row.statusUpdateGracePeriod?.previousStatus
           const hideUpdateButton = workflowCompleted && !isInStatusUpdateGracePeriod
           const statusButtonConfig = hideUpdateButton ? null : getStatusButtonConfig(row)
-          
+
+          const isDropdownOpen = openEscalationsDropdown === row.id
+
+          const actionItems = [
+            {
+              label: 'View details',
+              icon: Eye,
+              onClick: () => {
+                if (navigate) {
+                  navigate(`orders/escalated?viewOrder=${row.id}`)
+                }
+                setOpenEscalationsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            }
+          ]
+
+          // Fulfill button
+          if (!isFulfilled) {
+            actionItems.push({
+              label: 'Fulfill from Warehouse',
+              icon: Package,
+              onClick: () => {
+                setSelectedOrderForEscalation(row)
+                setFulfillmentNote('')
+                setCurrentView('escalation')
+                setOpenEscalationsDropdown(null)
+              },
+              className: 'text-green-600 hover:bg-green-50'
+            })
+          }
+
+          if (isFulfilled) {
+            // Confirm Status Update
+            if (isInStatusUpdateGracePeriod && !workflowCompleted) {
+              actionItems.push({
+                label: 'Confirm Update',
+                icon: CheckCircle,
+                onClick: async () => {
+                  const result = await updateOrderStatus(row.id, { finalizeGracePeriod: true })
+                  if (result.data) {
+                    fetchData()
+                    success(result.data.message || 'Status update confirmed successfully!', 3000)
+                  } else if (result.error) {
+                    showError(result.error.message || 'Failed to confirm status update', 5000)
+                  }
+                  setOpenEscalationsDropdown(null)
+                },
+                className: 'text-green-700 hover:bg-green-50'
+              })
+            }
+
+            // Revert button
+            if (isInStatusUpdateGracePeriod && previousStatus && !workflowCompleted) {
+              actionItems.push({
+                label: `Revert to ${previousStatus}`,
+                icon: ArrowLeft,
+                onClick: () => {
+                  handleOpenStatusUpdateModal(row)
+                  setOpenEscalationsDropdown(null)
+                },
+                className: 'text-orange-700 hover:bg-orange-50'
+              })
+            }
+
+            // Update Status button
+            if (!hideUpdateButton && !isInStatusUpdateGracePeriod) {
+              actionItems.push({
+                label: statusButtonConfig?.label || 'Update Status',
+                icon: statusButtonConfig?.icon || RefreshCw,
+                onClick: () => {
+                  handleOpenStatusUpdateModal(row)
+                  setOpenEscalationsDropdown(null)
+                },
+                disabled: !statusButtonConfig,
+                className: 'text-blue-700 hover:bg-blue-50'
+              })
+            }
+          }
+
           return (
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 items-end">
               {isInStatusUpdateGracePeriod && (
-                <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 mb-1">
                   ⏰ {statusUpdateTimeRemaining}m to revert
                 </div>
               )}
-              <div className="flex items-center gap-2 flex-wrap">
+
+              <div className="relative">
                 <button
                   type="button"
-                  onClick={() => {
-                    // Navigate to Orders screen to view details
-                    if (navigate) {
-                      navigate(`orders/escalated?viewOrder=${row.id}`)
-                    }
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setOpenEscalationsDropdown(isDropdownOpen ? null : row.id)
                   }}
                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-red-500 hover:bg-red-50 hover:text-red-700"
-                  title="View details"
+                  title="Actions"
                 >
-                  <Eye className="h-4 w-4" />
+                  <MoreVertical className="h-4 w-4" />
                 </button>
-                {/* Show Fulfill button only if not fulfilled */}
-                {!isFulfilled && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedOrderForEscalation(row)
-                      setFulfillmentNote('')
-                      setCurrentView('escalation')
-                    }}
-                    className="flex items-center gap-2 rounded-lg border border-green-300 bg-white px-3 py-2 text-sm font-bold text-green-600 transition-all hover:bg-green-50"
-                  >
-                    <Package className="h-4 w-4" />
-                    Fulfill
-                  </button>
-                )}
-                {/* Show operation buttons if fulfilled */}
-                {isFulfilled && (
+
+                {isDropdownOpen && (
                   <>
-                    {/* Confirm Status Update button - shown during grace period */}
-                    {isInStatusUpdateGracePeriod && !workflowCompleted && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const result = await updateOrderStatus(row.id, { finalizeGracePeriod: true })
-                          if (result.data) {
-                            fetchData()
-                            success(result.data.message || 'Status update confirmed successfully!', 3000)
-                          } else if (result.error) {
-                            showError(result.error.message || 'Failed to confirm status update', 5000)
-                          }
-                        }}
-                        className="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-green-300 bg-green-50 px-2.5 text-xs font-semibold text-green-700 transition-all hover:border-green-500 hover:bg-green-100"
-                        title="Confirm status update"
-                      >
-                        <CheckCircle className="h-3.5 w-3.5" />
-                        <span>Confirm</span>
-                      </button>
-                    )}
-                    {/* Revert button - shown during grace period */}
-                    {isInStatusUpdateGracePeriod && previousStatus && !workflowCompleted && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenStatusUpdateModal(row)}
-                        className="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-orange-300 bg-orange-50 px-2.5 text-xs font-semibold text-orange-700 transition-all hover:border-orange-500 hover:bg-orange-100"
-                        title={`Revert to ${previousStatus}`}
-                      >
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                        <span>Revert</span>
-                      </button>
-                    )}
-                    {/* Update Status button - hidden when workflow completed or during grace period */}
-                    {!hideUpdateButton && !isInStatusUpdateGracePeriod && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenStatusUpdateModal(row)}
-                        disabled={!statusButtonConfig}
-                        className={cn(
-                          'flex h-8 items-center justify-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-2.5 text-xs font-semibold text-blue-700 transition-all hover:border-blue-500 hover:bg-blue-100',
-                          !statusButtonConfig && 'opacity-50 cursor-not-allowed'
-                        )}
-                        title="Update order status"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        <span>Update Status</span>
-                      </button>
-                    )}
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setOpenEscalationsDropdown(null)}
+                    />
+                    <div className="absolute right-0 top-full mt-1 z-20 w-64 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                      {actionItems.map((item, index) => {
+                        const Icon = item.icon
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (!item.disabled) {
+                                item.onClick()
+                              }
+                            }}
+                            disabled={item.disabled}
+                            className={cn(
+                              'w-full flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
+                              item.className,
+                              item.disabled && 'opacity-50 cursor-not-allowed'
+                            )}
+                          >
+                            <Icon className="h-4 w-4" />
+                            <span>{item.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
                   </>
                 )}
               </div>
@@ -703,7 +801,7 @@ export function OperationsPage({ subRoute = null, navigate }) {
                     const quantity = item.quantity || 1
                     const unitPrice = item.unitPrice || item.price || item.amount || 0
                     const totalPrice = item.totalPrice || (unitPrice * quantity)
-                    
+
                     return (
                       <div key={itemId} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-2">
                         <div>
@@ -867,8 +965,8 @@ export function OperationsPage({ subRoute = null, navigate }) {
     const isPaid = currentPaymentStatus === 'fully_paid'
     const isInStatusUpdateGracePeriod = order?.statusUpdateGracePeriod?.isActive
     const statusUpdateGracePeriodExpiresAt = order?.statusUpdateGracePeriod?.expiresAt
-    const statusUpdateTimeRemaining = statusUpdateGracePeriodExpiresAt 
-      ? Math.max(0, Math.floor((new Date(statusUpdateGracePeriodExpiresAt) - new Date()) / 1000 / 60)) 
+    const statusUpdateTimeRemaining = statusUpdateGracePeriodExpiresAt
+      ? Math.max(0, Math.floor((new Date(statusUpdateGracePeriodExpiresAt) - new Date()) / 1000 / 60))
       : 0
     const previousStatus = order?.statusUpdateGracePeriod?.previousStatus
     const normalizedCurrentStatus = normalizeOrderStatus(currentStatus)
@@ -923,8 +1021,8 @@ export function OperationsPage({ subRoute = null, navigate }) {
 
     const handleStatusUpdateSubmit = () => {
       if (!selectedStatus && !selectedPaymentStatus) return
-      const backendStatus = selectedPaymentStatus === 'fully_paid' 
-        ? 'fully_paid' 
+      const backendStatus = selectedPaymentStatus === 'fully_paid'
+        ? 'fully_paid'
         : selectedStatus
       const updateData = {
         status: backendStatus,
@@ -1215,8 +1313,8 @@ export function OperationsPage({ subRoute = null, navigate }) {
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
               <p className="text-xs text-gray-500 mb-1">Default Delivery</p>
               <p className="text-lg font-bold text-gray-900">
-                {logisticsSettings.defaultDeliveryTime === '3h' ? '3 Hours' : 
-                 logisticsSettings.defaultDeliveryTime === '4h' ? '4 Hours' : '1 Day'}
+                {logisticsSettings.defaultDeliveryTime === '3h' ? '3 Hours' :
+                  logisticsSettings.defaultDeliveryTime === '4h' ? '4 Hours' : '1 Day'}
               </p>
             </div>
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">

@@ -4,6 +4,7 @@ import { useUserDispatch } from '../../context/UserContext'
 import * as userApi from '../../services/userApi'
 import { Trans } from '../../../../components/Trans'
 import { validatePhoneNumber, normalizePhoneNumber } from '../../../../utils/phoneValidation'
+import { PhoneInput } from '../../../../components/PhoneInput'
 
 export function LoginPageView({ onSuccess, onSwitchToSignup }) {
   const dispatch = useUserDispatch()
@@ -160,16 +161,13 @@ export function LoginPageView({ onSuccess, onSwitchToSignup }) {
                   <label htmlFor="login-phone" className="user-auth-page-view__label">
                     <Trans>Contact Number</Trans> <span className="user-auth-page-view__required">*</span>
                   </label>
-                  <input
+                  <PhoneInput
                     id="login-phone"
                     name="phone"
-                    type="tel"
                     required
                     value={form.phone}
                     onChange={handleChange}
-                    placeholder="+91 90000 00000"
-                    maxLength={15}
-                    className="user-auth-page-view__input"
+                    placeholder="Mobile"
                   />
                 </div>
 

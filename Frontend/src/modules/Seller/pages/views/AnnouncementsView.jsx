@@ -2,12 +2,14 @@ import { useState, useMemo } from 'react'
 import { sellerSnapshot } from '../../services/sellerData'
 import { cn } from '../../../../lib/cn'
 import { BellIcon, TargetIcon, SparkIcon, ShareIcon } from '../../components/icons'
+import { Trans } from '../../../../components/Trans'
+import { TransText } from '../../../../components/TransText'
 
 const FILTER_TABS = [
-  { id: 'all', label: 'All' },
-  { id: 'policy', label: 'Policy' },
-  { id: 'target', label: 'Target' },
-  { id: 'update', label: 'Update' },
+  { id: 'all', label: <Trans>All</Trans> },
+  { id: 'policy', label: <Trans>Policy</Trans> },
+  { id: 'target', label: <Trans>Target</Trans> },
+  { id: 'update', label: <Trans>Update</Trans> },
 ]
 
 const TYPE_ICONS = {
@@ -17,9 +19,9 @@ const TYPE_ICONS = {
 }
 
 const TYPE_LABELS = {
-  policy: 'Policy',
-  target: 'Target',
-  update: 'Update',
+  policy: <Trans>Policy</Trans>,
+  target: <Trans>Target</Trans>,
+  update: <Trans>Update</Trans>,
 }
 
 export function AnnouncementsView({ onShowDetail }) {
@@ -59,9 +61,9 @@ export function AnnouncementsView({ onShowDetail }) {
       const diff = now - date
       const days = Math.floor(diff / 86400000)
 
-      if (days === 0) return 'Today'
-      if (days === 1) return 'Yesterday'
-      if (days < 7) return `${days} days ago`
+      if (days === 0) return <Trans>Today</Trans>
+      if (days === 1) return <Trans>Yesterday</Trans>
+      if (days < 7) return <Trans>{`${days} days ago`}</Trans>
       return date.toLocaleDateString('en-IN', {
         day: 'numeric',
         month: 'short',
@@ -84,8 +86,8 @@ export function AnnouncementsView({ onShowDetail }) {
         <div className="seller-announcements-hero__card">
           <div className="seller-announcements-hero__header">
             <div>
-              <h2 className="seller-announcements-hero__title">Announcements</h2>
-              <p className="seller-announcements-hero__subtitle">Important updates from admin</p>
+              <h2 className="seller-announcements-hero__title"><Trans>Announcements</Trans></h2>
+              <p className="seller-announcements-hero__subtitle"><Trans>Important updates from admin</Trans></p>
             </div>
             <div className="seller-announcements-hero__badge">
               <BellIcon className="h-6 w-6 text-white" />
@@ -93,21 +95,21 @@ export function AnnouncementsView({ onShowDetail }) {
           </div>
           <div className="seller-announcements-hero__stats">
             <div className="seller-announcements-stat">
-              <p className="seller-announcements-stat__label">Total</p>
+              <p className="seller-announcements-stat__label"><Trans>Total</Trans></p>
               <span className="seller-announcements-stat__value">{stats.total}</span>
             </div>
             <div className="seller-announcements-stat">
-              <p className="seller-announcements-stat__label">Unread</p>
+              <p className="seller-announcements-stat__label"><Trans>Unread</Trans></p>
               <span className="seller-announcements-stat__value seller-announcements-stat__value--unread">
                 {stats.unread}
               </span>
             </div>
             <div className="seller-announcements-stat">
-              <p className="seller-announcements-stat__label">Policy</p>
+              <p className="seller-announcements-stat__label"><Trans>Policy</Trans></p>
               <span className="seller-announcements-stat__value">{stats.byType.policy}</span>
             </div>
             <div className="seller-announcements-stat">
-              <p className="seller-announcements-stat__label">Target</p>
+              <p className="seller-announcements-stat__label"><Trans>Target</Trans></p>
               <span className="seller-announcements-stat__value">{stats.byType.target}</span>
             </div>
           </div>
@@ -135,11 +137,11 @@ export function AnnouncementsView({ onShowDetail }) {
         {filteredAnnouncements.length === 0 ? (
           <div className="seller-announcements-empty">
             <BellIcon className="seller-announcements-empty__icon" />
-            <p className="seller-announcements-empty__text">No announcements found</p>
+            <p className="seller-announcements-empty__text"><Trans>No announcements found</Trans></p>
             <p className="seller-announcements-empty__subtext">
               {activeFilter === 'all'
-                ? 'You\'re all caught up! No new announcements.'
-                : `No ${activeFilter} announcements yet`}
+                ? <Trans>You're all caught up! No new announcements.</Trans>
+                : <Trans>{`No ${activeFilter} announcements yet`}</Trans>}
             </p>
           </div>
         ) : (
@@ -166,8 +168,8 @@ export function AnnouncementsView({ onShowDetail }) {
                         announcement.type === 'policy'
                           ? 'is-policy'
                           : announcement.type === 'target'
-                          ? 'is-target'
-                          : 'is-update',
+                            ? 'is-target'
+                            : 'is-update',
                       )}
                     >
                       {getTypeIcon(announcement.type)}
@@ -175,9 +177,9 @@ export function AnnouncementsView({ onShowDetail }) {
                   </div>
                   <div className="seller-announcement-card__info">
                     <div className="seller-announcement-card__row">
-                      <h3 className="seller-announcement-card__title">{announcement.title}</h3>
+                      <h3 className="seller-announcement-card__title"><TransText>{announcement.title}</TransText></h3>
                       {!announcement.read && (
-                        <span className="seller-announcement-card__badge">New</span>
+                        <span className="seller-announcement-card__badge"><Trans>New</Trans></span>
                       )}
                     </div>
                     <div className="seller-announcement-card__meta">
@@ -187,8 +189,8 @@ export function AnnouncementsView({ onShowDetail }) {
                           announcement.type === 'policy'
                             ? 'is-policy'
                             : announcement.type === 'target'
-                            ? 'is-target'
-                            : 'is-update',
+                              ? 'is-target'
+                              : 'is-update',
                         )}
                       >
                         {TYPE_LABELS[announcement.type]}
@@ -198,7 +200,7 @@ export function AnnouncementsView({ onShowDetail }) {
                   </div>
                 </div>
                 <div className="seller-announcement-card__body">
-                  <p className="seller-announcement-card__message">{announcement.message}</p>
+                  <p className="seller-announcement-card__message"><TransText>{announcement.message}</TransText></p>
                 </div>
               </div>
             ))}
@@ -218,7 +220,7 @@ export function AnnouncementsView({ onShowDetail }) {
           />
           <div className={cn('seller-activity-sheet__panel', showDetailSheet && 'is-open')}>
             <div className="seller-activity-sheet__header">
-              <h4>{selectedAnnouncement.title}</h4>
+              <h4><TransText>{selectedAnnouncement.title}</TransText></h4>
               <button
                 type="button"
                 onClick={() => {
@@ -226,7 +228,7 @@ export function AnnouncementsView({ onShowDetail }) {
                   setTimeout(() => setSelectedAnnouncement(null), 260)
                 }}
               >
-                Close
+                <Trans>Close</Trans>
               </button>
             </div>
             <div className="seller-activity-sheet__body">
@@ -238,8 +240,8 @@ export function AnnouncementsView({ onShowDetail }) {
                       selectedAnnouncement.type === 'policy'
                         ? 'is-policy'
                         : selectedAnnouncement.type === 'target'
-                        ? 'is-target'
-                        : 'is-update',
+                          ? 'is-target'
+                          : 'is-update',
                     )}
                   >
                     {TYPE_LABELS[selectedAnnouncement.type]}
@@ -249,8 +251,8 @@ export function AnnouncementsView({ onShowDetail }) {
                   </span>
                 </div>
                 <div className="seller-announcement-detail__content">
-                  <h3 className="seller-announcement-detail__title">{selectedAnnouncement.title}</h3>
-                  <p className="seller-announcement-detail__message">{selectedAnnouncement.message}</p>
+                  <h3 className="seller-announcement-detail__title"><TransText>{selectedAnnouncement.title}</TransText></h3>
+                  <p className="seller-announcement-detail__message"><TransText>{selectedAnnouncement.message}</TransText></p>
                 </div>
               </div>
             </div>

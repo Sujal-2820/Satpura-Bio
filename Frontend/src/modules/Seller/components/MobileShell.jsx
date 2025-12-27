@@ -5,6 +5,9 @@ import iraSathiLogo from '../../../assets/IRA Sathi.png'
 import { MapPinIcon } from './icons'
 import { NotificationsDropdown } from './NotificationsDropdown'
 import { LanguageToggle } from '../../../components/LanguageToggle'
+import { Trans } from '../../../components/Trans'
+import { useTranslation } from '../../../context/TranslationContext'
+import { TransText } from '../../../components/TransText'
 
 export function MobileShell({ title, subtitle, children, navigation, menuContent, onSearchClick, notificationsCount = 0, notifications = [], onProfileClick, onNotificationClick, isNotificationAnimating = false }) {
   const [open, setOpen] = useState(false)
@@ -35,6 +38,8 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  const { translateProduct, language } = useTranslation() // Get language to force re-render
 
   return (
     <div className="seller-shell">
@@ -88,11 +93,11 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
           </div>
         </div>
         <div className={cn('seller-shell-header__info', compact && 'is-compact')}>
-          {title ? <span className="seller-brand-title">{title}</span> : null}
-          <p className="seller-shell-header__hint">
+          {title ? <span className="seller-brand-title"><TransText>{title}</TransText></span> : null}
+          <div className="seller-shell-header__hint">
             <MapPinIcon className="mr-2 inline h-3.5 w-3.5" />
-            {subtitle}
-          </p>
+            <TransText>{subtitle}</TransText>
+          </div>
         </div>
       </header>
 
@@ -119,7 +124,7 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
         )}
       >
         <div className="flex items-center justify-between px-4 pb-3 pt-6">
-          <p className="text-sm font-semibold text-surface-foreground">Menu</p>
+          <p className="text-sm font-semibold text-surface-foreground"><Trans>Menu</Trans></p>
           <button
             type="button"
             onClick={() => setOpen(false)}
@@ -135,9 +140,9 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
           </div>
           {typeof menuContent === 'function'
             ? menuContent({
-                close: () => setOpen(false),
-                onNavigate: () => setOpen(false),
-              })
+              close: () => setOpen(false),
+              onNavigate: () => setOpen(false),
+            })
             : menuContent}
         </div>
       </aside>

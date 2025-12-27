@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../../lib/cn'
 import { BellIcon } from './icons'
 import { CloseIcon } from './icons'
+import { Trans } from '../../../components/Trans'
 
 export function NotificationsDropdown({ isOpen, onClose, notifications = [], onMarkAsRead, onMarkAllAsRead }) {
   const dropdownRef = useRef(null)
@@ -46,10 +47,10 @@ export function NotificationsDropdown({ isOpen, onClose, notifications = [], onM
     const hours = Math.floor(diff / 3600000)
     const days = Math.floor(diff / 86400000)
 
-    if (minutes < 1) return 'Just now'
-    if (minutes < 60) return `${minutes}m ago`
-    if (hours < 24) return `${hours}h ago`
-    if (days < 7) return `${days}d ago`
+    if (minutes < 1) return <Trans>Just now</Trans>
+    if (minutes < 60) return <Trans>{minutes}m ago</Trans>
+    if (hours < 24) return <Trans>{hours}h ago</Trans>
+    if (days < 7) return <Trans>{days}d ago</Trans>
     return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
   }
 
@@ -90,7 +91,7 @@ export function NotificationsDropdown({ isOpen, onClose, notifications = [], onM
     >
       <div className="seller-notifications-dropdown__header">
         <div className="seller-notifications-dropdown__header-content">
-          <h3 className="seller-notifications-dropdown__title">Notifications</h3>
+          <h3 className="seller-notifications-dropdown__title"><Trans>Notifications</Trans></h3>
           {unreadCount > 0 && <span className="seller-notifications-dropdown__badge">{unreadCount}</span>}
         </div>
         <div className="seller-notifications-dropdown__header-actions">
@@ -108,8 +109,8 @@ export function NotificationsDropdown({ isOpen, onClose, notifications = [], onM
         {recentNotifications.length === 0 ? (
           <div className="seller-notifications-dropdown__empty">
             <BellIcon className="seller-notifications-dropdown__empty-icon" />
-            <p className="seller-notifications-dropdown__empty-text">No new notifications</p>
-            <p className="seller-notifications-dropdown__empty-subtext">You're all caught up!</p>
+            <p className="seller-notifications-dropdown__empty-text"><Trans>No new notifications</Trans></p>
+            <p className="seller-notifications-dropdown__empty-subtext"><Trans>You're all caught up!</Trans></p>
           </div>
         ) : (
           <>
@@ -124,7 +125,7 @@ export function NotificationsDropdown({ isOpen, onClose, notifications = [], onM
                   }}
                   className="seller-notifications-dropdown__mark-all"
                 >
-                  Mark all as read
+                  <Trans>Mark all as read</Trans>
                 </button>
               </div>
             )}
@@ -140,7 +141,7 @@ export function NotificationsDropdown({ isOpen, onClose, notifications = [], onM
                   </div>
                   <div className="seller-notification-item__content">
                     <div className="seller-notification-item__header">
-                      <h4 className="seller-notification-item__title">{notification.title || 'Notification'}</h4>
+                      <h4 className="seller-notification-item__title">{notification.title || <Trans>Notification</Trans>}</h4>
                       {!notification.read && (
                         <span className="seller-notification-item__badge" />
                       )}

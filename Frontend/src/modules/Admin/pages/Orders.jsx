@@ -7,7 +7,7 @@ import { Timeline } from '../components/Timeline'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
 import { useToast } from '../components/ToastNotification'
-import { orders as mockOrders } from '../services/adminData'
+
 import { cn } from '../../../lib/cn'
 
 const columns = [
@@ -46,7 +46,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
   const [ordersList, setOrdersList] = useState([])
   const [allOrdersList, setAllOrdersList] = useState([])
   const [availableVendors, setAvailableVendors] = useState([])
-  
+
   // Filter states
   const [filters, setFilters] = useState({
     region: 'All',
@@ -66,21 +66,21 @@ export function OrdersPage({ subRoute = null, navigate }) {
   const [selectedOrderForRevert, setSelectedOrderForRevert] = useState(null)
   const [revertReason, setRevertReason] = useState('')
   const [selectedOrderForStatusUpdate, setSelectedOrderForStatusUpdate] = useState(null)
-  
+
   // Reassignment form states
   const [selectedVendorId, setSelectedVendorId] = useState('')
   const [reassignReason, setReassignReason] = useState('')
   const [reassignErrors, setReassignErrors] = useState({})
-  
+
   // Escalation form states
   const [fulfillmentNote, setFulfillmentNote] = useState('')
-  
+
   // Status update form states
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('')
   const [statusUpdateNotes, setStatusUpdateNotes] = useState('')
   const [isRevert, setIsRevert] = useState(false)
-  
+
   // Dropdown state for actions menu
   const [openActionsDropdown, setOpenActionsDropdown] = useState(null)
 
@@ -116,7 +116,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
         setOpenActionsDropdown(null)
       }
     }
-    
+
     if (openActionsDropdown) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => {
@@ -140,9 +140,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
       const formatted = result.data.orders.map(formatOrderForDisplay)
       setAllOrdersList(formatted)
     } else {
-      // Fallback to mock data
-      const formatted = mockOrders.map(formatOrderForDisplay)
-      setAllOrdersList(formatted)
+      setAllOrdersList([])
     }
   }, [getOrders, filters])
 
@@ -157,8 +155,8 @@ export function OrdersPage({ subRoute = null, navigate }) {
       // Processing orders: accepted but not delivered
       setOrdersList(allOrdersList.filter((o) => {
         const status = (o.status || '').toLowerCase()
-        return (status === 'processing' || status === 'accepted' || status === 'awaiting dispatch' || status === 'dispatched') && 
-               status !== 'delivered' && status !== 'completed' && status !== 'fully_paid'
+        return (status === 'processing' || status === 'accepted' || status === 'awaiting dispatch' || status === 'dispatched') &&
+          status !== 'delivered' && status !== 'completed' && status !== 'fully_paid'
       }))
     } else if (subRoute === 'completed') {
       // Completed: delivered and fully paid
@@ -205,13 +203,13 @@ export function OrdersPage({ subRoute = null, navigate }) {
   const handleViewOrderDetails = async (order) => {
     const originalOrder = ordersState.data?.orders?.find((o) => o.id === order.id) || order
     setSelectedOrderForDetail(originalOrder)
-    
+
     // Fetch detailed order data
     const result = await getOrderDetails(order.id)
     if (result.data) {
       setOrderDetails(result.data)
     }
-    
+
     setCurrentView('orderDetail')
   }
 
@@ -397,7 +395,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
     const normalizedCurrentStatus = normalizeOrderStatus(currentStatus)
     const isInStatusUpdateGracePeriod = order?.statusUpdateGracePeriod?.isActive
     const previousStatus = order?.statusUpdateGracePeriod?.previousStatus
-    
+
     if (isInStatusUpdateGracePeriod && previousStatus) {
       const normalizedPrevious = normalizeOrderStatus(previousStatus)
       setSelectedStatus(normalizedPrevious)
@@ -488,7 +486,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
           const isEscalated = originalOrder.escalated || originalOrder.assignedTo === 'admin'
           const status = row.status || 'Unknown'
           const isPaid = row.isPaid || originalOrder.paymentStatus === 'fully_paid'
-          
+
           if (isEscalated) {
             return (
               <div className="flex flex-col gap-1">
@@ -500,7 +498,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
               </div>
             )
           }
-          
+
           const tone = status === 'Processing' || status === 'processing' ? 'warning' : status === 'Completed' || status === 'completed' ? 'success' : 'neutral'
           return (
             <div className="flex flex-col gap-1">
@@ -531,8 +529,8 @@ export function OrdersPage({ subRoute = null, navigate }) {
           return (
             <span className={cn(
               'inline-flex items-center rounded-full px-3 py-1 text-xs font-bold',
-              type === 'User' || type === 'user' 
-                ? 'bg-blue-100 text-blue-700' 
+              type === 'User' || type === 'user'
+                ? 'bg-blue-100 text-blue-700'
                 : 'bg-green-100 text-green-700'
             )}>
               {type}
@@ -575,10 +573,10 @@ export function OrdersPage({ subRoute = null, navigate }) {
           const hideUpdateButton = workflowCompleted && !isInStatusUpdateGracePeriod
           const statusButtonConfig = hideUpdateButton ? null : getStatusButtonConfig(originalOrder)
           const isDropdownOpen = openActionsDropdown === row.id
-          
+
           // Build action items list
           const actionItems = []
-          
+
           // Always show View Details
           actionItems.push({
             label: 'View Details',
@@ -589,7 +587,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
             },
             className: 'text-gray-700 hover:bg-gray-50'
           })
-          
+
           // Confirm Status Update - shown during grace period
           if (isInStatusUpdateGracePeriod && !workflowCompleted) {
             actionItems.push({
@@ -608,7 +606,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
               className: 'text-green-700 hover:bg-green-50'
             })
           }
-          
+
           // Revert button - shown during grace period
           if (isInStatusUpdateGracePeriod && previousStatus && !workflowCompleted) {
             actionItems.push({
@@ -621,7 +619,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
               className: 'text-orange-700 hover:bg-orange-50'
             })
           }
-          
+
           // Update Status button - hidden when workflow completed or during grace period
           if (!hideUpdateButton && !isInStatusUpdateGracePeriod) {
             actionItems.push({
@@ -635,7 +633,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
               className: 'text-blue-700 hover:bg-blue-50'
             })
           }
-          
+
           // Escalation actions - Show for escalated orders that are not fulfilled
           if (isEscalated && !isFulfilled) {
             actionItems.push({
@@ -661,7 +659,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
               className: 'text-orange-700 hover:bg-orange-50'
             })
           }
-          
+
           // Reassign button - Only show if escalated AND status is awaiting/pending
           if (isEscalated && (normalizedStatus === 'awaiting' || normalizedStatus === 'pending')) {
             actionItems.push({
@@ -674,7 +672,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
               className: 'text-gray-700 hover:bg-gray-50'
             })
           }
-          
+
           return (
             <div className="relative">
               {isInStatusUpdateGracePeriod && (
@@ -702,7 +700,7 @@ export function OrdersPage({ subRoute = null, navigate }) {
                 >
                   <MoreVertical className="h-4 w-4" />
                 </button>
-                
+
                 {isDropdownOpen && (
                   <>
                     {/* Backdrop to close dropdown */}
@@ -816,8 +814,8 @@ export function OrdersPage({ subRoute = null, navigate }) {
     const vendorName = getVendorName(order)
     const vendorId = getVendorId(order)
     const userName = getUserName(order)
-    const orderValue = typeof order.value === 'number' 
-      ? order.value 
+    const orderValue = typeof order.value === 'number'
+      ? order.value
       : parseFloat(order.value?.replace(/[₹,\sL]/g, '') || '0') * 100000
     const advanceAmount = typeof order.advance === 'number'
       ? order.advance
@@ -1384,8 +1382,8 @@ export function OrdersPage({ subRoute = null, navigate }) {
     const isPaid = currentPaymentStatus === 'fully_paid'
     const isInStatusUpdateGracePeriod = order?.statusUpdateGracePeriod?.isActive
     const statusUpdateGracePeriodExpiresAt = order?.statusUpdateGracePeriod?.expiresAt
-    const statusUpdateTimeRemaining = statusUpdateGracePeriodExpiresAt 
-      ? Math.max(0, Math.floor((new Date(statusUpdateGracePeriodExpiresAt) - new Date()) / 1000 / 60)) 
+    const statusUpdateTimeRemaining = statusUpdateGracePeriodExpiresAt
+      ? Math.max(0, Math.floor((new Date(statusUpdateGracePeriodExpiresAt) - new Date()) / 1000 / 60))
       : 0
     const previousStatus = order?.statusUpdateGracePeriod?.previousStatus
     const normalizedCurrentStatus = normalizeOrderStatus(currentStatus)
@@ -1453,8 +1451,8 @@ export function OrdersPage({ subRoute = null, navigate }) {
 
     const handleStatusUpdateSubmit = () => {
       if (!selectedStatus && !selectedPaymentStatus) return
-      const backendStatus = selectedPaymentStatus === 'fully_paid' 
-        ? 'fully_paid' 
+      const backendStatus = selectedPaymentStatus === 'fully_paid'
+        ? 'fully_paid'
         : selectedStatus
       const updateData = {
         status: backendStatus,

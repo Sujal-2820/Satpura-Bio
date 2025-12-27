@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSellerState, useSellerDispatch } from '../../context/SellerContext'
 import { useSellerApi } from '../../hooks/useSellerApi'
 import { sellerSnapshot } from '../../services/sellerData'
@@ -6,19 +6,23 @@ import {
   UserIcon,
   HelpCircleIcon,
   EditIcon,
-  CheckIcon,
   XIcon,
   BuildingIcon,
   MapPinIcon,
 } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import { useToast } from '../../components/ToastNotification'
+import { Trans } from '../../../../components/Trans'
+import { TransText } from '../../../../components/TransText'
+import { useTranslation } from '../../../../context/TranslationContext'
 
 export function ProfileView({ onLogout, onNavigate }) {
   const { profile } = useSellerState()
   const dispatch = useSellerDispatch()
-  const { requestNameChange, requestPhoneChange, reportIssue, fetchDashboardOverview } = useSellerApi()
+  const { translate } = useTranslation()
+  const { requestNameChange, requestPhoneChange, reportIssue } = useSellerApi()
   const { success, warning, error: showError } = useToast()
+
   const [showNameChangePanel, setShowNameChangePanel] = useState(false)
   const [showPhoneChangePanel, setShowPhoneChangePanel] = useState(false)
   const [showSupportPanel, setShowSupportPanel] = useState(false)
@@ -45,11 +49,11 @@ export function ProfileView({ onLogout, onNavigate }) {
 
   const handleRequestNameChange = async () => {
     if (!nameChangeForm.requestedName.trim()) {
-      warning('Please enter the new name')
+      warning(<Trans>Please enter the new name</Trans>)
       return
     }
     if (nameChangeForm.requestedName.trim() !== nameChangeForm.confirmName.trim()) {
-      warning('Name confirmation does not match. Please enter the same name in both fields.')
+      warning(<Trans>Name confirmation does not match. Please enter the same name in both fields.</Trans>)
       return
     }
     try {
@@ -57,37 +61,32 @@ export function ProfileView({ onLogout, onNavigate }) {
         requestedName: nameChangeForm.requestedName.trim(),
         description: '',
       })
-      // Check for success
       if (result && (result.success || (result.data && !result.error))) {
         setNameChangeForm({ requestedName: '', confirmName: '' })
         setShowNameChangePanel(false)
-        // Show success notification after panel closes
-        setTimeout(() => {
-          success('Name change request sent to Admin. Kindly wait for the Admin approval.')
-        }, 100)
+        success(<Trans>Name change request sent to Admin. Kindly wait for the Admin approval.</Trans>)
       } else if (result && result.error) {
-        showError(result.error.message || 'Failed to submit name change request')
+        showError(result.error.message || <Trans>Failed to submit name change request</Trans>)
       } else {
-        showError('Failed to submit name change request. Please try again.')
+        showError(<Trans>Failed to submit name change request. Please try again.</Trans>)
       }
     } catch (err) {
-      showError(err.message || 'Failed to submit name change request')
+      showError(err.message || <Trans>Failed to submit name change request</Trans>)
     }
   }
 
   const handleRequestPhoneChange = async () => {
     if (!phoneChangeForm.requestedPhone.trim()) {
-      warning('Please enter the new phone number')
+      warning(<Trans>Please enter the new phone number</Trans>)
       return
     }
-    // Basic phone validation
     const phoneRegex = /^[+]?[1-9]\d{9,14}$/
     if (!phoneRegex.test(phoneChangeForm.requestedPhone.trim())) {
-      warning('Please enter a valid phone number')
+      warning(<Trans>Please enter a valid phone number</Trans>)
       return
     }
     if (phoneChangeForm.requestedPhone.trim() !== phoneChangeForm.confirmPhone.trim()) {
-      warning('Phone confirmation does not match. Please enter the same phone number in both fields.')
+      warning(<Trans>Phone confirmation does not match. Please enter the same phone number in both fields.</Trans>)
       return
     }
     try {
@@ -95,29 +94,23 @@ export function ProfileView({ onLogout, onNavigate }) {
         requestedPhone: phoneChangeForm.requestedPhone.trim(),
         description: '',
       })
-      // Check for success
       if (result && result.success) {
         setPhoneChangeForm({ requestedPhone: '', confirmPhone: '' })
         setShowPhoneChangePanel(false)
-        // Show success notification after panel closes
-        setTimeout(() => {
-          success('Phone number change request sent to Admin. Kindly wait for the Admin approval.')
-        }, 100)
+        success(<Trans>Phone number change request sent to Admin. Kindly wait for the Admin approval.</Trans>)
       } else if (result && result.error) {
-        // Show the specific error message from the backend
-        const errorMessage = result.error.message || 'Failed to submit phone change request'
-        showError(errorMessage)
+        showError(result.error.message || <Trans>Failed to submit phone change request</Trans>)
       } else {
-        showError('Failed to submit phone change request. Please try again.')
+        showError(<Trans>Failed to submit phone change request. Please try again.</Trans>)
       }
     } catch (err) {
-      showError(err.message || 'Failed to submit phone change request')
+      showError(err.message || <Trans>Failed to submit phone change request</Trans>)
     }
   }
 
   const handleSubmitReport = async () => {
     if (!reportForm.subject || !reportForm.description) {
-      warning('Please fill in all fields')
+      warning(<Trans>Please fill in all fields</Trans>)
       return
     }
     const result = await reportIssue({
@@ -126,11 +119,11 @@ export function ProfileView({ onLogout, onNavigate }) {
       category: reportForm.category,
     })
     if (result.data) {
-      success('Issue reported successfully! We will get back to you soon.')
+      success(<Trans>Issue reported successfully! We will get back to you soon.</Trans>)
       setReportForm({ subject: '', description: '', category: 'general' })
       setShowReportPanel(false)
     } else if (result.error) {
-      showError(result.error.message || 'Failed to submit report')
+      showError(result.error.message || <Trans>Failed to submit report</Trans>)
     }
   }
 
@@ -139,26 +132,26 @@ export function ProfileView({ onLogout, onNavigate }) {
   const sections = [
     {
       id: 'seller-info',
-      title: 'Seller Information',
+      title: <Trans>Seller Information</Trans>,
       icon: UserIcon,
       items: [
         {
           id: 'name',
-          label: 'Full Name',
+          label: <Trans>Full Name</Trans>,
           value: sellerProfile.name,
           editable: true,
           onEdit: () => setShowNameChangePanel(true),
         },
         {
           id: 'seller-id',
-          label: 'Seller ID',
+          label: <Trans>Seller ID</Trans>,
           value: sellerProfile.sellerId || sellerSnapshot.profile.sellerId,
           editable: false,
         },
         {
           id: 'phone',
-          label: 'Phone',
-          value: sellerProfile.phone || sellerSnapshot.profile.phone || 'Not set',
+          label: <Trans>Phone</Trans>,
+          value: sellerProfile.phone || sellerSnapshot.profile.phone || <Trans>Not set</Trans>,
           editable: true,
           onEdit: () => setShowPhoneChangePanel(true),
         },
@@ -166,50 +159,50 @@ export function ProfileView({ onLogout, onNavigate }) {
     },
     {
       id: 'business',
-      title: 'Business Details',
+      title: <Trans>Business Details</Trans>,
       icon: BuildingIcon,
       items: [
         {
           id: 'location',
-          label: 'Location',
-          value: sellerProfile.area || sellerSnapshot.profile.area || sellerProfile.location?.city || sellerProfile.location?.state || 'Not set',
+          label: <Trans>Location</Trans>,
+          value: sellerProfile.area || sellerSnapshot.profile.area || sellerProfile.location?.city || sellerProfile.location?.state || <Trans>Not set</Trans>,
           editable: false,
         },
         {
           id: 'commission',
-          label: 'Commission Rate',
-          value: sellerProfile.commissionRate || sellerSnapshot.profile.commissionRate || 'Not set',
+          label: <Trans>Commission Rate</Trans>,
+          value: sellerProfile.commissionRate || sellerSnapshot.profile.commissionRate || <Trans>Not set</Trans>,
           editable: false,
         },
         {
           id: 'cashback',
-          label: 'Cashback Rate',
-          value: sellerProfile.cashbackRate || sellerSnapshot.profile.cashbackRate || 'Not set',
+          label: <Trans>Cashback Rate</Trans>,
+          value: sellerProfile.cashbackRate || sellerSnapshot.profile.cashbackRate || <Trans>Not set</Trans>,
           editable: false,
         },
       ],
     },
     {
       id: 'support',
-      title: 'Support & Help',
+      title: <Trans>Support & Help</Trans>,
       icon: HelpCircleIcon,
       items: [
         {
           id: 'help',
-          label: 'Help Center',
-          value: 'FAQs & Guides',
+          label: <Trans>Help Center</Trans>,
+          value: <Trans>FAQs & Guides</Trans>,
           action: () => setShowSupportPanel(true),
         },
         {
           id: 'contact',
-          label: 'Contact Support',
-          value: 'Chat or Call',
+          label: <Trans>Contact Support</Trans>,
+          value: <Trans>Chat or Call</Trans>,
           action: () => setShowSupportPanel(true),
         },
         {
           id: 'report',
-          label: 'Report Issue',
-          value: 'Report a problem',
+          label: <Trans>Report Issue</Trans>,
+          value: <Trans>Report a problem</Trans>,
           action: () => setShowReportPanel(true),
         },
       ],
@@ -224,11 +217,11 @@ export function ProfileView({ onLogout, onNavigate }) {
           <UserIcon className="h-12 w-12" />
         </div>
         <div className="seller-profile-view__header-info">
-          <h2 className="seller-profile-view__header-name">{sellerProfile.name}</h2>
-          <p className="seller-profile-view__header-id">Seller ID: {sellerProfile.sellerId || sellerSnapshot.profile.sellerId}</p>
+          <h2 className="seller-profile-view__header-name"><TransText>{sellerProfile.name}</TransText></h2>
+          <p className="seller-profile-view__header-id"><TransText>Seller ID: {{ id: sellerProfile.sellerId || sellerSnapshot.profile.sellerId }}</TransText></p>
           <p className="seller-profile-view__header-location">
             <MapPinIcon className="h-4 w-4 inline mr-1" />
-            {sellerProfile.area || sellerSnapshot.profile.area || sellerProfile.location?.city || sellerProfile.location?.state || 'Location not set'}
+            <TransText>{sellerProfile.area || sellerSnapshot.profile.area || sellerProfile.location?.city || sellerProfile.location?.state || 'Location not set'}</TransText>
           </p>
         </div>
       </div>
@@ -242,41 +235,36 @@ export function ProfileView({ onLogout, onNavigate }) {
               <h3 className="seller-profile-view__section-title">{section.title}</h3>
             </div>
             <div className="seller-profile-view__section-content">
-              {section.items.length > 0 ? (
-                section.items.map((item) => (
-                  <div key={item.id} className="seller-profile-view__item">
-                    <div className="seller-profile-view__item-content">
-                      <span className="seller-profile-view__item-label">{item.label}</span>
-                      <span className="seller-profile-view__item-value">{item.value}</span>
-                    </div>
-                    <div className="seller-profile-view__item-actions">
-                      {item.editable && (
-                        <button
-                          type="button"
-                          className="seller-profile-view__item-edit"
-                          onClick={item.onEdit}
-                        >
-                          <EditIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                      {item.action && (
-                        <button
-                          type="button"
-                          className="seller-profile-view__item-action"
-                          onClick={item.action}
-                        >
-                          →
-                        </button>
-                      )}
-                    </div>
+              {section.items.map((item) => (
+                <div key={item.id} className="seller-profile-view__item">
+                  <div className="seller-profile-view__item-content">
+                    <span className="seller-profile-view__item-label">{item.label}</span>
+                    <span className="seller-profile-view__item-value">
+                      {typeof item.value === 'string' ? <TransText>{item.value}</TransText> : item.value}
+                    </span>
                   </div>
-                ))
-              ) : (
-                <div className="seller-profile-view__empty">
-                  <section.icon className="seller-profile-view__empty-icon" />
-                  <p className="seller-profile-view__empty-text">No {section.title.toLowerCase()} yet</p>
+                  <div className="seller-profile-view__item-actions">
+                    {item.editable && (
+                      <button
+                        type="button"
+                        className="seller-profile-view__item-edit"
+                        onClick={item.onEdit}
+                      >
+                        <EditIcon className="h-4 w-4" />
+                      </button>
+                    )}
+                    {item.action && (
+                      <button
+                        type="button"
+                        className="seller-profile-view__item-action"
+                        onClick={item.action}
+                      >
+                        →
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           </div>
         ))}
@@ -289,7 +277,7 @@ export function ProfileView({ onLogout, onNavigate }) {
           onClick={onLogout}
           className="seller-profile-view__logout-button"
         >
-          Sign Out
+          <Trans>Sign Out</Trans>
         </button>
       </div>
 
@@ -306,7 +294,7 @@ export function ProfileView({ onLogout, onNavigate }) {
         >
           <div className="seller-profile-view__panel-content">
             <div className="seller-profile-view__panel-header">
-              <h3 className="seller-profile-view__panel-title">Request Name Change</h3>
+              <h3 className="seller-profile-view__panel-title"><Trans>Request Name Change</Trans></h3>
               <button
                 type="button"
                 onClick={() => {
@@ -322,7 +310,7 @@ export function ProfileView({ onLogout, onNavigate }) {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    Current Name
+                    <Trans>Current Name</Trans>
                   </label>
                   <input
                     type="text"
@@ -333,32 +321,32 @@ export function ProfileView({ onLogout, onNavigate }) {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    New Name <span className="text-red-500">*</span>
+                    <Trans>New Name</Trans> <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={nameChangeForm.requestedName}
                     onChange={(e) => setNameChangeForm({ ...nameChangeForm, requestedName: e.target.value })}
-                    placeholder="Write your suggested name"
+                    placeholder={translate('Write your suggested name')}
                     className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    Confirm Name <span className="text-red-500">*</span>
+                    <Trans>Confirm Name</Trans> <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={nameChangeForm.confirmName}
                     onChange={(e) => setNameChangeForm({ ...nameChangeForm, confirmName: e.target.value })}
-                    placeholder="Enter the name again to confirm"
+                    placeholder={translate('Enter the name again to confirm')}
                     className={`w-full px-3 py-2.5 rounded-lg border text-sm focus:outline-none ${nameChangeForm.confirmName && nameChangeForm.requestedName.trim() !== nameChangeForm.confirmName.trim()
-                        ? 'border-red-300 bg-red-50 focus:border-red-500'
-                        : 'border-[rgba(34,94,65,0.15)] bg-white focus:border-[#1b8f5b]'
+                      ? 'border-red-300 bg-red-50 focus:border-red-500'
+                      : 'border-[rgba(34,94,65,0.15)] bg-white focus:border-[#1b8f5b]'
                       }`}
                   />
                   {nameChangeForm.confirmName && nameChangeForm.requestedName.trim() !== nameChangeForm.confirmName.trim() && (
-                    <p className="mt-1 text-xs text-red-600">Name does not match. Please enter the same name.</p>
+                    <p className="mt-1 text-xs text-red-600"><Trans>Name does not match. Please enter the same name.</Trans></p>
                   )}
                 </div>
               </div>
@@ -368,7 +356,7 @@ export function ProfileView({ onLogout, onNavigate }) {
                   onClick={handleRequestNameChange}
                   className="w-full py-2.5 px-4 rounded-xl bg-[#1b8f5b] text-white text-sm font-semibold hover:bg-[#2a9d61] transition-colors"
                 >
-                  Submit Request
+                  <Trans>Submit Request</Trans>
                 </button>
               </div>
             </div>
@@ -389,7 +377,7 @@ export function ProfileView({ onLogout, onNavigate }) {
         >
           <div className="seller-profile-view__panel-content">
             <div className="seller-profile-view__panel-header">
-              <h3 className="seller-profile-view__panel-title">Request Phone Change</h3>
+              <h3 className="seller-profile-view__panel-title"><Trans>Request Phone Change</Trans></h3>
               <button
                 type="button"
                 onClick={() => {
@@ -405,43 +393,43 @@ export function ProfileView({ onLogout, onNavigate }) {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    Current Phone
+                    <Trans>Current Phone</Trans>
                   </label>
                   <input
                     type="text"
-                    value={sellerProfile.phone || 'Not set'}
+                    value={sellerProfile.phone || translate('Not set')}
                     disabled
                     className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-gray-50 text-sm text-gray-600"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    New Phone Number <span className="text-red-500">*</span>
+                    <Trans>New Phone Number</Trans> <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="tel"
                     value={phoneChangeForm.requestedPhone}
                     onChange={(e) => setPhoneChangeForm({ ...phoneChangeForm, requestedPhone: e.target.value })}
-                    placeholder="Write your suggested phone number to change"
+                    placeholder={translate('Write your suggested phone number to change')}
                     className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    Confirm Phone Number <span className="text-red-500">*</span>
+                    <Trans>Confirm Phone Number</Trans> <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="tel"
                     value={phoneChangeForm.confirmPhone}
                     onChange={(e) => setPhoneChangeForm({ ...phoneChangeForm, confirmPhone: e.target.value })}
-                    placeholder="Enter the phone number again to confirm"
+                    placeholder={translate('Enter the phone number again to confirm')}
                     className={`w-full px-3 py-2.5 rounded-lg border text-sm focus:outline-none ${phoneChangeForm.confirmPhone && phoneChangeForm.requestedPhone.trim() !== phoneChangeForm.confirmPhone.trim()
-                        ? 'border-red-300 bg-red-50 focus:border-red-500'
-                        : 'border-[rgba(34,94,65,0.15)] bg-white focus:border-[#1b8f5b]'
+                      ? 'border-red-300 bg-red-50 focus:border-red-500'
+                      : 'border-[rgba(34,94,65,0.15)] bg-white focus:border-[#1b8f5b]'
                       }`}
                   />
                   {phoneChangeForm.confirmPhone && phoneChangeForm.requestedPhone.trim() !== phoneChangeForm.confirmPhone.trim() && (
-                    <p className="mt-1 text-xs text-red-600">Phone number does not match. Please enter the same phone number.</p>
+                    <p className="mt-1 text-xs text-red-600"><Trans>Phone number does not match. Please enter the same phone number.</Trans></p>
                   )}
                 </div>
               </div>
@@ -451,7 +439,7 @@ export function ProfileView({ onLogout, onNavigate }) {
                   onClick={handleRequestPhoneChange}
                   className="w-full py-2.5 px-4 rounded-xl bg-[#1b8f5b] text-white text-sm font-semibold hover:bg-[#2a9d61] transition-colors"
                 >
-                  Submit Request
+                  <Trans>Submit Request</Trans>
                 </button>
               </div>
             </div>
@@ -471,7 +459,7 @@ export function ProfileView({ onLogout, onNavigate }) {
         >
           <div className="seller-profile-view__panel-content">
             <div className="seller-profile-view__panel-header">
-              <h3 className="seller-profile-view__panel-title">Support & Help</h3>
+              <h3 className="seller-profile-view__panel-title"><Trans>Support & Help</Trans></h3>
               <button
                 type="button"
                 onClick={() => setShowSupportPanel(false)}
@@ -483,33 +471,33 @@ export function ProfileView({ onLogout, onNavigate }) {
             <div className="seller-profile-view__panel-body">
               <div className="space-y-4">
                 <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
-                  <h4 className="font-semibold text-[#172022] mb-2">Help Center</h4>
+                  <h4 className="font-semibold text-[#172022] mb-2"><Trans>Help Center</Trans></h4>
                   <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
-                    Browse FAQs and guides to find answers to common questions.
+                    <Trans>Browse FAQs and guides to find answers to common questions.</Trans>
                   </p>
                   <button
                     type="button"
                     className="text-sm text-[#1b8f5b] font-semibold hover:underline"
                   >
-                    Visit Help Center →
+                    <Trans>Visit Help Center →</Trans>
                   </button>
                 </div>
                 <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
-                  <h4 className="font-semibold text-[#172022] mb-2">Contact Support</h4>
+                  <h4 className="font-semibold text-[#172022] mb-2"><Trans>Contact Support</Trans></h4>
                   <p className="text-sm text-[rgba(26,42,34,0.7)] mb-2">
-                    <strong>Phone:</strong> +91 1800-XXX-XXXX
+                    <strong><Trans>Phone:</Trans></strong> +91 1800-XXX-XXXX
                   </p>
                   <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
-                    <strong>Email:</strong> support@irasathi.com
+                    <strong><Trans>Email:</Trans></strong> support@irasathi.com
                   </p>
                   <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
-                    <strong>Hours:</strong> Mon-Sat, 9 AM - 6 PM
+                    <strong><Trans>Hours:</Trans></strong> <Trans>Mon-Sat, 9 AM - 6 PM</Trans>
                   </p>
                   <button
                     type="button"
                     className="text-sm text-[#1b8f5b] font-semibold hover:underline"
                   >
-                    Start Chat →
+                    <Trans>Start Chat →</Trans>
                   </button>
                 </div>
               </div>
@@ -531,7 +519,7 @@ export function ProfileView({ onLogout, onNavigate }) {
         >
           <div className="seller-profile-view__panel-content">
             <div className="seller-profile-view__panel-header">
-              <h3 className="seller-profile-view__panel-title">Report Issue</h3>
+              <h3 className="seller-profile-view__panel-title"><Trans>Report Issue</Trans></h3>
               <button
                 type="button"
                 onClick={() => {
@@ -547,40 +535,40 @@ export function ProfileView({ onLogout, onNavigate }) {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    Category <span className="text-red-500">*</span>
+                    <Trans>Category</Trans> <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={reportForm.category}
                     onChange={(e) => setReportForm({ ...reportForm, category: e.target.value })}
                     className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
                   >
-                    <option value="general">General Issue</option>
-                    <option value="commission">Commission Issue</option>
-                    <option value="vendor">Vendor Issue</option>
-                    <option value="account">Account Issue</option>
-                    <option value="other">Other</option>
+                    <option value="general">{translate('General Issue')}</option>
+                    <option value="commission">{translate('Commission Issue')}</option>
+                    <option value="vendor">{translate('Vendor Issue')}</option>
+                    <option value="account">{translate('Account Issue')}</option>
+                    <option value="other">{translate('Other')}</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    Subject <span className="text-red-500">*</span>
+                    <Trans>Subject</Trans> <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={reportForm.subject}
                     onChange={(e) => setReportForm({ ...reportForm, subject: e.target.value })}
-                    placeholder="Brief description of the issue"
+                    placeholder={translate('Brief description of the issue')}
                     className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[#172022] mb-1.5">
-                    Description <span className="text-red-500">*</span>
+                    <Trans>Description</Trans> <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={reportForm.description}
                     onChange={(e) => setReportForm({ ...reportForm, description: e.target.value })}
-                    placeholder="Please provide detailed information about the issue"
+                    placeholder={translate('Please provide detailed information about the issue')}
                     rows={5}
                     className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b] resize-none"
                   />
@@ -592,7 +580,7 @@ export function ProfileView({ onLogout, onNavigate }) {
                   onClick={handleSubmitReport}
                   className="w-full py-2.5 px-4 rounded-xl bg-[#1b8f5b] text-white text-sm font-semibold hover:bg-[#2a9d61] transition-colors"
                 >
-                  Submit Report
+                  <Trans>Submit Report</Trans>
                 </button>
               </div>
             </div>
@@ -602,4 +590,3 @@ export function ProfileView({ onLogout, onNavigate }) {
     </div>
   )
 }
-

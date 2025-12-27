@@ -1,11 +1,12 @@
 import { AlertTriangle, X as CloseIcon } from 'lucide-react'
 import { cn } from '../../../lib/cn'
+import { Trans } from '../../../components/Trans'
 
 export function ConfirmationModal({
   isOpen,
   onClose,
   onConfirm,
-  title = 'Confirm Action',
+  title = <Trans>Confirm Action</Trans>,
   message,
   details = null,
   loading = false,
@@ -31,7 +32,7 @@ export function ConfirmationModal({
               <AlertTriangle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-yellow-700 mb-2">
-                  Please Double-Check Before Proceeding
+                  <Trans>Please Double-Check Before Proceeding</Trans>
                 </p>
                 {message && (
                   <p className="text-sm text-yellow-700">
@@ -45,7 +46,7 @@ export function ConfirmationModal({
           {/* Details Section */}
           {details && Object.keys(details).length > 0 && (
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 mb-4">
-              <p className="text-xs font-semibold text-gray-700 mb-3">Transaction Details:</p>
+              <p className="text-xs font-semibold text-gray-700 mb-3"><Trans>Transaction Details:</Trans></p>
               <div className="space-y-2">
                 {Object.entries(details).map(([key, value]) => (
                   <div key={key} className="flex justify-between items-start text-sm">
@@ -69,7 +70,7 @@ export function ConfirmationModal({
               disabled={loading}
               className="seller-panel__button seller-panel__button--secondary"
             >
-              Cancel
+              <Trans>Cancel</Trans>
             </button>
             <button
               type="button"
@@ -77,7 +78,7 @@ export function ConfirmationModal({
               disabled={loading}
               className="seller-panel__button seller-panel__button--primary"
             >
-              {loading ? 'Processing...' : 'Confirm'}
+              {loading ? <Trans>Processing...</Trans> : <Trans>Confirm</Trans>}
             </button>
           </div>
         </div>

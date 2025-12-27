@@ -4,13 +4,14 @@ import { cn } from '../../../lib/cn'
 import { useSellerApi } from '../hooks/useSellerApi'
 import { ConfirmationModal } from './ConfirmationModal'
 import { BankIcon } from './icons'
+import { Trans } from '../../../components/Trans'
 
 export function BankAccountForm({ isOpen, onClose, onSuccess }) {
   const { addBankAccount } = useSellerApi()
   const [step, setStep] = useState('form') // 'form' | 'confirm'
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
-  
+
   const [formData, setFormData] = useState({
     accountHolderName: '',
     accountNumber: '',
@@ -40,57 +41,57 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
 
   const validateForm = () => {
     const newErrors = {}
-    
+
     if (!formData.accountHolderName.trim()) {
-      newErrors.accountHolderName = 'Account holder name is required'
+      newErrors.accountHolderName = <Trans>Account holder name is required</Trans>
     }
-    
+
     if (!formData.accountNumber.trim()) {
-      newErrors.accountNumber = 'Account number is required'
+      newErrors.accountNumber = <Trans>Account number is required</Trans>
     } else if (!/^\d+$/.test(formData.accountNumber.trim())) {
-      newErrors.accountNumber = 'Account number must contain only digits'
+      newErrors.accountNumber = <Trans>Account number must contain only digits</Trans>
     } else if (formData.accountNumber.trim().length < 9 || formData.accountNumber.trim().length > 18) {
-      newErrors.accountNumber = 'Account number must be between 9 and 18 digits'
+      newErrors.accountNumber = <Trans>Account number must be between 9 and 18 digits</Trans>
     }
-    
+
     if (!formData.ifscCode.trim()) {
-      newErrors.ifscCode = 'IFSC code is required'
+      newErrors.ifscCode = <Trans>IFSC code is required</Trans>
     } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(formData.ifscCode.trim().toUpperCase())) {
-      newErrors.ifscCode = 'Please enter a valid IFSC code (e.g., SBIN0001234)'
+      newErrors.ifscCode = <Trans>Please enter a valid IFSC code (e.g., SBIN0001234)</Trans>
     }
-    
+
     if (!formData.bankName.trim()) {
-      newErrors.bankName = 'Bank name is required'
+      newErrors.bankName = <Trans>Bank name is required</Trans>
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleFormSubmit = (e) => {
     e.preventDefault()
-    
+
     if (!validateForm()) {
       return
     }
-    
+
     // Prepare confirmation data
     const dataToConfirm = {
-      'Account Holder Name': formData.accountHolderName.trim(),
-      'Account Number': formData.accountNumber.trim().replace(/(.{4})/g, '$1 ').trim(), // Format with spaces
-      'IFSC Code': formData.ifscCode.trim().toUpperCase(),
-      'Bank Name': formData.bankName.trim(),
-      'Branch Name': formData.branchName.trim() || 'Not provided',
-      'Set as Primary': formData.isPrimary ? 'Yes' : 'No',
+      [<Trans>Account Holder Name</Trans>]: formData.accountHolderName.trim(),
+      [<Trans>Account Number</Trans>]: formData.accountNumber.trim().replace(/(.{4})/g, '$1 ').trim(), // Format with spaces
+      [<Trans>IFSC Code</Trans>]: formData.ifscCode.trim().toUpperCase(),
+      [<Trans>Bank Name</Trans>]: formData.bankName.trim(),
+      [<Trans>Branch Name</Trans>]: formData.branchName.trim() || <Trans>Not provided</Trans>,
+      [<Trans>Set as Primary</Trans>]: formData.isPrimary ? <Trans>Yes</Trans> : <Trans>No</Trans>,
     }
-    
+
     setConfirmationData(dataToConfirm)
     setStep('confirm')
   }
 
   const handleConfirm = async () => {
     setLoading(true)
-    
+
     try {
       const result = await addBankAccount({
         accountHolderName: formData.accountHolderName.trim(),
@@ -100,16 +101,16 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
         branchName: formData.branchName.trim() || undefined,
         isPrimary: formData.isPrimary,
       })
-      
+
       if (result.data) {
         onSuccess?.(result.data.bankAccount)
         handleClose()
       } else if (result.error) {
-        setErrors({ submit: result.error.message || 'Failed to add bank account. Please try again.' })
+        setErrors({ submit: result.error.message || <Trans>Failed to add bank account. Please try again.</Trans> })
         setStep('form')
       }
     } catch (error) {
-      setErrors({ submit: error.message || 'An unexpected error occurred. Please try again.' })
+      setErrors({ submit: error.message || <Trans>An unexpected error occurred. Please try again.</Trans> })
       setStep('form')
     } finally {
       setLoading(false)
@@ -140,8 +141,8 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
         isOpen={isOpen}
         onClose={() => setStep('form')}
         onConfirm={handleConfirm}
-        title="Confirm Bank Account Details"
-        message="Please verify all details carefully. Bank account information cannot be changed after submission. Make sure all details are correct."
+        title={<Trans>Confirm Bank Account Details</Trans>}
+        message={<Trans>Please verify all details carefully. Bank account information cannot be changed after submission. Make sure all details are correct.</Trans>}
         details={confirmationData}
         loading={loading}
       />
@@ -159,15 +160,15 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
               <BankIcon className="h-6 w-6" />
             </div>
             <div>
-              <h3 className="seller-panel__title">Add Bank Account</h3>
-              <p className="seller-panel__subtitle">Add your bank account for withdrawals</p>
+              <h3 className="seller-panel__title"><Trans>Add Bank Account</Trans></h3>
+              <p className="seller-panel__subtitle"><Trans>Add your bank account for withdrawals</Trans></p>
             </div>
           </div>
           <button type="button" className="seller-panel__close" onClick={handleClose} disabled={loading} aria-label="Close">
             <X className="h-5 w-5" />
           </button>
         </div>
-        
+
         <div className="seller-panel__body">
           {/* Warning Message */}
           <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 mb-6">
@@ -175,10 +176,10 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
               <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-yellow-700 mb-1">
-                  Important Notice
+                  <Trans>Important Notice</Trans>
                 </p>
                 <p className="text-xs text-yellow-700">
-                  Bank account details cannot be changed after submission. Please double-check all information before confirming.
+                  <Trans>Bank account details cannot be changed after submission. Please double-check all information before confirming.</Trans>
                 </p>
               </div>
             </div>
@@ -189,7 +190,7 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
               {/* Account Holder Name */}
               <div style={{ width: '100%' }}>
                 <label className="seller-panel__label" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }}>
-                  Account Holder Name <span className="text-red-500">*</span>
+                  <Trans>Account Holder Name</Trans> <span className="text-red-500">*</span>
                 </label>
                 <div className="relative" style={{ width: '100%' }}>
                   <input
@@ -214,7 +215,7 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
               {/* Account Number */}
               <div style={{ width: '100%' }}>
                 <label className="seller-panel__label" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }}>
-                  Account Number <span className="text-red-500">*</span>
+                  <Trans>Account Number</Trans> <span className="text-red-500">*</span>
                 </label>
                 <div className="relative" style={{ width: '100%' }}>
                   <input
@@ -235,13 +236,13 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
                 {errors.accountNumber && (
                   <span className="seller-panel__error" style={{ display: 'block', width: '100%' }}>{errors.accountNumber}</span>
                 )}
-                <p className="text-xs text-gray-500 mt-1" style={{ width: '100%', wordWrap: 'break-word' }}>Account number must be 9-18 digits</p>
+                <p className="text-xs text-gray-500 mt-1" style={{ width: '100%', wordWrap: 'break-word' }}><Trans>Account number must be 9-18 digits</Trans></p>
               </div>
 
               {/* IFSC Code */}
               <div style={{ width: '100%' }}>
                 <label className="seller-panel__label" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }}>
-                  IFSC Code <span className="text-red-500">*</span>
+                  <Trans>IFSC Code</Trans> <span className="text-red-500">*</span>
                 </label>
                 <div className="relative" style={{ width: '100%' }}>
                   <input
@@ -262,13 +263,13 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
                 {errors.ifscCode && (
                   <span className="seller-panel__error" style={{ display: 'block', width: '100%' }}>{errors.ifscCode}</span>
                 )}
-                <p className="text-xs text-gray-500 mt-1" style={{ width: '100%', wordWrap: 'break-word' }}>Format: 4 letters, 0, 6 alphanumeric (e.g., SBIN0001234)</p>
+                <p className="text-xs text-gray-500 mt-1" style={{ width: '100%', wordWrap: 'break-word' }}><Trans>Format: 4 letters, 0, 6 alphanumeric (e.g., SBIN0001234)</Trans></p>
               </div>
 
               {/* Bank Name */}
               <div style={{ width: '100%' }}>
                 <label className="seller-panel__label" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }}>
-                  Bank Name <span className="text-red-500">*</span>
+                  <Trans>Bank Name</Trans> <span className="text-red-500">*</span>
                 </label>
                 <div className="relative" style={{ width: '100%' }}>
                   <input
@@ -293,7 +294,7 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
               {/* Branch Name */}
               <div style={{ width: '100%' }}>
                 <label className="seller-panel__label" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }}>
-                  Branch Name <span className="text-gray-500">(Optional)</span>
+                  <Trans>Branch Name</Trans> <span className="text-gray-500">(<Trans>Optional</Trans>)</span>
                 </label>
                 <div className="relative" style={{ width: '100%' }}>
                   <input
@@ -320,9 +321,9 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
                   style={{ flexShrink: 0 }}
                 />
                 <label htmlFor="isPrimary" className="flex-1 text-sm text-gray-700" style={{ width: '100%', minWidth: 0 }}>
-                  <span className="font-semibold" style={{ display: 'block', wordWrap: 'break-word' }}>Set as primary account</span>
+                  <span className="font-semibold" style={{ display: 'block', wordWrap: 'break-word' }}><Trans>Set as primary account</Trans></span>
                   <p className="text-xs text-gray-500 mt-1" style={{ wordWrap: 'break-word' }}>
-                    This account will be used by default for withdrawal requests. You can change this later if you add more accounts.
+                    <Trans>This account will be used by default for withdrawal requests. You can change this later if you add more accounts.</Trans>
                   </p>
                 </label>
               </div>
@@ -343,7 +344,7 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
                   className="flex-1 seller-panel__button seller-panel__button--secondary"
                   style={{ minWidth: 0, width: '100%' }}
                 >
-                  Cancel
+                  <Trans>Cancel</Trans>
                 </button>
                 <button
                   type="submit"
@@ -351,7 +352,7 @@ export function BankAccountForm({ isOpen, onClose, onSuccess }) {
                   className="flex-1 seller-panel__button seller-panel__button--primary"
                   style={{ minWidth: 0, width: '100%' }}
                 >
-                  {loading ? 'Processing...' : 'Continue to Confirm'}
+                  {loading ? <Trans>Processing...</Trans> : <Trans>Continue to Confirm</Trans>}
                 </button>
               </div>
             </div>

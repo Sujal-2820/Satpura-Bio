@@ -63,17 +63,17 @@ export function VendorEditForm({ vendor, onSave, onCancel, loading }) {
 
   const validateForm = () => {
     const newErrors = {}
-    
+
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required'
     }
-    
+
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone is required'
     } else if (!/^[6-9]\d{9}$/.test(formData.phone.replace(/\D/g, ''))) {
       newErrors.phone = 'Please enter a valid 10-digit phone number'
     }
-    
+
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -223,8 +223,11 @@ export function VendorEditForm({ vendor, onSave, onCancel, loading }) {
               <MapPin className="h-5 w-5 text-green-600" />
               <h3 className="text-lg font-bold text-gray-900">Location Information</h3>
             </div>
-            
+
             <div className="space-y-4">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+                <p>Location details cannot be edited by admin. Vendors must update their location from their profile.</p>
+              </div>
               {/* Address */}
               <div>
                 <label htmlFor="address" className="mb-2 block text-sm font-bold text-gray-900">
@@ -236,11 +239,12 @@ export function VendorEditForm({ vendor, onSave, onCancel, loading }) {
                   value={formData.location.address}
                   onChange={(e) => handleLocationChange('address', e.target.value)}
                   placeholder="Enter street address"
+                  readOnly
                   className={cn(
-                    'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2',
+                    'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2 bg-gray-100 cursor-not-allowed',
                     errors['location.address']
-                      ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                      : 'border-gray-300 bg-white focus:border-green-500 focus:ring-green-500/50',
+                      ? 'border-red-300'
+                      : 'border-gray-200 text-gray-500',
                   )}
                 />
                 {errors['location.address'] && <p className="mt-1 text-xs text-red-600">{errors['location.address']}</p>}
@@ -258,11 +262,12 @@ export function VendorEditForm({ vendor, onSave, onCancel, loading }) {
                     value={formData.location.city}
                     onChange={(e) => handleLocationChange('city', e.target.value)}
                     placeholder="Enter city"
+                    readOnly
                     className={cn(
-                      'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2',
+                      'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2 bg-gray-100 cursor-not-allowed',
                       errors['location.city']
-                        ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                        : 'border-gray-300 bg-white focus:border-green-500 focus:ring-green-500/50',
+                        ? 'border-red-300'
+                        : 'border-gray-200 text-gray-500',
                     )}
                   />
                   {errors['location.city'] && <p className="mt-1 text-xs text-red-600">{errors['location.city']}</p>}
@@ -277,11 +282,12 @@ export function VendorEditForm({ vendor, onSave, onCancel, loading }) {
                     value={formData.location.state}
                     onChange={(e) => handleLocationChange('state', e.target.value)}
                     placeholder="Enter state"
+                    readOnly
                     className={cn(
-                      'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2',
+                      'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2 bg-gray-100 cursor-not-allowed',
                       errors['location.state']
-                        ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                        : 'border-gray-300 bg-white focus:border-green-500 focus:ring-green-500/50',
+                        ? 'border-red-300'
+                        : 'border-gray-200 text-gray-500',
                     )}
                   />
                   {errors['location.state'] && <p className="mt-1 text-xs text-red-600">{errors['location.state']}</p>}
@@ -305,12 +311,13 @@ export function VendorEditForm({ vendor, onSave, onCancel, loading }) {
                       }
                     }}
                     placeholder="Enter 6-digit pincode"
+                    readOnly
                     maxLength={6}
                     className={cn(
-                      'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2',
+                      'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2 bg-gray-100 cursor-not-allowed',
                       errors['location.pincode']
-                        ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                        : 'border-gray-300 bg-white focus:border-green-500 focus:ring-green-500/50',
+                        ? 'border-red-300'
+                        : 'border-gray-200 text-gray-500',
                     )}
                   />
                   {errors['location.pincode'] && <p className="mt-1 text-xs text-red-600">{errors['location.pincode']}</p>}
@@ -326,11 +333,12 @@ export function VendorEditForm({ vendor, onSave, onCancel, loading }) {
                     value={formData.location.lat}
                     onChange={(e) => handleLocationChange('lat', e.target.value)}
                     placeholder="e.g., 23.0225"
+                    readOnly
                     className={cn(
-                      'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2',
+                      'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2 bg-gray-100 cursor-not-allowed',
                       errors['location.lat']
-                        ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                        : 'border-gray-300 bg-white focus:border-green-500 focus:ring-green-500/50',
+                        ? 'border-red-300'
+                        : 'border-gray-200 text-gray-500',
                     )}
                   />
                   {errors['location.lat'] && <p className="mt-1 text-xs text-red-600">{errors['location.lat']}</p>}
@@ -346,11 +354,12 @@ export function VendorEditForm({ vendor, onSave, onCancel, loading }) {
                     value={formData.location.lng}
                     onChange={(e) => handleLocationChange('lng', e.target.value)}
                     placeholder="e.g., 72.5714"
+                    readOnly
                     className={cn(
-                      'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2',
+                      'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2 bg-gray-100 cursor-not-allowed',
                       errors['location.lng']
-                        ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                        : 'border-gray-300 bg-white focus:border-green-500 focus:ring-green-500/50',
+                        ? 'border-red-300'
+                        : 'border-gray-200 text-gray-500',
                     )}
                   />
                   {errors['location.lng'] && <p className="mt-1 text-xs text-red-600">{errors['location.lng']}</p>}

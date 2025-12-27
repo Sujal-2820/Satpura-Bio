@@ -4,15 +4,19 @@ import { useSellerApi } from '../../hooks/useSellerApi'
 import { sellerSnapshot } from '../../services/sellerData'
 import { cn } from '../../../../lib/cn'
 import { UsersIcon, WalletIcon, TrendingUpIcon } from '../../components/icons'
+import { Trans } from '../../../../components/Trans'
+import { TransText } from '../../../../components/TransText'
+import { useTranslation } from '../../../../context/TranslationContext'
 
 const FILTER_TABS = [
-  { id: 'all', label: 'All' },
-  { id: 'active', label: 'Active' },
-  { id: 'registered', label: 'New' },
+  { id: 'all', label: <Trans>All</Trans> },
+  { id: 'active', label: <Trans>Active</Trans> },
+  { id: 'registered', label: <Trans>New</Trans> },
 ]
 
 export function ReferralsView({ onNavigate }) {
   const { dashboard } = useSellerState()
+  const { translate } = useTranslation()
   const { fetchReferrals } = useSellerApi()
   const [activeFilter, setActiveFilter] = useState('all')
   const [expandedId, setExpandedId] = useState(null)
@@ -32,14 +36,14 @@ export function ReferralsView({ onNavigate }) {
           const transformedReferrals = result.data.referrals.map((ref) => ({
             id: ref._id || ref.id,
             userId: ref._id || ref.id,
-            name: ref.name || 'User',
+            name: ref.name || <Trans>User</Trans>,
             phone: ref.phone || '',
             email: ref.email || '',
             monthlyPurchases: ref.monthlyPurchases || 0,
             orderCount: ref.orderCount || 0,
             commissionRate: ref.commissionRate || 0.02,
             estimatedCommission: ref.estimatedCommission || 0,
-            status: ref.monthlyPurchases > 0 ? 'Active' : 'Registered',
+            status: ref.monthlyPurchases > 0 ? <Trans>Active</Trans> : <Trans>Registered</Trans>,
             createdAt: ref.createdAt,
             registeredDate: ref.createdAt,
             totalAmount: ref.monthlyPurchases || 0, // For display purposes
@@ -58,7 +62,9 @@ export function ReferralsView({ onNavigate }) {
 
   const formatCurrency = (value = 0) => {
     const amount = Number(value) || 0
-    return `₹${amount.toLocaleString('en-IN')}`
+    return amount >= 100000
+      ? <><Trans>₹</Trans>{(amount / 100000).toFixed(1)} <Trans>L</Trans></>
+      : `₹${amount.toLocaleString('en-IN')}`
   }
 
   const getCommissionInfo = (amount) => {
@@ -84,8 +90,8 @@ export function ReferralsView({ onNavigate }) {
     const aggregates = referrals.reduce(
       (acc, referral) => {
         // Handle both string and number formats
-        const lifetimeAmount = typeof referral.totalAmount === 'number' 
-          ? referral.totalAmount 
+        const lifetimeAmount = typeof referral.totalAmount === 'number'
+          ? referral.totalAmount
           : parseFloat((referral.totalAmount || '0').toString().replace(/[₹,\sL]/g, '')) || 0
         const monthlyPurchases = typeof referral.monthlyPurchases === 'number'
           ? referral.monthlyPurchases
@@ -154,8 +160,8 @@ export function ReferralsView({ onNavigate }) {
         <div className="seller-referrals-hero__card">
           <div className="seller-referrals-hero__header">
             <div>
-              <h2 className="seller-referrals-hero__title">Your Referrals</h2>
-              <p className="seller-referrals-hero__subtitle">Track your referral network</p>
+              <h2 className="seller-referrals-hero__title"><Trans>Your Referrals</Trans></h2>
+              <p className="seller-referrals-hero__subtitle"><Trans>Track your referral network</Trans></p>
             </div>
             <div className="seller-referrals-hero__badge">
               <UsersIcon className="h-6 w-6 text-white" />
@@ -163,19 +169,19 @@ export function ReferralsView({ onNavigate }) {
           </div>
           <div className="seller-referrals-hero__stats">
             <div className="seller-referrals-stat">
-              <p className="seller-referrals-stat__label">Total Referrals</p>
+              <p className="seller-referrals-stat__label"><Trans>Total Referrals</Trans></p>
               <span className="seller-referrals-stat__value">{stats.total}</span>
             </div>
             <div className="seller-referrals-stat">
-              <p className="seller-referrals-stat__label">Active Users</p>
+              <p className="seller-referrals-stat__label"><Trans>Active Users</Trans></p>
               <span className="seller-referrals-stat__value">{stats.active}</span>
             </div>
             <div className="seller-referrals-stat">
-              <p className="seller-referrals-stat__label">This Month Commission</p>
+              <p className="seller-referrals-stat__label"><Trans>This Month Commission</Trans></p>
               <span className="seller-referrals-stat__value">{stats.monthlyCommission}</span>
             </div>
             <div className="seller-referrals-stat">
-              <p className="seller-referrals-stat__label">This Month Purchases</p>
+              <p className="seller-referrals-stat__label"><Trans>This Month Purchases</Trans></p>
               <span className="seller-referrals-stat__value">{stats.monthlyPurchases}</span>
             </div>
           </div>
@@ -186,14 +192,14 @@ export function ReferralsView({ onNavigate }) {
       <section className="seller-section">
         <div className="rounded-2xl border border-[rgba(34,94,65,0.15)] bg-white/80 p-4">
           <p className="text-sm font-semibold text-[#172022]">
-            Monthly commission tally resets on day {commissionPolicy?.resetDay || 1} of every month.
+            <Trans>{`Monthly commission tally resets on day ${commissionPolicy?.resetDay || 1} of every month.`}</Trans>
           </p>
           <p className="mt-1 text-xs text-[rgba(26,42,34,0.7)]">
-            Current cycle: {currentMonthLabel}. Commission rates apply per connected user:
+            <Trans>{`Current cycle: ${currentMonthLabel}. Commission rates apply per connected user:`}</Trans>
           </p>
           <ul className="mt-3 space-y-1 text-xs text-[rgba(26,42,34,0.7)]">
-            <li>• Up to ₹50,000 cumulative purchases: earn 2% commission.</li>
-            <li>• Above ₹50,000: the entire month’s purchases earn 3%.</li>
+            <li>• <Trans>Up to ₹50,000 cumulative purchases: earn 2% commission.</Trans></li>
+            <li>• <Trans>Above ₹50,000: the entire month’s purchases earn 3%.</Trans></li>
           </ul>
         </div>
       </section>
@@ -221,9 +227,9 @@ export function ReferralsView({ onNavigate }) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, user ID, or amount..."
+            placeholder={translate('Search by name, user ID, or amount...')}
             className="seller-search-bar__input"
-            aria-label="Search referrals"
+            aria-label={translate('Search referrals')}
           />
         </div>
       </section>
@@ -233,14 +239,14 @@ export function ReferralsView({ onNavigate }) {
         {loading ? (
           <div className="seller-referrals-empty">
             <UsersIcon className="seller-referrals-empty__icon" />
-            <p className="seller-referrals-empty__text">Loading referrals...</p>
+            <p className="seller-referrals-empty__text"><Trans>Loading referrals...</Trans></p>
           </div>
         ) : filteredReferrals.length === 0 ? (
           <div className="seller-referrals-empty">
             <UsersIcon className="seller-referrals-empty__icon" />
-            <p className="seller-referrals-empty__text">No referrals found</p>
+            <p className="seller-referrals-empty__text"><Trans>No referrals found</Trans></p>
             <p className="seller-referrals-empty__subtext">
-              {searchQuery ? 'Try adjusting your search or filters' : 'Start referring users to see them here'}
+              {searchQuery ? <Trans>Try adjusting your search or filters</Trans> : <Trans>Start referring users to see them here</Trans>}
             </p>
           </div>
         ) : (
@@ -250,7 +256,7 @@ export function ReferralsView({ onNavigate }) {
               const monthlyPurchases = typeof referral.monthlyPurchases === 'number'
                 ? referral.monthlyPurchases
                 : parseFloat((referral.monthlyPurchases || '0').toString().replace(/[₹,\sL]/g, '')) || 0
-              
+
               // Always calculate commission rate based on monthlyPurchases (not backend commissionRate)
               const commissionInfo = getCommissionInfo(monthlyPurchases)
               const monthlyPurchaseDisplay = formatCurrency(commissionInfo.purchaseAmount)
@@ -262,14 +268,14 @@ export function ReferralsView({ onNavigate }) {
                 ? formatCurrency(referral.totalAmount)
                 : referral.totalAmount || '₹0'
               const avatar = referral.name ? referral.name.substring(0, 2).toUpperCase() : 'U'
-              const status = referral.status || 'Registered'
+              const status = referral.status || <Trans>Registered</Trans>
               const userId = referral.userId || referral.id || 'N/A'
               const registeredDate = referral.registeredDate || referral.createdAt || new Date().toISOString()
               const totalPurchases = referral.totalPurchases || referral.orderCount || 0
-              const lastPurchase = referral.lastPurchase || referral.lastOrderDate 
+              const lastPurchase = referral.lastPurchase || referral.lastOrderDate
                 ? formatDate(referral.lastPurchase || referral.lastOrderDate)
-                : 'Never'
-              
+                : <Trans>Never</Trans>
+
               // Determine commission rate badge style
               const isPremiumRate = commissionInfo.rate >= 0.03
 
@@ -278,124 +284,123 @@ export function ReferralsView({ onNavigate }) {
                   key={referral.id || referral._id}
                   className={cn('seller-referral-card', expandedId === referral.id && 'is-expanded')}
                 >
-                <div
-                  className="seller-referral-card__header"
-                  onClick={() => setExpandedId(expandedId === referral.id ? null : referral.id)}
-                >
-                  <div className="seller-referral-card__avatar">{avatar}</div>
-                  <div className="seller-referral-card__info">
-                    <div className="seller-referral-card__row">
-                      <h3 className="seller-referral-card__name">{referral.name || 'User'}</h3>
-                      <div className="seller-referral-card__header-badges">
-                        <span
-                          className={cn(
-                            'seller-referral-card__commission-badge',
-                            isPremiumRate ? 'seller-referral-card__commission-badge--premium' : 'seller-referral-card__commission-badge--standard'
-                          )}
-                          title={`Commission Rate: ${commissionRateLabel} for this month`}
-                        >
-                          {commissionRateLabel}
-                        </span>
-                        <span
-                          className={cn(
-                            'seller-referral-card__status',
-                            (status === 'Active' || status === 'active') ? 'is-active' : 'is-registered',
-                          )}
-                        >
-                          {status}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="seller-referral-card__meta">
-                      <span className="seller-referral-card__id">{userId}</span>
-                      <span className="seller-referral-card__date">
-                        Joined {formatDate(registeredDate)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="seller-referral-card__toggle">
-                    <TrendingUpIcon
-                      className={cn('h-4 w-4', expandedId === referral.id && 'rotate-180')}
-                    />
-                  </div>
-                </div>
-
-                {expandedId === referral.id && (
-                  <div className="seller-referral-card__details">
-                    <div className="seller-referral-card__stats-grid">
-                      <div className="seller-referral-stat">
-                        <p className="seller-referral-stat__label">Total Purchases</p>
-                        <span className="seller-referral-stat__value">{totalPurchases}</span>
-                      </div>
-                      <div className="seller-referral-stat">
-                        <p className="seller-referral-stat__label">Lifetime Amount</p>
-                        <span className="seller-referral-stat__value">{lifetimeTotal}</span>
-                      </div>
-                      <div className="seller-referral-stat">
-                        <p className="seller-referral-stat__label">This Month Purchases</p>
-                        <span className="seller-referral-stat__value">{monthlyPurchaseDisplay}</span>
-                        <div className="mt-1 flex items-center gap-2">
-                          <span className={cn(
-                            'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.7rem] font-semibold',
-                            isPremiumRate 
-                              ? 'bg-orange-100 text-orange-700 border border-orange-200' 
-                              : 'bg-blue-100 text-blue-700 border border-blue-200'
-                          )}>
-                            Commission Rate: {commissionRateLabel}
+                  <div
+                    className="seller-referral-card__header"
+                    onClick={() => setExpandedId(expandedId === referral.id ? null : referral.id)}
+                  >
+                    <div className="seller-referral-card__avatar">{avatar}</div>
+                    <div className="seller-referral-card__info">
+                      <div className="seller-referral-card__row">
+                        <h3 className="seller-referral-card__name"><TransText>{referral.name || 'User'}</TransText></h3>
+                        <div className="seller-referral-card__header-badges">
+                          <span
+                            className={cn(
+                              'seller-referral-card__commission-badge',
+                              isPremiumRate ? 'seller-referral-card__commission-badge--premium' : 'seller-referral-card__commission-badge--standard'
+                            )}
+                            title={`Commission Rate: ${commissionRateLabel} for this month`}
+                          >
+                            {commissionRateLabel}
+                          </span>
+                          <span
+                            className={cn(
+                              'seller-referral-card__status',
+                              (status === 'Active' || status === 'active') ? 'is-active' : 'is-registered',
+                            )}
+                          >
+                            <Trans>{status}</Trans>
                           </span>
                         </div>
-                        {commissionInfo.purchaseAmount < 50000 && (
-                          <p className="mt-1 text-[0.7rem] text-[rgba(26,42,34,0.6)]">
-                            {amountToNextSlabDisplay} more unlocks 3% rate
-                          </p>
-                        )}
                       </div>
-                      <div className="seller-referral-stat">
-                        <p className="seller-referral-stat__label">Commission (This Month)</p>
-                        <span className="seller-referral-stat__value seller-referral-stat__value--commission">
-                          {commissionDisplay}
+                      <div className="seller-referral-card__meta">
+                        <span className="seller-referral-card__id">{userId}</span>
+                        <span className="seller-referral-card__date">
+                          <Trans>{`Joined ${formatDate(registeredDate)}`}</Trans>
                         </span>
-                        <p className="mt-1 text-[0.7rem] text-[rgba(26,42,34,0.6)]">
-                          Calculated at {commissionRateLabel} rate
-                        </p>
-                      </div>
-                      <div className="seller-referral-stat">
-                        <p className="seller-referral-stat__label">Last Purchase</p>
-                        <span className="seller-referral-stat__value">{lastPurchase}</span>
                       </div>
                     </div>
-                    <div className="seller-referral-card__actions">
-                      <button
-                        type="button"
-                        className="seller-referral-card__action"
-                        onClick={() => onNavigate('wallet')}
-                      >
-                        <WalletIcon className="h-4 w-4" />
-                        View Transactions
-                      </button>
+                    <div className="seller-referral-card__toggle">
+                      <TrendingUpIcon
+                        className={cn('h-4 w-4', expandedId === referral.id && 'rotate-180')}
+                      />
                     </div>
                   </div>
-                )}
+
+                  {expandedId === referral.id && (
+                    <div className="seller-referral-card__details">
+                      <div className="seller-referral-card__stats-grid">
+                        <div className="seller-referral-stat">
+                          <p className="seller-referral-stat__label"><Trans>Total Purchases</Trans></p>
+                          <span className="seller-referral-stat__value">{totalPurchases}</span>
+                        </div>
+                        <div className="seller-referral-stat">
+                          <p className="seller-referral-stat__label"><Trans>Lifetime Amount</Trans></p>
+                          <span className="seller-referral-stat__value">{lifetimeTotal}</span>
+                        </div>
+                        <div className="seller-referral-stat">
+                          <p className="seller-referral-stat__label">This Month Purchases</p>
+                          <span className="seller-referral-stat__value">{monthlyPurchaseDisplay}</span>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span className={cn(
+                              'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.7rem] font-semibold',
+                              isPremiumRate ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                                : 'bg-blue-100 text-blue-700 border border-blue-200'
+                            )}>
+                              <Trans>{`Commission Rate: ${commissionRateLabel}`}</Trans>
+                            </span>
+                          </div>
+                          {commissionInfo.purchaseAmount < 50000 && (
+                            <p className="mt-1 text-[0.7rem] text-[rgba(26,42,34,0.6)]">
+                              <Trans>{`${amountToNextSlabDisplay} more unlocks 3% rate`}</Trans>
+                            </p>
+                          )}
+                        </div>
+                        <div className="seller-referral-stat">
+                          <p className="seller-referral-stat__label"><Trans>Commission (This Month)</Trans></p>
+                          <span className="seller-referral-stat__value seller-referral-stat__value--commission">
+                            {commissionDisplay}
+                          </span>
+                          <p className="mt-1 text-[0.7rem] text-[rgba(26,42,34,0.6)]">
+                            <Trans>{`Calculated at ${commissionRateLabel} rate`}</Trans>
+                          </p>
+                        </div>
+                        <div className="seller-referral-stat">
+                          <p className="seller-referral-stat__label"><Trans>Last Purchase</Trans></p>
+                          <span className="seller-referral-stat__value">{lastPurchase}</span>
+                        </div>
+                      </div>
+                      <div className="seller-referral-card__actions">
+                        <button
+                          type="button"
+                          className="seller-referral-card__action"
+                          onClick={() => onNavigate('wallet')}
+                        >
+                          <WalletIcon className="h-4 w-4" />
+                          <Trans>View Transactions</Trans>
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Quick Stats (always visible) */}
                   <div className="seller-referral-card__quick-stats">
                     <div className="seller-referral-quick-stat">
-                      <span className="seller-referral-quick-stat__label">Purchases</span>
+                      <span className="seller-referral-quick-stat__label"><Trans>Purchases</Trans></span>
                       <span className="seller-referral-quick-stat__value">{totalPurchases}</span>
                     </div>
                     <div className="seller-referral-quick-stat">
-                      <span className="seller-referral-quick-stat__label">This Month</span>
+                      <span className="seller-referral-quick-stat__label"><Trans>This Month</Trans></span>
                       <span className="seller-referral-quick-stat__value">{monthlyPurchaseDisplay}</span>
                     </div>
                     <div className="seller-referral-quick-stat seller-referral-quick-stat--commission">
-                      <span className="seller-referral-quick-stat__label">Commission</span>
+                      <span className="seller-referral-quick-stat__label"><Trans>Commission</Trans></span>
                       <span className="seller-referral-quick-stat__value">{commissionDisplay}</span>
                     </div>
                     <div className={cn(
                       'seller-referral-quick-stat',
                       isPremiumRate ? 'seller-referral-quick-stat--premium' : 'seller-referral-quick-stat--standard'
                     )}>
-                      <span className="seller-referral-quick-stat__label">Rate</span>
+                      <span className="seller-referral-quick-stat__label"><Trans>Rate</Trans></span>
                       <span className="seller-referral-quick-stat__value">{commissionRateLabel}</span>
                     </div>
                   </div>

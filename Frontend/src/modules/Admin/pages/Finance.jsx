@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { BadgeIndianRupee, Sparkles, Building2, Eye, AlertCircle, Package, CheckCircle, XCircle, ArrowLeft, Calendar } from 'lucide-react'
+import { BadgeIndianRupee, Sparkles, Building2, Eye, AlertCircle, Package, CheckCircle, XCircle, ArrowLeft, Calendar, MoreVertical } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
 import { ProgressList } from '../components/ProgressList'
 import { Timeline } from '../components/Timeline'
@@ -11,7 +11,7 @@ import { PenaltiesPage } from './Penalties'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
 import { useToast } from '../components/ToastNotification'
-import { finance as mockFinance } from '../services/adminData'
+// Mock finance import removed
 import { cn } from '../../../lib/cn'
 
 const vendorColumns = [
@@ -62,6 +62,7 @@ export function FinancePage({ subRoute = null, navigate }) {
   const [repaymentsLoading, setRepaymentsLoading] = useState(false)
   const [approvingPurchase, setApprovingPurchase] = useState(false)
   const [purchaseRejectReasonState, setPurchaseRejectReasonState] = useState('')
+  const [openActionsDropdown, setOpenActionsDropdown] = useState(null)
 
   // Fetch purchase requests
   const fetchPurchaseRequests = useCallback(async () => {
@@ -97,8 +98,7 @@ export function FinancePage({ subRoute = null, navigate }) {
     if (outstandingResult.data?.credits) {
       setOutstandingCredits(outstandingResult.data.credits)
     } else {
-      // Fallback to mock data
-      setOutstandingCredits(mockFinance.outstandingCredits)
+      setOutstandingCredits([])
     }
 
     // Fetch recovery status
@@ -324,15 +324,69 @@ export function FinancePage({ subRoute = null, navigate }) {
         ...column,
         Cell: (row) => {
           const originalVendor = vendors.data?.vendors?.find((v) => v.id === row.id) || row
+          const isDropdownOpen = openActionsDropdown === row.id
+
+          const actionItems = [
+            {
+              label: 'View Credit Balance',
+              icon: Eye,
+              onClick: () => {
+                handleViewCreditBalance(originalVendor)
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            }
+          ]
+
           return (
-            <button
-              type="button"
-              onClick={() => handleViewCreditBalance(originalVendor)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-pink-500 hover:bg-pink-50 hover:text-pink-700"
-              title="View credit balance"
-            >
-              <Eye className="h-4 w-4" />
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpenActionsDropdown(isDropdownOpen ? null : row.id)
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-pink-500 hover:bg-pink-50 hover:text-pink-700"
+                title="Actions"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+
+              {isDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setOpenActionsDropdown(null)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                    {actionItems.map((item, index) => {
+                      const Icon = item.icon
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!item.disabled) {
+                              item.onClick()
+                            }
+                          }}
+                          disabled={item.disabled}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
+                            item.className,
+                            item.disabled && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
           )
         },
       }
@@ -1020,15 +1074,9 @@ export function FinancePage({ subRoute = null, navigate }) {
                 </div>
               </>
             ) : (
-              mockFinance.creditPolicies.map((policy) => (
-                <div key={policy.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)]">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-bold text-gray-900">{policy.label}</p>
-                    <StatusBadge tone="success">{policy.value}</StatusBadge>
-                  </div>
-                  <p className="mt-2 text-xs text-gray-600">{policy.meta}</p>
-                </div>
-              ))
+              <div className="py-8 text-center text-sm text-gray-500 italic">
+                Loading financial parameters...
+              </div>
             )}
           </div>
         </div>
@@ -1068,39 +1116,17 @@ export function FinancePage({ subRoute = null, navigate }) {
             ))}
           </div>
         </div>
-        <Timeline
-          events={[
-            {
-              id: 'finance-1',
-              title: 'Outstanding Credits Review',
-              timestamp: 'Today • 08:30',
-              description: '₹1.92 Cr flagged for recovery. Weekly sync scheduled with collections team.',
-              status: 'completed',
-            },
-            {
-              id: 'finance-2',
-              title: 'Penalty Applied',
-              timestamp: 'Today • 10:45',
-              description: 'Penalty of ₹82,300 applied to 4 vendors exceeding grace period.',
-              status: 'completed',
-            },
-            {
-              id: 'finance-3',
-              title: 'Recovery Follow-up',
-              timestamp: 'Today • 14:00',
-              description: 'Auto reminders scheduled. Finance to confirm repayment plans.',
-              status: 'pending',
-            },
-          ]}
-        />
-      </section>
+
+      </section >
 
       {/* Recovery Status */}
-      {recoveryStatus.length > 0 && (
-        <RecoveryStatusView recoveryData={recoveryStatus} />
-      )}
+      {
+        recoveryStatus.length > 0 && (
+          <RecoveryStatusView recoveryData={recoveryStatus} />
+        )
+      }
 
-    </div>
+    </div >
   )
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Building2, CreditCard, MapPin, ShieldAlert, Edit2, Eye, Package, Ban, Unlock, CheckCircle, XCircle, ArrowLeft, Calendar, FileText, ExternalLink, Search } from 'lucide-react'
+import { Building2, CreditCard, MapPin, ShieldAlert, Edit2, Eye, Package, Ban, Unlock, CheckCircle, XCircle, ArrowLeft, Calendar, FileText, ExternalLink, Search, MoreVertical } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { Timeline } from '../components/Timeline'
@@ -9,7 +9,7 @@ import { VendorEditForm } from '../components/VendorEditForm'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
 import { useToast } from '../components/ToastNotification'
-import { vendors as mockVendors } from '../services/adminData'
+
 import { cn } from '../../../lib/cn'
 
 const EARTH_RADIUS_KM = 6371
@@ -99,7 +99,7 @@ export function VendorsPage({ subRoute = null, navigate }) {
   const [rawVendors, setRawVendors] = useState([])
   const [purchaseRequests, setPurchaseRequests] = useState([])
   const [coverageReport, setCoverageReport] = useState(null)
-  
+
   // View states (replacing modals with full-screen views)
   const [currentView, setCurrentView] = useState(null) // 'creditPolicy', 'vendorDetail', 'vendorMap', 'purchaseRequest', 'approveVendor', 'rejectVendor', 'banVendor', 'unbanVendor', 'editVendor'
   const [selectedVendorForPolicy, setSelectedVendorForPolicy] = useState(null)
@@ -118,6 +118,7 @@ export function VendorsPage({ subRoute = null, navigate }) {
   const [processingPurchase, setProcessingPurchase] = useState(false) // Local loading state for purchase actions
   const [purchaseApprovalNotes, setPurchaseApprovalNotes] = useState('') // Notes for purchase approval
   const [loadingPurchaseRequests, setLoadingPurchaseRequests] = useState(false) // Loading state for purchase requests
+  const [openActionsDropdown, setOpenActionsDropdown] = useState(null)
 
   // Format vendor data for display
   const formatVendorForDisplay = (vendor, flaggedVendorIds = new Set()) => {
@@ -145,7 +146,7 @@ export function VendorsPage({ subRoute = null, navigate }) {
   // Fetch vendors
   const fetchVendors = useCallback(async () => {
     const result = await getVendors()
-    const sourceVendors = result.data?.vendors || mockVendors
+    const sourceVendors = result.data?.vendors || []
     setRawVendors(sourceVendors)
     const coverageInfo = computeCoverageReport(sourceVendors)
     setCoverageReport(coverageInfo)
@@ -184,11 +185,11 @@ export function VendorsPage({ subRoute = null, navigate }) {
         const phone = (v.phone || '').replace(/\D/g, '')
         const email = (v.email || '').toLowerCase()
         const searchPhone = query.replace(/\D/g, '')
-        
-        return name.includes(query) || 
-               phone.includes(searchPhone) || 
-               email.includes(query) ||
-               (v.id && v.id.toLowerCase().includes(query))
+
+        return name.includes(query) ||
+          phone.includes(searchPhone) ||
+          email.includes(query) ||
+          (v.id && v.id.toLowerCase().includes(query))
       })
     }
 
@@ -372,9 +373,9 @@ export function VendorsPage({ subRoute = null, navigate }) {
       showError('Short description is required for approval', 3000)
       return
     }
-    
+
     console.log('handleApprovePurchase called:', { requestId, shortDescription, trimmedNotes, stateValue: purchaseApprovalNotes })
-    
+
     setProcessingPurchase(true)
     try {
       const result = await approveVendorPurchase(requestId, trimmedNotes)
@@ -545,104 +546,148 @@ export function VendorsPage({ subRoute = null, navigate }) {
           const isRejected = vendorStatus === 'rejected'
           const isBanned = originalVendor.banInfo?.isBanned || originalVendor.status === 'temporarily_banned' || originalVendor.status === 'permanently_banned'
           const banType = originalVendor.banInfo?.banType || (originalVendor.status === 'permanently_banned' ? 'permanent' : 'temporary')
-          return (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleViewVendorMap(originalVendor)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
-                title="View location"
-              >
-                <MapPin className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleViewVendorDetails(originalVendor)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
-                title="View details"
-              >
-                <Eye className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleEditVendor(originalVendor)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
-                title="Edit vendor information"
-              >
-                <Edit2 className="h-4 w-4" />
-              </button>
-              
-              {/* Approve/Reject buttons for pending vendors */}
-              {isPending && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedVendorForAction(originalVendor)
-                      setCurrentView('approveVendor')
-                    }}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-50 text-green-700 transition-all hover:border-green-500 hover:bg-green-100 hover:text-green-800"
-                    title="Approve vendor"
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                  onClick={() => {
-                    setSelectedVendorForAction(originalVendor)
-                    setRejectReason('')
-                    setCurrentView('rejectVendor')
-                  }}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition-all hover:border-red-500 hover:bg-red-100 hover:text-red-800"
-                    title="Reject vendor"
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </button>
-                </>
-              )}
+          const isDropdownOpen = openActionsDropdown === row.id
 
-              {/* Actions for approved vendors (not banned) */}
-              {!isBanned && !isPending && !isRejected && (
+          const actionItems = [
+            {
+              label: 'View Location',
+              icon: MapPin,
+              onClick: () => {
+                handleViewVendorMap(originalVendor)
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            },
+            {
+              label: 'View Details',
+              icon: Eye,
+              onClick: () => {
+                handleViewVendorDetails(originalVendor)
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            },
+            {
+              label: 'Edit Info',
+              icon: Edit2,
+              onClick: () => {
+                handleEditVendor(originalVendor)
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            }
+          ]
+
+          if (isPending) {
+            actionItems.push({
+              label: 'Approve Vendor',
+              icon: CheckCircle,
+              onClick: () => {
+                setSelectedVendorForAction(originalVendor)
+                setCurrentView('approveVendor')
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-green-700 hover:bg-green-50'
+            })
+            actionItems.push({
+              label: 'Reject Vendor',
+              icon: XCircle,
+              onClick: () => {
+                setSelectedVendorForAction(originalVendor)
+                setRejectReason('')
+                setCurrentView('rejectVendor')
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-red-700 hover:bg-red-50'
+            })
+          }
+
+          if (!isBanned && !isPending && !isRejected) {
+            actionItems.push({
+              label: 'Update Credit Policy',
+              icon: CreditCard,
+              onClick: () => {
+                setSelectedVendorForPolicy(originalVendor)
+                setCurrentView('creditPolicy')
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            })
+            actionItems.push({
+              label: 'Ban Vendor',
+              icon: Ban,
+              onClick: () => {
+                setSelectedVendorForAction(originalVendor)
+                setBanType('temporary')
+                setBanReason('')
+                setCurrentView('banVendor')
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-red-700 hover:bg-red-50'
+            })
+          }
+
+          if (isBanned && banType === 'temporary') {
+            actionItems.push({
+              label: 'Unban Vendor',
+              icon: Unlock,
+              onClick: () => {
+                setSelectedVendorForAction(originalVendor)
+                setRevocationReason('')
+                setCurrentView('unbanVendor')
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-green-700 hover:bg-green-50'
+            })
+          }
+
+          return (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpenActionsDropdown(isDropdownOpen ? null : row.id)
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
+                title="Actions"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+
+              {isDropdownOpen && (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedVendorForPolicy(originalVendor)
-                      setCurrentView('creditPolicy')
-                    }}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-green-500 hover:bg-green-50 hover:text-green-700"
-                    title="Update credit policy"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                  onClick={() => {
-                    setSelectedVendorForAction(originalVendor)
-                    setBanType('temporary')
-                    setBanReason('')
-                    setCurrentView('banVendor')
-                  }}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-700 transition-all hover:border-red-500 hover:bg-red-100 hover:text-red-800"
-                    title="Ban vendor"
-                  >
-                    <Ban className="h-4 w-4" />
-                  </button>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setOpenActionsDropdown(null)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                    {actionItems.map((item, index) => {
+                      const Icon = item.icon
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!item.disabled) {
+                              item.onClick()
+                            }
+                          }}
+                          disabled={item.disabled}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
+                            item.className,
+                            item.disabled && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </>
-              )}
-              {isBanned && banType === 'temporary' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedVendorForAction(originalVendor)
-                    setRevocationReason('')
-                    setCurrentView('unbanVendor')
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-50 text-green-700 transition-all hover:border-green-500 hover:bg-green-100 hover:text-green-800"
-                  title="Unban vendor"
-                >
-                  <Unlock className="h-4 w-4" />
-                </button>
               )}
             </div>
           )
@@ -703,8 +748,8 @@ export function VendorsPage({ subRoute = null, navigate }) {
       if (value >= 100000) return `₹${(value / 100000).toFixed(1)} L`
       return `₹${value.toLocaleString('en-IN')}`
     }
-    const creditLimit = typeof vendor.creditLimit === 'number' 
-      ? vendor.creditLimit 
+    const creditLimit = typeof vendor.creditLimit === 'number'
+      ? vendor.creditLimit
       : parseFloat(vendor.creditLimit?.replace(/[₹,\sL]/g, '') || '0') * 100000
     const dues = typeof vendor.dues === 'number'
       ? vendor.dues
@@ -870,7 +915,7 @@ export function VendorsPage({ subRoute = null, navigate }) {
             {/* Verification Documents */}
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-gray-900">Verification Documents</h4>
-              
+
               <div className="grid gap-4 sm:grid-cols-2">
                 {/* Aadhaar Card */}
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -894,8 +939,8 @@ export function VendorsPage({ subRoute = null, navigate }) {
                         </div>
                       ) : (
                         <div className="rounded-lg overflow-hidden border border-gray-300 bg-white">
-                          <img 
-                            src={vendor.aadhaarCard.url} 
+                          <img
+                            src={vendor.aadhaarCard.url}
                             alt="Aadhaar Card"
                             className="w-full h-auto max-h-40 object-contain"
                             onError={(e) => {
@@ -942,8 +987,8 @@ export function VendorsPage({ subRoute = null, navigate }) {
                         </div>
                       ) : (
                         <div className="rounded-lg overflow-hidden border border-gray-300 bg-white">
-                          <img 
-                            src={vendor.panCard.url} 
+                          <img
+                            src={vendor.panCard.url}
                             alt="PAN Card"
                             className="w-full h-auto max-h-40 object-contain"
                             onError={(e) => {
@@ -1107,7 +1152,7 @@ export function VendorsPage({ subRoute = null, navigate }) {
                           .replace(/^./, str => str.toUpperCase())
                           .trim()
                       }
-                      
+
                       return (
                         <div key={index} className="rounded-lg bg-white p-3">
                           <div className="flex items-center justify-between mb-1">

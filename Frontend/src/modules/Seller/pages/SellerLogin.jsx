@@ -3,6 +3,7 @@ import { OtpVerification } from '../../../components/auth/OtpVerification'
 import * as sellerApi from '../services/sellerApi'
 import { useSellerDispatch } from '../context/SellerContext'
 import { validatePhoneNumber, extractPhoneDigits } from '../../../utils/phoneValidation'
+import { PhoneInput } from '../../../components/PhoneInput'
 
 export function SellerLogin({ onSuccess, onSubmit, onSwitchToRegister }) {
   const [step, setStep] = useState('phone') // 'phone' | 'otp' | 'pending'
@@ -282,16 +283,13 @@ export function SellerLogin({ onSuccess, onSubmit, onSwitchToRegister }) {
               <label htmlFor="seller-login-phone" className="text-xs font-semibold text-gray-700">
                 Contact Number <span className="text-red-500">*</span>
               </label>
-              <input
+              <PhoneInput
                 id="seller-login-phone"
                 name="phone"
-                type="tel"
                 required
                 value={form.phone}
                 onChange={handleChange}
-                placeholder="+91 90000 00000"
-                maxLength={15}
-                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                placeholder="Mobile"
               />
             </div>
 

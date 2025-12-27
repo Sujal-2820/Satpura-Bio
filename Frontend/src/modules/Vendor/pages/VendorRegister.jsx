@@ -6,6 +6,7 @@ import { VendorStatusMessage } from '../components/VendorStatusMessage'
 import { DocumentUpload } from '../components/DocumentUpload'
 import { GoogleMapsLocationPicker } from '../../../components/GoogleMapsLocationPicker'
 import * as vendorApi from '../services/vendorApi'
+import { PhoneInput } from '../../../components/PhoneInput'
 
 export function VendorRegister({ onSuccess, onSwitchToLogin }) {
   const navigate = useNavigate()
@@ -65,8 +66,8 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
         return
       }
       // Validate coordinates are valid (not 0,0)
-      if (!form.location.coordinates.lat || !form.location.coordinates.lng || 
-          form.location.coordinates.lat === 0 || form.location.coordinates.lng === 0) {
+      if (!form.location.coordinates.lat || !form.location.coordinates.lng ||
+        form.location.coordinates.lat === 0 || form.location.coordinates.lng === 0) {
         setError('Please select a valid location. Coordinates are required.')
         setLoading(false)
         return
@@ -93,7 +94,7 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
       const imageFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg']
       const aadhaarFormat = form.aadhaarCard.format?.toLowerCase()
       const panFormat = form.panCard.format?.toLowerCase()
-      
+
       if (!aadhaarFormat || !imageFormats.includes(aadhaarFormat)) {
         setError('Aadhaar card must be an image file (JPG, PNG, GIF, etc.). PDF files are not accepted.')
         setLoading(false)
@@ -138,7 +139,7 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
         aadhaarCard: form.aadhaarCard,
         panCard: form.panCard,
       })
-      
+
       if (result.success || result.data) {
         setStep('otp')
       } else {
@@ -196,7 +197,7 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
         if (responseData?.token || result.data?.token) {
           localStorage.setItem('vendor_token', responseData?.token || result.data?.token)
         }
-        
+
         // Update vendor context with profile
         if (vendorData) {
           dispatch({
@@ -212,15 +213,15 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
             },
           })
         }
-        
+
         onSuccess?.(vendorData || { name: form.fullName, phone: form.contact })
         navigate('/vendor/dashboard')
       } else {
         // Check for rejected status in error response
         if (result.error?.status === 'rejected' || result.error?.message?.includes('rejected')) {
           setStep('rejected')
-      } else {
-        setError(result.error?.message || 'Invalid OTP. Please try again.')
+        } else {
+          setError(result.error?.message || 'Invalid OTP. Please try again.')
         }
       }
     } catch (err) {
@@ -267,7 +268,7 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
   }
 
   if (step === 'pending' || step === 'rejected') {
-    return <VendorStatusMessage status={step} onBack={() => setStep('register')} />
+    return <VendorStatusMessage status={step} onBack={() => navigate('/vendor/login')} />
   }
 
   return (
@@ -312,16 +313,13 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
               <label htmlFor="register-contact" className="text-xs font-semibold text-gray-700">
                 Contact Number <span className="text-red-500">*</span>
               </label>
-              <input
+              <PhoneInput
                 id="register-contact"
                 name="contact"
-                type="tel"
-                required
                 value={form.contact}
                 onChange={handleChange}
-                placeholder="+91 90000 00000"
-                maxLength={15}
-                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                required
+                placeholder="90000 00000"
               />
             </div>
 
@@ -342,7 +340,7 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
 
             <div className="border-t border-gray-200 pt-5 mt-5">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">Address & Location</h3>
-              
+
               <div className="space-y-4">
                 <GoogleMapsLocationPicker
                   onLocationSelect={(location) => {
@@ -362,7 +360,7 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
               <p className="text-xs text-gray-600 mb-4">
                 Please upload clear images or PDFs of your Aadhaar Card and PAN Card for verification.
               </p>
-              
+
               <div className="space-y-4">
                 <DocumentUpload
                   label="Aadhaar Card"
@@ -371,7 +369,7 @@ export function VendorRegister({ onSuccess, onSwitchToLogin }) {
                   required
                   disabled={loading}
                 />
-                
+
                 <DocumentUpload
                   label="PAN Card"
                   value={form.panCard}

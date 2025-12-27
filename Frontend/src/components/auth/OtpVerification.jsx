@@ -65,7 +65,7 @@ const themes = {
 // Icon components for each user type
 const UserTypeIcon = ({ userType }) => {
   const iconClass = `w-6 h-6 ${themes[userType]?.iconColor || 'text-gray-600'}`
-  
+
   switch (userType) {
     case 'admin':
       return <ShieldCheckIcon className={iconClass} />
@@ -81,6 +81,8 @@ const UserTypeIcon = ({ userType }) => {
 
 export function OtpVerification({ phone, email, onVerify, onResend, onBack, loading = false, error = null, userType = 'user' }) {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
+  const [timer, setTimer] = useState(120) // 2 minutes in seconds
+  const [canResend, setCanResend] = useState(false)
   const inputRefs = useRef([])
 
   useEffect(() => {
@@ -89,6 +91,24 @@ export function OtpVerification({ phone, email, onVerify, onResend, onBack, load
       inputRefs.current[0].focus()
     }
   }, [])
+
+  useEffect(() => {
+    let interval
+    if (timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1)
+      }, 1000)
+    } else {
+      setCanResend(true)
+    }
+    return () => clearInterval(interval)
+  }, [timer])
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
 
   const handleChange = (index, value) => {
     // Only allow numbers
@@ -135,6 +155,8 @@ export function OtpVerification({ phone, email, onVerify, onResend, onBack, load
 
   const handleResend = () => {
     setOtp(['', '', '', '', '', ''])
+    setTimer(120)
+    setCanResend(false)
     if (inputRefs.current[0]) {
       inputRefs.current[0].focus()
     }
@@ -152,7 +174,7 @@ export function OtpVerification({ phone, email, onVerify, onResend, onBack, load
           <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${theme.iconBg} mb-2 overflow-hidden border-2 ${theme.borderColor}`}>
             <img src={iraSathiLogo} alt="IRA Sathi" className="h-full w-full object-contain p-2" />
           </div>
-          
+
           {/* User Type Badge */}
           <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full ${theme.iconBg} border ${theme.borderColor}`}>
             <UserTypeIcon userType={userType} />
@@ -176,27 +198,27 @@ export function OtpVerification({ phone, email, onVerify, onResend, onBack, load
         </div>
       </div>
 
-       <form onSubmit={handleSubmit} className="space-y-6">
-         {/* OTP Input Boxes */}
-         <div className="w-full flex justify-center items-center gap-2 px-2">
-           {otp.map((digit, index) => (
-             <input
-               key={index}
-               ref={(el) => (inputRefs.current[index] = el)}
-               type="text"
-               inputMode="numeric"
-               maxLength={1}
-               value={digit}
-               onChange={(e) => handleChange(index, e.target.value)}
-               onKeyDown={(e) => handleKeyDown(index, e)}
-               className={`flex-1 max-w-[48px] h-14 text-center text-xl font-bold rounded-xl border-2 ${theme.borderColor} bg-white ${theme.focusBorder} focus:outline-none focus:ring-2 ${theme.focusRing} transition-all shadow-sm hover:shadow-md`}
-               style={{ 
-                 borderColor: digit ? theme.primaryColor : undefined,
-                 color: theme.textColor
-               }}
-             />
-           ))}
-         </div>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* OTP Input Boxes */}
+        <div className="w-full flex justify-center items-center gap-2 px-0 sm:px-2 overflow-hidden">
+          {otp.map((digit, index) => (
+            <input
+              key={index}
+              ref={(el) => (inputRefs.current[index] = el)}
+              type="text"
+              inputMode="numeric"
+              maxLength={1}
+              value={digit}
+              onChange={(e) => handleChange(index, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(index, e)}
+              className={`w-[40px] h-[50px] sm:w-[50px] sm:h-[60px] text-center text-xl font-bold rounded-xl border-2 ${theme.borderColor} bg-white ${theme.focusBorder} focus:outline-none focus:ring-2 ${theme.focusRing} transition-all shadow-sm hover:shadow-md shrink-0`}
+              style={{
+                borderColor: digit ? theme.primaryColor : undefined,
+                color: theme.textColor
+              }}
+            />
+          ))}
+        </div>
 
         {/* Error Message */}
         {error && (
@@ -228,17 +250,23 @@ export function OtpVerification({ phone, email, onVerify, onResend, onBack, load
           </button>
 
           {/* Resend Code */}
-          <div className="flex items-center justify-center gap-2 text-sm">
+          <div className="flex flex-col items-center justify-center gap-1 text-sm">
             <span className={theme.mutedColor}>Didn't receive code?</span>
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={loading}
-              className={`font-semibold hover:underline disabled:opacity-50 transition-colors`}
-              style={{ color: theme.primaryColor }}
-            >
-              Resend
-            </button>
+            {canResend ? (
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={loading}
+                className={`font-semibold hover:underline disabled:opacity-50 transition-colors`}
+                style={{ color: theme.primaryColor }}
+              >
+                Resend
+              </button>
+            ) : (
+              <span className={theme.mutedColor} style={{ opacity: 0.8 }}>
+                Resend in {formatTime(timer)}
+              </span>
+            )}
           </div>
 
           {/* Back Button */}

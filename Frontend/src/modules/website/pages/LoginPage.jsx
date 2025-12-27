@@ -4,6 +4,7 @@ import { OtpVerification } from '../../../components/auth/OtpVerification'
 import { useWebsiteDispatch } from '../context/WebsiteContext'
 import * as websiteApi from '../services/websiteApi'
 import { validatePhoneNumber } from '../../../utils/phoneValidation'
+import { PhoneInput } from '../../../components/PhoneInput'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -166,16 +167,13 @@ export function LoginPage() {
               <label htmlFor="login-phone" className="text-xs font-semibold text-gray-700">
                 Contact Number <span className="text-red-500">*</span>
               </label>
-              <input
+              <PhoneInput
                 id="login-phone"
                 name="phone"
-                type="tel"
                 required
                 value={form.phone}
                 onChange={handleChange}
-                placeholder="+91 90000 00000"
-                maxLength={15}
-                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                placeholder="Mobile"
               />
             </div>
 

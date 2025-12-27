@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Wallet, ShieldCheck, Eye, CheckCircle, XCircle, Calendar, IndianRupee, Filter, Search } from 'lucide-react'
+import { Wallet, ShieldCheck, Eye, CheckCircle, XCircle, Calendar, IndianRupee, Filter, Search, MoreVertical } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { Modal } from '../components/Modal'
@@ -36,6 +36,7 @@ export function SellerWithdrawalsPage({ subRoute = null, navigate }) {
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState(null) // { type: 'approve' | 'reject', requestId: string, reason?: string }
   const [approvingRequest, setApprovingRequest] = useState(null) // Request being approved (for full-screen flow)
+  const [openActionsDropdown, setOpenActionsDropdown] = useState(null)
 
   const fetchWithdrawals = useCallback(async () => {
     try {
@@ -144,16 +145,106 @@ export function SellerWithdrawalsPage({ subRoute = null, navigate }) {
     if (column.accessor === 'actions') {
       return {
         ...column,
-        Cell: (row) => (
-          <button
-            type="button"
-            onClick={() => handleViewRequest(row)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-yellow-500 hover:bg-yellow-50 hover:text-yellow-700"
-            title="View details"
-          >
-            <Eye className="h-4 w-4" />
-          </button>
-        ),
+        Cell: (row) => {
+          const isDropdownOpen = openActionsDropdown === row.id
+          const status = row.status || 'pending'
+
+          const actionItems = [
+            {
+              label: 'View details',
+              icon: Eye,
+              onClick: () => {
+                handleViewRequest(row)
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-gray-700 hover:bg-gray-50'
+            }
+          ]
+
+          if (status === 'pending') {
+            actionItems.push({
+              label: 'Approve',
+              icon: CheckCircle,
+              onClick: () => {
+                if (navigate) {
+                  setApprovingRequest(row)
+                  navigate(`seller-withdrawals/approve/${row.requestId || row.id}`)
+                } else {
+                  setSelectedRequest(row)
+                  setPendingAction({ type: 'approve', requestId: row.requestId || row.id })
+                  setConfirmationModalOpen(true)
+                }
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-green-600 hover:bg-green-50'
+            })
+            actionItems.push({
+              label: 'Reject',
+              icon: XCircle,
+              onClick: () => {
+                setSelectedRequest(row)
+                const reason = window.prompt('Please provide a reason for rejection:')
+                if (reason) {
+                  setPendingAction({ type: 'reject', requestId: row.requestId || row.id, reason })
+                  setConfirmationModalOpen(true)
+                }
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-red-600 hover:bg-red-50'
+            })
+          }
+
+          return (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpenActionsDropdown(isDropdownOpen ? null : row.id)
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-yellow-500 hover:bg-yellow-50 hover:text-yellow-700"
+                title="Actions"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+
+              {isDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setOpenActionsDropdown(null)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                    {actionItems.map((item, index) => {
+                      const Icon = item.icon
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!item.disabled) {
+                              item.onClick()
+                            }
+                          }}
+                          disabled={item.disabled}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
+                            item.className,
+                            item.disabled && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        },
       }
     }
     return column

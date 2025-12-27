@@ -4,6 +4,7 @@ import { useUserDispatch } from '../context/UserContext'
 import { GoogleMapsLocationPicker } from '../../../components/GoogleMapsLocationPicker'
 import * as userApi from '../services/userApi'
 import { Trans } from '../../../components/Trans'
+import { PhoneInput } from '../../../components/PhoneInput'
 
 export function AuthPromptModal({ isOpen, onClose, actionType, onSuccess }) {
   const dispatch = useUserDispatch()
@@ -78,7 +79,7 @@ export function AuthPromptModal({ isOpen, onClose, actionType, onSuccess }) {
       }
 
       const result = await userApi.requestOTP({ phone })
-      
+
       if (result.success || result.data) {
         setStep('otp')
       } else {
@@ -101,7 +102,7 @@ export function AuthPromptModal({ isOpen, onClose, actionType, onSuccess }) {
 
       if (result.success && result.data?.token) {
         localStorage.setItem('user_token', result.data.token)
-        
+
         // Fetch user profile
         const profileResult = await userApi.getUserProfile()
         if (profileResult.success && profileResult.data?.user) {
@@ -241,16 +242,13 @@ export function AuthPromptModal({ isOpen, onClose, actionType, onSuccess }) {
                 <label htmlFor="register-contact" className="text-xs font-semibold text-gray-700">
                   <Trans>Contact Number</Trans> <span className="text-red-500">*</span>
                 </label>
-                <input
+                <PhoneInput
                   id="register-contact"
                   name="contact"
-                  type="tel"
                   required
                   value={form.contact}
                   onChange={handleChange}
-                  placeholder="+91 90000 00000"
-                  maxLength={15}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                  placeholder="Mobile"
                 />
               </div>
 
@@ -352,16 +350,13 @@ export function AuthPromptModal({ isOpen, onClose, actionType, onSuccess }) {
               <label htmlFor="login-phone" className="text-xs font-semibold text-gray-700">
                 <Trans>Contact Number</Trans> <span className="text-red-500">*</span>
               </label>
-              <input
+              <PhoneInput
                 id="login-phone"
                 name="phone"
-                type="tel"
                 required
                 value={form.phone}
                 onChange={handleChange}
-                placeholder="+91 90000 00000"
-                maxLength={15}
-                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                placeholder="Mobile"
               />
             </div>
 

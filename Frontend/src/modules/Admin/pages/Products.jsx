@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Layers3, MapPin, ToggleRight, Edit2, Trash2, ArrowLeft, Package } from 'lucide-react'
+import { Layers3, MapPin, ToggleRight, Edit2, Trash2, ArrowLeft, Package, MoreVertical } from 'lucide-react'
 import { DataTable } from '../components/DataTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { FilterBar } from '../components/FilterBar'
@@ -8,7 +8,7 @@ import { ProductAttributesModal } from '../components/ProductAttributesModal'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
 import { useToast } from '../components/ToastNotification'
-import { productInventory } from '../services/adminData'
+// Product inventory import removed
 import { cn } from '../../../lib/cn'
 
 const columns = [
@@ -27,12 +27,13 @@ export function ProductsPage({ subRoute = null, navigate }) {
   const { products } = useAdminState()
   const { getProducts, createProduct, updateProduct, deleteProduct, toggleProductVisibility, loading } = useAdminApi()
   const { success, error: showError, warning: showWarning } = useToast()
-  
+
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [productsList, setProductsList] = useState([])
   const [allProductsList, setAllProductsList] = useState([])
   const [showAttributesModal, setShowAttributesModal] = useState(false)
   const [selectedProductForAttributes, setSelectedProductForAttributes] = useState(null)
+  const [openActionsDropdown, setOpenActionsDropdown] = useState(null)
 
   const regionColors = [
     { border: 'border-green-200', bg: 'bg-gradient-to-br from-green-50 to-green-100/50', text: 'text-green-700', progress: 'bg-gradient-to-r from-green-500 to-green-600' },
@@ -46,29 +47,29 @@ export function ProductsPage({ subRoute = null, navigate }) {
   // Format product data for display
   const formatProductForDisplay = (product) => {
     // Get actual stock
-    const actualStockValue = typeof product.actualStock === 'number' 
-      ? product.actualStock 
+    const actualStockValue = typeof product.actualStock === 'number'
+      ? product.actualStock
       : parseFloat(product.actualStock?.replace(/[^\d.]/g, '') || '0')
-    
+
     // Get display stock (vendor stock)
     const displayStockValue = typeof product.displayStock === 'number'
       ? product.displayStock
       : parseFloat(product.displayStock?.replace(/[^\d.]/g, '') || product.stock?.replace(/[^\d.]/g, '') || '0')
-    
+
     const stockUnit = product.weight?.unit || product.stockUnit || 'kg'
     const actualStockFormatted = `${actualStockValue.toLocaleString('en-IN')} ${stockUnit}`
     const vendorStockFormatted = `${displayStockValue.toLocaleString('en-IN')} ${stockUnit}`
-    
+
     const vendorPrice = typeof product.vendorPrice === 'number' ? product.vendorPrice : parseFloat(product.vendorPrice?.replace(/[₹,]/g, '') || product.priceToVendor || '0')
     const userPrice = typeof product.userPrice === 'number' ? product.userPrice : parseFloat(product.userPrice?.replace(/[₹,]/g, '') || product.priceToUser || '0')
-    
+
     // Format expiry date
     let expiryFormatted = product.expiry || ''
     if (product.expiry && product.expiry.includes('-')) {
       const date = new Date(product.expiry)
       expiryFormatted = date.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
     }
-    
+
     // Include batch number if available
     if (product.batchNumber) {
       expiryFormatted = expiryFormatted ? `${expiryFormatted} (${product.batchNumber})` : product.batchNumber
@@ -94,9 +95,7 @@ export function ProductsPage({ subRoute = null, navigate }) {
       const formatted = result.data.products.map(formatProductForDisplay)
       setAllProductsList(formatted)
     } else {
-      // Fallback to mock data
-      const formatted = productInventory.map(formatProductForDisplay)
-      setAllProductsList(formatted)
+      setAllProductsList([])
     }
   }, [getProducts])
 
@@ -154,7 +153,7 @@ export function ProductsPage({ subRoute = null, navigate }) {
     try {
       const currentVisibility = product.visibility === 'Active' || product.visibility === 'active' ? 'active' : 'inactive'
       const newVisibility = currentVisibility === 'active' ? 'inactive' : 'active'
-      
+
       const result = await toggleProductVisibility(product.id, { visibility: newVisibility })
       if (result.data) {
         fetchProducts()
@@ -225,10 +224,10 @@ export function ProductsPage({ subRoute = null, navigate }) {
         ...column,
         Cell: (row) => {
           const originalProduct = products.data?.products?.find((p) => p.id === row.id) || row
-          const hasAttributes = originalProduct.attributeStocks && 
-                               Array.isArray(originalProduct.attributeStocks) && 
-                               originalProduct.attributeStocks.length > 0
-          
+          const hasAttributes = originalProduct.attributeStocks &&
+            Array.isArray(originalProduct.attributeStocks) &&
+            originalProduct.attributeStocks.length > 0
+
           return (
             <div className="flex items-center gap-2">
               <span className="font-semibold text-gray-900">{row.name}</span>
@@ -278,41 +277,96 @@ export function ProductsPage({ subRoute = null, navigate }) {
         Cell: (row) => {
           const originalProduct = products.data?.products?.find((p) => p.id === row.id) || row
           // Check if product has attributes
-          const hasAttributes = originalProduct.attributeStocks && 
-                               Array.isArray(originalProduct.attributeStocks) && 
-                               originalProduct.attributeStocks.length > 0
-          
+          const hasAttributes = originalProduct.attributeStocks &&
+            Array.isArray(originalProduct.attributeStocks) &&
+            originalProduct.attributeStocks.length > 0
+
+
+
+          const isDropdownOpen = openActionsDropdown === row.id
+          const actionItems = []
+
+          if (hasAttributes) {
+            actionItems.push({
+              label: 'View Attributes',
+              icon: Package,
+              onClick: () => {
+                setSelectedProductForAttributes(originalProduct)
+                setShowAttributesModal(true)
+                setOpenActionsDropdown(null)
+              },
+              className: 'text-blue-700 hover:bg-blue-50'
+            })
+          }
+
+          actionItems.push({
+            label: 'Edit Product',
+            icon: Edit2,
+            onClick: () => {
+              handleEditProduct(originalProduct)
+              setOpenActionsDropdown(null)
+            },
+            className: 'text-gray-700 hover:bg-gray-50'
+          })
+
+          actionItems.push({
+            label: 'Delete Product',
+            icon: Trash2,
+            onClick: () => {
+              handleDeleteProduct(row.id)
+              setOpenActionsDropdown(null)
+            },
+            className: 'text-red-700 hover:bg-red-50'
+          })
+
           return (
-            <div className="flex items-center gap-2">
-              {hasAttributes && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedProductForAttributes(originalProduct)
-                    setShowAttributesModal(true)
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-300 bg-blue-50 text-blue-700 transition-all hover:border-blue-500 hover:bg-blue-100"
-                  title="View attributes"
-                >
-                  <Package className="h-4 w-4" />
-                </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpenActionsDropdown(isDropdownOpen ? null : row.id)
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
+                title="Actions"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+
+              {isDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setOpenActionsDropdown(null)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                    {actionItems.map((item, index) => {
+                      const Icon = item.icon
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!item.disabled) {
+                              item.onClick()
+                            }
+                          }}
+                          disabled={item.disabled}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
+                            item.className,
+                            item.disabled && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
               )}
-              <button
-                type="button"
-                onClick={() => handleEditProduct(originalProduct)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
-                title="Edit product"
-              >
-                <Edit2 className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteProduct(row.id)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-red-600 transition-all hover:border-red-500 hover:bg-red-50"
-                title="Delete product"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
             </div>
           )
         },
@@ -344,7 +398,7 @@ export function ProductsPage({ subRoute = null, navigate }) {
               {selectedProduct ? 'Edit Product' : 'Add New Product'}
             </h2>
             <p className="text-sm text-gray-600">
-              {selectedProduct 
+              {selectedProduct
                 ? 'Update product details, pricing, and stock information.'
                 : 'Create a new product entry with pricing, stock, and visibility settings.'}
             </p>
@@ -416,50 +470,7 @@ export function ProductsPage({ subRoute = null, navigate }) {
         product={selectedProductForAttributes}
       />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-3xl border border-purple-200 bg-white p-5 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] lg:col-span-2">
-          <header className="border-b border-purple-200 pb-3 mb-5">
-            <h3 className="text-lg font-bold text-purple-700">Regional Assignment Snapshot</h3>
-            <p className="text-sm text-gray-600">Ensure region-specific pricing and stock buffers are within threshold.</p>
-          </header>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {[
-              { region: 'West', coverage: '32 vendors', fill: 78, tone: 'success' },
-              { region: 'North', coverage: '24 vendors', fill: 62, tone: 'warning' },
-              { region: 'South', coverage: '18 vendors', fill: 44 },
-              { region: 'Central', coverage: '12 vendors', fill: 58 },
-              { region: 'North East', coverage: '8 vendors', fill: 39 },
-              { region: 'East', coverage: '28 vendors', fill: 71, tone: 'success' },
-            ].map((item, index) => {
-              const colors = item.tone === 'success' 
-                ? regionColors[0] 
-                : item.tone === 'warning' 
-                ? regionColors[1] 
-                : regionColors[index % regionColors.length]
-              return (
-                <div
-                  key={item.region}
-                  className={cn(
-                    'rounded-2xl border p-4 transition-all duration-300 hover:scale-105 hover:shadow-[0_6px_20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]',
-                    colors.border,
-                    colors.bg,
-                  )}
-                >
-                  <div className="flex items-center justify-between text-sm font-bold text-gray-900">
-                    <span>{item.region}</span>
-                    <span className={colors.text}>{item.coverage}</span>
-                  </div>
-                  <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
-                    <div
-                      className={cn('h-full rounded-full transition-all duration-500 shadow-[0_2px_8px_rgba(0,0,0,0.2)]', colors.progress)}
-                      style={{ width: `${item.fill}%` }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+      <div className="space-y-6">
         <div className="space-y-3 rounded-3xl border border-orange-200 bg-white p-5 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
           <header className="border-b border-orange-200 pb-3">
             <h3 className="text-lg font-bold text-orange-700">Visibility Controls</h3>
@@ -467,32 +478,38 @@ export function ProductsPage({ subRoute = null, navigate }) {
               Toggle product availability and orchestrate upcoming launches or sunset batches.
             </p>
           </header>
-          {productsList.map((product) => {
-            const originalProduct = products.data?.products?.find((p) => p.id === product.id) || product
-            return (
-            <div
-              key={product.id}
-              className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 transition-all duration-200 hover:bg-gray-50 hover:scale-[1.02] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)]"
-            >
-              <div>
-                <p className="text-sm font-bold text-gray-900">{product.name}</p>
-                <p className="text-xs text-gray-600">Batch expiry • {product.expiry}</p>
-              </div>
-                <button
-                  onClick={() => handleToggleVisibility(originalProduct)}
-                  className={cn(
-                'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold transition-all duration-200 hover:scale-105',
-                product.visibility === 'Active' 
-                  ? 'border-green-200 bg-gradient-to-br from-green-500 to-green-600 text-white shadow-[0_2px_8px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)]' 
-                  : 'border-gray-200 bg-white text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] hover:border-yellow-300 hover:bg-yellow-50 hover:text-yellow-700'
-                  )}
-                >
-                <ToggleRight className="h-4 w-4" />
-                {product.visibility === 'Active' ? 'Active' : 'Inactive'}
-              </button>
+          {productsList.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {productsList.map((product) => {
+                const originalProduct = products.data?.products?.find((p) => p.id === product.id) || product
+                return (
+                  <div
+                    key={product.id}
+                    className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 transition-all duration-200 hover:bg-gray-50 hover:scale-[1.02] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)]"
+                  >
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">{product.name}</p>
+                      <p className="text-xs text-gray-600">Batch expiry • {product.expiry}</p>
+                    </div>
+                    <button
+                      onClick={() => handleToggleVisibility(originalProduct)}
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold transition-all duration-200 hover:scale-105',
+                        product.visibility === 'Active'
+                          ? 'border-green-200 bg-gradient-to-br from-green-500 to-green-600 text-white shadow-[0_2px_8px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)]'
+                          : 'border-gray-200 bg-white text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] hover:border-yellow-300 hover:bg-yellow-50 hover:text-yellow-700'
+                      )}
+                    >
+                      <ToggleRight className="h-4 w-4" />
+                      {product.visibility === 'Active' ? 'Active' : 'Inactive'}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
-            )
-          })}
+          ) : (
+            <p className="text-center text-gray-500 italic py-8">No products available for visibility control.</p>
+          )}
         </div>
       </div>
     </div>

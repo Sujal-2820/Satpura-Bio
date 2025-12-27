@@ -4,16 +4,20 @@ import { useSellerApi } from '../../hooks/useSellerApi'
 import * as sellerApi from '../../services/sellerApi'
 import { cn } from '../../../../lib/cn'
 import { WalletIcon, TrendingUpIcon, TrendingDownIcon, SparkIcon, ChartIcon, CreditIcon, BankIcon, PlusIcon } from '../../components/icons'
+import { Trans } from '../../../../components/Trans'
+import { TransText } from '../../../../components/TransText'
+import { useTranslation } from '../../../../context/TranslationContext'
 
 const FILTER_TABS = [
-  { id: 'all', label: 'All' },
-  { id: 'commission', label: 'Commission' },
-  { id: 'withdrawal', label: 'Withdrawal' },
+  { id: 'all', label: <Trans>All</Trans> },
+  { id: 'commission', label: <Trans>Commission</Trans> },
+  { id: 'withdrawal', label: <Trans>Withdrawal</Trans> },
 ]
 
 export function WalletView({ openPanel }) {
-  const { dashboard } = useSellerState()
-  const { fetchWalletData, getCommissionSummary, getBankAccounts } = useSellerApi()
+  const { dashboard, profile } = useSellerState()
+  const { translate } = useTranslation()
+  const { fetchWalletData, requestWithdrawal, getBankDetails, updateBankDetails, getCommissionSummary, getBankAccounts } = useSellerApi()
   const [activeFilter, setActiveFilter] = useState('all')
   const [selectedTransaction, setSelectedTransaction] = useState(null)
   const [showTransactionDetail, setShowTransactionDetail] = useState(false)
@@ -35,7 +39,9 @@ export function WalletView({ openPanel }) {
   // Format currency
   const formatCurrency = (amount) => {
     if (typeof amount === 'number') {
-      return amount >= 100000 ? `₹${(amount / 100000).toFixed(1)} L` : `₹${amount.toLocaleString('en-IN')}`
+      return amount >= 100000
+        ? <><Trans>₹</Trans>{(amount / 100000).toFixed(1)} <Trans>L</Trans></>
+        : `₹${amount.toLocaleString('en-IN')}`
     }
     return amount || '₹0'
   }
@@ -47,43 +53,43 @@ export function WalletView({ openPanel }) {
       try {
         // Fetch wallet balance (stored in context)
         await fetchWalletData()
-        
+
         // Fetch commission summary
         const summaryResult = await getCommissionSummary()
         if (summaryResult.data) {
           setCommissionSummary(summaryResult.data)
         }
-        
+
         // Fetch bank accounts
         const bankAccountsResult = await getBankAccounts()
         if (bankAccountsResult.data?.bankAccounts) {
           setBankAccounts(bankAccountsResult.data.bankAccounts)
         }
-        
+
         // Fetch transactions (commissions)
         const transactionsResult = await sellerApi.getWalletTransactions({ limit: 50 })
-        
+
         // Fetch withdrawal requests
         const withdrawalsResult = await sellerApi.getWithdrawalRequests({ limit: 50 })
-        
+
         const allTransactions = []
-        
+
         // Add commission transactions
         if (transactionsResult.success && transactionsResult.data?.transactions) {
           const commissionTransactions = transactionsResult.data.transactions.map((txn) => {
             const userId = txn.userId?._id || txn.userId
-            const userName = txn.userId?.name || 'User'
-            const orderNumber = txn.orderId?.orderNumber || 'N/A'
-            
+            const userName = txn.userId?.name || translate('User')
+            const orderNumber = txn.orderId?.orderNumber || translate('N/A')
+
             return {
               id: txn._id || txn.id,
               type: 'commission',
               transactionType: 'commission',
               amount: txn.commissionAmount || 0,
-              description: `Commission for order ${orderNumber}`,
-              note: `Commission earned from ${userName}`,
-              reason: `Order ${orderNumber}`,
-              status: txn.status === 'credited' ? 'Completed' : txn.status || 'Completed',
+              description: translate('Commission for order {{orderNumber}}', { orderNumber }),
+              note: translate('Commission earned from {{userName}}', { userName }),
+              reason: translate('Order {{orderNumber}}', { orderNumber }),
+              status: txn.status === 'credited' ? translate('Completed') : txn.status || translate('Completed'),
               date: txn.createdAt || txn.creditedAt,
               createdAt: txn.createdAt || txn.creditedAt,
               userId: userId,
@@ -96,7 +102,7 @@ export function WalletView({ openPanel }) {
           })
           allTransactions.push(...commissionTransactions)
         }
-        
+
         // Add withdrawal transactions
         if (withdrawalsResult.success && withdrawalsResult.data?.withdrawals) {
           const withdrawalTransactions = withdrawalsResult.data.withdrawals.map((wd) => ({
@@ -104,10 +110,10 @@ export function WalletView({ openPanel }) {
             type: 'withdrawal',
             transactionType: 'withdrawal',
             amount: -(wd.amount || 0), // Negative for withdrawals
-            description: `Withdrawal request`,
-            note: wd.notes || `Withdrawal of ₹${wd.amount}`,
-            reason: `Withdrawal request`,
-            status: wd.status === 'approved' ? 'Completed' : wd.status === 'rejected' ? 'Rejected' : 'Pending',
+            description: <Trans>Withdrawal request</Trans>,
+            note: wd.notes || translate('Withdrawal of {{amount}}', { amount: formatCurrency(wd.amount) }),
+            reason: <Trans>Withdrawal request</Trans>,
+            status: wd.status === 'approved' ? translate('Completed') : wd.status === 'rejected' ? translate('Rejected') : translate('Pending'),
             date: wd.createdAt,
             createdAt: wd.createdAt,
             withdrawalId: wd._id || wd.id,
@@ -115,10 +121,10 @@ export function WalletView({ openPanel }) {
           }))
           allTransactions.push(...withdrawalTransactions)
         }
-        
+
         // Sort by date (newest first)
         allTransactions.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))
-        
+
         setTransactions(allTransactions)
       } catch (error) {
         console.error('Failed to fetch wallet data:', error)
@@ -137,7 +143,7 @@ export function WalletView({ openPanel }) {
     return () => {
       window.removeEventListener('seller-refresh-bank-accounts', handleRefresh)
     }
-  }, [fetchWalletData, getCommissionSummary, getBankAccounts])
+  }, [fetchWalletData, getCommissionSummary, getBankAccounts, translate])
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -160,7 +166,7 @@ export function WalletView({ openPanel }) {
   }
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A'
+    if (!dateString) return translate('N/A')
     try {
       const date = new Date(dateString)
       return date.toLocaleDateString('en-IN', {
@@ -174,10 +180,10 @@ export function WalletView({ openPanel }) {
   }
 
   const commissionMetrics = [
-    { label: 'Total Commission', value: formatCurrency(commissionSummary.totalCommission || wallet.totalEarned || 0), icon: WalletIcon, tone: 'success' },
-    { label: 'Available Balance', value: formatCurrency(commissionSummary.availableBalance || wallet.balance || 0), icon: SparkIcon, tone: 'success' },
-    { label: 'Pending Withdrawal', value: formatCurrency(commissionSummary.pendingWithdrawal || wallet.pending || 0), icon: CreditIcon, tone: 'warn' },
-    { label: 'This Month', value: formatCurrency(commissionSummary.thisMonthCommission || 0), icon: ChartIcon, tone: 'teal' },
+    { label: <Trans>Total Commission</Trans>, value: formatCurrency(commissionSummary.totalCommission || wallet.totalEarned || 0), icon: WalletIcon, tone: 'success' },
+    { label: <Trans>Available Balance</Trans>, value: formatCurrency(commissionSummary.availableBalance || wallet.balance || 0), icon: SparkIcon, tone: 'success' },
+    { label: <Trans>Pending Withdrawal</Trans>, value: formatCurrency(commissionSummary.pendingWithdrawal || wallet.pending || 0), icon: CreditIcon, tone: 'warn' },
+    { label: <Trans>This Month</Trans>, value: formatCurrency(commissionSummary.thisMonthCommission || 0), icon: ChartIcon, tone: 'teal' },
   ]
 
   return (
@@ -187,8 +193,8 @@ export function WalletView({ openPanel }) {
         <div className="seller-wallet-hero__card">
           <div className="seller-wallet-hero__header">
             <div>
-              <h2 className="seller-wallet-hero__title">Wallet</h2>
-              <p className="seller-wallet-hero__subtitle">Your earnings & balance</p>
+              <h2 className="seller-wallet-hero__title"><Trans>Wallet</Trans></h2>
+              <p className="seller-wallet-hero__subtitle"><Trans>Your earnings & balance</Trans></p>
             </div>
             <div className="seller-wallet-hero__badge">
               <WalletIcon className="h-6 w-6 text-white" />
@@ -196,7 +202,7 @@ export function WalletView({ openPanel }) {
           </div>
           <div className="seller-wallet-hero__balance">
             <div>
-              <p className="seller-wallet-hero__label">Available Balance</p>
+              <p className="seller-wallet-hero__label"><Trans>Available Balance</Trans></p>
               <p className="seller-wallet-hero__value">{formatCurrency(commissionSummary.availableBalance || wallet.balance || 0)}</p>
             </div>
             <button
@@ -211,16 +217,16 @@ export function WalletView({ openPanel }) {
               className="seller-wallet-hero__cta"
               disabled={bankAccounts.length === 0}
             >
-              Withdraw
+              <Trans>Withdraw</Trans>
             </button>
           </div>
           <div className="seller-wallet-hero__stats">
             <div className="seller-wallet-stat">
-              <p className="seller-wallet-stat__label">Pending</p>
+              <p className="seller-wallet-stat__label"><Trans>Pending</Trans></p>
               <span className="seller-wallet-stat__value">{formatCurrency(commissionSummary.pendingWithdrawal || wallet.pending || 0)}</span>
             </div>
             <div className="seller-wallet-stat">
-              <p className="seller-wallet-stat__label">Total Earned</p>
+              <p className="seller-wallet-stat__label"><Trans>Total Earned</Trans></p>
               <span className="seller-wallet-stat__value">{formatCurrency(commissionSummary.totalCommission || wallet.totalEarned || 0)}</span>
             </div>
           </div>
@@ -230,7 +236,7 @@ export function WalletView({ openPanel }) {
             className="seller-wallet-hero__view-earnings"
           >
             <TrendingUpIcon className="h-4 w-4" />
-            View Earnings
+            <Trans>View Earnings</Trans>
           </button>
         </div>
       </section>
@@ -239,7 +245,7 @@ export function WalletView({ openPanel }) {
       <section id="commission-metrics" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Commission Summary</h3>
+            <h3 className="seller-section__title"><Trans>Commission Summary</Trans></h3>
           </div>
         </div>
         <div className="seller-wallet-metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
@@ -248,9 +254,9 @@ export function WalletView({ openPanel }) {
             return (
               <div key={metric.label} className="seller-wallet-metric-card" style={{ padding: '1rem', background: '#fff', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                  <div style={{ 
-                    padding: '0.5rem', 
-                    borderRadius: '0.375rem', 
+                  <div style={{
+                    padding: '0.5rem',
+                    borderRadius: '0.375rem',
                     background: metric.tone === 'warn' ? '#fef3c7' : metric.tone === 'teal' ? '#d1fae5' : '#dcfce7',
                     color: metric.tone === 'warn' ? '#d97706' : metric.tone === 'teal' ? '#059669' : '#16a34a'
                   }}>
@@ -270,17 +276,17 @@ export function WalletView({ openPanel }) {
         <section id="commission-breakdown" className="seller-section">
           <div className="seller-section__header">
             <div>
-              <h3 className="seller-section__title">Commission by Rate</h3>
-              <p className="seller-section__subtitle">Breakdown of commissions by rate tier</p>
+              <h3 className="seller-section__title"><Trans>Commission by Rate</Trans></h3>
+              <p className="seller-section__subtitle"><Trans>Breakdown of commissions by rate tier</Trans></p>
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
             <div style={{ padding: '1rem', background: '#fff', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
-              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>2% Commission (Up to ₹50,000)</p>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}><Trans>2% Commission (Up to ₹50,000)</Trans></p>
               <p style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827' }}>{formatCurrency(commissionSummary.commissionByRate.low || 0)}</p>
             </div>
             <div style={{ padding: '1rem', background: '#fff', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
-              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>3% Commission (Above ₹50,000)</p>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}><Trans>3% Commission (Above ₹50,000)</Trans></p>
               <p style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827' }}>{formatCurrency(commissionSummary.commissionByRate.high || 0)}</p>
             </div>
           </div>
@@ -291,34 +297,34 @@ export function WalletView({ openPanel }) {
       <section id="bank-accounts" ref={bankAccountsSectionRef} className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Bank Accounts</h3>
-            <p className="seller-section__subtitle">Manage your bank accounts for withdrawals</p>
+            <h3 className="seller-section__title"><Trans>Bank Accounts</Trans></h3>
+            <p className="seller-section__subtitle"><Trans>Manage your bank accounts for withdrawals</Trans></p>
           </div>
           {bankAccounts.length === 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              openPanel('add-bank-account')
-              // Scroll to bank accounts section after a short delay to allow panel to open
-              setTimeout(() => {
-                if (bankAccountsSectionRef.current) {
-                  bankAccountsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                }
-              }, 300)
-            }}
+            <button
+              type="button"
+              onClick={() => {
+                openPanel('add-bank-account')
+                // Scroll to bank accounts section after a short delay to allow panel to open
+                setTimeout(() => {
+                  if (bankAccountsSectionRef.current) {
+                    bankAccountsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                }, 300)
+              }}
               className="seller-section__cta"
               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <PlusIcon className="h-4 w-4" />
-            Add Account
-          </button>
+            >
+              <PlusIcon className="h-4 w-4" />
+              <Trans>Add Account</Trans>
+            </button>
           )}
         </div>
         {bankAccounts.length === 0 ? (
           <div className="seller-wallet-empty">
             <BankIcon className="seller-wallet-empty__icon" />
-            <p className="seller-wallet-empty__text">No bank accounts added yet</p>
-            <p className="seller-wallet-empty__subtext">Please add a bank account to receive withdrawals</p>
+            <p className="seller-wallet-empty__text"><Trans>No bank accounts added yet</Trans></p>
+            <p className="seller-wallet-empty__subtext"><Trans>Please add a bank account to receive withdrawals</Trans></p>
           </div>
         ) : (
           <div className="seller-bank-accounts-list">
@@ -330,14 +336,14 @@ export function WalletView({ openPanel }) {
                 <div className="seller-bank-account-card__content">
                   <h4 className="seller-bank-account-card__name">{account.accountHolderName}</h4>
                   <div className="seller-bank-account-card__details">
-                    <span className="seller-bank-account-card__account-number">**** {account.accountNumber?.slice(-4) || 'N/A'}</span>
+                    <span className="seller-bank-account-card__account-number">**** {account.accountNumber?.slice(-4) || translate('N/A')}</span>
                     <span className="seller-bank-account-card__separator">•</span>
                     <span className="seller-bank-account-card__bank">{account.bankName}</span>
-                </div>
+                  </div>
                   <p className="seller-bank-account-card__ifsc">IFSC: {account.ifscCode}</p>
                 </div>
                 <div className="seller-bank-account-card__badge">
-                  <span>Active</span>
+                  <span><Trans>Active</Trans></span>
                 </div>
               </div>
             ))}
@@ -365,23 +371,23 @@ export function WalletView({ openPanel }) {
       <section id="seller-wallet-transactions" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Transaction History</h3>
-            <p className="seller-section__subtitle">{filteredTransactions.length} transactions</p>
+            <h3 className="seller-section__title"><Trans>Transaction History</Trans></h3>
+            <p className="seller-section__subtitle"><TransText>{filteredTransactions.length} transactions</TransText></p>
           </div>
         </div>
         {loading ? (
           <div className="seller-wallet-empty">
             <WalletIcon className="seller-wallet-empty__icon" />
-            <p className="seller-wallet-empty__text">Loading transactions...</p>
+            <p className="seller-wallet-empty__text"><Trans>Loading transactions...</Trans></p>
           </div>
         ) : filteredTransactions.length === 0 ? (
           <div className="seller-wallet-empty">
             <WalletIcon className="seller-wallet-empty__icon" />
-            <p className="seller-wallet-empty__text">No transactions found</p>
+            <p className="seller-wallet-empty__text"><Trans>No transactions found</Trans></p>
             <p className="seller-wallet-empty__subtext">
               {activeFilter === 'all'
-                ? 'Your transaction history will appear here'
-                : `No ${activeFilter} transactions yet`}
+                ? <Trans>Your transaction history will appear here</Trans>
+                : translate('No {{activeFilter}} transactions yet', { activeFilter })}
             </p>
           </div>
         ) : (
@@ -392,10 +398,10 @@ export function WalletView({ openPanel }) {
               const amount = typeof transaction.amount === 'number'
                 ? (isCredit ? `+₹${transaction.amount.toLocaleString('en-IN')}` : `-₹${Math.abs(transaction.amount).toLocaleString('en-IN')}`)
                 : transaction.amount || '₹0'
-              const description = transaction.description || transaction.note || transaction.reason || 'Transaction'
-              const status = transaction.status || 'Completed'
+              const description = transaction.description || transaction.note || transaction.reason || translate('Transaction')
+              const status = transaction.status || translate('Completed')
               const date = transaction.date || transaction.createdAt || new Date().toISOString()
-              
+
               return (
                 <div
                   key={transaction.id || transaction._id}
@@ -418,7 +424,7 @@ export function WalletView({ openPanel }) {
                   </div>
                   <div className="seller-transaction-card__info">
                     <div className="seller-transaction-card__row">
-                      <h4 className="seller-transaction-card__description">{description}</h4>
+                      <h4 className="seller-transaction-card__description"><TransText>{description}</TransText></h4>
                       <span
                         className={cn(
                           'seller-transaction-card__amount',
@@ -435,16 +441,16 @@ export function WalletView({ openPanel }) {
                           isCredit ? 'is-commission' : 'is-withdrawal',
                         )}
                       >
-                        {isCredit ? 'Commission' : 'Withdrawal'}
+                        {isCredit ? <Trans>Commission</Trans> : <Trans>Withdrawal</Trans>}
                       </span>
                       <span className="seller-transaction-card__date">{formatDate(date)}</span>
                       <span
                         className={cn(
                           'seller-transaction-card__status',
-                          status === 'Completed' || status === 'completed' ? 'is-completed' : 'is-pending',
+                          (status === 'Completed' || status === 'completed') ? 'is-completed' : 'is-pending',
                         )}
                       >
-                        {status}
+                        <TransText>{status}</TransText>
                       </span>
                     </div>
                   </div>
@@ -467,7 +473,7 @@ export function WalletView({ openPanel }) {
           />
           <div className={cn('seller-activity-sheet__panel', showTransactionDetail && 'is-open')}>
             <div className="seller-activity-sheet__header">
-              <h4>Transaction Details</h4>
+              <h4><Trans>Transaction Details</Trans></h4>
               <button
                 type="button"
                 onClick={() => {
@@ -475,7 +481,7 @@ export function WalletView({ openPanel }) {
                   setTimeout(() => setSelectedTransaction(null), 260)
                 }}
               >
-                Close
+                <Trans>Close</Trans>
               </button>
             </div>
             <div className="seller-activity-sheet__body">
@@ -491,7 +497,7 @@ export function WalletView({ openPanel }) {
                   </div>
                   <div className="seller-transaction-detail__info">
                     <h3 className="seller-transaction-detail__description">
-                      {selectedTransaction.description || selectedTransaction.note || 'Transaction'}
+                      <TransText>{selectedTransaction.description || selectedTransaction.note || 'Transaction'}</TransText>
                     </h3>
                     <span
                       className={cn(
@@ -507,29 +513,29 @@ export function WalletView({ openPanel }) {
                 </div>
                 <div className="seller-transaction-detail__meta">
                   <div className="seller-transaction-detail__meta-item">
-                    <span className="seller-transaction-detail__meta-label">Type</span>
+                    <span className="seller-transaction-detail__meta-label"><Trans>Type</Trans></span>
                     <span
                       className={cn(
                         'seller-transaction-card__type',
                         (selectedTransaction.type === 'commission' || selectedTransaction.type === 'credit') ? 'is-commission' : 'is-withdrawal',
                       )}
                     >
-                      {(selectedTransaction.type === 'commission' || selectedTransaction.type === 'credit') ? 'Commission' : 'Withdrawal'}
+                      {(selectedTransaction.type === 'commission' || selectedTransaction.type === 'credit') ? <Trans>Commission</Trans> : <Trans>Withdrawal</Trans>}
                     </span>
                   </div>
                   <div className="seller-transaction-detail__meta-item">
-                    <span className="seller-transaction-detail__meta-label">Status</span>
+                    <span className="seller-transaction-detail__meta-label"><Trans>Status</Trans></span>
                     <span
                       className={cn(
                         'seller-transaction-card__status',
                         (selectedTransaction.status === 'Completed' || selectedTransaction.status === 'completed') ? 'is-completed' : 'is-pending',
                       )}
                     >
-                      {selectedTransaction.status || 'Completed'}
+                      <TransText>{selectedTransaction.status || 'Completed'}</TransText>
                     </span>
                   </div>
                   <div className="seller-transaction-detail__meta-item">
-                    <span className="seller-transaction-detail__meta-label">Date</span>
+                    <span className="seller-transaction-detail__meta-label"><Trans>Date</Trans></span>
                     <span className="seller-transaction-detail__meta-value">
                       {(() => {
                         const dateString = selectedTransaction.date || selectedTransaction.createdAt
@@ -542,10 +548,10 @@ export function WalletView({ openPanel }) {
                           const hours = Math.floor(diff / 3600000)
                           const days = Math.floor(diff / 86400000)
 
-                          if (minutes < 1) return 'Just now'
-                          if (minutes < 60) return `${minutes}m ago`
-                          if (hours < 24) return `${hours}h ago`
-                          if (days < 7) return `${days}d ago`
+                          if (minutes < 1) return <Trans>Just now</Trans>
+                          if (minutes < 60) return <Trans>{`${minutes}m ago`}</Trans>
+                          if (hours < 24) return <Trans>{`${hours}h ago`}</Trans>
+                          if (days < 7) return <Trans>{`${days}d ago`}</Trans>
                           return date.toLocaleDateString('en-IN', {
                             day: 'numeric',
                             month: 'short',
@@ -558,7 +564,7 @@ export function WalletView({ openPanel }) {
                     </span>
                   </div>
                   <div className="seller-transaction-detail__meta-item">
-                    <span className="seller-transaction-detail__meta-label">Transaction ID</span>
+                    <span className="seller-transaction-detail__meta-label"><Trans>Transaction ID</Trans></span>
                     <span className="seller-transaction-detail__meta-value">{selectedTransaction.id || selectedTransaction._id || 'N/A'}</span>
                   </div>
                 </div>

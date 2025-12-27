@@ -10,7 +10,7 @@ const userRoutes = require('./routes/user');
 const vendorRoutes = require('./routes/vendor');
 const sellerRoutes = require('./routes/seller');
 const adminRoutes = require('./routes/admin');
-const utilsRoutes = require('./routes/utils');
+// const utilsRoutes = require('./routes/utils');
 
 // Import config
 const { connectDB } = require('./config/database');
@@ -69,7 +69,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/sellers', sellerRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/utils', utilsRoutes);
+// app.use('/api/utils', utilsRoutes); // Deprecated: Frontend uses Google Cloud Translation API directly
 
 // 404 handler (must come before error handler)
 app.use((req, res) => {

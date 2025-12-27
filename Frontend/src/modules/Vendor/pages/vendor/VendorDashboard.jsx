@@ -38,38 +38,38 @@ import { TransText } from '../../../../components/TransText'
 const NAV_ITEMS = [
   {
     id: 'overview',
-    label: 'Overview',
-    description: 'Orders, sales, and reminders',
+    label: <Trans>Overview</Trans>,
+    description: <Trans>Orders, sales, and reminders</Trans>,
     icon: HomeIcon,
   },
   {
     id: 'inventory',
-    label: 'Stock Manager',
-    description: 'Current stock status',
+    label: <Trans>Stock Manager</Trans>,
+    description: <Trans>Current stock status</Trans>,
     icon: BoxIcon,
   },
   {
     id: 'orders',
-    label: 'Orders',
-    description: 'Confirm availability and delivery',
+    label: <Trans>Orders</Trans>,
+    description: <Trans>Confirm availability and delivery</Trans>,
     icon: CartIcon,
   },
   {
     id: 'credit',
-    label: 'Credit Status',
-    description: 'Credit limit, fines, payment',
+    label: <Trans>Credit Status</Trans>,
+    description: <Trans>Credit limit, fines, payment</Trans>,
     icon: CreditIcon,
   },
   {
     id: 'earnings',
-    label: 'Earnings',
-    description: 'Earnings, balance, withdrawals',
+    label: <Trans>Earnings</Trans>,
+    description: <Trans>Earnings, balance, withdrawals</Trans>,
     icon: WalletIcon,
   },
   {
     id: 'reports',
-    label: 'Summary',
-    description: 'Weekly / monthly summary',
+    label: <Trans>Summary</Trans>,
+    description: <Trans>Weekly / monthly summary</Trans>,
     icon: ReportIcon,
   },
 ]
@@ -447,8 +447,8 @@ export function VendorDashboard({ onLogout }) {
   const buildMenuItems = (close) => [
     ...NAV_ITEMS.map((item) => ({
       id: item.id,
-      label: item.label,
-      description: item.description,
+      label: <Trans>{item.label}</Trans>,
+      description: <Trans>{item.description}</Trans>,
       icon: <item.icon className="h-4 w-4" />,
       onSelect: () => {
         navigateToTab(item.id)
@@ -457,9 +457,9 @@ export function VendorDashboard({ onLogout }) {
     })),
     {
       id: 'logout',
-      label: 'Sign out',
+      label: <Trans>Logout</Trans>,
       icon: <MenuIcon className="h-4 w-4" />,
-      description: 'Log out from vendor account',
+      description: <Trans>Log out from vendor account</Trans>,
       onSelect: () => {
         handleLogout()
         close()
@@ -536,8 +536,8 @@ export function VendorDashboard({ onLogout }) {
   return (
     <>
       <MobileShell
-        title={`Hello ${welcomeName}`}
-        subtitle={profile?.location?.city ? `${profile.location.city}${profile.location.state ? `, ${profile.location.state}` : ''}` : 'Location not set'}
+        title={<><Trans>Welcome</Trans> {welcomeName}</>}
+        subtitle={profile?.location?.city ? `${profile.location.city}${profile.location.state ? `, ${profile.location.state}` : ''}` : <Trans>Location not set</Trans>}
         onSearchClick={openSearch}
         onNotificationClick={handleNotificationClick}
         notificationCount={unreadNotificationCount}
@@ -545,7 +545,7 @@ export function VendorDashboard({ onLogout }) {
         navigation={NAV_ITEMS.map((item) => (
           <BottomNavItem
             key={item.id}
-            label={item.label}
+            label={<Trans>{item.label}</Trans>}
             active={activeTab === item.id}
             onClick={() => navigateToTab(item.id)}
             icon={<item.icon active={activeTab === item.id} className="h-5 w-5" />}
@@ -1350,14 +1350,14 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
   }, [fetchDashboardData, getEarningsSummary])
 
   const services = [
-    { label: 'Stock', note: 'Reorder stock', tone: 'success', target: 'inventory', icon: BoxIcon, action: null },
-    { label: 'Pricing', note: 'Update price', tone: 'warn', target: 'inventory', icon: ReportIcon, action: 'update-mrp' },
-    { label: 'Send', note: 'Arrange truck', tone: 'success', target: 'orders', icon: TruckIcon, action: null },
-    { label: 'Wallet', note: 'View payments', tone: 'success', target: 'credit', icon: WalletIcon, action: 'view-payouts' },
-    { label: 'Performance', note: 'Summary', tone: 'success', target: 'reports', icon: ChartIcon, action: null },
-    { label: 'Support', note: 'Get help', tone: 'warn', target: 'orders', icon: MenuIcon, action: null },
-    { label: 'Network', note: 'Partner list', tone: 'success', target: 'reports', icon: HomeIcon, action: null },
-    { label: 'Settings', note: 'Profile & verification', tone: 'success', target: 'credit', icon: CreditIcon, action: 'profile-settings' },
+    { label: <Trans>Stock</Trans>, note: <Trans>Reorder stock</Trans>, tone: 'success', target: 'inventory', icon: BoxIcon, action: null },
+    { label: <Trans>Pricing</Trans>, note: <Trans>Update price</Trans>, tone: 'warn', target: 'inventory', icon: ReportIcon, action: 'update-mrp' },
+    { label: <Trans>Send</Trans>, note: <Trans>Arrange truck</Trans>, tone: 'success', target: 'orders', icon: TruckIcon, action: null },
+    { label: <Trans>Wallet</Trans>, note: <Trans>View payments</Trans>, tone: 'success', target: 'credit', icon: WalletIcon, action: 'view-payouts' },
+    { label: <Trans>Performance</Trans>, note: <Trans>Summary</Trans>, tone: 'success', target: 'reports', icon: ChartIcon, action: null },
+    { label: <Trans>Support</Trans>, note: <Trans>Get help</Trans>, tone: 'warn', target: 'orders', icon: MenuIcon, action: null },
+    { label: <Trans>Network</Trans>, note: <Trans>Partner list</Trans>, tone: 'success', target: 'reports', icon: HomeIcon, action: null },
+    { label: <Trans>Settings</Trans>, note: <Trans>Profile & verification</Trans>, tone: 'success', target: 'credit', icon: CreditIcon, action: 'profile-settings' },
   ]
 
   // Fetch recent withdrawals for activity
@@ -1410,7 +1410,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
     const initials = customerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
     return {
       name: customerName,
-      action: `Order ${order.status === 'pending' ? 'received' : order.status === 'awaiting' ? 'accepted' : order.status}`,
+      action: <TransText>{`Order ${order.status === 'pending' ? 'received' : order.status === 'awaiting' ? 'accepted' : order.status}`}</TransText>,
       amount: `+₹${(order.totalAmount || 0).toLocaleString('en-IN')}`,
       status: order.status === 'delivered' ? 'Completed' : order.status === 'pending' ? 'Pending' : 'In Progress',
       avatar: initials,
@@ -1425,10 +1425,10 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
   const withdrawalTransactions = recentWithdrawals.map((withdrawal) => {
     const statusText = withdrawal.status === 'approved' ? 'Approved' : withdrawal.status === 'completed' ? 'Completed' : withdrawal.status
     return {
-      name: 'Withdrawal Request',
-      action: `Withdrawal ${statusText}`,
+      name: <Trans>Withdrawal Request</Trans>,
+      action: <TransText>{`Withdrawal ${statusText}`}</TransText>,
       amount: `-₹${(withdrawal.amount || 0).toLocaleString('en-IN')}`,
-      status: statusText,
+      status: <Trans>{statusText}</Trans>,
       avatar: 'WD',
       withdrawalId: withdrawal._id || withdrawal.id,
       type: 'withdrawal',
@@ -1473,24 +1473,24 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
 
   const quickActions = [
     {
-      label: 'Confirm delivery time',
-      description: 'Set delivery time',
+      label: <Trans>Confirm delivery time</Trans>,
+      description: <Trans>Set delivery time</Trans>,
       target: 'orders',
       icon: TruckIcon,
       tone: 'green',
       action: 'confirm-delivery-slot',
     },
     {
-      label: 'Update stock',
-      description: 'Add new stock / update stock',
+      label: <Trans>Update stock</Trans>,
+      description: <Trans>Add new stock / update stock</Trans>,
       target: 'inventory',
       icon: BoxIcon,
       tone: 'orange',
       action: 'update-inventory-batch',
     },
     {
-      label: 'Request credit order',
-      description: 'Request stock from admin',
+      label: <Trans>Request credit order</Trans>,
+      description: <Trans>Request stock from admin</Trans>,
       target: 'credit',
       icon: CreditIcon,
       tone: 'teal',
@@ -1530,7 +1530,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
           </div>
           <div className="overview-hero__core">
             <div className="overview-hero__identity">
-              <span className="overview-hero__greeting">Today's summary</span>
+              <span className="overview-hero__greeting"><Trans>Today's summary</Trans></span>
               <h2 className="overview-hero__welcome">{welcomeName}</h2>
             </div>
             <div className="overview-hero__badge">
@@ -1539,7 +1539,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
           </div>
           <div className="overview-hero__balance">
             <div>
-              <p className="overview-hero__label">Available money</p>
+              <p className="overview-hero__label"><Trans>Wallet Balance</Trans></p>
               <p className="overview-hero__value">{walletBalance}</p>
             </div>
             <button type="button" onClick={() => openPanel('check-credit')} className="overview-hero__cta">
@@ -1554,7 +1554,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
               { label: 'Credit utilization', value: `${Math.round(overviewData.credit?.utilization || 0)}%` },
             ].map((item) => (
               <div key={item.label} className="overview-stat-card">
-                <p>{item.label}</p>
+                <p><Trans>{item.label}</Trans></p>
                 <span>{item.value}</span>
               </div>
             ))}
@@ -1565,7 +1565,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
       <section id="overview-services" className="overview-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Shortcuts</h3>
+            <h3 className="overview-section__title"><Trans>Home</Trans></h3>
           </div>
         </div>
         <div ref={servicesRef} className="overview-services__rail">
@@ -1585,8 +1585,8 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
               <span className={cn('overview-service-card__icon', service.tone === 'warn' ? 'is-warn' : 'is-success')}>
                 <service.icon className="h-5 w-5" />
               </span>
-              <span className="overview-service-card__label">{service.label}</span>
-              <span className="overview-service-card__note">{service.note}</span>
+              <span className="overview-service-card__label"><Trans>{service.label}</Trans></span>
+              <span className="overview-service-card__note"><Trans>{service.note}</Trans></span>
             </button>
           ))}
         </div>
@@ -1603,7 +1603,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
       <section id="overview-activity" className="overview-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Recent activity</h3>
+            <h3 className="overview-section__title"><Trans>Recent Activity</Trans></h3>
           </div>
         </div>
         <div className="overview-activity__list">
@@ -1613,12 +1613,12 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
               <div className="overview-activity__details">
                 <div className="overview-activity__row">
                   <span className="overview-activity__name">
-                    {item.type === 'repayment' && item.repaymentNumber ? item.repaymentNumber : item.name}
+                    {item.type === 'repayment' && item.repaymentNumber ? item.repaymentNumber : <TransText>{item.name}</TransText>}
                   </span>
                   <span
                     className={cn(
                       'overview-activity__amount',
-                      item.amount.startsWith('-') ? 'is-negative' : 'is-positive',
+                      String(item.amount).startsWith('-') ? 'is-negative' : 'is-positive',
                     )}
                   >
                     {item.amount}
@@ -1626,10 +1626,10 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
                 </div>
                 <div className="overview-activity__meta">
                   <span>{item.action}</span>
-                  <span>{item.status}</span>
+                  <span><TransText>{item.status}</TransText></span>
                   {item.type === 'repayment' && item.penaltyAmount > 0 && (
                     <span className="text-xs text-red-600">
-                      (Penalty: ₹{item.penaltyAmount.toLocaleString('en-IN')})
+                      (<Trans>Penalty:</Trans> ₹{item.penaltyAmount.toLocaleString('en-IN')})
                     </span>
                   )}
                 </div>
@@ -1656,23 +1656,23 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
           {[
             {
               id: 'orders',
-              label: 'Total Orders',
+              label: <Trans>Total Orders</Trans>,
               value: String(overviewData.orders?.total || 0),
-              trend: 'Today',
+              trend: <Trans>Today</Trans>,
               // Calculate progress based on orders today vs average (if available) or use utilization
               progress: overviewData.orders?.total ? Math.min(100, Math.max(10, (overviewData.orders.total / Math.max(overviewData.orders.averageDaily || 10, 1)) * 50)) : 0
             },
             {
               id: 'inventory',
-              label: 'Products',
+              label: <Trans>Products</Trans>,
               value: String(overviewData.inventory?.totalProducts || 0),
-              trend: 'Assigned',
+              trend: <Trans>Assigned</Trans>,
               // Calculate progress based on in-stock vs total products
               progress: overviewData.inventory?.totalProducts ? Math.min(100, Math.max(10, ((overviewData.inventory.totalProducts - (overviewData.inventory.outOfStockCount || 0)) / overviewData.inventory.totalProducts) * 100)) : 0
             },
             {
               id: 'credit',
-              label: 'Credit Used',
+              label: <Trans>Credit Used</Trans>,
               value: overviewData.credit?.used ? `₹${(overviewData.credit.used / 100000).toFixed(1)}L` : '₹0',
               trend: `${Math.round(overviewData.credit?.utilization || 0)}%`,
               // Use actual credit utilization percentage
@@ -1696,7 +1696,7 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
       <section id="overview-quick-actions" className="overview-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Quick actions</h3>
+            <h3 className="overview-section__title"><Trans>Quick actions</Trans></h3>
           </div>
         </div>
         <div className="overview-callout-grid">
@@ -1723,8 +1723,8 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
               <span className="overview-callout__icon">
                 <action.icon className="h-5 w-5" />
               </span>
-              <span className="overview-callout__label">{action.label}</span>
-              <span className="overview-callout__note">{action.description}</span>
+              <span className="overview-callout__label"><Trans>{action.label}</Trans></span>
+              <span className="overview-callout__note"><Trans>{action.description}</Trans></span>
             </button>
           ))}
         </div>
@@ -2034,7 +2034,7 @@ function InventoryView({ openPanel, onNavigate }) {
       selectedProduct.attributeStocks.length > 0
 
     if (hasAttributes && Object.keys(selectedProductAttributes).length === 0) {
-      setOrderError('Please select a variant before ordering.')
+      setOrderError(<Trans>Please select a variant before ordering.</Trans>)
       return
     }
 
@@ -2052,23 +2052,23 @@ function InventoryView({ openPanel, onNavigate }) {
     setOrderError('')
 
     if (!quantityNumber || quantityNumber <= 0) {
-      setOrderError('Enter a valid quantity to order.')
+      setOrderError(<Trans>Enter a valid quantity to order.</Trans>)
       return
     }
     if (quantityNumber > adminStock) {
-      setOrderError('Requested quantity exceeds admin stock availability.')
+      setOrderError(<Trans>Requested quantity exceeds admin stock availability.</Trans>)
       return
     }
     if (orderTotal < MIN_PURCHASE_VALUE) {
-      setOrderError(`Minimum order value is ₹${MIN_PURCHASE_VALUE.toLocaleString('en-IN')}.`)
+      setOrderError(<Trans>Minimum order value is ₹{MIN_PURCHASE_VALUE.toLocaleString('en-IN')}.</Trans>)
       return
     }
     if (orderTotal > creditRemaining) {
-      setOrderError('Insufficient remaining credits to place this request.')
+      setOrderError(<Trans>Insufficient remaining credits to place this request.</Trans>)
       return
     }
     if (!confirmProductName || confirmProductName.trim().toLowerCase() !== selectedProduct.name.trim().toLowerCase()) {
-      setOrderError('Please type the exact product name to confirm the request.')
+      setOrderError(<Trans>Please type the exact product name to confirm the request.</Trans>)
       return
     }
 
@@ -2093,7 +2093,7 @@ function InventoryView({ openPanel, onNavigate }) {
 
       const result = await requestCreditPurchase(payload)
       if (result.data) {
-        success('Order request submitted. Admin will review and approve.')
+        success(<Trans>Order request submitted. Admin will review and approve.</Trans>)
         setSelectedProduct(null)
         // Refresh dashboard to update credit info
         fetchDashboardData()
@@ -2103,8 +2103,8 @@ function InventoryView({ openPanel, onNavigate }) {
           payload: {
             id: `stock-request-${Date.now()}`,
             type: 'stock_request',
-            title: 'Stock Request Submitted',
-            message: `Stock request for ${selectedProduct.name || 'product'} submitted. Waiting for admin approval.`,
+            title: <Trans>Stock Request Submitted</Trans>,
+            message: <Trans>Stock request for {selectedProduct.name || 'product'} submitted. Waiting for admin approval.</Trans>,
             timestamp: new Date().toISOString(),
             data: { productId: selectedProduct.id || selectedProduct._id, productName: selectedProduct.name },
             read: false,
@@ -2308,8 +2308,8 @@ function InventoryView({ openPanel, onNavigate }) {
           payload: {
             id: `stock-request-${Date.now()}`,
             type: 'stock_request',
-            title: 'Stock Request Submitted',
-            message: `Stock request of ₹${totalAmount.toLocaleString('en-IN')} submitted. Waiting for admin approval.`,
+            title: <Trans>Stock Request Submitted</Trans>,
+            message: <Trans>Stock request of ₹{totalAmount.toLocaleString('en-IN')} submitted. Waiting for admin approval.</Trans>,
             timestamp: new Date().toISOString(),
             data: { requestId: result.data.requestId || result.data.purchase?._id, amount: totalAmount },
             read: false,
@@ -2345,24 +2345,21 @@ function InventoryView({ openPanel, onNavigate }) {
   const getVendorStockStatus = (stock) => {
     const value = Number(stock) || 0
     if (value <= 0) {
-      return { label: 'No stock', tone: 'critical', helper: 'Order stock to start selling', message: 'You have no stock yet' }
+      return { label: <Trans>Out of Stock</Trans>, tone: 'critical', helper: <Trans>Order stock to start selling</Trans>, message: <Trans>You have no stock yet</Trans> }
     }
     if (value <= 25) {
-      return { label: 'Low stock', tone: 'warn', helper: 'Plan a stock refill soon', message: 'Order more to avoid delays' }
+      return { label: <Trans>Low Stock</Trans>, tone: 'critical', helper: <Trans>Refill soon</Trans>, message: <Trans>Very low stock</Trans> }
     }
-    if (value <= 75) {
-      return { label: 'Mid stock', tone: 'teal', helper: 'Stock looks steady', message: 'Keep tracking demand' }
-    }
-    return { label: 'High stock', tone: 'success', helper: 'You are well stocked', message: 'Ready for incoming orders' }
+    return { label: <Trans>In Stock</Trans>, tone: 'success', helper: <Trans>Good to go</Trans>, message: <Trans>Sufficient stock</Trans> }
   }
 
   const topStats = [
-    { label: 'Available products', value: inStockCount, note: 'Ready to order', tone: 'success' },
-    { label: 'Out of stock', value: outOfStockCount, note: 'Check back later', tone: 'warn' },
+    { label: <Trans>Available products</Trans>, value: inStockCount, note: <Trans>Ready to order</Trans>, tone: 'success' },
+    { label: <Trans>Out of stock</Trans>, value: outOfStockCount, note: <Trans>Check back later</Trans>, tone: 'warn' },
   ]
 
   const inventoryStats = [
-    { label: 'Out of stock', value: `${outOfStockCount}`, meta: 'Not available', tone: 'warn' },
+    { label: <Trans>Out of stock</Trans>, value: `${outOfStockCount}`, meta: <Trans>Not available</Trans>, tone: 'warn' },
   ]
 
   const metricIcons = [BoxIcon, ChartIcon, SparkIcon, TruckIcon]
@@ -2375,11 +2372,11 @@ function InventoryView({ openPanel, onNavigate }) {
   if (lowStockItems.length > 0) {
     const lowStockCount = lowStockItems.length
     alerts.push({
-      title: 'Need to order more',
-      body: `${lowStockCount} product${lowStockCount > 1 ? 's' : ''} running low. Request stock before deadline.`,
-      badge: 'Low stock • Action needed',
+      title: <Trans>Need to order more</Trans>,
+      body: <Trans>{lowStockCount} product{lowStockCount > 1 ? 's' : ''} running low. Request stock before deadline.</Trans>,
+      badge: <Trans>Low stock • Action needed</Trans>,
       tone: 'warn',
-      action: 'Raise request',
+      action: <Trans>Raise request</Trans>,
     })
   }
 
@@ -2442,10 +2439,10 @@ function InventoryView({ openPanel, onNavigate }) {
               onClick={() => setSelectedProduct(null)}
               className="text-sm font-semibold text-purple-600 hover:text-purple-800"
             >
-              ← Back to products
+              ← <Trans>Back to products</Trans>
             </button>
-            <h2 className="mt-2 text-2xl font-bold text-gray-900">{selectedProduct.name}</h2>
-            <p className="text-sm text-gray-500">SKU: {selectedProduct.sku || 'N/A'}</p>
+            <h2 className="mt-2 text-2xl font-bold text-gray-900"><TransText>{selectedProduct.name}</TransText></h2>
+            <p className="text-sm text-gray-500"><Trans>SKU:</Trans> {selectedProduct.sku || <Trans>N/A</Trans>}</p>
           </div>
           {selectedProduct.stockStatus === 'in_stock' && (
             <button
@@ -2453,7 +2450,7 @@ function InventoryView({ openPanel, onNavigate }) {
               onClick={openOrderRequestScreen}
               className="rounded-full bg-purple-600 px-6 py-2 text-sm font-semibold text-white transition-all hover:bg-purple-700"
             >
-              Order Stock
+              <Trans>Order Stock</Trans>
             </button>
           )}
         </div>
@@ -2477,15 +2474,15 @@ function InventoryView({ openPanel, onNavigate }) {
 
           <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div>
-              <h4 className="text-sm font-semibold text-gray-700">Description</h4>
+              <h4 className="text-sm font-semibold text-gray-700"><Trans>Description</Trans></h4>
               <p className="text-sm text-gray-600 mt-1">
-                {selectedProduct.description || 'No description available'}
+                <TransText>{selectedProduct.description || 'No description available'}</TransText>
               </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <p className="text-xs text-gray-600">Vendor stock status</p>
+                <p className="text-xs text-gray-600"><Trans>Vendor stock status</Trans></p>
                 <p
                   className={cn(
                     'text-lg font-bold',
@@ -2627,11 +2624,11 @@ function InventoryView({ openPanel, onNavigate }) {
               onClick={closeOrderRequestScreen}
               className="text-sm font-semibold text-purple-600 hover:text-purple-800"
             >
-              ← Back to inventory
+              ← <Trans>Go Back</Trans>
             </button>
-            <h2 className="mt-2 text-2xl font-bold text-gray-900">Request stock from Admin</h2>
+            <h2 className="mt-2 text-2xl font-bold text-gray-900"><Trans>Request Stock from Admin</Trans></h2>
             <p className="text-sm text-gray-500">
-              Select products, enter quantities, and submit for approval. Stock arrives within 24 hours after approval.
+              <Trans>Select products, enter quantities, and submit for approval. Stock arrives within 24 hours after approval.</Trans>
             </p>
           </div>
         </div>
@@ -2662,7 +2659,7 @@ function InventoryView({ openPanel, onNavigate }) {
 
             {/* Product Cards Section */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Available Products</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4"><Trans>All Products</Trans></h3>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {products.map((product) => {
                   const productId = (product.id || product._id)?.toString()
@@ -2681,7 +2678,7 @@ function InventoryView({ openPanel, onNavigate }) {
                     productWithVariants.attributeStocks.length > 0
                   )
 
-                  console.log(`[Inventory] Product ${product.name} - hasVariants:`, hasVariants, 'attributeStocks:', productWithVariants.attributeStocks)
+
 
                   // Use product with variants for rendering
                   const productToRender = hasVariants && isExpanded ? productWithVariants : product
@@ -2776,12 +2773,12 @@ function InventoryView({ openPanel, onNavigate }) {
                               )}
                             >
                               {loadingVariants && expandedProductId === productId ? (
-                                <>Loading variants...</>
+                                <><Trans>Loading variants...</Trans></>
                               ) : adminStock === 0 ? (
-                                'Out of Stock'
+                                <Trans>Out of Stock</Trans>
                               ) : (
                                 <>
-                                  View Variants
+                                  <Trans>View Variants</Trans>
                                   {isExpanded ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
                                 </>
                               )}
@@ -2806,7 +2803,7 @@ function InventoryView({ openPanel, onNavigate }) {
                                   : 'bg-purple-600 text-white hover:bg-purple-700'
                               )}
                             >
-                              {adminStock === 0 ? 'Out of Stock' : 'Add to Order'}
+                              {adminStock === 0 ? <Trans>Out of Stock</Trans> : <Trans>Add to Order</Trans>}
                             </button>
                           )}
                         </>
@@ -3045,7 +3042,7 @@ function InventoryView({ openPanel, onNavigate }) {
             {/* Billing Summary */}
             {billingItems.length > 0 && (
               <div className="rounded-xl border-2 border-gray-200 bg-white p-5">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Billing Summary</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4"><Trans>Billing Summary</Trans></h3>
                 <div className="space-y-3 mb-4">
                   {billingItems.map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between border-b border-gray-100 pb-2">
@@ -3081,7 +3078,7 @@ function InventoryView({ openPanel, onNavigate }) {
                   ))}
                 </div>
                 <div className="flex items-center justify-between pt-3 border-t-2 border-gray-200">
-                  <p className="text-base font-semibold text-gray-900">Total Amount</p>
+                  <p className="text-base font-semibold text-gray-900"><Trans>Total Amount</Trans></p>
                   <p
                     className={cn(
                       'text-xl font-bold',
@@ -3093,18 +3090,18 @@ function InventoryView({ openPanel, onNavigate }) {
                 </div>
                 {!meetsMinValue && (
                   <p className="text-xs text-red-600 mt-2">
-                    Minimum order value is ₹{MIN_PURCHASE_VALUE.toLocaleString('en-IN')}
+                    <Trans>Minimum order value is ₹{MIN_PURCHASE_VALUE.toLocaleString('en-IN')}</Trans>
                   </p>
                 )}
                 {!withinMaxValue && (
                   <p className="text-xs text-red-600 mt-2">
-                    Maximum order value is ₹{MAX_PURCHASE_VALUE.toLocaleString('en-IN')}
+                    <Trans>Maximum order value is ₹{MAX_PURCHASE_VALUE.toLocaleString('en-IN')}</Trans>
                   </p>
                 )}
                 {hasUnpaidCredits && (
                   <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
                     <p className="text-xs font-semibold text-red-800">
-                      ⚠️ You have unpaid credits. Clear outstanding payments before making a new request.
+                      ⚠️ <Trans>You have unpaid credits. Clear outstanding payments before making a new request.</Trans>
                     </p>
                   </div>
                 )}
@@ -3115,7 +3112,7 @@ function InventoryView({ openPanel, onNavigate }) {
             {selectedProducts.length > 0 && (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-gray-700">Reason for request *</label>
+                  <label className="text-xs font-semibold text-gray-700"><Trans>Reason for request *</Trans></label>
                   <textarea
                     rows={3}
                     value={orderRequestForm.reason}
@@ -3125,7 +3122,7 @@ function InventoryView({ openPanel, onNavigate }) {
                   />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-gray-700">Additional notes (optional)</label>
+                  <label className="text-xs font-semibold text-gray-700"><Trans>Additional notes (optional)</Trans></label>
                   <textarea
                     rows={3}
                     value={orderRequestForm.notes}
@@ -3244,7 +3241,7 @@ function InventoryView({ openPanel, onNavigate }) {
                       : 'bg-purple-300 cursor-not-allowed'
                   )}
                 >
-                  {isOrderRequestSubmitting ? 'Submitting...' : 'Submit for Admin Approval'}
+                  {isOrderRequestSubmitting ? <Trans>Submitting...</Trans> : <Trans>Submit for Admin Approval</Trans>}
                 </button>
               </div>
             )}
@@ -3308,10 +3305,10 @@ function InventoryView({ openPanel, onNavigate }) {
       <section id="inventory-hero" className="inventory-hero">
         <div className="inventory-hero__shell">
           <div className="inventory-hero__headline">
-            <span className="inventory-hero__chip">Stock hub</span>
-            <h3 className="inventory-hero__title">{totalProducts} products available</h3>
+            <span className="inventory-hero__chip"><Trans>Stock hub</Trans></span>
+            <h3 className="inventory-hero__title"><Trans>{totalProducts} products available</Trans></h3>
             <p className="inventory-hero__meta">
-              {inStockCount} in stock • {outOfStockCount} out of stock
+              <Trans>{inStockCount} in stock • {outOfStockCount} out of stock</Trans>
             </p>
             <div className="inventory-order-cta">
               <div>
@@ -3431,8 +3428,8 @@ function InventoryView({ openPanel, onNavigate }) {
       <section className="inventory-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Available Products</h3>
-            <p className="text-sm text-gray-600 mt-1">Use the View details button to inspect and order stock</p>
+            <h3 className="overview-section__title"><Trans>Available Products</Trans></h3>
+            <p className="text-sm text-gray-600 mt-1"><Trans>Use the View details button to inspect and order stock</Trans></p>
           </div>
         </div>
 
@@ -3604,7 +3601,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
   }, [refreshKey, refreshOrders])
 
   const STATUS_FLOW = ['awaiting', 'accepted', 'dispatched', 'delivered', 'fully_paid']
-  const STAGES = ['Awaiting', 'Accepted', 'Dispatched', 'Delivered']
+  const STAGES = [<Trans>Awaiting</Trans>, <Trans>Accepted</Trans>, <Trans>Dispatched</Trans>, <Trans>Delivered</Trans>]
 
   const normalizeStatus = (status) => {
     if (!status) return 'pending'
@@ -3689,21 +3686,21 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
     // Determine next message based on status and payment
     let nextMessage = null
     if (order.status === 'pending') {
-      nextMessage = 'Confirm availability within 1 hour'
+      nextMessage = <Trans>Confirm availability within 1 hour</Trans>
     } else if (order.status === 'awaiting') {
-      nextMessage = 'Process and dispatch order'
+      nextMessage = <Trans>Process and dispatch order</Trans>
     } else if (order.status === 'processing') {
-      nextMessage = 'Prepare for delivery'
+      nextMessage = <Trans>Prepare for delivery</Trans>
     } else if (order.status === 'ready_for_delivery') {
-      nextMessage = 'Mark as out for delivery'
+      nextMessage = <Trans>Mark as out for delivery</Trans>
     } else if (order.status === 'out_for_delivery') {
-      nextMessage = 'Mark as delivered'
+      nextMessage = <Trans>Mark as delivered</Trans>
     } else if (isDelivered) {
       // For delivered orders, check payment status
       if (isFullyPaid) {
-        nextMessage = 'Payment completed'
+        nextMessage = <Trans>Payment completed</Trans>
       } else {
-        nextMessage = 'Mark payment as done'
+        nextMessage = <Trans>Mark payment as done</Trans>
       }
     }
 
@@ -3747,11 +3744,11 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
   const recentOrdersForTracker = recentOrdersForTrackerRaw.map(mapOrderToDisplay)
 
   const filterChips = [
-    { id: 'all', label: 'All orders', value: totalOrders },
-    { id: 'awaiting', label: 'Awaiting', value: totals.awaiting },
-    { id: 'accepted', label: 'Accepted', value: totals.accepted },
-    { id: 'dispatched', label: 'Dispatched', value: totals.dispatched },
-    { id: 'delivered', label: 'Delivered', value: totals.delivered },
+    { id: 'all', label: <Trans>All orders</Trans>, value: totalOrders },
+    { id: 'awaiting', label: <Trans>Awaiting</Trans>, value: totals.awaiting },
+    { id: 'accepted', label: <Trans>Accepted</Trans>, value: totals.accepted },
+    { id: 'dispatched', label: <Trans>Dispatched</Trans>, value: totals.dispatched },
+    { id: 'delivered', label: <Trans>Delivered</Trans>, value: totals.delivered },
   ]
 
   const getHeroStats = (filter) => {
@@ -3759,105 +3756,105 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
       case 'all':
         return [
           {
-            label: 'Waiting for your reply',
+            label: <Trans>Waiting for your reply</Trans>,
             value: totals.awaiting,
-            meta: 'Needs your reply',
+            meta: <Trans>Needs your reply</Trans>,
             tone: 'warn',
           },
           {
-            label: 'Orders in transit',
+            label: <Trans>Orders in transit</Trans>,
             value: totals.dispatched,
-            meta: 'Delivery in progress',
+            meta: <Trans>Delivery in progress</Trans>,
             tone: 'teal',
           },
           {
-            label: 'Ready to deliver',
+            label: <Trans>Ready to deliver</Trans>,
             value: totals.delivered,
-            meta: 'Track delivery',
+            meta: <Trans>Track delivery</Trans>,
             tone: 'success',
           },
         ]
       case 'awaiting':
         return [
           {
-            label: 'Waiting for your reply',
+            label: <Trans>Waiting for your reply</Trans>,
             value: totals.awaiting,
-            meta: 'Action required',
+            meta: <Trans>Action required</Trans>,
             tone: 'warn',
           },
           {
-            label: 'Average wait time',
+            label: <Trans>Average wait time</Trans>,
             value: '2.5h',
-            meta: 'Time to reply',
+            meta: <Trans>Time to reply</Trans>,
             tone: 'teal',
           },
           {
-            label: 'Urgent orders',
+            label: <Trans>Urgent orders</Trans>,
             value: Math.max(0, totals.awaiting - 2),
-            meta: 'Taking too long',
+            meta: <Trans>Taking too long</Trans>,
             tone: 'warn',
           },
         ]
       case 'accepted':
         return [
           {
-            label: 'Ready to dispatch',
+            label: <Trans>Ready to dispatch</Trans>,
             value: totals.accepted,
-            meta: 'Accepted & pending dispatch',
+            meta: <Trans>Accepted & pending dispatch</Trans>,
             tone: 'teal',
           },
           {
-            label: 'Dispatch SLA',
+            label: <Trans>Dispatch SLA</Trans>,
             value: '24h',
-            meta: 'Target to dispatch',
+            meta: <Trans>Target to dispatch</Trans>,
             tone: 'teal',
           },
           {
-            label: 'Next actions',
-            value: totals.accepted > 0 ? 'Pack & assign' : 'All clear',
-            meta: 'Keep SLA green',
+            label: <Trans>Next actions</Trans>,
+            value: totals.accepted > 0 ? <Trans>Pack & assign</Trans> : <Trans>All clear</Trans>,
+            meta: <Trans>Keep SLA green</Trans>,
             tone: totals.accepted > 0 ? 'warn' : 'success',
           },
         ]
       case 'dispatched':
         return [
           {
-            label: 'In transit',
+            label: <Trans>In transit</Trans>,
             value: totals.dispatched,
-            meta: 'On the way to farmer',
+            meta: <Trans>On the way to farmer</Trans>,
             tone: 'teal',
           },
           {
-            label: 'Awaiting delivery',
+            label: <Trans>Awaiting delivery</Trans>,
             value: Math.max(0, totals.dispatched - totals.delivered),
-            meta: 'Deliver within 24h SLA',
+            meta: <Trans>Deliver within 24h SLA</Trans>,
             tone: 'success',
           },
           {
-            label: 'Average dispatch time',
+            label: <Trans>Average dispatch time</Trans>,
             value: '4.2h',
-            meta: 'After confirmation',
+            meta: <Trans>After confirmation</Trans>,
             tone: 'teal',
           },
         ]
       case 'delivered':
         return [
           {
-            label: 'Completed today',
+            label: <Trans>Completed today</Trans>,
             value: totals.delivered,
-            meta: 'Successfully delivered',
+            meta: <Trans>Successfully delivered</Trans>,
             tone: 'success',
           },
           {
-            label: 'Delivered on time',
+            label: <Trans>Delivered on time</Trans>,
             value: '94%',
-            meta: 'On-time delivery',
+            meta: <Trans>On-time delivery</Trans>,
             tone: 'success',
           },
           {
-            label: 'Average delivery time',
+            label: <Trans>Average delivery time</Trans>,
             value: '18.5h',
-            meta: 'After order placed',
+            meta: <Trans>After order placed</Trans>,
             tone: 'teal',
           },
         ]
@@ -3873,10 +3870,10 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
       <section id="orders-hero" className="orders-hero">
         <div className="orders-hero__shell">
           <div className="orders-hero__headline">
-            <span className="orders-hero__chip">Orders</span>
-            <h3 className="orders-hero__title">{totalOrders} active orders</h3>
+            <span className="orders-hero__chip"><Trans>Orders</Trans></span>
+            <h3 className="orders-hero__title"><Trans>{`${totalOrders} active orders`}</Trans></h3>
             <p className="orders-hero__meta">
-              {totals.awaiting} awaiting • {totals.dispatched} dispatched • {totals.delivered} delivered
+              <Trans>{`${totals.awaiting} awaiting`}</Trans> • <Trans>{`${totals.dispatched} dispatched`}</Trans> • <Trans>{`${totals.delivered} delivered`}</Trans>
             </p>
           </div>
           <div className="orders-hero__filters" role="group" aria-label="Filter orders">
@@ -3923,11 +3920,11 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                 className="orders-section__cta"
                 onClick={onShowAllOrders}
               >
-                See All
+                <Trans>See All</Trans>
               </button>
             )}
             <button type="button" className="orders-section__cta" onClick={() => openPanel('view-sla-policy')}>
-              View delivery policy
+              <Trans>View delivery policy</Trans>
             </button>
           </div>
         </div>
@@ -3959,20 +3956,20 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
             const nextMessage =
               orderDisplay.next ||
               (isInGracePeriod
-                ? `Confirm or escalate within ${timeRemaining} minutes`
+                ? <Trans>{`Confirm or escalate within ${timeRemaining} minutes`}</Trans>
                 : isInStatusUpdateGracePeriod
-                  ? `You can revert status within ${statusUpdateTimeRemaining} minutes`
+                  ? <Trans>{`You can revert status within ${statusUpdateTimeRemaining} minutes`}</Trans>
                   : normalizedStatus === 'awaiting'
-                    ? 'Accept or escalate this order'
+                    ? <Trans>Accept or escalate this order</Trans>
                     : normalizedStatus === 'accepted'
-                      ? 'Dispatch items before SLA ends'
+                      ? <Trans>Dispatch items before SLA ends</Trans>
                       : normalizedStatus === 'dispatched'
-                        ? 'Deliver before the 24h SLA'
+                        ? <Trans>Deliver before the 24h SLA</Trans>
                         : normalizedStatus === 'delivered'
-                          ? (isPartialPayment ? 'Collect remaining payment' : 'Delivery completed')
+                          ? (isPartialPayment ? <Trans>Collect remaining payment</Trans> : <Trans>Delivery completed</Trans>)
                           : normalizedStatus === 'fully_paid'
-                            ? 'Payment completed'
-                            : 'Update order status')
+                            ? <Trans>Payment completed</Trans>
+                            : <Trans>Update order status</Trans>)
 
             return (
               <article key={orderDisplay.id} className="orders-card">
@@ -4006,23 +4003,23 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                             : {}
                     }>
                       {normalizedStatus === 'awaiting'
-                        ? 'Awaiting'
+                        ? <Trans>Awaiting</Trans>
                         : normalizedStatus === 'accepted'
-                          ? 'Accepted'
+                          ? <Trans>Accepted</Trans>
                           : normalizedStatus === 'dispatched'
-                            ? 'Dispatched'
+                            ? <Trans>Dispatched</Trans>
                             : normalizedStatus === 'delivered'
                               ? (isPartialPayment && !paymentCompleted ? (
                                 <>
-                                  <span>Delivered</span>
-                                  <span>Awaiting Payment</span>
+                                  <span><Trans>Delivered</Trans></span>
+                                  <span><Trans>Awaiting Payment</Trans></span>
                                 </>
-                              ) : 'Delivered')
+                              ) : <Trans>Delivered</Trans>)
                               : normalizedStatus === 'fully_paid'
                                 ? (
                                   <>
-                                    <span>Delivered</span>
-                                    <span>Paid</span>
+                                    <span><Trans>Delivered</Trans></span>
+                                    <span><Trans>Paid</Trans></span>
                                   </>
                                 )
                                 : order.status}
@@ -4036,15 +4033,15 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                           fontWeight: '600',
                           textTransform: 'uppercase'
                         }}>
-                          Escalated
+                          <Trans>Escalated</Trans>
                         </span>
                       )}
                     </span>
                   </div>
                 </header>
                 <div className="orders-card__next">
-                  <span className="orders-card__next-label">Next</span>
-                  <span className="orders-card__next-value">{nextMessage}</span>
+                  <span className="orders-card__next-label"><Trans>Next</Trans></span>
+                  <span className="orders-card__next-value"><TransText>{nextMessage}</TransText></span>
                 </div>
                 <div className="orders-card__stages">
                   {STAGES.map((stage, stageIdx) => (
@@ -4069,21 +4066,21 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                         fontSize: '12px',
                         color: '#92400E'
                       }}>
-                        ⏰ Grace Period: {timeRemaining} minutes remaining. Confirm or escalate now.
+                        ⏰ <Trans>{`Grace Period: ${timeRemaining} minutes remaining. Confirm or escalate now.`}</Trans>
                       </div>
                       <button
                         type="button"
                         className="orders-card__action is-primary"
                         onClick={() => openPanel('confirm-acceptance', { orderId: orderDisplay.id })}
                       >
-                        Confirm Acceptance
+                        <Trans>Confirm Acceptance</Trans>
                       </button>
                       <button
                         type="button"
                         className="orders-card__action is-secondary"
                         onClick={() => openPanel('cancel-acceptance', { orderId: orderDisplay.id })}
                       >
-                        Cancel & Escalate
+                        <Trans>Cancel & Escalate</Trans>
                       </button>
                     </>
                   ) : (
@@ -4099,7 +4096,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                           fontSize: '12px',
                           color: '#1E40AF'
                         }}>
-                          ⏰ Status Update Grace Period: {statusUpdateTimeRemaining} minutes remaining. You can revert to "{previousStatus}" status or confirm now.
+                          ⏰ <Trans>{`Status Update Grace Period: ${statusUpdateTimeRemaining} minutes remaining. You can revert to "${previousStatus}" status or confirm now.`}</Trans>
                         </div>
                       )}
                       {/* Show update status button for accepted orders (not pending, not paid, not in grace period) - Hide for escalated orders */}
@@ -4114,7 +4111,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                             })
                           }
                         >
-                          Update status
+                          <Trans>Update status</Trans>
                         </button>
                       )}
                       {/* Show confirm and revert buttons during grace period - Hide for escalated orders */}
@@ -4156,7 +4153,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                               }
                             }}
                           >
-                            Confirm Status Update
+                            <Trans>Confirm Status Update</Trans>
                           </button>
                           {previousStatus && (
                             <button
@@ -4170,7 +4167,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                                 })
                               }
                             >
-                              Revert to {previousStatus}
+                              <Trans>{`Revert to ${previousStatus}`}</Trans>
                             </button>
                           )}
                         </>
@@ -4188,7 +4185,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                           alignItems: 'center',
                           gap: '6px'
                         }}>
-                          ✓ Paid
+                          ✓ <Trans>Paid</Trans>
                         </div>
                       )}
                       {showAvailabilityActions && (
@@ -4198,7 +4195,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                             className="orders-card__action is-primary"
                             onClick={() => openPanel('order-available', { orderId: orderDisplay.id })}
                           >
-                            Accept Order
+                            <Trans>Accept Order</Trans>
                           </button>
                           <button
                             type="button"
@@ -4210,7 +4207,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                               }
                             }}
                           >
-                            Escalate All
+                            <Trans>Escalate All</Trans>
                           </button>
                           <button
                             type="button"
@@ -4222,7 +4219,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                               }
                             }}
                           >
-                            Partial Items
+                            <Trans>Partial Items</Trans>
                           </button>
                           <button
                             type="button"
@@ -4234,7 +4231,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                               }
                             }}
                           >
-                            Partial Qty
+                            <Trans>Partial Qty</Trans>
                           </button>
                         </>
                       )}
@@ -4254,7 +4251,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
                       }
                     }}
                   >
-                    View Details
+                    <Trans>View Details</Trans>
                   </button>
                 </div>
               </article>
@@ -4262,7 +4259,7 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
           }) : (
             <div className="orders-card">
               <div className="orders-card__details">
-                <p className="text-sm text-gray-500 text-center py-4">No orders found</p>
+                <p className="text-sm text-gray-500 text-center py-4"><Trans>No orders found</Trans></p>
               </div>
             </div>
           )}
@@ -4272,18 +4269,18 @@ function OrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalationM
       <section id="orders-fallback" className="orders-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Backup delivery</h3>
+            <h3 className="overview-section__title"><Trans>Backup delivery</Trans></h3>
 
           </div>
         </div>
         <div className="orders-fallback-card">
           <p className="orders-fallback-card__body">
-            Western hub reporting a mild delay. Send low-priority orders to Admin delivery if it takes more than 24 hours.
+            <Trans>Western hub reporting a mild delay. Send low-priority orders to Admin delivery if it takes more than 24 hours.</Trans>
           </p>
           <div className="orders-fallback-card__footer">
-            <span className="orders-fallback-card__badge">Delay • Western hub</span>
+            <span className="orders-fallback-card__badge"><Trans>Delay • Western hub</Trans></span>
             <button type="button" className="orders-fallback-card__cta" onClick={() => openPanel('escalate-to-admin')}>
-              Send to admin
+              <Trans>Send to admin</Trans>
             </button>
           </div>
         </div>
@@ -4302,13 +4299,13 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
   const [isLoading, setIsLoading] = useState(false)
 
   const filterTabs = [
-    { id: 'all', label: 'All Orders' },
-    { id: 'awaiting', label: 'Awaiting' },
-    { id: 'accepted', label: 'Accepted' },
-    { id: 'dispatched', label: 'Dispatched' },
-    { id: 'delivered', label: 'Delivered' },
-    { id: 'fully_paid', label: 'Fully Paid' },
-    { id: 'escalated', label: 'Escalated' },
+    { id: 'all', label: <Trans>All Orders</Trans> },
+    { id: 'awaiting', label: <Trans>Awaiting</Trans> },
+    { id: 'accepted', label: <Trans>Accepted</Trans> },
+    { id: 'dispatched', label: <Trans>Dispatched</Trans> },
+    { id: 'delivered', label: <Trans>Delivered</Trans> },
+    { id: 'fully_paid', label: <Trans>Fully Paid</Trans> },
+    { id: 'escalated', label: <Trans>Escalated</Trans> },
   ]
 
   const fetchOrders = useCallback(async () => {
@@ -4363,7 +4360,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
   }, [])
 
   const STATUS_FLOW = ['awaiting', 'accepted', 'dispatched', 'delivered', 'fully_paid']
-  const STAGES = ['Awaiting', 'Accepted', 'Dispatched', 'Delivered']
+  const STAGES = [<Trans>Awaiting</Trans>, <Trans>Accepted</Trans>, <Trans>Dispatched</Trans>, <Trans>Delivered</Trans>]
 
   const normalizeStatus = (status) => {
     if (!status) return 'awaiting'
@@ -4398,23 +4395,23 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
       order.status === 'rejected'
     const next =
       normalizedStatus === 'awaiting'
-        ? 'Accept or escalate this order'
+        ? <Trans>Accept or escalate this order</Trans>
         : normalizedStatus === 'accepted'
-          ? 'Dispatch items before SLA ends'
+          ? <Trans>Dispatch items before SLA ends</Trans>
           : normalizedStatus === 'dispatched'
-            ? 'Deliver before the 24h SLA'
+            ? <Trans>Deliver before the 24h SLA</Trans>
             : normalizedStatus === 'delivered'
-              ? (isPartialPayment ? 'Collect remaining payment' : 'Delivery completed')
+              ? (isPartialPayment ? <Trans>Collect remaining payment</Trans> : <Trans>Delivery completed</Trans>)
               : normalizedStatus === 'fully_paid'
-                ? 'Payment completed'
+                ? <Trans>Payment completed</Trans>
                 : null
 
     return {
       id: order._id || order.id,
       orderNumber: order.orderNumber,
-      farmer: order.userId?.name || 'Unknown Customer',
+      farmer: order.userId?.name || translate('Unknown Customer'),
       value: `₹${(order.totalAmount || 0).toLocaleString('en-IN')}`,
-      payment: paymentStatus === 'fully_paid' ? 'Paid' : paymentStatus === 'partial_paid' ? 'Partial' : 'Pending',
+      payment: paymentStatus === 'fully_paid' ? translate('Paid') : paymentStatus === 'partial_paid' ? translate('Partial') : translate('Pending'),
       paymentStatus,
       paymentPreference: order.paymentPreference || 'partial',
       status: order.status || 'awaiting',
@@ -4456,20 +4453,21 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
               textDecoration: 'none'
             }}
           >
-            ← Back
+            ← <Trans>Back</Trans>
           </button>
-          <h3 className="overview-section__title">All Orders</h3>
+          <h3 className="overview-section__title"><Trans>All Orders</Trans></h3>
         </div>
       </div>
 
       {/* Search bar */}
       <div className="orders-section" style={{ marginBottom: '20px' }}>
         <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px' }}>
+          {/* Wrap input to allow translation of placeholder via useTranslation if needed, but for now placeholder stays as is or we use i18n key */}
           <input
             type="text"
             value={searchQuery}
             onChange={handleSearchChange}
-            placeholder="Search by order number..."
+            placeholder={translate('Search by order number...')}
             className="vendor-action-panel__input"
             style={{ flex: 1 }}
           />
@@ -4477,7 +4475,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
             type="submit"
             className="orders-section__cta"
           >
-            Search
+            <Trans>Search</Trans>
           </button>
         </form>
       </div>
@@ -4508,7 +4506,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
         {isLoading ? (
           <div className="orders-card">
             <div className="orders-card__details">
-              <p className="text-sm text-gray-500 text-center py-4">Loading orders...</p>
+              <p className="text-sm text-gray-500 text-center py-4"><Trans>Loading orders...</Trans></p>
             </div>
           </div>
         ) : orders.length > 0 ? orders.map((order) => {
@@ -4530,20 +4528,20 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
           const nextMessage =
             order.next ||
             (isInGracePeriod
-              ? `Confirm or escalate within ${timeRemaining} minutes`
+              ? translate('Confirm or escalate within {{minutes}} minutes', { minutes: timeRemaining })
               : isInStatusUpdateGracePeriod
-                ? `You can revert status within ${statusUpdateTimeRemaining} minutes`
+                ? translate('You can revert status within {{minutes}} minutes', { minutes: statusUpdateTimeRemaining })
                 : normalizedStatus === 'awaiting'
-                  ? 'Accept or escalate this order'
+                  ? <Trans>Accept or escalate this order</Trans>
                   : normalizedStatus === 'accepted'
-                    ? 'Dispatch items before SLA ends'
+                    ? <Trans>Dispatch items before SLA ends</Trans>
                     : normalizedStatus === 'dispatched'
-                      ? 'Deliver before the 24h SLA'
+                      ? <Trans>Deliver before the 24h SLA</Trans>
                       : normalizedStatus === 'delivered'
-                        ? (isPartialPayment ? 'Collect remaining payment' : 'Delivery completed')
+                        ? (isPartialPayment ? <Trans>Collect remaining payment</Trans> : <Trans>Delivery completed</Trans>)
                         : normalizedStatus === 'fully_paid'
-                          ? 'Payment completed'
-                          : 'Mark payment as collected')
+                          ? <Trans>Payment completed</Trans>
+                          : <Trans>Mark payment as collected</Trans>)
 
           return (
             <article key={order.id} className="orders-card">
@@ -4553,7 +4551,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                     <TruckIcon className="h-5 w-5" />
                   </span>
                   <div className="orders-card__details">
-                    <p className="orders-card__name">{order.farmer}</p>
+                    <p className="orders-card__name"><TransText>{order.farmer}</TransText></p>
                     <p className="orders-card__value">{order.value}</p>
                     {order.orderNumber && (
                       <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>{order.orderNumber}</p>
@@ -4577,23 +4575,23 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                           : {}
                   }>
                     {normalizedStatus === 'awaiting'
-                      ? 'Awaiting'
+                      ? <Trans>Awaiting</Trans>
                       : normalizedStatus === 'accepted'
-                        ? 'Accepted'
+                        ? <Trans>Accepted</Trans>
                         : normalizedStatus === 'dispatched'
-                          ? 'Dispatched'
+                          ? <Trans>Dispatched</Trans>
                           : normalizedStatus === 'delivered'
                             ? (isPartialPayment && !paymentCompleted ? (
                               <>
-                                <span>Delivered</span>
-                                <span>Awaiting Payment</span>
+                                <span><Trans>Delivered</Trans></span>
+                                <span><Trans>Awaiting Payment</Trans></span>
                               </>
-                            ) : 'Delivered')
+                            ) : <Trans>Delivered</Trans>)
                             : normalizedStatus === 'fully_paid'
                               ? (
                                 <>
-                                  <span>Delivered</span>
-                                  <span>Paid</span>
+                                  <span><Trans>Delivered</Trans></span>
+                                  <span><Trans>Paid</Trans></span>
                                 </>
                               )
                               : order.status}
@@ -4607,14 +4605,14 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                         fontWeight: '600',
                         textTransform: 'uppercase'
                       }}>
-                        Escalated
+                        <Trans>Escalated</Trans>
                       </span>
                     )}
                   </span>
                 </div>
               </header>
               <div className="orders-card__next">
-                <span className="orders-card__next-label">Next</span>
+                <span className="orders-card__next-label"><Trans>Next</Trans></span>
                 <span className="orders-card__next-value">{nextMessage}</span>
               </div>
               <div className="orders-card__stages">
@@ -4640,21 +4638,21 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                       fontSize: '12px',
                       color: '#92400E'
                     }}>
-                      ⏰ Grace Period: {timeRemaining} minutes remaining. Confirm or escalate now.
+                      ⏰ <Trans>{`Grace Period: ${timeRemaining} minutes remaining. Confirm or escalate now.`}</Trans>
                     </div>
                     <button
                       type="button"
                       className="orders-card__action is-primary"
                       onClick={() => openPanel('confirm-acceptance', { orderId: order.id })}
                     >
-                      Confirm Acceptance
+                      <Trans>Confirm Acceptance</Trans>
                     </button>
                     <button
                       type="button"
                       className="orders-card__action is-secondary"
                       onClick={() => openPanel('cancel-acceptance', { orderId: order.id })}
                     >
-                      Cancel & Escalate
+                      <Trans>Cancel & Escalate</Trans>
                     </button>
                   </>
                 ) : (
@@ -4669,7 +4667,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                         fontSize: '12px',
                         color: '#1E40AF'
                       }}>
-                        ⏰ Status Update Grace Period: {statusUpdateTimeRemaining} minutes remaining. You can revert to "{previousStatus}" status.
+                        ⏰ <Trans>{`Status Update Grace Period: ${statusUpdateTimeRemaining} minutes remaining. You can revert to "${previousStatus}" status.`}</Trans>
                       </div>
                     )}
                     {/* Show update status button once acceptance is finalized - Hide for escalated orders */}
@@ -4684,7 +4682,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                           })
                         }
                       >
-                        Update status
+                        <Trans>Update status</Trans>
                       </button>
                     )}
                     {/* Show revert button during grace period - Hide for escalated orders */}
@@ -4700,7 +4698,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                           })
                         }
                       >
-                        Revert to {previousStatus}
+                        <Trans>Revert to {previousStatus}</Trans>
                       </button>
                     )}
                     {(normalizedStatus === 'fully_paid' || (!isPartialPayment && paymentCompleted && normalizedStatus === 'delivered')) && (
@@ -4715,7 +4713,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                         alignItems: 'center',
                         gap: '6px'
                       }}>
-                        ✓ Paid
+                        ✓ <Trans>Paid</Trans>
                       </div>
                     )}
                     {showAvailabilityActions && (
@@ -4725,7 +4723,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                           className="orders-card__action is-primary"
                           onClick={() => openPanel('order-available', { orderId: order.id })}
                         >
-                          Accept Order
+                          <Trans>Accept Order</Trans>
                         </button>
                         <button
                           type="button"
@@ -4737,7 +4735,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                             }
                           }}
                         >
-                          Escalate All
+                          <Trans>Escalate All</Trans>
                         </button>
                         <button
                           type="button"
@@ -4749,7 +4747,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                             }
                           }}
                         >
-                          Partial Items
+                          <Trans>Partial Items</Trans>
                         </button>
                         <button
                           type="button"
@@ -4761,7 +4759,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                             }
                           }}
                         >
-                          Partial Qty
+                          <Trans>Partial Qty</Trans>
                         </button>
                       </>
                     )}
@@ -4781,7 +4779,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
                     }
                   }}
                 >
-                  View Details
+                  <Trans>View Details</Trans>
                 </button>
               </div>
             </article>
@@ -4789,7 +4787,7 @@ function AllOrdersView({ openPanel, onOpenEscalationModal, onOpenPartialEscalati
         }) : (
           <div className="orders-card">
             <div className="orders-card__details">
-              <p className="text-sm text-gray-500 text-center py-4">No orders found</p>
+              <p className="text-sm text-gray-500 text-center py-4"><Trans>No orders found</Trans></p>
             </div>
           </div>
         )}
@@ -4863,15 +4861,23 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
   }
 
   const STATUS_FLOW = ['awaiting', 'accepted', 'dispatched', 'delivered', 'fully_paid']
-  const STAGES = ['Awaiting', 'Accepted', 'Dispatched', 'Delivered']
+  const STAGES = [<Trans>Awaiting</Trans>, <Trans>Accepted</Trans>, <Trans>Dispatched</Trans>, <Trans>Delivered</Trans>]
+
+  // Helper for date parsing
+  const getTimeRemaining = (expiry) => {
+    if (!expiry) return 0
+    const date = new Date(expiry)
+    if (isNaN(date.getTime())) return 0
+    return Math.max(0, Math.floor((date - new Date()) / 1000 / 60))
+  }
 
   const normalizedStatus = normalizeStatus(order?.status)
   const isInGracePeriod = order?.acceptanceGracePeriod?.isActive
   const gracePeriodExpiresAt = order?.acceptanceGracePeriod?.expiresAt
-  const timeRemaining = gracePeriodExpiresAt ? Math.max(0, Math.floor((new Date(gracePeriodExpiresAt) - new Date()) / 1000 / 60)) : 0
+  const timeRemaining = getTimeRemaining(gracePeriodExpiresAt)
   const isInStatusUpdateGracePeriod = order?.statusUpdateGracePeriod?.isActive
   const statusUpdateGracePeriodExpiresAt = order?.statusUpdateGracePeriod?.expiresAt
-  const statusUpdateTimeRemaining = statusUpdateGracePeriodExpiresAt ? Math.max(0, Math.floor((new Date(statusUpdateGracePeriodExpiresAt) - new Date()) / 1000 / 60)) : 0
+  const statusUpdateTimeRemaining = getTimeRemaining(statusUpdateGracePeriodExpiresAt)
   const previousStatus = order?.statusUpdateGracePeriod?.previousStatus
   const isPartialPayment = order?.paymentPreference !== 'full'
   const paymentStatus = order?.paymentStatus || 'pending'
@@ -4890,13 +4896,13 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
       <div className="orders-view">
         <div className="overview-section__header">
           <button type="button" className="orders-section__cta" onClick={onBack}>
-            ← Back
+            ← <Trans>Back</Trans>
           </button>
-          <h3 className="overview-section__title">Order Details</h3>
+          <h3 className="overview-section__title"><Trans>Order Details</Trans></h3>
         </div>
         <div className="orders-card">
           <div className="orders-card__details">
-            <p className="text-sm text-gray-500 text-center py-4">Loading order details...</p>
+            <p className="text-sm text-gray-500 text-center py-4"><Trans>Loading order details...</Trans></p>
           </div>
         </div>
       </div>
@@ -4909,9 +4915,9 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
       <div className="overview-section__header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button type="button" className="orders-section__cta" onClick={onBack}>
-            ← Back
+            ← <Trans>Back</Trans>
           </button>
-          <h3 className="overview-section__title">Order Details</h3>
+          <h3 className="overview-section__title"><Trans>Order Details</Trans></h3>
         </div>
       </div>
 
@@ -4923,7 +4929,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
               <TruckIcon className="h-5 w-5" />
             </span>
             <div className="orders-card__details">
-              <p className="orders-card__name">Order #{order?.orderNumber || order?.id}</p>
+              <p className="orders-card__name"><Trans>{`Order #${order?.orderNumber || order?.id}`}</Trans></p>
               <p className="orders-card__value">₹{(order?.totalAmount || 0).toLocaleString('en-IN')}</p>
             </div>
           </div>
@@ -4932,7 +4938,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
               'orders-card__payment',
               order?.paymentStatus === 'fully_paid' && 'is-paid'
             )}>
-              {order?.paymentStatus === 'fully_paid' ? 'Paid' : order?.paymentStatus === 'partial_paid' ? 'Partial' : 'Pending'}
+              {order?.paymentStatus === 'fully_paid' ? <Trans>Paid</Trans> : order?.paymentStatus === 'partial_paid' ? <Trans>Partial</Trans> : <Trans>Pending</Trans>}
             </span>
             <span className="orders-card__stage-label" style={
               normalizedStatus === 'delivered' && isPartialPayment && !paymentCompleted
@@ -4944,23 +4950,23 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                     : {}
             }>
               {normalizedStatus === 'awaiting'
-                ? 'Awaiting'
+                ? <Trans>Awaiting</Trans>
                 : normalizedStatus === 'accepted'
-                  ? 'Accepted'
+                  ? <Trans>Accepted</Trans>
                   : normalizedStatus === 'dispatched'
-                    ? 'Dispatched'
+                    ? <Trans>Dispatched</Trans>
                     : normalizedStatus === 'delivered'
                       ? (isPartialPayment && !paymentCompleted ? (
                         <>
-                          <span>Delivered</span>
-                          <span>Awaiting Payment</span>
+                          <span><Trans>Delivered</Trans></span>
+                          <span><Trans>Awaiting Payment</Trans></span>
                         </>
-                      ) : 'Delivered')
+                      ) : <Trans>Delivered</Trans>)
                       : normalizedStatus === 'fully_paid'
                         ? (
                           <>
-                            <span>Delivered</span>
-                            <span>Paid</span>
+                            <span><Trans>Delivered</Trans></span>
+                            <span><Trans>Paid</Trans></span>
                           </>
                         )
                         : order?.status}
@@ -4974,7 +4980,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                   fontWeight: '600',
                   textTransform: 'uppercase'
                 }}>
-                  Escalated
+                  <Trans>Escalated</Trans>
                 </span>
               )}
             </span>
@@ -4983,14 +4989,14 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
 
         {/* Customer Information */}
         <div style={{ padding: '16px', borderTop: '1px solid #E5E7EB' }}>
-          <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: '#1F2937' }}>Customer Information</h4>
+          <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: '#1F2937' }}><Trans>Customer Information</Trans></h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#4B5563' }}>
-            <p><strong>Name:</strong> {order?.userId?.name || order?.farmer || 'Unknown Customer'}</p>
-            <p><strong>Contact:</strong> {order?.userId?.phone || order?.customerPhone || 'N/A'}</p>
+            <p><strong><Trans>Name</Trans>:</strong> {order?.userId?.name || order?.farmer || 'Unknown Customer'}</p>
+            <p><strong><Trans>Contact</Trans>:</strong> {order?.userId?.phone || order?.customerPhone || 'N/A'}</p>
             {order?.deliveryAddress && (
               <>
-                <p><strong>Address:</strong> {order.deliveryAddress.address || 'N/A'}</p>
-                <p><strong>City:</strong> {order.deliveryAddress.city || 'N/A'}, {order.deliveryAddress.state || 'N/A'} - {order.deliveryAddress.pincode || 'N/A'}</p>
+                <p><strong><Trans>Address</Trans>:</strong> {order.deliveryAddress.address || 'N/A'}</p>
+                <p><strong><Trans>City</Trans>:</strong> {order.deliveryAddress.city || 'N/A'}, {order.deliveryAddress.state || 'N/A'} - {order.deliveryAddress.pincode || 'N/A'}</p>
               </>
             )}
           </div>
@@ -4999,7 +5005,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
         {/* Order Items */}
         {order?.items && order.items.length > 0 && (
           <div style={{ padding: '16px', borderTop: '1px solid #E5E7EB' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: '#1F2937' }}>Order Items</h4>
+            <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: '#1F2937' }}><Trans>Order Items</Trans></h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {order.items.map((item, index) => (
                 <div key={index} style={{
@@ -5008,8 +5014,8 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                   borderRadius: '8px',
                   fontSize: '14px'
                 }}>
-                  <p style={{ fontWeight: '600', marginBottom: '4px' }}>{item.productName || 'Product'}</p>
-                  <p style={{ color: '#6B7280' }}>Quantity: {item.quantity} × ₹{item.unitPrice?.toLocaleString('en-IN')} = ₹{item.totalPrice?.toLocaleString('en-IN')}</p>
+                  <p style={{ fontWeight: '600', marginBottom: '4px' }}>{item.productName || <Trans>Product</Trans>}</p>
+                  <p style={{ color: '#6B7280' }}><Trans>Quantity</Trans>: {item.quantity} × ₹{item.unitPrice?.toLocaleString('en-IN')} = ₹{item.totalPrice?.toLocaleString('en-IN')}</p>
                 </div>
               ))}
             </div>
@@ -5042,7 +5048,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
               fontSize: '12px',
               color: '#92400E'
             }}>
-              ⏰ Grace Period: {timeRemaining} minutes remaining. Confirm or escalate now.
+              ⏰ <Trans>{`Grace Period: ${timeRemaining} minutes remaining. Confirm or escalate now.`}</Trans>
             </div>
           )}
           {isInStatusUpdateGracePeriod && (
@@ -5055,7 +5061,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
               fontSize: '12px',
               color: '#1E40AF'
             }}>
-              ⏰ Status Update Grace Period: {statusUpdateTimeRemaining} minutes remaining. You can revert to "{previousStatus}" status.
+              ⏰ <Trans>{`Status Update Grace Period: ${statusUpdateTimeRemaining} minutes remaining. You can revert to "${previousStatus}" status.`}</Trans>
             </div>
           )}
 
@@ -5066,7 +5072,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
               className="orders-card__action is-primary"
               onClick={() => openPanel('order-available', { orderId: order.id || order._id })}
             >
-              Accept Order
+              <Trans>Accept Order</Trans>
             </button>
           )}
 
@@ -5082,7 +5088,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                 })
               }
             >
-              Update Status
+              <Trans>Update Status</Trans>
             </button>
           )}
 
@@ -5106,7 +5112,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                   }
                 }}
               >
-                Confirm Status Update
+                <Trans>Confirm Status Update</Trans>
               </button>
               {previousStatus && (
                 <button
@@ -5120,7 +5126,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                     })
                   }
                 >
-                  Revert to {previousStatus}
+                  <Trans>Revert to {previousStatus}</Trans>
                 </button>
               )}
             </>
@@ -5136,7 +5142,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                   onOpenEscalationModal?.(order)
                 }}
               >
-                Escalate All
+                <Trans>Escalate All</Trans>
               </button>
               <button
                 type="button"
@@ -5145,7 +5151,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                   onOpenPartialEscalationModal?.(order, 'items')
                 }}
               >
-                Partial Items
+                <Trans>Partial Items</Trans>
               </button>
               <button
                 type="button"
@@ -5154,7 +5160,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                   onOpenPartialEscalationModal?.(order, 'quantities')
                 }}
               >
-                Partial Qty
+                <Trans>Partial Qty</Trans>
               </button>
             </>
           )}
@@ -5167,14 +5173,14 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
                 className="orders-card__action is-primary"
                 onClick={() => openPanel('confirm-acceptance', { orderId: order.id || order._id })}
               >
-                Confirm Acceptance
+                <Trans>Confirm Acceptance</Trans>
               </button>
               <button
                 type="button"
                 className="orders-card__action is-secondary"
                 onClick={() => openPanel('cancel-acceptance', { orderId: order.id || order._id })}
               >
-                Cancel & Escalate
+                <Trans>Cancel & Escalate</Trans>
               </button>
             </>
           )}
@@ -5193,7 +5199,7 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
               justifyContent: 'center',
               gap: '6px'
             }}>
-              ✓ Paid
+              ✓ <Trans>Paid</Trans>
             </div>
           )}
         </div>
@@ -5278,15 +5284,15 @@ function CreditView({ openPanel }) {
   const credit = {
     outstanding: creditUsed > 0 ? formatCurrency(creditUsed) : '₹0',
     repaid: totalRepaid > 0 ? formatCurrency(totalRepaid) : '₹0',
-    penalty: penalty === 0 ? 'No penalty' : `₹${penalty.toLocaleString('en-IN')}`,
-    due: creditInfo.dueDate || dashboard.overview?.credit?.dueDate ? new Date(creditInfo.dueDate || dashboard.overview?.credit?.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set',
-    lastRepaymentDate: lastRepayment ? new Date(lastRepayment.paidAt || lastRepayment.transactionDate || lastRepayment.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Never',
+    penalty: penalty === 0 ? <Trans>No penalty</Trans> : `₹${penalty.toLocaleString('en-IN')}`,
+    due: creditInfo.dueDate || dashboard.overview?.credit?.dueDate ? new Date(creditInfo.dueDate || dashboard.overview?.credit?.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : <Trans>Not set</Trans>,
+    lastRepaymentDate: lastRepayment ? new Date(lastRepayment.paidAt || lastRepayment.transactionDate || lastRepayment.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : <Trans>Never</Trans>,
   }
 
   const creditMetrics = [
-    { label: 'Outstanding Credit', value: credit.outstanding, icon: CreditIcon, tone: 'success' },
-    { label: totalRepaid > 0 ? 'Total Repaid' : 'To Repay', value: totalRepaid > 0 ? credit.repaid : credit.outstanding, icon: WalletIcon, tone: 'success' },
-    { label: repaymentCount > 0 ? 'Last Repayment' : 'Due Date', value: repaymentCount > 0 ? credit.lastRepaymentDate : credit.due, icon: repaymentCount > 0 ? WalletIcon : ReportIcon, tone: repaymentCount > 0 ? 'success' : 'teal' },
+    { label: <Trans>Outstanding Credit</Trans>, value: credit.outstanding, icon: CreditIcon, tone: 'success' },
+    { label: totalRepaid > 0 ? <Trans>Total Repaid</Trans> : <Trans>To Repay</Trans>, value: totalRepaid > 0 ? credit.repaid : credit.outstanding, icon: WalletIcon, tone: 'success' },
+    { label: repaymentCount > 0 ? <Trans>Last Repayment</Trans> : <Trans>Due Date</Trans>, value: repaymentCount > 0 ? credit.lastRepaymentDate : credit.due, icon: repaymentCount > 0 ? WalletIcon : ReportIcon, tone: repaymentCount > 0 ? 'success' : 'teal' },
   ]
 
   // Get penalty rate for display
@@ -5294,21 +5300,21 @@ function CreditView({ openPanel }) {
 
   const penaltyTimeline = [
     {
-      period: 'Days 0-5',
-      title: 'Grace Period',
-      description: 'No penalties applied. Automated reminders will be sent.',
+      period: <Trans>Days 0-5</Trans>,
+      title: <Trans>Grace Period</Trans>,
+      description: <Trans>No penalties applied. Automated reminders will be sent.</Trans>,
       tone: 'success'
     },
     {
-      period: 'Days 6-10',
-      title: 'Penalty Period',
-      description: `${penaltyRate}% daily penalty applied. Finance team notified.`,
+      period: <Trans>Days 6-10</Trans>,
+      title: <Trans>Penalty Period</Trans>,
+      description: <Trans>{`${penaltyRate}% daily penalty applied. Finance team notified.`}</Trans>,
       tone: 'warn'
     },
     {
-      period: 'Days 11+',
-      title: 'Restrictions Active',
-      description: 'New credit orders blocked. Daily penalties continue until repayment.',
+      period: <Trans>Days 11+</Trans>,
+      title: <Trans>Restrictions Active</Trans>,
+      description: <Trans>New credit orders blocked. Daily penalties continue until repayment.</Trans>,
       tone: 'critical'
     },
   ]
@@ -5322,22 +5328,22 @@ function CreditView({ openPanel }) {
             <div className="credit-status-card__details">
               <div className="credit-status-card__amount">
                 <span className="credit-status-card__amount-value">{credit.outstanding}</span>
-                <span className="credit-status-card__amount-label">Outstanding Credit</span>
+                <span className="credit-status-card__amount-label"><Trans>Outstanding Credit</Trans></span>
               </div>
               <div className="credit-status-card__quick-info">
                 <div className="credit-status-card__info-item">
-                  <span className="credit-status-card__info-label">To Repay</span>
+                  <span className="credit-status-card__info-label"><Trans>To Repay</Trans></span>
                   <span className="credit-status-card__info-value">{credit.outstanding}</span>
                 </div>
                 {totalRepaid > 0 && (
                   <div className="credit-status-card__info-item">
-                    <span className="credit-status-card__info-label">Total Repaid</span>
+                    <span className="credit-status-card__info-label"><Trans>Total Repaid</Trans></span>
                     <span className="credit-status-card__info-value">{credit.repaid}</span>
                   </div>
                 )}
                 {repaymentCount > 0 && (
                   <div className="credit-status-card__info-item">
-                    <span className="credit-status-card__info-label">Repayments</span>
+                    <span className="credit-status-card__info-label"><Trans>Repayments</Trans></span>
                     <span className="credit-status-card__info-value">{repaymentCount}</span>
                   </div>
                 )}
@@ -5346,10 +5352,10 @@ function CreditView({ openPanel }) {
           </div>
           <div className="credit-status-card__footer">
             <div className="credit-status-card__status-badge">
-              <span className="credit-status-card__status-text">{credit.penalty === 'No penalty' ? 'No fine' : credit.penalty}</span>
+              <span className="credit-status-card__status-text">{credit.penalty === 'No penalty' ? <Trans>No fine</Trans> : credit.penalty}</span>
             </div>
             <button type="button" className="credit-status-card__action" onClick={() => openPanel('view-details')}>
-              View Details
+              <Trans>View Details</Trans>
             </button>
           </div>
         </div>
@@ -5358,7 +5364,7 @@ function CreditView({ openPanel }) {
       <section id="credit-summary" className="credit-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Credit Summary</h3>
+            <h3 className="overview-section__title"><Trans>Credit Summary</Trans></h3>
           </div>
         </div>
         <div className="credit-metric-grid">
@@ -5382,7 +5388,7 @@ function CreditView({ openPanel }) {
       <section id="credit-actions" className="credit-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Credit management</h3>
+            <h3 className="overview-section__title"><Trans>Credit management</Trans></h3>
           </div>
         </div>
         <div className="credit-action-grid">
@@ -5392,10 +5398,10 @@ function CreditView({ openPanel }) {
                 <span className="credit-action-card__icon">
                   <CreditIcon className="h-5 w-5" />
                 </span>
-                <h4 className="credit-action-card__title">Repay Credit</h4>
+                <h4 className="credit-action-card__title"><Trans>Repay Credit</Trans></h4>
               </header>
               <p className="credit-action-card__body">
-                Repay your outstanding credit to avoid penalties. Ensure you have added bank account details before proceeding.
+                <Trans>Repay your outstanding credit to avoid penalties. Ensure you have added bank account details before proceeding.</Trans>
               </p>
               <button
                 type="button"
@@ -5410,7 +5416,7 @@ function CreditView({ openPanel }) {
                   })
                 }}
               >
-                Repay Now
+                <Trans>Repay Now</Trans>
               </button>
             </div>
           )}
@@ -5420,7 +5426,7 @@ function CreditView({ openPanel }) {
       <section id="credit-penalty" className="credit-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Fine timeline</h3>
+            <h3 className="overview-section__title"><Trans>Fine timeline</Trans></h3>
           </div>
         </div>
         <div className="credit-timeline">
@@ -5448,7 +5454,7 @@ function CreditView({ openPanel }) {
         <section id="credit-repayments" className="credit-section">
           <div className="overview-section__header">
             <div>
-              <h3 className="overview-section__title">Recent repayments</h3>
+              <h3 className="overview-section__title"><Trans>Recent repayments</Trans></h3>
             </div>
           </div>
           <div className="overview-activity__list">
@@ -5472,12 +5478,12 @@ function CreditView({ openPanel }) {
                     </div>
                     <div className="overview-activity__meta">
                       <span>
-                        {repayment.status === 'completed' ? 'Completed' : repayment.status === 'pending' ? 'Pending' : repayment.status}
+                        {repayment.status === 'completed' ? <Trans>Completed</Trans> : repayment.status === 'pending' ? <Trans>Pending</Trans> : repayment.status}
                       </span>
                       <span>{formattedDate}</span>
                       {repayment.penaltyAmount > 0 && (
                         <span className="text-xs text-red-600">
-                          (Penalty: ₹{repayment.penaltyAmount.toLocaleString('en-IN')})
+                          <Trans>{`Penalty: ₹${repayment.penaltyAmount.toLocaleString('en-IN')}`}</Trans>
                         </span>
                       )}
                     </div>
@@ -5530,17 +5536,17 @@ function ReportsView({ onNavigate }) {
   const reportIcons = [ChartIcon, WalletIcon, CreditIcon, HomeIcon]
 
   const tabs = [
-    { id: 'revenue', label: 'Earnings Summary' },
-    { id: 'performance', label: 'Performance' },
-    { id: 'trends', label: 'Trends' },
-    { id: 'insights', label: 'Tips' },
+    { id: 'revenue', label: <Trans>Earnings Summary</Trans> },
+    { id: 'performance', label: <Trans>Performance</Trans> },
+    { id: 'trends', label: <Trans>Trends</Trans> },
+    { id: 'insights', label: <Trans>Tips</Trans> },
   ]
 
   const timePeriods = [
-    { id: 'week', label: '1 Week' },
-    { id: 'month', label: '1 Month' },
-    { id: 'year', label: '1 Year' },
-    { id: 'all', label: 'All Time' },
+    { id: 'week', label: <Trans>1 Week</Trans> },
+    { id: 'month', label: <Trans>1 Month</Trans> },
+    { id: 'year', label: <Trans>1 Year</Trans> },
+    { id: 'all', label: <Trans>All Time</Trans> },
   ]
 
   // Get reports data from state
@@ -5584,7 +5590,7 @@ function ReportsView({ onNavigate }) {
   const totalEarnings = earningsSummary?.totalEarnings || 0
   const orderCount = revenueData.orderCount || 0
   const averageOrderValue = revenueData.averageOrderValue || 0
-  const maxValue = Math.max(...chartData.revenue, ...chartData.orders)
+  const maxValue = Math.max(...chartData.revenue, ...chartData.orders, 1) // Default to 1 to avoid /0
   const yAxisSteps = 5
   const yAxisLabels = Array.from({ length: yAxisSteps + 1 }, (_, i) => {
     const value = (maxValue / yAxisSteps) * (yAxisSteps - i)
@@ -5603,7 +5609,7 @@ function ReportsView({ onNavigate }) {
               </div>
               <div className="reports-summary-card__stats">
                 <div className="reports-summary-card__stat">
-                  <span className="reports-summary-card__stat-label">Total Earnings</span>
+                  <span className="reports-summary-card__stat-label"><Trans>Total Earnings</Trans></span>
                   <span className="reports-summary-card__stat-value">
                     {totalEarnings >= 100000
                       ? `₹${(totalEarnings / 100000).toFixed(1)}L`
@@ -5613,7 +5619,7 @@ function ReportsView({ onNavigate }) {
                   </span>
                 </div>
                 <div className="reports-summary-card__stat">
-                  <span className="reports-summary-card__stat-label">Total Orders</span>
+                  <span className="reports-summary-card__stat-label"><Trans>Total Orders</Trans></span>
                   <span className="reports-summary-card__stat-value">{orderCount}</span>
                 </div>
               </div>
@@ -5622,19 +5628,19 @@ function ReportsView({ onNavigate }) {
               {orderCount > 0 && (
                 <div className="reports-summary-card__insight">
                   <span className="reports-summary-card__insight-icon">⚡</span>
-                  <span className="reports-summary-card__insight-text">{orderCount} orders completed this {timePeriod}</span>
+                  <span className="reports-summary-card__insight-text"><Trans>{`${orderCount} orders completed this ${timePeriod}`}</Trans></span>
                 </div>
               )}
               {averageOrderValue > 0 && (
                 <div className="reports-summary-card__insight">
                   <span className="reports-summary-card__insight-icon">📈</span>
-                  <span className="reports-summary-card__insight-text">Average order value: ₹{averageOrderValue.toLocaleString('en-IN')}</span>
+                  <span className="reports-summary-card__insight-text"><Trans>{`Average order value: ₹${averageOrderValue.toLocaleString('en-IN')}`}</Trans></span>
                 </div>
               )}
               {orderCount === 0 && (
                 <div className="reports-summary-card__insight">
                   <span className="reports-summary-card__insight-icon">ℹ️</span>
-                  <span className="reports-summary-card__insight-text">No orders data available for this period</span>
+                  <span className="reports-summary-card__insight-text"><Trans>No orders data available for this period</Trans></span>
                 </div>
               )}
             </div>
@@ -5645,14 +5651,14 @@ function ReportsView({ onNavigate }) {
       <section id="reports-metrics" className="reports-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Performance metrics</h3>
+            <h3 className="overview-section__title"><Trans>Performance metrics</Trans></h3>
           </div>
         </div>
         <div className="reports-metric-grid">
           {[
-            { label: 'Avg Order Value', value: averageOrderValue > 0 ? `₹${averageOrderValue.toLocaleString('en-IN')}` : '₹0', meta: 'Per order', icon: WalletIcon },
-            { label: 'Orders Completed', value: String(orderCount), meta: 'Delivered orders', icon: CreditIcon },
-            { label: 'Performance', value: orderCount > 0 ? 'Active' : 'No activity', meta: 'This period', icon: HomeIcon },
+            { label: <Trans>Avg Order Value</Trans>, value: averageOrderValue > 0 ? `₹${averageOrderValue.toLocaleString('en-IN')}` : '₹0', meta: <Trans>Per order</Trans>, icon: WalletIcon },
+            { label: <Trans>Orders Completed</Trans>, value: String(orderCount), meta: <Trans>Delivered orders</Trans>, icon: CreditIcon },
+            { label: <Trans>Performance</Trans>, value: orderCount > 0 ? <Trans>Active</Trans> : <Trans>No activity</Trans>, meta: <Trans>This period</Trans>, icon: HomeIcon },
           ].map((metric, index) => {
             const Icon = metric.icon || reportIcons[index % reportIcons.length]
             return (
@@ -5691,12 +5697,12 @@ function ReportsView({ onNavigate }) {
                 <div className="reports-analytics-card__header">
                   <div className="reports-analytics-card__header-top">
                     <div>
-                      <h4 className="reports-analytics-card__title">Earnings from orders</h4>
+                      <h4 className="reports-analytics-card__title"><Trans>Earnings from orders</Trans></h4>
                       <span className="reports-analytics-card__subtitle">
-                        {timePeriod === 'week' && 'Last 7 days'}
-                        {timePeriod === 'month' && 'Last 30 days'}
-                        {timePeriod === 'year' && 'Last 12 months'}
-                        {timePeriod === 'all' && 'From start'}
+                        {timePeriod === 'week' && <Trans>Last 7 days</Trans>}
+                        {timePeriod === 'month' && <Trans>Last 30 days</Trans>}
+                        {timePeriod === 'year' && <Trans>Last 12 months</Trans>}
+                        {timePeriod === 'all' && <Trans>From start</Trans>}
                       </span>
                     </div>
                     <div className="reports-time-period-selector">
@@ -5721,11 +5727,11 @@ function ReportsView({ onNavigate }) {
                     <div className="reports-line-chart__legend">
                       <div className="reports-line-chart__legend-item">
                         <span className="reports-line-chart__legend-dot is-revenue" />
-                        <span className="reports-line-chart__legend-label">Earnings (₹L)</span>
+                        <span className="reports-line-chart__legend-label"><Trans>Earnings (₹L)</Trans></span>
                       </div>
                       <div className="reports-line-chart__legend-item">
                         <span className="reports-line-chart__legend-dot is-orders" />
-                        <span className="reports-line-chart__legend-label">Orders</span>
+                        <span className="reports-line-chart__legend-label"><Trans>Orders</Trans></span>
                       </div>
                     </div>
                     <div className="reports-line-chart__container">
@@ -5839,22 +5845,22 @@ function ReportsView({ onNavigate }) {
                     </div>
                     <div className="reports-line-chart__stats">
                       <div className="reports-line-chart__stat">
-                        <span className="reports-line-chart__stat-label">Earnings</span>
+                        <span className="reports-line-chart__stat-label"><Trans>Earnings</Trans></span>
                         <span className="reports-line-chart__stat-value">
-                          {(
+                          {chartData.revenue.length > 0 ? (
                             chartData.revenue.reduce((a, b) => a + b, 0) /
                             chartData.revenue.length
-                          ).toFixed(1)}
+                          ).toFixed(1) : '0.0'}
                           {timePeriod === 'year' || timePeriod === 'all' ? 'k' : ''} ₹L
                         </span>
                         <span className="reports-line-chart__stat-change is-positive">+12.5%</span>
                       </div>
                       <div className="reports-line-chart__stat">
-                        <span className="reports-line-chart__stat-label">Orders</span>
+                        <span className="reports-line-chart__stat-label"><Trans>Orders</Trans></span>
                         <span className="reports-line-chart__stat-value">
-                          {Math.round(
+                          {chartData.orders.length > 0 ? Math.round(
                             chartData.orders.reduce((a, b) => a + b, 0) / chartData.orders.length,
-                          )}
+                          ) : 0}
                         </span>
                         <span className="reports-line-chart__stat-change is-positive">+8.3%</span>
                       </div>
@@ -5868,27 +5874,27 @@ function ReportsView({ onNavigate }) {
             <div className="reports-tab-panel is-active">
               <div className="reports-analytics-card">
                 <div className="reports-analytics-card__header">
-                  <span className="reports-analytics-card__badge">Last 30 days</span>
-                  <h4 className="reports-analytics-card__title">Order delivery performance</h4>
+                  <span className="reports-analytics-card__badge"><Trans>Last 30 days</Trans></span>
+                  <h4 className="reports-analytics-card__title"><Trans>Order delivery performance</Trans></h4>
                 </div>
                 <div className="reports-analytics-card__chart">
                   <div className="reports-chart">
                     <div className="reports-chart__legend">
                       <div className="reports-chart__legend-item">
                         <span className="reports-chart__legend-dot is-revenue" />
-                        <span className="reports-chart__legend-label">On-time delivery</span>
+                        <span className="reports-chart__legend-label"><Trans>On-time delivery</Trans></span>
                       </div>
                       <div className="reports-chart__legend-item">
                         <span className="reports-chart__legend-dot is-fulfilment" />
-                        <span className="reports-chart__legend-label">Average delay</span>
+                        <span className="reports-chart__legend-label"><Trans>Average delay</Trans></span>
                       </div>
                     </div>
                     <div className="reports-chart__bars">
                       {[
-                        { label: 'Week 1', revenue: 92, fulfilment: 8 },
-                        { label: 'Week 2', revenue: 88, fulfilment: 12 },
-                        { label: 'Week 3', revenue: 95, fulfilment: 5 },
-                        { label: 'Week 4', revenue: 90, fulfilment: 10 },
+                        { label: <Trans>Week 1</Trans>, revenue: 92, fulfilment: 8 },
+                        { label: <Trans>Week 2</Trans>, revenue: 88, fulfilment: 12 },
+                        { label: <Trans>Week 3</Trans>, revenue: 95, fulfilment: 5 },
+                        { label: <Trans>Week 4</Trans>, revenue: 90, fulfilment: 10 },
                       ].map((week, index) => (
                         <div key={index} className="reports-chart__bar-group">
                           <div className="reports-chart__bar-container">
@@ -5907,15 +5913,15 @@ function ReportsView({ onNavigate }) {
                 </div>
                 <div className="reports-performance-metrics">
                   <div className="reports-performance-metric">
-                    <span className="reports-performance-metric__label">Average time to deliver</span>
+                    <span className="reports-performance-metric__label"><Trans>Average time to deliver</Trans></span>
                     <span className="reports-performance-metric__value">18.5h</span>
                   </div>
                   <div className="reports-performance-metric">
-                    <span className="reports-performance-metric__label">Order correctness</span>
+                    <span className="reports-performance-metric__label"><Trans>Order correctness</Trans></span>
                     <span className="reports-performance-metric__value">96.2%</span>
                   </div>
                   <div className="reports-performance-metric">
-                    <span className="reports-performance-metric__label">Customer rating</span>
+                    <span className="reports-performance-metric__label"><Trans>Customer rating</Trans></span>
                     <span className="reports-performance-metric__value">4.7/5</span>
                   </div>
                 </div>
@@ -5926,26 +5932,26 @@ function ReportsView({ onNavigate }) {
             <div className="reports-tab-panel is-active">
               <div className="reports-analytics-card">
                 <div className="reports-analytics-card__header">
-                  <span className="reports-analytics-card__badge">Last 3 months</span>
-                  <h4 className="reports-analytics-card__title">Growth summary</h4>
+                  <span className="reports-analytics-card__badge"><Trans>Last 3 months</Trans></span>
+                  <h4 className="reports-analytics-card__title"><Trans>Growth summary</Trans></h4>
                 </div>
                 <div className="reports-analytics-card__chart">
                   <div className="reports-chart">
                     <div className="reports-chart__legend">
                       <div className="reports-chart__legend-item">
                         <span className="reports-chart__legend-dot is-revenue" />
-                        <span className="reports-chart__legend-label">Number of orders</span>
+                        <span className="reports-chart__legend-label"><Trans>Number of orders</Trans></span>
                       </div>
                       <div className="reports-chart__legend-item">
                         <span className="reports-chart__legend-dot is-fulfilment" />
-                        <span className="reports-chart__legend-label">Earnings growth</span>
+                        <span className="reports-chart__legend-label"><Trans>Earnings growth</Trans></span>
                       </div>
                     </div>
                     <div className="reports-chart__bars">
                       {[
-                        { label: 'Month 1', revenue: 68, fulfilment: 72 },
-                        { label: 'Month 2', revenue: 75, fulfilment: 78 },
-                        { label: 'Month 3', revenue: 82, fulfilment: 85 },
+                        { label: <Trans>Month 1</Trans>, revenue: 68, fulfilment: 72 },
+                        { label: <Trans>Month 2</Trans>, revenue: 75, fulfilment: 78 },
+                        { label: <Trans>Month 3</Trans>, revenue: 82, fulfilment: 85 },
                       ].map((month, index) => (
                         <div key={index} className="reports-chart__bar-group">
                           <div className="reports-chart__bar-container">
@@ -5966,15 +5972,15 @@ function ReportsView({ onNavigate }) {
                   <div className="reports-trend-item">
                     <span className="reports-trend-item__icon">📈</span>
                     <div className="reports-trend-item__content">
-                      <span className="reports-trend-item__label">Busy season coming</span>
-                      <span className="reports-trend-item__value">+24% expected growth</span>
+                      <span className="reports-trend-item__label"><Trans>Busy season coming</Trans></span>
+                      <span className="reports-trend-item__value"><Trans>+24% expected growth</Trans></span>
                     </div>
                   </div>
                   <div className="reports-trend-item">
                     <span className="reports-trend-item__icon">🌾</span>
                     <div className="reports-trend-item__content">
-                      <span className="reports-trend-item__label">Top product category</span>
-                      <span className="reports-trend-item__value">Organic fertilizers</span>
+                      <span className="reports-trend-item__label"><Trans>Top product category</Trans></span>
+                      <span className="reports-trend-item__value"><Trans>Organic fertilizers</Trans></span>
                     </div>
                   </div>
                 </div>
@@ -5985,43 +5991,43 @@ function ReportsView({ onNavigate }) {
             <div className="reports-tab-panel is-active">
               <div className="reports-analytics-card">
                 <div className="reports-analytics-card__header">
-                  <span className="reports-analytics-card__badge">Smart suggestions</span>
-                  <h4 className="reports-analytics-card__title">Important tips</h4>
+                  <span className="reports-analytics-card__badge"><Trans>Smart suggestions</Trans></span>
+                  <h4 className="reports-analytics-card__title"><Trans>Important tips</Trans></h4>
                 </div>
                 <div className="reports-insights-list">
                   <div className="reports-insight-card">
                     <div className="reports-insight-card__icon is-success">✓</div>
                     <div className="reports-insight-card__content">
-                      <h5 className="reports-insight-card__title">Manage stock better</h5>
+                      <h5 className="reports-insight-card__title"><Trans>Manage stock better</Trans></h5>
                       <p className="reports-insight-card__description">
-                        Your top 3 products show 15% higher demand. Consider increasing stock by 20% to meet busy season.
+                        <Trans>Your top 3 products show 15% higher demand. Consider increasing stock by 20% to meet busy season.</Trans>
                       </p>
                     </div>
                   </div>
                   <div className="reports-insight-card">
                     <div className="reports-insight-card__icon is-warn">⚠</div>
                     <div className="reports-insight-card__content">
-                      <h5 className="reports-insight-card__title">Faster delivery</h5>
+                      <h5 className="reports-insight-card__title"><Trans>Faster delivery</Trans></h5>
                       <p className="reports-insight-card__description">
-                        Western hub routes show 8% delay. Consider other delivery partners for faster delivery.
+                        <Trans>Western hub routes show 8% delay. Consider other delivery partners for faster delivery.</Trans>
                       </p>
                     </div>
                   </div>
                   <div className="reports-insight-card">
                     <div className="reports-insight-card__icon is-info">💡</div>
                     <div className="reports-insight-card__content">
-                      <h5 className="reports-insight-card__title">Credit usage</h5>
+                      <h5 className="reports-insight-card__title"><Trans>Credit usage</Trans></h5>
                       <p className="reports-insight-card__description">
-                        Your credit usage is good at 68%. You can safely increase number of orders by 25% without risk.
+                        <Trans>Your credit usage is good at 68%. You can safely increase number of orders by 25% without risk.</Trans>
                       </p>
                     </div>
                   </div>
                   <div className="reports-insight-card">
                     <div className="reports-insight-card__icon is-success">📊</div>
                     <div className="reports-insight-card__content">
-                      <h5 className="reports-insight-card__title">Repeat customers</h5>
+                      <h5 className="reports-insight-card__title"><Trans>Repeat customers</Trans></h5>
                       <p className="reports-insight-card__description">
-                        Repeat orders increased by 12% this month. Focus on maintaining quality standards.
+                        <Trans>Repeat orders increased by 12% this month. Focus on maintaining quality standards.</Trans>
                       </p>
                     </div>
                   </div>
@@ -6082,7 +6088,7 @@ function EarningsView({ openPanel, onNavigate }) {
       if (ordersResult.data?.earningsByOrder) setEarningsByOrders(ordersResult.data.earningsByOrder)
       if (withdrawalsResult.data?.withdrawals) setWithdrawals(withdrawalsResult.data.withdrawals)
     } catch (err) {
-      error('Failed to load earnings data')
+      error(<Trans>Failed to load earnings data</Trans>)
     } finally {
       setLoading(false)
     }
@@ -6101,7 +6107,7 @@ function EarningsView({ openPanel, onNavigate }) {
   }
 
   const formatDate = (date) => {
-    if (!date) return 'N/A'
+    if (!date) return translate('N/A')
     return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
   }
 
@@ -6110,7 +6116,7 @@ function EarningsView({ openPanel, onNavigate }) {
       <div className="earnings-view space-y-6">
         <div className="credit-status-card">
           <div className="credit-status-card__main">
-            <p>Loading earnings data...</p>
+            <p><Trans>Loading earnings data...</Trans></p>
           </div>
         </div>
       </div>
@@ -6127,10 +6133,10 @@ function EarningsView({ openPanel, onNavigate }) {
   }
 
   const earningsMetrics = [
-    { label: 'Available Balance', value: formatCurrency(summary.availableBalance), icon: SparkIcon, tone: 'success' },
-    { label: 'Total Withdrawn', value: formatCurrency(summary.totalWithdrawn || 0), icon: WalletIcon, tone: 'info' },
-    { label: 'Pending Withdrawal', value: formatCurrency(summary.pendingWithdrawal), icon: CreditIcon, tone: 'warn' },
-    { label: 'This Month', value: formatCurrency(summary.thisMonthEarnings), icon: ChartIcon, tone: 'teal' },
+    { label: <Trans>Available Balance</Trans>, value: formatCurrency(summary.availableBalance), icon: SparkIcon, tone: 'success' },
+    { label: <Trans>Total Withdrawn</Trans>, value: formatCurrency(summary.totalWithdrawn || 0), icon: WalletIcon, tone: 'info' },
+    { label: <Trans>Pending Withdrawal</Trans>, value: formatCurrency(summary.pendingWithdrawal), icon: CreditIcon, tone: 'warn' },
+    { label: <Trans>This Month</Trans>, value: formatCurrency(summary.thisMonthEarnings), icon: ChartIcon, tone: 'teal' },
   ]
 
   return (
@@ -6168,25 +6174,25 @@ function EarningsView({ openPanel, onNavigate }) {
                       ? Math.round((summary.availableBalance / summary.totalEarnings) * 100)
                       : 0}%
                   </span>
-                  <span className="credit-status-card__progress-label">Available</span>
+                  <span className="credit-status-card__progress-label"><Trans>Available</Trans></span>
                 </div>
               </div>
               <div className="credit-status-card__details">
                 <div className="credit-status-card__amount">
                   <span className="credit-status-card__amount-value">{formatCurrency(summary.totalEarnings)}</span>
-                  <span className="credit-status-card__amount-label">Total Earnings</span>
+                  <span className="credit-status-card__amount-label"><Trans>Total Earnings</Trans></span>
                 </div>
                 <div className="credit-status-card__quick-info">
                   <div className="credit-status-card__info-item">
-                    <span className="credit-status-card__info-label">Available</span>
+                    <span className="credit-status-card__info-label"><Trans>Available</Trans></span>
                     <span className="credit-status-card__info-value">{formatCurrency(summary.availableBalance)}</span>
                   </div>
                   <div className="credit-status-card__info-item">
-                    <span className="credit-status-card__info-label">Withdrawn</span>
+                    <span className="credit-status-card__info-label"><Trans>Withdrawn</Trans></span>
                     <span className="credit-status-card__info-value">{formatCurrency(summary.totalWithdrawn || 0)}</span>
                   </div>
                   <div className="credit-status-card__info-item">
-                    <span className="credit-status-card__info-label">Pending</span>
+                    <span className="credit-status-card__info-label"><Trans>Pending</Trans></span>
                     <span className="credit-status-card__info-value">{formatCurrency(summary.pendingWithdrawal)}</span>
                   </div>
                 </div>
@@ -6197,8 +6203,8 @@ function EarningsView({ openPanel, onNavigate }) {
             <div className="credit-status-card__status-badge">
               <span className="credit-status-card__status-text">
                 {summary.lastWithdrawalDate
-                  ? `Last withdrawal: ${formatDate(summary.lastWithdrawalDate)}`
-                  : 'No withdrawals yet'}
+                  ? <Trans>{`Last withdrawal: ${formatDate(summary.lastWithdrawalDate)}`}</Trans>
+                  : <Trans>No withdrawals yet</Trans>}
               </span>
             </div>
             <button
@@ -6206,14 +6212,21 @@ function EarningsView({ openPanel, onNavigate }) {
               className="credit-status-card__action"
               onClick={() => {
                 if (bankAccounts.length === 0) {
-                  error('Please add a bank account before requesting withdrawal')
+                  error(<Trans>Please add a bank account before requesting withdrawal</Trans>)
                   return
                 }
 
                 // Prepare bank account options for the select field
                 const bankAccountOptions = bankAccounts.map((account) => ({
                   value: account._id || account.id,
-                  label: `${account.accountHolderName} - ${account.bankName} (${account.accountNumber.slice(-4)})${account.isPrimary ? ' - Primary' : ''}`,
+                  label: translate('{{name}} - {{bank}} ({{last4}}){{primary}}', {
+                    name: account.accountHolderName,
+                    bank: account.bankName,
+                    last4: account.accountNumber && account.accountNumber.length >= 4
+                      ? account.accountNumber.slice(-4)
+                      : (account.accountNumber || 'N/A'),
+                    primary: account.isPrimary ? ` - ${translate('Primary')}` : '',
+                  }),
                 }))
 
                 // Set default to primary account if available
@@ -6230,14 +6243,14 @@ function EarningsView({ openPanel, onNavigate }) {
               }}
               disabled={summary.availableBalance < 1000 || bankAccounts.length === 0}
             >
-              Request Withdrawal
+              <Trans>Request Withdrawal</Trans>
             </button>
           </div>
           {bankAccounts.length === 0 && (
             <div style={{ marginTop: '1rem', padding: '1rem', background: '#fef3c7', borderRadius: '0.5rem', fontSize: '0.875rem', color: '#92400e' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <p style={{ margin: 0 }}>
-                  <strong>No bank account added.</strong> Please add a bank account to request withdrawals.
+                  <strong><Trans>No bank account added.</Trans></strong> <Trans>Please add a bank account to request withdrawals.</Trans>
                 </p>
                 <button
                   type="button"
@@ -6257,7 +6270,7 @@ function EarningsView({ openPanel, onNavigate }) {
                   onMouseEnter={(e) => e.target.style.background = '#157a4d'}
                   onMouseLeave={(e) => e.target.style.background = '#1b8f5b'}
                 >
-                  Add Bank Account
+                  <Trans>Add Bank Account</Trans>
                 </button>
               </div>
             </div>
@@ -6269,7 +6282,7 @@ function EarningsView({ openPanel, onNavigate }) {
       <section id="earnings-metrics" className="credit-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Earnings Summary</h3>
+            <h3 className="overview-section__title"><Trans>Earnings Summary</Trans></h3>
           </div>
         </div>
         <div className="credit-metric-grid">
@@ -6299,7 +6312,7 @@ function EarningsView({ openPanel, onNavigate }) {
       <section id="earnings-tabs" className="credit-section">
         <div className="overview-section__header">
           <div>
-            <h3 className="overview-section__title">Earnings Details</h3>
+            <h3 className="overview-section__title"><Trans>Earnings Details</Trans></h3>
           </div>
         </div>
         <div className="credit-action-grid credit-action-grid--scrollable">
@@ -6312,7 +6325,7 @@ function EarningsView({ openPanel, onNavigate }) {
               <span className="credit-action-card__icon">
                 <ReportIcon className="h-5 w-5" />
               </span>
-              <h4 className="credit-action-card__title">History</h4>
+              <h4 className="credit-action-card__title"><Trans>History</Trans></h4>
             </header>
           </button>
           <button
@@ -6324,7 +6337,7 @@ function EarningsView({ openPanel, onNavigate }) {
               <span className="credit-action-card__icon">
                 <CartIcon className="h-5 w-5" />
               </span>
-              <h4 className="credit-action-card__title">By Orders</h4>
+              <h4 className="credit-action-card__title"><Trans>By Orders</Trans></h4>
             </header>
           </button>
           <button
@@ -6336,7 +6349,7 @@ function EarningsView({ openPanel, onNavigate }) {
               <span className="credit-action-card__icon">
                 <WalletIcon className="h-5 w-5" />
               </span>
-              <h4 className="credit-action-card__title">Withdrawals</h4>
+              <h4 className="credit-action-card__title"><Trans>Withdrawals</Trans></h4>
             </header>
           </button>
         </div>
@@ -6347,12 +6360,12 @@ function EarningsView({ openPanel, onNavigate }) {
         <section id="earnings-history" className="credit-section">
           <div className="overview-section__header">
             <div>
-              <h3 className="overview-section__title">Earnings History</h3>
+              <h3 className="overview-section__title"><Trans>Earnings History</Trans></h3>
             </div>
           </div>
           {earningsHistory.length === 0 ? (
             <div className="credit-usage-card">
-              <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No earnings history yet</p>
+              <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}><Trans>No earnings history yet</Trans></p>
             </div>
           ) : (
             <div className="credit-usage-card">
@@ -6370,10 +6383,10 @@ function EarningsView({ openPanel, onNavigate }) {
                   >
                     <div>
                       <p style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
-                        {earning.productName || 'Product'}
+                        <TransText>{earning.productName || 'Product'}</TransText>
                       </p>
                       <p style={{ fontSize: '0.875rem', color: '#666' }}>
-                        Order: {earning.orderId?.orderNumber || 'N/A'} • Qty: {earning.quantity}
+                        <TransText>{`Order: ${earning.orderId?.orderNumber || 'N/A'} • Qty: ${earning.quantity}`}</TransText>
                       </p>
                       <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
                         {formatDate(earning.processedAt)}
@@ -6382,7 +6395,7 @@ function EarningsView({ openPanel, onNavigate }) {
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ fontWeight: '600', color: '#10b981' }}>{formatCurrency(earning.earnings)}</p>
                       <p style={{ fontSize: '0.75rem', color: '#666' }}>
-                        {formatCurrency(earning.userPrice - earning.vendorPrice)} per unit
+                        <TransText>{`${formatCurrency(earning.userPrice - earning.vendorPrice)} per unit`}</TransText>
                       </p>
                     </div>
                   </div>
@@ -6398,12 +6411,12 @@ function EarningsView({ openPanel, onNavigate }) {
         <section id="earnings-orders" className="credit-section">
           <div className="overview-section__header">
             <div>
-              <h3 className="overview-section__title">Earnings by Orders</h3>
+              <h3 className="overview-section__title"><Trans>Earnings by Orders</Trans></h3>
             </div>
           </div>
           {earningsByOrders.length === 0 ? (
             <div className="credit-usage-card">
-              <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No earnings from orders yet</p>
+              <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}><Trans>No earnings from orders yet</Trans></p>
             </div>
           ) : (
             <div className="credit-usage-card">
@@ -6421,10 +6434,10 @@ function EarningsView({ openPanel, onNavigate }) {
                   >
                     <div>
                       <p style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
-                        {orderEarning.orderNumber || 'Order'}
+                        {orderEarning.orderNumber || <Trans>Order</Trans>}
                       </p>
                       <p style={{ fontSize: '0.875rem', color: '#666' }}>
-                        {orderEarning.itemCount} item{orderEarning.itemCount !== 1 ? 's' : ''}
+                        <Trans>{`${orderEarning.itemCount} item${orderEarning.itemCount !== 1 ? 's' : ''}`}</Trans>
                       </p>
                       <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
                         {formatDate(orderEarning.processedAt)}
@@ -6435,7 +6448,7 @@ function EarningsView({ openPanel, onNavigate }) {
                         {formatCurrency(orderEarning.totalEarnings)}
                       </p>
                       <p style={{ fontSize: '0.75rem', color: '#666' }}>
-                        Order: {formatCurrency(orderEarning.orderTotal)}
+                        <Trans>{`Order: ${formatCurrency(orderEarning.orderTotal)}`}</Trans>
                       </p>
                     </div>
                   </div>
@@ -6451,12 +6464,12 @@ function EarningsView({ openPanel, onNavigate }) {
         <section id="earnings-withdrawals" className="credit-section">
           <div className="overview-section__header">
             <div>
-              <h3 className="overview-section__title">Withdrawal History</h3>
+              <h3 className="overview-section__title"><Trans>Withdrawal History</Trans></h3>
             </div>
           </div>
           {withdrawals.length === 0 ? (
             <div className="credit-usage-card">
-              <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No withdrawal requests yet</p>
+              <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}><Trans>No withdrawal requests yet</Trans></p>
             </div>
           ) : (
             <div className="credit-usage-card">
@@ -6467,10 +6480,10 @@ function EarningsView({ openPanel, onNavigate }) {
                     : withdrawal.status === 'rejected'
                       ? '#ef4444'
                       : '#f59e0b'
-                  const statusText = withdrawal.status === 'approved' ? 'Approved'
-                    : withdrawal.status === 'completed' ? 'Completed'
-                      : withdrawal.status === 'rejected' ? 'Rejected'
-                        : 'Pending'
+                  const statusText = withdrawal.status === 'approved' ? <Trans>Approved</Trans>
+                    : withdrawal.status === 'completed' ? <Trans>Completed</Trans>
+                      : withdrawal.status === 'rejected' ? <Trans>Rejected</Trans>
+                        : <Trans>Pending</Trans>
                   return (
                     <div
                       key={withdrawal._id || withdrawal.id}
@@ -6484,10 +6497,10 @@ function EarningsView({ openPanel, onNavigate }) {
                     >
                       <div>
                         <p style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
-                          Withdrawal Request
+                          <Trans>Withdrawal Request</Trans>
                         </p>
                         <p style={{ fontSize: '0.875rem', color: '#666' }}>
-                          {withdrawal.bankAccountId?.bankName || 'Bank'} • {withdrawal.bankAccountId?.accountNumber ? `****${withdrawal.bankAccountId.accountNumber.slice(-4)}` : 'N/A'}
+                          <TransText>{withdrawal.bankAccountId?.bankName || 'Bank'}</TransText> • {withdrawal.bankAccountId?.accountNumber ? `****${withdrawal.bankAccountId.accountNumber.slice(-4)}` : <Trans>N/A</Trans>}
                         </p>
                         <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
                           {formatDate(withdrawal.reviewedAt || withdrawal.createdAt)}
@@ -6500,7 +6513,7 @@ function EarningsView({ openPanel, onNavigate }) {
                         </p>
                         {withdrawal.paymentReference && (
                           <p style={{ fontSize: '0.7rem', color: '#999', marginTop: '0.25rem' }}>
-                            Ref: {withdrawal.paymentReference.slice(-8)}
+                            <Trans>{`Ref: ${withdrawal.paymentReference.slice(-8)}`}</Trans>
                           </p>
                         )}
                       </div>
@@ -6520,7 +6533,7 @@ function EarningsView({ openPanel, onNavigate }) {
             isOpen={showBankAccountForm}
             onClose={() => setShowBankAccountForm(false)}
             onSuccess={async (bankAccount) => {
-              success('Bank account added successfully!')
+              success(<Trans>Bank account added successfully!</Trans>)
               // Reload bank accounts
               await loadBankAccounts()
               setShowBankAccountForm(false)

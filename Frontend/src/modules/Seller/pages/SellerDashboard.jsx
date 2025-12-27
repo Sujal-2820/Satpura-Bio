@@ -26,32 +26,32 @@ import { TransText } from '../../../components/TransText'
 const NAV_ITEMS = [
   {
     id: 'overview',
-    label: 'Overview',
-    description: 'Target, wallet, stats',
+    label: <Trans>Overview</Trans>,
+    description: <Trans>Target, wallet, stats</Trans>,
     icon: HomeIcon,
   },
   {
     id: 'referrals',
-    label: 'Referrals',
-    description: 'Your referral network',
+    label: <Trans>Referrals</Trans>,
+    description: <Trans>Network & commission</Trans>,
     icon: UsersIcon,
   },
   {
     id: 'wallet',
-    label: 'Wallet',
-    description: 'Balance & transactions',
+    label: <Trans>Wallet</Trans>,
+    description: <Trans>Withdrawals & history</Trans>,
     icon: WalletIcon,
   },
   {
     id: 'announcements',
-    label: 'Updates',
-    description: 'Admin announcements',
+    label: <Trans>Updates</Trans>,
+    description: <Trans>Admin announcements</Trans>,
     icon: BellIcon,
   },
   {
     id: 'profile',
-    label: 'Profile',
-    description: 'Settings & account',
+    label: <Trans>Profile</Trans>,
+    description: <Trans>Settings & account</Trans>,
     icon: UserIcon,
   },
 ]
@@ -142,9 +142,9 @@ export function SellerDashboard({ onLogout }) {
     })),
     {
       id: 'logout',
-      label: 'Sign out',
+      label: <Trans>Sign out</Trans>,
       icon: <MenuIcon className="h-4 w-4" />,
-      description: 'Log out from IRA Partner account',
+      description: <Trans>Log out from IRA Partner account</Trans>,
       onSelect: () => {
         handleLogout()
         close()
@@ -212,8 +212,15 @@ export function SellerDashboard({ onLogout }) {
     }, 260)
   }
 
+  const formatCurrency = (amount) => {
+    if (typeof amount === 'number') {
+      return amount >= 100000 ? <><Trans>₹</Trans>{(amount / 100000).toFixed(1)} <Trans>L</Trans></> : `₹${amount.toLocaleString('en-IN')}`
+    }
+    return amount || '₹0'
+  }
+
   const handleWithdrawalSuccess = async (data) => {
-    success(`Withdrawal request of ₹${data.amount.toLocaleString('en-IN')} submitted successfully!`)
+    success(<Trans>Withdrawal request of {formatCurrency(data.amount)} submitted successfully!</Trans>)
     // Refresh wallet data and dashboard
     await fetchWalletData()
     await fetchDashboardOverview()
@@ -224,11 +231,11 @@ export function SellerDashboard({ onLogout }) {
   }
 
   const handleShareCopy = (text) => {
-    success('Copied to clipboard!')
+    success(<Trans>Copied to clipboard!</Trans>)
   }
 
   const handleBankAccountSuccess = async (bankAccount) => {
-    success('Bank account added successfully!')
+    success(<Trans>Bank account added successfully!</Trans>)
     // Refresh wallet data and dashboard
     await fetchWalletData()
     await fetchDashboardOverview()
@@ -322,70 +329,70 @@ export function SellerDashboard({ onLogout }) {
       [
         {
           id: 'search-overview-hero',
-          label: 'My Earnings',
+          label: <Trans>My Earnings</Trans>,
           keywords: ['earnings', 'wallet', 'balance', 'money', 'income', 'revenue'],
           tab: 'overview',
           targetId: 'seller-overview-hero',
         },
         {
           id: 'search-overview-services',
-          label: 'Quick Actions',
+          label: <Trans>Quick Actions</Trans>,
           keywords: ['actions', 'shortcuts', 'share', 'referrals', 'quick'],
           tab: 'overview',
           targetId: 'seller-overview-services',
         },
         {
           id: 'search-overview-activity',
-          label: 'Recent Activity',
+          label: <Trans>Recent Activity</Trans>,
           keywords: ['activity', 'recent', 'transactions', 'updates', 'history'],
           tab: 'overview',
           targetId: 'seller-overview-activity',
         },
         {
           id: 'search-overview-snapshot',
-          label: 'My Stats',
+          label: <Trans>My Stats</Trans>,
           keywords: ['stats', 'summary', 'metrics', 'numbers', 'performance'],
           tab: 'overview',
           targetId: 'seller-overview-snapshot',
         },
         {
           id: 'search-overview-target',
-          label: 'My Target',
+          label: <Trans>My Target</Trans>,
           keywords: ['target', 'goal', 'progress', 'monthly', 'aim'],
           tab: 'overview',
           targetId: 'seller-target-progress',
         },
         {
           id: 'search-referrals',
-          label: 'My Referrals',
+          label: <Trans>My Referrals</Trans>,
           keywords: ['referrals', 'users', 'people', 'commission', 'sales'],
           tab: 'referrals',
           targetId: null,
         },
         {
           id: 'search-wallet',
-          label: 'My Wallet',
+          label: <Trans>My Wallet</Trans>,
           keywords: ['wallet', 'balance', 'money', 'transactions', 'withdrawal', 'commission'],
           tab: 'wallet',
           targetId: null,
         },
         {
           id: 'search-announcements',
-          label: 'Updates',
+          label: <Trans>Updates</Trans>,
           keywords: ['updates', 'announcements', 'news', 'notifications', 'messages'],
           tab: 'announcements',
           targetId: null,
         },
         {
           id: 'search-performance',
-          label: 'My Performance',
+          label: <Trans>My Performance</Trans>,
           keywords: ['performance', 'reports', 'analytics', 'insights', 'progress'],
           tab: 'performance',
           targetId: null,
         },
         {
           id: 'search-profile',
-          label: 'My Profile',
+          label: <Trans>My Profile</Trans>,
           keywords: ['profile', 'account', 'settings', 'seller id', 'info'],
           tab: 'profile',
           targetId: null,
@@ -453,8 +460,8 @@ export function SellerDashboard({ onLogout }) {
   return (
     <>
       <MobileShell
-        title={`Hello ${welcomeName}`}
-        subtitle={profile.area || profile.location?.area || 'Location not set'}
+        title={<Trans>Hello {welcomeName}</Trans>}
+        subtitle={profile.area || profile.location?.area || <Trans>Location not set</Trans>}
         onSearchClick={openSearch}
         onProfileClick={() => navigateToTab('profile')}
         onNotificationClick={handleNotificationClick}
@@ -493,6 +500,7 @@ export function SellerDashboard({ onLogout }) {
             <div className="seller-search-sheet__header">
               <input
                 ref={searchInputRef}
+                type="text"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 onKeyDown={(event) => {
@@ -505,12 +513,12 @@ export function SellerDashboard({ onLogout }) {
                     closeSearch()
                   }
                 }}
-                placeholder="Search for referrals, wallet, earnings..."
+                placeholder={translate('Search by name, user ID, or amount...')}
                 className="seller-search-input"
-                aria-label="Search seller console"
+                aria-label={translate('Search referrals')}
               />
               <button type="button" className="seller-search-cancel" onClick={closeSearch}>
-                Cancel
+                <Trans>Cancel</Trans>
               </button>
             </div>
             <div className="seller-search-sheet__body">
@@ -527,7 +535,7 @@ export function SellerDashboard({ onLogout }) {
                   </button>
                 ))
               ) : (
-                <p className="seller-search-empty">No matches yet. Try another keyword.</p>
+                <p className="seller-search-empty"><Trans>No matches yet. Try another keyword.</Trans></p>
               )}
             </div>
           </div>

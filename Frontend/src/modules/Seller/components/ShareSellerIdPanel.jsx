@@ -3,6 +3,7 @@ import { useSellerState } from '../context/SellerContext'
 import { sellerSnapshot } from '../services/sellerData'
 import { cn } from '../../../lib/cn'
 import { ShareIcon, CloseIcon, CheckCircleIcon } from './icons'
+import { Trans } from '../../../components/Trans'
 
 export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
   const { profile } = useSellerState()
@@ -75,8 +76,8 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
               <ShareIcon className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="seller-panel__title">Share IRA Partner ID</h3>
-              <p className="seller-panel__subtitle">Help users register with your unique ID</p>
+              <h3 className="seller-panel__title"><Trans>Share IRA Partner ID</Trans></h3>
+              <p className="seller-panel__subtitle"><Trans>Help users register with your unique ID</Trans></p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="seller-panel__close">
@@ -85,7 +86,7 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
         </div>
         <div className="seller-panel__body">
           <div className="seller-share-id__display">
-            <span className="seller-share-id__label">Your Unique IRA Partner ID</span>
+            <span className="seller-share-id__label"><Trans>Your Unique IRA Partner ID</Trans></span>
             <span className="seller-share-id__value">{sellerId}</span>
             <button
               type="button"
@@ -94,32 +95,32 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
             >
               {copied ? (
                 <>
-                  <CheckCircleIcon className="h-4 w-4" /> Copied!
+                  <CheckCircleIcon className="h-4 w-4" /> <Trans>Copied!</Trans>
                 </>
               ) : (
                 <>
-                  <ShareIcon className="h-4 w-4" /> Copy ID
+                  <ShareIcon className="h-4 w-4" /> <Trans>Copy ID</Trans>
                 </>
               )}
             </button>
           </div>
 
           <div className="seller-share-id__section">
-            <h4 className="seller-share-id__section-title">Share Message</h4>
+            <h4 className="seller-share-id__section-title"><Trans>Share Message</Trans></h4>
             <div className="seller-share-id__message-box">
-              <p className="seller-share-id__message">{shareText}</p>
+              <p className="seller-share-id__message"><Trans>{shareText}</Trans></p>
             </div>
             <button
               type="button"
               onClick={handleShareViaWhatsApp}
               className="seller-share-id__button seller-share-id__button--primary"
             >
-              Share via WhatsApp
+              <Trans>Share via WhatsApp</Trans>
             </button>
           </div>
 
           <div className="seller-share-id__section">
-            <h4 className="seller-share-id__section-title">Share App Link</h4>
+            <h4 className="seller-share-id__section-title"><Trans>Share App Link</Trans></h4>
             <div className="seller-share-id__link-box">
               <p className="seller-share-id__link">{shareUrl}</p>
             </div>
@@ -128,7 +129,7 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
               onClick={handleShareLink}
               className="seller-share-id__button"
             >
-              Share Link
+              <Trans>Share Link</Trans>
             </button>
           </div>
         </div>

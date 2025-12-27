@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { cn } from '../../../lib/cn'
 import { CloseIcon, BellIcon } from './icons'
+import { Trans } from '../../../components/Trans'
 
 export function NotificationPanel({ isOpen, onClose, notifications, onMarkAsRead, onMarkAllAsRead }) {
   const panelRef = useRef(null)
@@ -20,10 +21,10 @@ export function NotificationPanel({ isOpen, onClose, notifications, onMarkAsRead
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    if (diffDays < 7) return `${diffDays}d ago`
+    if (diffMins < 1) return <Trans>Just now</Trans>
+    if (diffMins < 60) return <Trans>{diffMins}m ago</Trans>
+    if (diffHours < 24) return <Trans>{diffHours}h ago</Trans>
+    if (diffDays < 7) return <Trans>{diffDays}d ago</Trans>
     return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
   }
 
@@ -73,9 +74,9 @@ export function NotificationPanel({ isOpen, onClose, notifications, onMarkAsRead
               <BellIcon className="h-6 w-6" />
             </div>
             <div>
-              <h3 className="seller-notification-panel__title">Notifications</h3>
+              <h3 className="seller-notification-panel__title"><Trans>Notifications</Trans></h3>
               <p className="seller-notification-panel__subtitle">
-                {recentNotifications.length > 0 ? `${recentNotifications.length} new` : 'No new notifications'}
+                {recentNotifications.length > 0 ? <Trans>{recentNotifications.length} new</Trans> : <Trans>No new notifications</Trans>}
               </p>
             </div>
           </div>
@@ -88,8 +89,8 @@ export function NotificationPanel({ isOpen, onClose, notifications, onMarkAsRead
           {recentNotifications.length === 0 ? (
             <div className="seller-notification-panel__empty">
               <BellIcon className="h-12 w-12" style={{ opacity: 0.3, marginBottom: '1rem' }} />
-              <p className="seller-notification-panel__empty-text">No new notifications</p>
-              <p className="seller-notification-panel__empty-subtext">You're all caught up!</p>
+              <p className="seller-notification-panel__empty-text"><Trans>No new notifications</Trans></p>
+              <p className="seller-notification-panel__empty-subtext"><Trans>You're all caught up!</Trans></p>
             </div>
           ) : (
             <>
@@ -104,7 +105,7 @@ export function NotificationPanel({ isOpen, onClose, notifications, onMarkAsRead
                     }}
                     className="seller-notification-panel__mark-all"
                   >
-                    Mark all as read
+                    <Trans>Mark all as read</Trans>
                   </button>
                 </div>
               )}
@@ -124,14 +125,14 @@ export function NotificationPanel({ isOpen, onClose, notifications, onMarkAsRead
                     <div className="seller-notification-item__content">
                       <div className="seller-notification-item__header">
                         <h4 className="seller-notification-item__title">
-                          {notification.title || 'Notification'}
+                          {notification.title || <Trans>Notification</Trans>}
                         </h4>
                         {!notification.read && (
                           <span className="seller-notification-item__badge" />
                         )}
                       </div>
                       <p className="seller-notification-item__message">
-                        {notification.message || 'You have a new notification'}
+                        {notification.message || <Trans>You have a new notification</Trans>}
                       </p>
                       <span className="seller-notification-item__time">
                         {formatTime(notification.timestamp || notification.createdAt || notification.date)}

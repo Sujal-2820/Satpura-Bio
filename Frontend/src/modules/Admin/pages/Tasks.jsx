@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { CheckCircle, Clock, AlertCircle, ExternalLink, Filter, Search, Calendar, User, ShoppingBag, Truck, Info } from 'lucide-react'
+import { CheckCircle, Clock, AlertCircle, ExternalLink, Filter, Search, Calendar, User, ShoppingBag, Truck, Info, MoreVertical } from 'lucide-react'
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
 import { StatusBadge } from '../components/StatusBadge'
@@ -22,6 +22,7 @@ export default function TasksPage({ navigate }) {
 
     const [activeTab, setActiveTab] = useState('pending')
     const [filterList, setFilterList] = useState([])
+    const [openActionsDropdown, setOpenActionsDropdown] = useState(null)
 
     const loadTasks = useCallback(async () => {
         await fetchTasks({ status: activeTab === 'all' ? '' : activeTab })
@@ -136,26 +137,83 @@ export default function TasksPage({ navigate }) {
         if (col.accessor === 'action') {
             return {
                 ...col,
-                Cell: (row) => (
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => handleTaskAction(row)}
-                            className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all border border-blue-100 shadow-sm"
-                            title="Go to Task"
-                        >
-                            <ExternalLink className="h-4 w-4" />
-                        </button>
-                        {row.status !== 'completed' && (
+                Cell: (row) => {
+                    const isDropdownOpen = openActionsDropdown === row._id
+
+                    const actionItems = [
+                        {
+                            label: 'Go to Task',
+                            icon: ExternalLink,
+                            onClick: () => {
+                                handleTaskAction(row)
+                                setOpenActionsDropdown(null)
+                            },
+                            className: 'text-blue-600 hover:bg-blue-50'
+                        }
+                    ]
+
+                    if (row.status !== 'completed') {
+                        actionItems.push({
+                            label: 'Mark as Completed',
+                            icon: CheckCircle,
+                            onClick: () => {
+                                handleCompleteTask(row._id)
+                                setOpenActionsDropdown(null)
+                            },
+                            className: 'text-green-600 hover:bg-green-50'
+                        })
+                    }
+
+                    return (
+                        <div className="relative">
                             <button
-                                onClick={() => handleCompleteTask(row._id)}
-                                className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-all border border-green-100 shadow-sm"
-                                title="Mark as Completed"
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setOpenActionsDropdown(isDropdownOpen ? null : row._id)
+                                }}
+                                className="p-2 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 transition-all border border-gray-200 shadow-sm"
+                                title="Actions"
                             >
-                                <CheckCircle className="h-4 w-4" />
+                                <MoreVertical className="h-4 w-4" />
                             </button>
-                        )}
-                    </div>
-                )
+
+                            {isDropdownOpen && (
+                                <>
+                                    <div
+                                        className="fixed inset-0 z-10"
+                                        onClick={() => setOpenActionsDropdown(null)}
+                                    />
+                                    <div className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                                        {actionItems.map((item, index) => {
+                                            const Icon = item.icon
+                                            return (
+                                                <button
+                                                    key={index}
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        if (!item.disabled) {
+                                                            item.onClick()
+                                                        }
+                                                    }}
+                                                    disabled={item.disabled}
+                                                    className={cn(
+                                                        'w-full flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
+                                                        item.className,
+                                                        item.disabled && 'opacity-50 cursor-not-allowed'
+                                                    )}
+                                                >
+                                                    <Icon className="h-4 w-4" />
+                                                    <span>{item.label}</span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )
+                }
             }
         }
         return col

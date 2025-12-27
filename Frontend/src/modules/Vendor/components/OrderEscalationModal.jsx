@@ -60,19 +60,19 @@ export function OrderEscalationModal({ isOpen, onClose, order, onSuccess }) {
         showError('Invalid order ID')
         return
       }
-      
+
       if (!escalationReason || !escalationReason.trim()) {
         showError('Please provide an escalation reason')
         return
       }
-      
+
       const requestPayload = {
         reason: escalationReason.trim(),
         notes: notes?.trim() || undefined,
       }
-      
-      console.log('OrderEscalationModal: Sending request', { orderId, payload: requestPayload })
-      
+
+
+
       const result = await rejectOrder(orderId, requestPayload)
 
       if (result.data) {
@@ -94,16 +94,7 @@ export function OrderEscalationModal({ isOpen, onClose, order, onSuccess }) {
 
   if (!isOpen || !order) return null
 
-  // Debug: Log order structure
-  if (isOpen && order) {
-    console.log('OrderEscalationModal: Order object', {
-      id: order.id,
-      _id: order._id,
-      orderNumber: order.orderNumber,
-      status: order.status,
-      vendorId: order.vendorId,
-    })
-  }
+
 
   return (
     <div className={cn('vendor-activity-sheet', isOpen && 'is-open')}>
@@ -144,11 +135,11 @@ export function OrderEscalationModal({ isOpen, onClose, order, onSuccess }) {
                   const requestedQty = item.quantity || 0
                   const vendorStock = item.vendorStock ?? 0
                   const unit = item.unit || 'units'
-                  
+
                   // Check if product has attributes
-                  const hasAttributes = product.attributeStocks && 
-                                       Array.isArray(product.attributeStocks) && 
-                                       product.attributeStocks.length > 0
+                  const hasAttributes = product.attributeStocks &&
+                    Array.isArray(product.attributeStocks) &&
+                    product.attributeStocks.length > 0
                   const itemAttributes = item.attributeCombination || item.attributes || {}
 
                   return (
@@ -167,7 +158,7 @@ export function OrderEscalationModal({ isOpen, onClose, order, onSuccess }) {
                           </span>
                         </div>
                       </div>
-                      
+
                       {/* Show attributes if product has them */}
                       {hasAttributes && Object.keys(itemAttributes).length > 0 && (
                         <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-2">

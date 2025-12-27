@@ -5,7 +5,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { FilterBar } from '../components/FilterBar'
 import { ProgressList } from '../components/ProgressList'
 import { Timeline } from '../components/Timeline'
-import { dashboardSummary, analyticsSummary } from '../services/adminData'
+
 import { useAdminState } from '../context/AdminContext'
 import { useAdminApi } from '../hooks/useAdminApi'
 import { cn } from '../../../lib/cn'
@@ -19,9 +19,9 @@ export function DashboardPage() {
     fetchTasks({ limit: 5 })
   }, [fetchDashboardData, fetchTasks])
 
-  // Use data from context or fallback to snapshot
-  const dashboardData = dashboard.data || dashboardSummary
-  const { headline, payables } = dashboardData
+  // Use data from context
+  const dashboardData = dashboard.data || {}
+  const { headline = [], payables = {} } = dashboardData
 
   return (
     <div className="space-y-8">
@@ -49,7 +49,7 @@ export function DashboardPage() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-4 rounded-3xl border border-blue-200 bg-white p-6 shadow-[0_2px_6px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)] lg:col-span-2">
+        <div className="space-y-4 rounded-3xl border border-blue-200 bg-white p-6 shadow-[0_2px_6px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)] lg:col-span-3">
           <header className="flex items-center justify-between border-b border-blue-200 pb-4">
             <div>
               <h2 className="text-lg font-bold text-blue-700">Payment Status</h2>
@@ -60,17 +60,17 @@ export function DashboardPage() {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-green-100/50 p-4 transition-all duration-300 hover:shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.4)]">
               <p className="text-xs uppercase tracking-wide text-green-700 font-bold">Advance (30%)</p>
-              <p className="mt-2 text-xl font-bold text-gray-900">{payables.advance}</p>
+              <p className="mt-2 text-xl font-bold text-gray-900">{payables.advance || '₹0'}</p>
               <p className="text-xs text-green-600">Received this month</p>
             </div>
             <div className="rounded-2xl border border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100/50 p-4 transition-all duration-300 hover:shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.4)]">
               <p className="text-xs uppercase tracking-wide text-yellow-700 font-bold">Pending (70%)</p>
-              <p className="mt-2 text-xl font-bold text-gray-900">{payables.pending}</p>
+              <p className="mt-2 text-xl font-bold text-gray-900">{payables.pending || '₹0'}</p>
               <p className="text-xs text-yellow-600">Follow-up required before 18 Nov</p>
             </div>
             <div className="rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100/50 p-4 transition-all duration-300 hover:shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.4)]">
               <p className="text-xs uppercase tracking-wide text-purple-700 font-bold">Unpaid Amounts</p>
-              <p className="mt-2 text-xl font-bold text-gray-900">{payables.outstanding}</p>
+              <p className="mt-2 text-xl font-bold text-gray-900">{payables.outstanding || '₹0'}</p>
               <p className="text-xs text-purple-600">From 14 vendors</p>
             </div>
           </div>
@@ -82,11 +82,9 @@ export function DashboardPage() {
             </p>
           </div>
         </div>
-        <ProgressList items={analyticsSummary.highlights.map((item) => ({ label: item.label, progress: 100, meta: `${item.value} (${item.change})`, tone: 'success' }))} />
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <Timeline events={analyticsSummary.timeline} />
+      <section className="grid gap-6">
         <div className="space-y-4 rounded-3xl border border-orange-200 bg-white p-6 shadow-[0_2px_6px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)] transition-all duration-300">
           <header className="flex items-center justify-between border-b border-orange-200 pb-3">
             <div>
@@ -102,7 +100,7 @@ export function DashboardPage() {
               View All
             </a>
           </header>
-          <div className="space-y-3">
+          <div className="grid gap-4 md:grid-cols-2">
             {tasks.data && tasks.data.filter(t => t.status !== 'completed' || t.priority === 'urgent').slice(0, 4).map((task) => {
               // Determine color based on priority or category
               let color = 'blue';
@@ -152,7 +150,7 @@ export function DashboardPage() {
             })}
 
             {(!tasks.data || tasks.data.length === 0) && (
-              <div className="py-12 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50">
+              <div className="col-span-full py-12 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50">
                 <p className="text-sm text-gray-500 italic">No pending tasks found. All clear! 🎉</p>
               </div>
             )}

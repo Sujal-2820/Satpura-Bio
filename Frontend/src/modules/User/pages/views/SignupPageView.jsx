@@ -5,6 +5,7 @@ import { GoogleMapsLocationPicker } from '../../../../components/GoogleMapsLocat
 import * as userApi from '../../services/userApi'
 import { Trans } from '../../../../components/Trans'
 import { validatePhoneNumber } from '../../../../utils/phoneValidation'
+import { PhoneInput } from '../../../../components/PhoneInput'
 
 export function SignupPageView({ onSuccess, onSwitchToLogin }) {
   const dispatch = useUserDispatch()
@@ -201,16 +202,13 @@ export function SignupPageView({ onSuccess, onSwitchToLogin }) {
                   <label htmlFor="register-contact" className="user-auth-page-view__label">
                     <Trans>Contact Number</Trans> <span className="user-auth-page-view__required">*</span>
                   </label>
-                  <input
+                  <PhoneInput
                     id="register-contact"
                     name="contact"
-                    type="tel"
                     required
                     value={form.contact}
                     onChange={handleChange}
-                    placeholder="+91 90000 00000"
-                    maxLength={15}
-                    className="user-auth-page-view__input"
+                    placeholder="Mobile"
                   />
                 </div>
 

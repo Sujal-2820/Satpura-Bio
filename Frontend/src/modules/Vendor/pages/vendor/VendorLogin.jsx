@@ -3,9 +3,12 @@ import { OtpVerification } from '../../../../components/auth/OtpVerification'
 import { useVendorDispatch } from '../../context/VendorContext'
 import * as vendorApi from '../../services/vendorApi'
 import { validatePhoneNumber } from '../../../../utils/phoneValidation'
+import { PhoneInput } from '../../../../components/PhoneInput'
+import { useToast } from '../../../../modules/Admin/components/ToastNotification'
 
 export function VendorLogin({ onSuccess, onSwitchToRegister }) {
   const dispatch = useVendorDispatch()
+  const { warning: showWarning } = useToast()
   const [step, setStep] = useState('phone') // 'phone' | 'otp'
   const [form, setForm] = useState({ phone: '' })
   const [loading, setLoading] = useState(false)
@@ -60,7 +63,15 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
       const result = await vendorApi.loginVendorWithOtp({ phone: form.phone, otp: otpCode })
 
       if (result.success || result.data) {
-        const vendorData = result.data?.vendor || result.data?.data?.vendor
+        const vendorData = result.data?.vendor || result.data?.data?.vendor || result.data // handle different structures
+
+        // Check if vendor status is pending
+        if (vendorData?.status === 'pending') {
+          showWarning('Your account is currently under review. Please wait for admin approval.', 5000)
+          setLoading(false)
+          return
+        }
+
         if (result.data?.token || result.data?.data?.token) {
           localStorage.setItem('vendor_token', result.data?.token || result.data?.data?.token)
         }
@@ -95,6 +106,8 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
           setError(result.error?.message || 'Your account has been banned. Please contact admin.')
         } else if (result.error?.message?.includes('inactive')) {
           setError('Your account is inactive. Please contact admin.')
+        } else if (result.status === 'rejected' || result.data?.status === 'rejected') { // Handle rejected status from API response
+          setError(result.message || result.data?.message || 'Your application was rejected.')
         } else {
           setError(result.error?.message || 'Invalid OTP. Please try again.')
         }
@@ -162,16 +175,13 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
               <label htmlFor="login-phone" className="text-xs font-semibold text-gray-700">
                 Contact Number <span className="text-red-500">*</span>
               </label>
-              <input
+              <PhoneInput
                 id="login-phone"
                 name="phone"
-                type="tel"
                 required
                 value={form.phone}
                 onChange={handleChange}
-                placeholder="+91 90000 00000"
-                maxLength={15}
-                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                placeholder="Mobile"
               />
             </div>
 

@@ -4,9 +4,13 @@ import { useSellerApi } from '../../hooks/useSellerApi'
 import { cn } from '../../../../lib/cn'
 import { TrendingUpIcon, UsersIcon, WalletIcon, CloseIcon } from '../../components/icons'
 import * as sellerApi from '../../services/sellerApi'
+import { Trans } from '../../../../components/Trans'
+import { TransText } from '../../../../components/TransText'
+import { useTranslation } from '../../../../context/TranslationContext'
 
 export function PerformanceView({ onBack }) {
   const { dashboard, profile } = useSellerState()
+  const { translate } = useTranslation()
   const { fetchPerformance } = useSellerApi()
   const [performanceAnalytics, setPerformanceAnalytics] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -89,7 +93,7 @@ export function PerformanceView({ onBack }) {
 
   const formatCurrency = (value) => {
     if (value >= 100000) {
-      return `₹${(value / 100000).toFixed(1)}L`
+      return <><Trans>₹</Trans>{(value / 100000).toFixed(1)} <Trans>L</Trans></>
     }
     return `₹${value.toLocaleString('en-IN')}`
   }
@@ -101,8 +105,8 @@ export function PerformanceView({ onBack }) {
         <div className="seller-performance-hero__card">
           <div className="seller-performance-hero__header">
             <div>
-              <h2 className="seller-performance-hero__title">Performance Analytics</h2>
-              <p className="seller-performance-hero__subtitle">Detailed insights into your sales performance</p>
+              <h2 className="seller-performance-hero__title"><Trans>Performance Analytics</Trans></h2>
+              <p className="seller-performance-hero__subtitle"><Trans>Detailed insights into your sales performance</Trans></p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {onBack && (
@@ -127,8 +131,8 @@ export function PerformanceView({ onBack }) {
       <section id="seller-performance-metrics" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Key Metrics</h3>
-            <p className="seller-section__subtitle">Your performance at a glance</p>
+            <h3 className="seller-section__title"><Trans>Key Metrics</Trans></h3>
+            <p className="seller-section__subtitle"><Trans>Your performance at a glance</Trans></p>
           </div>
         </div>
         <div className="seller-performance-grid">
@@ -137,13 +141,13 @@ export function PerformanceView({ onBack }) {
               <TrendingUpIcon className="h-5 w-5" />
             </div>
             <div className="seller-performance-card__content">
-              <p className="seller-performance-card__label">Total Sales</p>
+              <p className="seller-performance-card__label"><Trans>Total Sales</Trans></p>
               <h4 className="seller-performance-card__value">{formatCurrency(performanceData.totalSales)}</h4>
               <div className="seller-performance-card__trend-group">
-                <span className="seller-performance-card__trend">{performanceData.orderCount} orders this month</span>
+                <span className="seller-performance-card__trend"><Trans>{`${performanceData.orderCount} orders this month`}</Trans></span>
                 {performanceData.averageOrderValue > 0 && (
                   <span className="seller-performance-card__trend-secondary">
-                    Avg: {formatCurrency(performanceData.averageOrderValue)}
+                    <Trans>{`Avg: ${formatCurrency(performanceData.averageOrderValue)}`}</Trans>
                   </span>
                 )}
               </div>
@@ -155,15 +159,15 @@ export function PerformanceView({ onBack }) {
               <UsersIcon className="h-5 w-5" />
             </div>
             <div className="seller-performance-card__content">
-              <p className="seller-performance-card__label">Total Referrals</p>
+              <p className="seller-performance-card__label"><Trans>Total Referrals</Trans></p>
               <h4 className="seller-performance-card__value">{performanceData.totalReferrals}</h4>
               <div className="seller-performance-card__trend-group">
                 <span className="seller-performance-card__trend seller-performance-card__trend--active">
-                  {performanceData.activeReferrals} active
+                  <Trans>{`${performanceData.activeReferrals} active`}</Trans>
                 </span>
                 {performanceData.conversionRate > 0 && (
                   <span className="seller-performance-card__trend-secondary">
-                    {performanceData.conversionRate.toFixed(1)}% conversion
+                    <Trans>{`${performanceData.conversionRate.toFixed(1)}% conversion`}</Trans>
                   </span>
                 )}
               </div>
@@ -175,13 +179,13 @@ export function PerformanceView({ onBack }) {
               <WalletIcon className="h-5 w-5" />
             </div>
             <div className="seller-performance-card__content">
-              <p className="seller-performance-card__label">Total Commission</p>
+              <p className="seller-performance-card__label"><Trans>Total Commission</Trans></p>
               <h4 className="seller-performance-card__value">
                 {formatCurrency(performanceData.totalCommission || (performanceData.totalSales * 0.025))}
               </h4>
               <div className="seller-performance-card__trend-group">
                 <span className="seller-performance-card__trend">
-                  Avg: ₹{performanceData.avgCommissionPerSale.toLocaleString('en-IN')}/order
+                  <Trans>{`Avg: ₹${performanceData.avgCommissionPerSale.toLocaleString('en-IN')}/order`}</Trans>
                 </span>
                 {(performanceData.commissionRate2Percent > 0 || performanceData.commissionRate3Percent > 0) && (
                   <span className="seller-performance-card__trend-secondary">
@@ -200,8 +204,8 @@ export function PerformanceView({ onBack }) {
       <section id="seller-performance-breakdown" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Sales Summary</h3>
-            <p className="seller-section__subtitle">This month's sales overview</p>
+            <h3 className="seller-section__title"><Trans>Sales Summary</Trans></h3>
+            <p className="seller-section__subtitle"><Trans>This month's sales overview</Trans></p>
           </div>
         </div>
         <div className="seller-performance-breakdown-card">
@@ -209,13 +213,13 @@ export function PerformanceView({ onBack }) {
             <div className="seller-performance-breakdown-card__target">
               <TrendingUpIcon className="h-5 w-5 text-[#1b8f5b]" />
               <div>
-                <p className="seller-performance-breakdown-card__target-label">Total Sales</p>
+                <p className="seller-performance-breakdown-card__target-label"><Trans>Total Sales</Trans></p>
                 <p className="seller-performance-breakdown-card__target-value">{formatCurrency(performanceData.thisMonthSales)}</p>
               </div>
             </div>
             <div className="seller-performance-breakdown-card__progress-badge">
               <span className="seller-performance-breakdown-card__progress-percent">{performanceData.orderCount}</span>
-              <span className="seller-performance-breakdown-card__progress-label">Orders</span>
+              <span className="seller-performance-breakdown-card__progress-label"><Trans>Orders</Trans></span>
             </div>
           </div>
           <div className="seller-performance-breakdown-card__details">
@@ -224,7 +228,7 @@ export function PerformanceView({ onBack }) {
                 <WalletIcon className="h-4 w-4 text-[#1b8f5b]" />
               </div>
               <div className="seller-performance-breakdown-card__detail-content">
-                <p className="seller-performance-breakdown-card__detail-label">Total Commission</p>
+                <p className="seller-performance-breakdown-card__detail-label"><Trans>Total Commission</Trans></p>
                 <p className="seller-performance-breakdown-card__detail-value">
                   {formatCurrency(performanceData.totalCommission || (performanceData.totalSales * 0.025))}
                 </p>
@@ -235,7 +239,7 @@ export function PerformanceView({ onBack }) {
                 <TrendingUpIcon className="h-4 w-4 text-[#3b82f6]" />
               </div>
               <div className="seller-performance-breakdown-card__detail-content">
-                <p className="seller-performance-breakdown-card__detail-label">Avg Order Value</p>
+                <p className="seller-performance-breakdown-card__detail-label"><Trans>Avg Order Value</Trans></p>
                 <p className="seller-performance-breakdown-card__detail-value">
                   {formatCurrency(performanceData.averageOrderValue || 0)}
                 </p>
@@ -250,31 +254,31 @@ export function PerformanceView({ onBack }) {
         <section id="seller-performance-commission" className="seller-section">
           <div className="seller-section__header">
             <div>
-              <h3 className="seller-section__title">Commission Breakdown</h3>
-              <p className="seller-section__subtitle">Earnings by commission rate</p>
+              <h3 className="seller-section__title"><Trans>Commission Breakdown</Trans></h3>
+              <p className="seller-section__subtitle"><Trans>Earnings by commission rate</Trans></p>
             </div>
           </div>
           <div className="seller-performance-commission-grid">
             <div className="seller-performance-commission-card seller-performance-commission-card--standard">
               <div className="seller-performance-commission-card__header">
                 <WalletIcon className="h-5 w-5 text-[#1b8f5b]" />
-                <span className="seller-performance-commission-card__rate">2% Rate</span>
+                <span className="seller-performance-commission-card__rate"><Trans>2% Rate</Trans></span>
               </div>
               <div className="seller-performance-commission-card__content">
-                <p className="seller-performance-commission-card__label">Users at 2%</p>
+                <p className="seller-performance-commission-card__label"><Trans>Users at 2%</Trans></p>
                 <p className="seller-performance-commission-card__value">{performanceData.commissionRate2Percent || 0}</p>
-                <p className="seller-performance-commission-card__note">Up to ₹50,000/month</p>
+                <p className="seller-performance-commission-card__note"><Trans>Up to ₹50,000/month</Trans></p>
               </div>
             </div>
             <div className="seller-performance-commission-card seller-performance-commission-card--premium">
               <div className="seller-performance-commission-card__header">
                 <WalletIcon className="h-5 w-5 text-[#f97316]" />
-                <span className="seller-performance-commission-card__rate">3% Rate</span>
+                <span className="seller-performance-commission-card__rate"><Trans>3% Rate</Trans></span>
               </div>
               <div className="seller-performance-commission-card__content">
-                <p className="seller-performance-commission-card__label">Users at 3%</p>
+                <p className="seller-performance-commission-card__label"><Trans>Users at 3%</Trans></p>
                 <p className="seller-performance-commission-card__value">{performanceData.commissionRate3Percent || 0}</p>
-                <p className="seller-performance-commission-card__note">Above ₹50,000/month</p>
+                <p className="seller-performance-commission-card__note"><Trans>Above ₹50,000/month</Trans></p>
               </div>
             </div>
           </div>
@@ -285,8 +289,8 @@ export function PerformanceView({ onBack }) {
       <section id="seller-performance-stats" className="seller-section">
         <div className="seller-section__header">
           <div>
-            <h3 className="seller-section__title">Performance Statistics</h3>
-            <p className="seller-section__subtitle">Key performance indicators</p>
+            <h3 className="seller-section__title"><Trans>Performance Statistics</Trans></h3>
+            <p className="seller-section__subtitle"><Trans>Key performance indicators</Trans></p>
           </div>
         </div>
         <div className="seller-performance-stats-grid">
@@ -295,9 +299,9 @@ export function PerformanceView({ onBack }) {
               <UsersIcon className="h-5 w-5 text-[#1b8f5b]" />
             </div>
             <div className="seller-stat-card-enhanced__content">
-              <p className="seller-stat-card-enhanced__label">Conversion Rate</p>
-              <p className="seller-stat-card-enhanced__value">{performanceData.conversionRate.toFixed(1)}%</p>
-              <p className="seller-stat-card-enhanced__note">Active vs Total Referrals</p>
+              <p className="seller-stat-card-enhanced__label"><Trans>Conversion Rate</Trans></p>
+              <p className="seller-stat-card-enhanced__value"><Trans>{`${performanceData.conversionRate.toFixed(1)}%`}</Trans></p>
+              <p className="seller-stat-card-enhanced__note"><Trans>Active vs Total Referrals</Trans></p>
             </div>
           </div>
           <div className="seller-stat-card-enhanced">
@@ -305,9 +309,9 @@ export function PerformanceView({ onBack }) {
               <UsersIcon className="h-5 w-5 text-[#3b82f6]" />
             </div>
             <div className="seller-stat-card-enhanced__content">
-              <p className="seller-stat-card-enhanced__label">Active Users</p>
+              <p className="seller-stat-card-enhanced__label"><Trans>Active Users</Trans></p>
               <p className="seller-stat-card-enhanced__value">{performanceData.activeReferrals}</p>
-              <p className="seller-stat-card-enhanced__note">Made purchases this month</p>
+              <p className="seller-stat-card-enhanced__note"><Trans>Made purchases this month</Trans></p>
             </div>
           </div>
           <div className="seller-stat-card-enhanced">
@@ -315,9 +319,9 @@ export function PerformanceView({ onBack }) {
               <TrendingUpIcon className="h-5 w-5 text-[#eab308]" />
             </div>
             <div className="seller-stat-card-enhanced__content">
-              <p className="seller-stat-card-enhanced__label">Avg Purchase Value</p>
+              <p className="seller-stat-card-enhanced__label"><Trans>Avg Purchase Value</Trans></p>
               <p className="seller-stat-card-enhanced__value">₹{Math.round(performanceData.averageOrderValue).toLocaleString('en-IN')}</p>
-              <p className="seller-stat-card-enhanced__note">Per order average</p>
+              <p className="seller-stat-card-enhanced__note"><Trans>Per order average</Trans></p>
             </div>
           </div>
           <div className="seller-stat-card-enhanced">
@@ -325,9 +329,9 @@ export function PerformanceView({ onBack }) {
               <TrendingUpIcon className="h-5 w-5 text-[#8b5cf6]" />
             </div>
             <div className="seller-stat-card-enhanced__content">
-              <p className="seller-stat-card-enhanced__label">Orders This Month</p>
+              <p className="seller-stat-card-enhanced__label"><Trans>Orders This Month</Trans></p>
               <p className="seller-stat-card-enhanced__value">{performanceData.orderCount}</p>
-              <p className="seller-stat-card-enhanced__note">Total orders processed</p>
+              <p className="seller-stat-card-enhanced__note"><Trans>Total orders processed</Trans></p>
             </div>
           </div>
         </div>
@@ -338,8 +342,8 @@ export function PerformanceView({ onBack }) {
         <section id="seller-performance-top-users" className="seller-section">
           <div className="seller-section__header">
             <div>
-              <h3 className="seller-section__title">Top Performing Users</h3>
-              <p className="seller-section__subtitle">Your highest value referrals this month</p>
+              <h3 className="seller-section__title"><Trans>Top Performing Users</Trans></h3>
+              <p className="seller-section__subtitle"><Trans>Your highest value referrals this month</Trans></p>
             </div>
           </div>
           <div className="seller-performance-top-users">
@@ -352,10 +356,10 @@ export function PerformanceView({ onBack }) {
                   {user.name ? user.name.substring(0, 2).toUpperCase() : 'U'}
                 </div>
                 <div className="seller-performance-top-user-card__content">
-                  <p className="seller-performance-top-user-card__name">{user.name || 'User'}</p>
+                  <p className="seller-performance-top-user-card__name"><TransText>{user.name || 'User'}</TransText></p>
                   <p className="seller-performance-top-user-card__purchase">{formatCurrency(user.monthlyPurchases || 0)}</p>
                   <p className="seller-performance-top-user-card__commission">
-                    Commission: {formatCurrency(user.commission || 0)} @ {user.commissionRate ? `${user.commissionRate * 100}%` : '2-3%'}
+                    <Trans>{`Commission: ${formatCurrency(user.commission || 0)} @ ${user.commissionRate ? `${user.commissionRate * 100}%` : '2-3%'}`}</Trans>
                   </p>
                 </div>
               </div>
