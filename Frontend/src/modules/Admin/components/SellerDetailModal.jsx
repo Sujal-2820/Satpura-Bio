@@ -27,8 +27,8 @@ export function SellerDetailModal({ isOpen, onClose, seller, onEdit }) {
   const achieved = typeof seller.achieved === 'number'
     ? seller.achieved
     : typeof seller.progress === 'number'
-    ? seller.progress
-    : monthlyTarget > 0 ? ((totalSales / monthlyTarget) * 100).toFixed(1) : 0
+      ? seller.progress
+      : monthlyTarget > 0 ? ((totalSales / monthlyTarget) * 100).toFixed(1) : 0
 
   const cashbackRate = typeof seller.cashbackRate === 'number'
     ? seller.cashbackRate
@@ -41,9 +41,9 @@ export function SellerDetailModal({ isOpen, onClose, seller, onEdit }) {
   const referrals = seller.referrals || seller.referredUsers || 0
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="IRA Partner Performance Details" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="Satpura Partner Performance Details" size="lg">
       <div className="space-y-6">
-        {/* IRA Partner Header */}
+        {/* Satpura Partner Header */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4">
@@ -52,7 +52,7 @@ export function SellerDetailModal({ isOpen, onClose, seller, onEdit }) {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900">{seller.name}</h3>
-                <p className="text-sm text-gray-600">IRA Partner ID: {seller.sellerId || seller.id}</p>
+                <p className="text-sm text-gray-600">Satpura Partner ID: {seller.sellerId || seller.id}</p>
                 {seller.area && (
                   <p className="mt-1 text-xs text-gray-500">{seller.area}</p>
                 )}
@@ -117,8 +117,8 @@ export function SellerDetailModal({ isOpen, onClose, seller, onEdit }) {
                 parseFloat(achieved) >= 100
                   ? 'bg-gradient-to-r from-green-500 to-green-600'
                   : parseFloat(achieved) >= 80
-                  ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
-                  : 'bg-gradient-to-r from-orange-500 to-orange-600',
+                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                    : 'bg-gradient-to-r from-orange-500 to-orange-600',
               )}
               style={{ width: `${Math.min(achieved, 100)}%` }}
             />

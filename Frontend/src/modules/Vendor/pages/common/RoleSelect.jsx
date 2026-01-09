@@ -10,7 +10,7 @@ const roles = [
   },
   {
     id: 'seller',
-    label: 'IRA Partner',
+    label: 'Satpura Partner',
     description: 'Refer farmers, earn commissions, and track payouts.',
     icon: Users,
   },
@@ -34,7 +34,7 @@ export function RoleSelect({ onSelect, onBack }) {
         <div>
           <h1 className="text-3xl font-semibold text-surface-foreground">Who are you?</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Tell us your role to customise the experience. आप Vendor हैं या IRA Partner?
+            Tell us your role to customise the experience. आप Vendor हैं या Satpura Partner?
           </p>
         </div>
 
@@ -47,11 +47,10 @@ export function RoleSelect({ onSelect, onBack }) {
                 dispatch({ type: 'SET_ROLE', payload: item.id })
                 onSelect(item.id)
               }}
-              className={`flex w-full items-center gap-4 rounded-3xl border px-5 py-4 text-left transition ${
-                role === item.id
+              className={`flex w-full items-center gap-4 rounded-3xl border px-5 py-4 text-left transition ${role === item.id
                   ? 'border-brand bg-brand-soft/70 text-brand shadow-card'
                   : 'border-muted/60 bg-white/80 text-surface-foreground hover:border-brand/40'
-              }`}
+                }`}
             >
               <span className="flex h-12 w-12 flex-none items-center justify-center rounded-2xl bg-brand-soft text-brand">
                 <item.icon className="h-5 w-5" />

@@ -14,11 +14,11 @@ import { cn } from '../../../lib/cn'
  * @param {boolean} required - Whether document is required
  * @param {boolean} disabled - Disable upload
  */
-export function DocumentUpload({ 
-  label, 
-  value, 
-  onChange, 
-  required = false, 
+export function DocumentUpload({
+  label,
+  value,
+  onChange,
+  required = false,
   disabled = false
 }) {
   const [uploading, setUploading] = useState(false)
@@ -52,7 +52,7 @@ export function DocumentUpload({
 
   const openUploadWidget = () => {
     if (disabled || uploading) return
-    
+
     if (!window.cloudinary) {
       setError('Cloudinary Upload Widget is not loaded yet. Please wait a moment and try again.')
       return
@@ -78,7 +78,7 @@ export function DocumentUpload({
       clientAllowedFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], // Images only, no PDF
       maxFileSize: 2000000, // 2MB max file size
       cropping: false, // No cropping for documents
-      folder: 'ira-sathi/vendor-documents', // Organize documents in folder
+      folder: 'satpura-bio/vendor-documents', // Organize documents in folder
       resourceType: 'image', // Images only
       showAdvancedOptions: false,
       showCompletedButton: true,
@@ -105,17 +105,17 @@ export function DocumentUpload({
       options,
       (error, result) => {
         setUploading(false)
-        
+
         if (error) {
           console.error('Upload error:', error)
           // Handle specific error messages
           const errorMessage = error.message || error.statusText || error.status || ''
           const errorString = String(errorMessage).toLowerCase()
-          
-          if (errorString.includes('preset') || errorString.includes('unsigned') || 
-              error.status === 'Upload preset not found' || 
-              error.statusText === 'Upload preset not found' ||
-              errorMessage.includes('Upload preset must be specified')) {
+
+          if (errorString.includes('preset') || errorString.includes('unsigned') ||
+            error.status === 'Upload preset not found' ||
+            error.statusText === 'Upload preset not found' ||
+            errorMessage.includes('Upload preset must be specified')) {
             setError('Upload preset not configured. Please create the preset "ira-sathi-products" in Cloudinary Dashboard: Settings → Upload → Add upload preset → Name: "ira-sathi-products" → Signing mode: "Unsigned" → Save')
           } else if (errorString.includes('file size') || errorString.includes('size') || errorString.includes('too large')) {
             setError('Image size exceeds 2MB limit. Please upload a smaller image.')
@@ -190,8 +190,8 @@ export function DocumentUpload({
         <div className="relative rounded-2xl border border-muted/60 bg-surface p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 overflow-hidden">
-              <img 
-                src={value.url} 
+              <img
+                src={value.url}
                 alt={label}
                 className="h-12 w-12 object-cover rounded-xl"
                 onError={(e) => {
@@ -228,8 +228,8 @@ export function DocumentUpload({
           </div>
           {isImage && (
             <div className="mt-3 rounded-lg overflow-hidden border border-muted/40 bg-white">
-              <img 
-                src={value.url} 
+              <img
+                src={value.url}
                 alt={label}
                 className="w-full h-auto max-h-48 object-contain"
                 onError={(e) => {

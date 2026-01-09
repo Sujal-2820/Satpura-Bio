@@ -31,7 +31,7 @@
   margin: auto;
   width: min(65%, 420px);
   height: min(65%, 420px);
-  background-image: url('../../assets/IRA Sathi.png');
+  background-image: url('/assets/Satpura-1.webp');
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
@@ -4002,17 +4002,20 @@
 .vendor-action-panel__input--no-spinner::-webkit-outer-spin-button,
 .vendor-action-panel__input--no-spinner::-webkit-inner-spin-button {
   -webkit-appearance: none;
+  appearance: none;
   margin: 0;
 }
 
 .vendor-action-panel__input--no-spinner[type=number] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 /* Remove and disable number input arrows/spinners */
 .vendor-quantity-input[type=number]::-webkit-inner-spin-button,
 .vendor-quantity-input[type=number]::-webkit-outer-spin-button {
   -webkit-appearance: none;
+  appearance: none;
   margin: 0;
   display: none;
 }

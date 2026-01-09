@@ -33,7 +33,7 @@ function Home() {
     <div className="min-h-screen bg-surface px-6 py-12 text-surface-foreground">
       <div className="mx-auto flex max-w-4xl flex-col gap-6">
         <header>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">IRA Sathi</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Satpura Bio</p>
           <h1 className="mt-2 text-3xl font-semibold text-surface-foreground">Access Console Routes</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Choose a portal to continue. Authentication is mocked at the moment; each dashboard renders the respective
@@ -52,7 +52,7 @@ function Home() {
           ))}
         </nav>
       </div>
-      </div>
+    </div>
   )
 }
 
@@ -99,35 +99,35 @@ function App() {
     <TranslationProvider>
       <BrowserRouter>
         <Routes>
-        {/* Home route redirects to user dashboard */}
-        <Route path="/" element={<Navigate to="/user/dashboard/home" replace />} />
-        {/* Console/Admin Routes - Specific paths first */}
-        <Route path="/console" element={<Home />} />
-        <Route path="/admin/login" element={<AdminLoginRoute />} />
-        <Route path="/admin/dashboard" element={<AdminDashboardRoute />} />
-        <Route path="/user/login" element={<UserLoginRoute />} />
-        <Route path="/user/register" element={<UserRegisterRoute />} />
-        <Route path="/user/dashboard" element={<Navigate to="/user/dashboard/home" replace />} />
-        <Route path="/user/dashboard/:tab" element={<UserDashboardPage />} />
-        <Route path="/vendor" element={<VendorRouteContainer />}>
-          <Route path="language" element={<VendorLanguagePage />} />
-          <Route path="role" element={<VendorRolePage />} />
-          <Route path="login" element={<VendorLoginPage />} />
-          <Route path="register" element={<VendorRegisterPage />} />
-          <Route path="dashboard" element={<Navigate to="/vendor/dashboard/overview" replace />} />
-          <Route path="dashboard/:tab" element={<VendorDashboardPage />} />
-        </Route>
-        <Route path="/seller/login" element={<SellerLoginRoute />} />
-        <Route path="/seller/register" element={<SellerRegisterRoute />} />
-        <Route path="/seller/dashboard" element={<Navigate to="/seller/dashboard/overview" replace />} />
-        <Route path="/seller/dashboard/:tab" element={<SellerDashboardPage />} />
+          {/* Home route redirects to user dashboard */}
+          <Route path="/" element={<Navigate to="/user/dashboard/home" replace />} />
+          {/* Console/Admin Routes - Specific paths first */}
+          <Route path="/console" element={<Home />} />
+          <Route path="/admin/login" element={<AdminLoginRoute />} />
+          <Route path="/admin/dashboard" element={<AdminDashboardRoute />} />
+          <Route path="/user/login" element={<UserLoginRoute />} />
+          <Route path="/user/register" element={<UserRegisterRoute />} />
+          <Route path="/user/dashboard" element={<Navigate to="/user/dashboard/home" replace />} />
+          <Route path="/user/dashboard/:tab" element={<UserDashboardPage />} />
+          <Route path="/vendor" element={<VendorRouteContainer />}>
+            <Route path="language" element={<VendorLanguagePage />} />
+            <Route path="role" element={<VendorRolePage />} />
+            <Route path="login" element={<VendorLoginPage />} />
+            <Route path="register" element={<VendorRegisterPage />} />
+            <Route path="dashboard" element={<Navigate to="/vendor/dashboard/overview" replace />} />
+            <Route path="dashboard/:tab" element={<VendorDashboardPage />} />
+          </Route>
+          <Route path="/seller/login" element={<SellerLoginRoute />} />
+          <Route path="/seller/register" element={<SellerRegisterRoute />} />
+          <Route path="/seller/dashboard" element={<Navigate to="/seller/dashboard/overview" replace />} />
+          <Route path="/seller/dashboard/:tab" element={<SellerDashboardPage />} />
 
-        {/* Website Routes - Public E-commerce Site (catch-all for remaining paths) */}
-        <Route path="/*" element={
-          <WebsiteProvider>
-            <WebsiteRoutes />
-          </WebsiteProvider>
-        } />
+          {/* Website Routes - Public E-commerce Site (catch-all for remaining paths) */}
+          <Route path="/*" element={
+            <WebsiteProvider>
+              <WebsiteRoutes />
+            </WebsiteProvider>
+          } />
         </Routes>
       </BrowserRouter>
     </TranslationProvider>

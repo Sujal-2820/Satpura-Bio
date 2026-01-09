@@ -74,7 +74,7 @@ export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, on
     if (request.seller && typeof request.seller === 'object') {
       return request.seller.name
     }
-    return 'Unknown IRA Partner'
+    return 'Unknown Satpura Partner'
   }
 
   // Extract seller wallet safely
@@ -92,7 +92,7 @@ export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, on
   const sellerName = getSellerName()
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="IRA Partner Withdrawal Request Review" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Satpura Partner Withdrawal Request Review" size="md">
       <div className="space-y-6">
         {/* Request Header */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -108,17 +108,17 @@ export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, on
                   <span>{sellerName}</span>
                 </div>
                 {sellerId && (
-                  <p className="mt-1 text-xs text-gray-500">IRA Partner ID: {sellerId}</p>
+                  <p className="mt-1 text-xs text-gray-500">Satpura Partner ID: {sellerId}</p>
                 )}
                 {(request.date || request.createdAt) && (
                   <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
                     <Calendar className="h-3.5 w-3.5" />
                     <span>
-                      {request.date 
+                      {request.date
                         ? (typeof request.date === 'string' ? request.date : new Date(request.date).toLocaleDateString('en-IN'))
-                        : request.createdAt 
-                        ? (typeof request.createdAt === 'string' ? request.createdAt : new Date(request.createdAt).toLocaleDateString('en-IN'))
-                        : ''}
+                        : request.createdAt
+                          ? (typeof request.createdAt === 'string' ? request.createdAt : new Date(request.createdAt).toLocaleDateString('en-IN'))
+                          : ''}
                     </span>
                   </div>
                 )}
@@ -180,7 +180,7 @@ export function WithdrawalRequestModal({ isOpen, onClose, request, onApprove, on
 
           {request.sellerPerformance && (
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-              <p className="mb-2 text-xs font-bold text-blue-900">IRA Partner Performance Summary</p>
+              <p className="mb-2 text-xs font-bold text-blue-900">Satpura Partner Performance Summary</p>
               <div className="grid gap-2 text-xs text-blue-800 sm:grid-cols-2">
                 {request.sellerPerformance.totalSales && (
                   <div>

@@ -76,9 +76,96 @@ const vendorSchema = new mongoose.Schema({
     },
     penaltyRate: {
       type: Number,
-      default: 2, // 2% default penalty rate
+      default: 2, // 2% default penalty rate (DEPRECATED)
     },
     dueDate: Date,
+  },
+
+  // ============================================================================
+  // NEW FIELDS FOR CREDIT HISTORY & PERFORMANCE TRACKING
+  // ============================================================================
+
+  // Credit performance analytics
+  creditHistory: {
+    totalCreditTaken: {
+      type: Number,
+      default: 0,
+      // Cumulative credit purchases made
+    },
+    totalRepaid: {
+      type: Number,
+      default: 0,
+      // Total amount repaid successfully
+    },
+    totalDiscountsEarned: {
+      type: Number,
+      default: 0,
+      // Total savings from early repayments
+    },
+    totalInterestPaid: {
+      type: Number,
+      default: 0,
+      // Total interest paid for late repayments
+    },
+    avgRepaymentDays: {
+      type: Number,
+      default: 0,
+      // Average days taken to repay
+    },
+    onTimeRepaymentCount: {
+      type: Number,
+      default: 0,
+      // Number of on-time (0-90 days) repayments
+    },
+    lateRepaymentCount: {
+      type: Number,
+      default: 0,
+      // Number of late (90+ days) repayments
+    },
+    totalRepaymentCount: {
+      type: Number,
+      default: 0,
+      // Total number of repayments made
+    },
+    creditScore: {
+      type: Number,
+      default: 100,
+      min: [0, 'Credit score cannot be negative'],
+      max: [100, 'Credit score cannot exceed 100'],
+      // Calculated credit score (0-100)
+    },
+    lastRepaymentDate: Date,
+    lastRepaymentDays: Number,
+  },
+
+  // Purchase incentives earned
+  incentivesEarned: [{
+    incentiveId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PurchaseIncentive',
+    },
+    historyRecordId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'VendorIncentiveHistory',
+    },
+    earnedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    rewardValue: mongoose.Schema.Types.Mixed,
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'claimed', 'rejected'],
+      default: 'pending',
+    },
+  }],
+
+  // Performance tier/rating
+  performanceTier: {
+    type: String,
+    enum: ['bronze', 'silver', 'gold', 'platinum', 'not_rated'],
+    default: 'not_rated',
+    // Based on repayment performance
   },
   // Escalation tracking
   escalationCount: {
@@ -211,7 +298,7 @@ vendorSchema.methods.generateOTP = function () {
     // Fallback to Math.random if crypto is not available
     code = Math.floor(100000 + Math.random() * 900000).toString();
   }
-  
+
   // Always generate a new OTP (overwrite existing)
   this.otp = {
     code,

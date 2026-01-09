@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useUserState } from '../../context/UserContext'
-import { MIN_ORDER_VALUE } from '../../services/userData'
+// import { MIN_ORDER_VALUE } from '../../services/userData'
 import { PlusIcon, MinusIcon, TrashIcon, TruckIcon, ChevronRightIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import * as userApi from '../../services/userApi'
@@ -9,7 +9,8 @@ import { Trans } from '../../../../components/Trans'
 import { TransText } from '../../../../components/TransText'
 
 export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart, onNavigateToProduct }) {
-  const { cart } = useUserState()
+  const { cart, settings } = useUserState()
+  const MIN_ORDER_VALUE = settings?.minOrderValue || 2000
   const [suggestedProducts, setSuggestedProducts] = useState([])
   const [cartProducts, setCartProducts] = useState({})
   const [expandedVariants, setExpandedVariants] = useState({}) // Track expanded state: { variantId: true/false }

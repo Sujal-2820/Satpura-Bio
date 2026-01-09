@@ -4,6 +4,13 @@ import './index.css'
 import App from './App.jsx'
 import { loadGoogleMaps } from './utils/loadGoogleMaps'
 
+// Prevent numeric input from changing values on scroll
+document.addEventListener('wheel', (e) => {
+  if (document.activeElement.type === 'number') {
+    document.activeElement.blur();
+  }
+});
+
 // Load Google Maps API before rendering the app
 loadGoogleMaps()
   .then(() => {

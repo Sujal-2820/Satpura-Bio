@@ -101,7 +101,7 @@ export function OverviewView({ onNavigate, openPanel }) {
   }
 
   const services = [
-    { label: <Trans>Share ID</Trans>, note: <Trans>Share your Seller ID</Trans>, tone: 'success', icon: ShareIcon, action: 'share-seller-id' },
+    { label: <Trans>Share ID</Trans>, note: <Trans>Share your Satpura Partner ID</Trans>, tone: 'success', icon: ShareIcon, action: 'share-seller-id' },
     { label: <Trans>Referrals</Trans>, note: <Trans>View all referrals</Trans>, tone: 'success', target: 'referrals', icon: UsersIcon, action: null },
     { label: <Trans>Wallet</Trans>, note: <Trans>View balance</Trans>, tone: 'success', target: 'wallet', icon: WalletIcon, action: null },
     { label: <Trans>Performance</Trans>, note: <Trans>View analytics</Trans>, tone: 'success', icon: ChartIcon, action: 'view-performance' },
@@ -109,8 +109,8 @@ export function OverviewView({ onNavigate, openPanel }) {
 
   const quickActions = [
     {
-      label: <Trans>Share Seller ID</Trans>,
-      description: <Trans>Copy your unique Seller ID</Trans>,
+      label: <Trans>Share Satpura Partner ID</Trans>,
+      description: <Trans>Copy your unique Satpura Partner ID</Trans>,
       icon: ShareIcon,
       tone: 'green',
       action: 'share-seller-id',
@@ -160,7 +160,7 @@ export function OverviewView({ onNavigate, openPanel }) {
         <div className="seller-hero__card">
           <div className="seller-hero__meta">
             <span className="seller-chip seller-chip--success">
-              <Trans>{`Seller ID • ${profile.sellerId || 'N/A'}`}</Trans>
+              <Trans>{`Satpura Partner ID • ${profile.sellerId || 'N/A'}`}</Trans>
             </span>
             <span className="seller-chip seller-chip--warn"><Trans>{`Today ${new Date().toLocaleDateString('en-GB')}`}</Trans></span>
           </div>

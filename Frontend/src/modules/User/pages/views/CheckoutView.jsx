@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useUserState, useUserDispatch } from '../../context/UserContext'
 import { useUserApi } from '../../hooks/useUserApi'
-import { ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE } from '../../services/userData'
+// import { ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE } from '../../services/userData'
 import { MapPinIcon, CreditCardIcon, TruckIcon, ChevronRightIcon, ChevronDownIcon, CheckIcon, PackageIcon, XIcon } from '../../components/icons'
 import { cn } from '../../../../lib/cn'
 import { useToast } from '../../components/ToastNotification'
@@ -16,11 +16,13 @@ const STEPS = [
 ]
 
 export function CheckoutView({ onBack, onOrderPlaced }) {
-  const { cart, profile, assignedVendor, vendorAvailability } = useUserState()
+  const { cart, profile, assignedVendor, vendorAvailability, settings } = useUserState()
+  const ADVANCE_PAYMENT_PERCENTAGE = settings?.advancePaymentPercent || 30
+  const REMAINING_PAYMENT_PERCENTAGE = 100 - ADVANCE_PAYMENT_PERCENTAGE
   const dispatch = useUserDispatch()
   const { createOrder, createPaymentIntent, confirmPayment, loading } = useUserApi()
   const { success, error: showError } = useToast()
-  
+
   // Debug: Log state values
   useEffect(() => {
     console.log('🔍 CheckoutView - State Values:', {
@@ -30,7 +32,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       vendorAvailability: vendorAvailability,
     })
   }, [cart, profile, assignedVendor, vendorAvailability])
-  
+
   const [currentStep, setCurrentStep] = useState(1)
   const [summaryExpanded, setSummaryExpanded] = useState(true)
   const [shippingMethod, setShippingMethod] = useState('standard')
@@ -46,7 +48,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
   const deliveryAddress = useMemo(() => {
     console.log('📍 CheckoutView - Profile data:', profile)
     console.log('📍 CheckoutView - Profile location:', profile?.location)
-    
+
     if (!profile.location || !profile.location.city || !profile.location.state || !profile.location.pincode) {
       console.log('📍 CheckoutView - Delivery address is NULL (missing required fields)')
       return null
@@ -79,7 +81,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       }
       setCartProducts(productMap)
     }
-    
+
     if (cart.length > 0) {
       loadCartProducts()
     }
@@ -107,18 +109,18 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
   // Group items by productId, and if variants exist, group variants together
   const groupedCartItems = useMemo(() => {
     const grouped = {}
-    
+
     cartItems.forEach((item) => {
       const product = cartProducts[item.productId]
-      
+
       // Use variant-specific price (unitPrice) if available, otherwise fallback
       const unitPrice = item.unitPrice || item.price || (product ? (product.priceToUser || product.price || 0) : 0)
-      
+
       // Check if item has variant attributes
       const variantAttrs = item.variantAttributes || {}
       const hasVariants = variantAttrs && typeof variantAttrs === 'object' && Object.keys(variantAttrs).length > 0
       const key = item.productId
-      
+
       if (!grouped[key]) {
         grouped[key] = {
           productId: item.productId,
@@ -129,7 +131,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           hasVariants: false,
         }
       }
-      
+
       // Add this item as a variant - ensure we have proper ID and variant attributes
       const variantItem = {
         ...item,
@@ -140,15 +142,15 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
         variantAttributes: variantAttrs, // Ensure variant attributes are included
         hasVariants,
       }
-      
+
       grouped[key].variants.push(variantItem)
-      
+
       // Mark as having variants if any variant exists
       if (hasVariants) {
         grouped[key].hasVariants = true
       }
     })
-    
+
     return Object.values(grouped)
   }, [cartItems, cartProducts])
 
@@ -187,7 +189,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
         return variantSum + (itemPrice * itemQuantity)
       }, 0)
     }, 0)
-    
+
     const deliveryBeforeBenefit = subtotal >= (selectedShipping.minOrder || Infinity) ? 0 : selectedShipping.cost
     const delivery = paymentPreference === 'full' ? 0 : deliveryBeforeBenefit
     const discount = 0 // Promo code discount would be calculated here
@@ -265,7 +267,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       amountDueLater,
       deliveryWaived: isFullPayment && totals.deliveryBeforeBenefit > 0,
     }
-    
+
     // Store preview data (not actual order) - order will be created on confirmation
     setPendingOrder({
       preview: true, // Flag to indicate this is preview, not actual order
@@ -307,7 +309,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
         notes: `Shipping method: ${selectedShipping.label}`,
         // Backend will calculate amounts from cart items
       }
-      
+
       console.log('📦 Order Data being sent:', orderData)
 
       const orderResult = await createOrder(orderData)
@@ -319,7 +321,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       }
 
       const order = orderResult.data.order
-      
+
       // Update pendingOrder with actual order data
       const updatedPendingOrder = {
         ...order,
@@ -370,7 +372,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           amount: amount, // Amount in rupees (will be converted to paise in openRazorpayCheckout)
           currency: 'INR',
           order_id: razorpayOrderId,
-          name: 'IRA SATHI',
+          name: 'Satpura Bio',
           description: `Payment for Order ${pendingOrder.orderNumber || pendingOrder.id}`,
           prefill: {
             name: profile.name || '',
@@ -467,7 +469,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
                     <p className="text-[0.65rem] text-[rgba(26,42,34,0.6)]">{group.variants.length} variant{group.variants.length > 1 ? 's' : ''}</p>
                   </div>
                 </div>
-                
+
                 {/* Variants */}
                 {group.variants.map((variant, variantIndex) => (
                   <div key={variant.id || variant._id || variant.cartItemId || `variant-${variantIndex}`} className="flex items-start justify-between gap-2 pl-4">
@@ -554,8 +556,8 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
             const connectorCompleted = currentStep > step.id
 
             return (
-              <div 
-                key={step.id} 
+              <div
+                key={step.id}
                 className={cn(
                   "user-checkout-progress__step-wrapper",
                   !isLast && connectorCompleted && "user-checkout-progress__step-wrapper--connector-completed"
@@ -716,8 +718,8 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
                   )}
                   <div className="flex items-center gap-2 mb-2">
                     <p className="text-sm text-[rgba(26,42,34,0.75)] font-medium">
-                    {deliveryAddress.city}, {deliveryAddress.state} - {deliveryAddress.pincode}
-                  </p>
+                      {deliveryAddress.city}, {deliveryAddress.state} - {deliveryAddress.pincode}
+                    </p>
                   </div>
                   {deliveryAddress.phone && (
                     <div className="flex items-center gap-2">
@@ -753,7 +755,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           <div className="mt-6">
             <h3 className="text-base font-bold text-[#172022] mb-4 flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-[rgba(27,143,91,0.1)] flex items-center justify-center">
-              <TruckIcon className="h-5 w-5 text-[#1b8f5b]" />
+                <TruckIcon className="h-5 w-5 text-[#1b8f5b]" />
               </div>
               Shipping Method
             </h3>
@@ -918,21 +920,21 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           <>
             {(() => {
               const hasDeliveryAddress = !!deliveryAddress
-              
+
               // Only disable if vendorAvailability has been explicitly checked and found unavailable
               // Logic: If assignedVendor exists, vendor was checked. If not, it's likely default state.
               // Default state (all false, no assignedVendor) should allow order - backend will handle vendor assignment
-              const vendorWasChecked = assignedVendor !== null || 
+              const vendorWasChecked = assignedVendor !== null ||
                 (vendorAvailability && (vendorAvailability.canPlaceOrder === true || vendorAvailability.isInBufferZone === true))
-              
+
               // Only block if vendor was explicitly checked AND found unavailable (not in buffer zone)
-              const vendorCheck = vendorWasChecked && 
-                vendorAvailability && 
-                !vendorAvailability?.canPlaceOrder && 
+              const vendorCheck = vendorWasChecked &&
+                vendorAvailability &&
+                !vendorAvailability?.canPlaceOrder &&
                 !vendorAvailability?.isInBufferZone
-              
+
               const isDisabled = !hasDeliveryAddress || vendorCheck
-              
+
               console.log('🔘 CheckoutView - Button State Check:', {
                 hasDeliveryAddress,
                 deliveryAddress,
@@ -946,7 +948,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
                 isDisabled,
                 finalDisabled: isDisabled
               })
-              
+
               return (
                 <button
                   type="button"

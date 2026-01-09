@@ -16,10 +16,11 @@ const Payment = require('../models/Payment');
 const Commission = require('../models/Commission');
 const Review = require('../models/Review');
 
+const Settings = require('../models/Settings');
 const { sendOTP } = require('../utils/otp');
 const { getTestOTPInfo } = require('../services/smsIndiaHubService');
 const { generateToken } = require('../middleware/auth');
-const { OTP_EXPIRY_MINUTES, MIN_ORDER_VALUE, ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE, DELIVERY_CHARGE, VENDOR_COVERAGE_RADIUS_KM, VENDOR_ASSIGNMENT_BUFFER_KM, VENDOR_ASSIGNMENT_MAX_RADIUS_KM, ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS, IRA_PARTNER_COMMISSION_THRESHOLD, IRA_PARTNER_COMMISSION_RATE_LOW, IRA_PARTNER_COMMISSION_RATE_HIGH } = require('../utils/constants');
+const { OTP_EXPIRY_MINUTES, MIN_ORDER_VALUE, ADVANCE_PAYMENT_PERCENTAGE, REMAINING_PAYMENT_PERCENTAGE, DELIVERY_CHARGE, MIN_VENDOR_PURCHASE, VENDOR_COVERAGE_RADIUS_KM, VENDOR_ASSIGNMENT_BUFFER_KM, VENDOR_ASSIGNMENT_MAX_RADIUS_KM, ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS, IRA_PARTNER_COMMISSION_THRESHOLD, IRA_PARTNER_COMMISSION_RATE_LOW, IRA_PARTNER_COMMISSION_RATE_HIGH } = require('../utils/constants');
 const { checkPhoneExists, checkPhoneInRole, isSpecialBypassNumber, SPECIAL_BYPASS_OTP } = require('../utils/phoneValidation');
 const { processOrderEarnings } = require('../services/earningsService');
 const PaymentHistory = require('../models/PaymentHistory');
@@ -2163,6 +2164,9 @@ exports.validateCart = async (req, res, next) => {
     // If paymentPreference is 'partial', minimum order check is skipped
     const validation = cart.validateForCheckout(paymentPreference);
 
+    // Use dynamic MIN_ORDER_VALUE from Settings or fallback
+    const dynamicMinOrderValue = await Settings.getSetting('FINANCIAL_PARAMETERS', { minimumUserOrder: MIN_ORDER_VALUE }).then(s => s.minimumUserOrder || MIN_ORDER_VALUE);
+
     if (!validation.valid) {
       return res.status(200).json({
         success: true,
@@ -2170,8 +2174,9 @@ exports.validateCart = async (req, res, next) => {
           valid: false,
           total: cart.subtotal,
           meetsMinimum: cart.meetsMinimumOrder,
-          shortfall: Math.max(0, MIN_ORDER_VALUE - cart.subtotal),
-          message: validation.message,
+          shortfall: Math.max(0, dynamicMinOrderValue - cart.subtotal),
+          message: validation.message.replace(MIN_ORDER_VALUE.toString(), dynamicMinOrderValue.toString()),
+          minOrderValue: dynamicMinOrderValue,
         },
       });
     }
@@ -2598,20 +2603,29 @@ exports.createOrder = async (req, res, next) => {
     const deliveryCharge = paymentPreference === 'full' ? 0 : DELIVERY_CHARGE;
     const totalAmount = subtotal + deliveryCharge;
 
+    // Use dynamic settings from Settings or fallback
+    const financialParams = await Settings.getSetting('FINANCIAL_PARAMETERS', {
+      minimumUserOrder: MIN_ORDER_VALUE,
+      userAdvancePaymentPercent: ADVANCE_PAYMENT_PERCENTAGE,
+    });
+    const dynamicMinOrderValue = financialParams.minimumUserOrder || MIN_ORDER_VALUE;
+    const dynamicAdvancePercent = financialParams.userAdvancePaymentPercent || ADVANCE_PAYMENT_PERCENTAGE;
+
     // Validate cart minimum order value using calculated totalAmount
     // Skip minimum order check if paymentPreference is 'partial' (30% advance)
-    if (paymentPreference === 'full' && totalAmount < MIN_ORDER_VALUE) {
+    if (paymentPreference === 'full' && totalAmount < dynamicMinOrderValue) {
       return res.status(400).json({
         success: false,
-        message: `Minimum order value is ₹${MIN_ORDER_VALUE}. Current total: ₹${totalAmount.toFixed(2)}`,
+        message: `Minimum order value is ₹${dynamicMinOrderValue}. Current total: ₹${totalAmount.toFixed(2)}`,
         data: {
           total: totalAmount,
-          shortfall: Math.max(0, MIN_ORDER_VALUE - totalAmount),
+          shortfall: Math.max(0, dynamicMinOrderValue - totalAmount),
+          minOrderValue: dynamicMinOrderValue,
         },
       });
     }
 
-    const upfrontAmount = paymentPreference === 'full' ? totalAmount : Math.round(totalAmount * (ADVANCE_PAYMENT_PERCENTAGE / 100));
+    const upfrontAmount = paymentPreference === 'full' ? totalAmount : Math.round(totalAmount * (dynamicAdvancePercent / 100));
     const remainingAmount = paymentPreference === 'full' ? 0 : totalAmount - upfrontAmount;
 
     // Generate order number before creating order
@@ -4880,3 +4894,30 @@ exports.deleteReview = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Get financial settings (min order value, etc)
+ * @route   GET /api/users/settings/financial
+ * @access  Public
+ */
+exports.getFinancialSettings = async (req, res, next) => {
+  try {
+    const financialParams = await Settings.getSetting('FINANCIAL_PARAMETERS', {
+      userAdvancePaymentPercent: ADVANCE_PAYMENT_PERCENTAGE,
+      minimumUserOrder: MIN_ORDER_VALUE,
+      minimumVendorPurchase: MIN_VENDOR_PURCHASE,
+      deliveryCharge: DELIVERY_CHARGE,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        minOrderValue: financialParams.minimumUserOrder || MIN_ORDER_VALUE,
+        advancePaymentPercent: financialParams.userAdvancePaymentPercent || ADVANCE_PAYMENT_PERCENTAGE,
+        deliveryCharge: financialParams.deliveryCharge || DELIVERY_CHARGE,
+        minimumVendorPurchase: financialParams.minimumVendorPurchase || MIN_VENDOR_PURCHASE,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

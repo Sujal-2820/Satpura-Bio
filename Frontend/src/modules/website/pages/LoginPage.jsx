@@ -151,7 +151,7 @@ export function LoginPage() {
             </svg>
           </div>
           <p className="text-xs uppercase tracking-wide text-green-600 font-semibold">Welcome Back</p>
-          <h1 className="text-3xl font-bold text-gray-900">Sign in to IRA Sathi</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Sign in to Satpura Bio</h1>
           <p className="text-sm text-gray-600">Enter your contact number to continue</p>
         </div>
 

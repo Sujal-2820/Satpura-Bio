@@ -14,6 +14,7 @@ const CreditPurchase = require('../models/CreditPurchase');
 const Seller = require('../models/Seller');
 const WithdrawalRequest = require('../models/WithdrawalRequest');
 const VendorEarning = require('../models/VendorEarning');
+const VendorIncentiveHistory = require('../models/VendorIncentiveHistory');
 const BankAccount = require('../models/BankAccount');
 const User = require('../models/User');
 const Order = require('../models/Order');
@@ -28,6 +29,7 @@ const CreditRepayment = require('../models/CreditRepayment');
 const Review = require('../models/Review');
 const SellerChangeRequest = require('../models/SellerChangeRequest');
 const razorpayService = require('../services/razorpayService');
+const incentiveService = require('../services/incentiveService');
 const { VENDOR_COVERAGE_RADIUS_KM, MIN_VENDOR_PURCHASE, DELIVERY_TIMELINE_HOURS, ORDER_STATUS, PAYMENT_STATUS } = require('../utils/constants');
 
 const { sendOTP } = require('../utils/otp');
@@ -422,6 +424,7 @@ exports.getDashboard = async (req, res, next) => {
       completedPayments,
       pendingCreditPurchases,
       pendingWithdrawals,
+      pendingIncentiveClaims,
     ] = await Promise.all([
       // Users
       User.countDocuments(),
@@ -459,6 +462,9 @@ exports.getDashboard = async (req, res, next) => {
 
       // Withdrawal Requests
       WithdrawalRequest.countDocuments({ status: 'pending' }),
+
+      // Incentive Claims
+      VendorIncentiveHistory.countDocuments({ status: 'pending_approval' }),
     ]);
 
     // Calculate revenue (from completed orders)
@@ -618,18 +624,22 @@ exports.getDashboard = async (req, res, next) => {
             cancelled: cancelledOrders,
           },
           // Revenue statistics
-          revenue: {
-            total: totalRevenue,
-            last30Days: revenueLast30DaysAmount,
-            last7Days: revenueLast7DaysAmount,
+          finance: {
+            revenue: totalRevenue,
             averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+            revenueLast30Days: revenueLast30DaysAmount,
+            revenueLast7Days: revenueLast7DaysAmount,
+            totalOutstandingCredits,
+            totalCreditLimit,
+            pendingPayments: pendingPaymentsAmount,
+            pendingWithdrawals: pendingWithdrawalsAmount,
+            pendingIncentiveClaims: pendingIncentiveClaims || 0,
           },
-          // Payment statistics
+          // Payment statistics (kept for total, pending, completed counts)
           payments: {
             total: totalPayments,
             pending: pendingPayments,
             completed: completedPayments,
-            pendingAmount: pendingPaymentsAmount,
           },
           // Credit statistics
           credits: {
@@ -2182,6 +2192,14 @@ exports.approveVendorPurchase = async (req, res, next) => {
       vendor.creditPolicy.dueDate = dueDate;
     }
     await vendor.save();
+
+    // Process Purchase Incentives (Phase 4)
+    try {
+      await incentiveService.processIncentivesForPurchase(purchase._id, vendor._id, purchase.totalAmount);
+    } catch (incentiveError) {
+      console.error('Failed to process incentives:', incentiveError);
+      // Don't fail the whole approval if incentives fail
+    }
 
     // SEND VENDOR NOTIFICATION: Credit Purchase Approved
     try {

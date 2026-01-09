@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useReducer, useEffect, useState } from 'react'
-import { initializeRealtimeConnection, handleRealtimeNotification, getUserProfile } from '../services/userApi'
+import { initializeRealtimeConnection, handleRealtimeNotification, getUserProfile, getFinancialSettings } from '../services/userApi'
 
 const UserStateContext = createContext(null)
 const UserDispatchContext = createContext(() => { })
@@ -32,6 +32,11 @@ const initialState = {
     isInBufferZone: false, // Within 300m buffer (20km to 20.3km) - no warning shown
   },
   realtimeConnected: false,
+  settings: {
+    minOrderValue: 2000,
+    advancePaymentPercent: 30,
+    deliveryCharge: 0,
+  },
 }
 
 function reducer(state, action) {
@@ -202,6 +207,14 @@ function reducer(state, action) {
         ...state,
         notifications: state.notifications.map((notif) => ({ ...notif, read: true })),
       }
+    case 'SET_SETTINGS':
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          ...action.payload,
+        },
+      }
     default:
       return state
   }
@@ -210,6 +223,21 @@ function reducer(state, action) {
 export function UserProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const [isInitialized, setIsInitialized] = useState(false)
+
+  // Fetch settings on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const result = await getFinancialSettings()
+        if (result.success && result.data) {
+          dispatch({ type: 'SET_SETTINGS', payload: result.data })
+        }
+      } catch (error) {
+        console.error('Failed to fetch financial settings:', error)
+      }
+    }
+    fetchSettings()
+  }, [])
 
   // Initialize user session from stored token on mount
   useEffect(() => {

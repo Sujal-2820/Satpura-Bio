@@ -186,6 +186,7 @@ router.get('/products/:productId', userController.getProductDetails);
  * @access  Public
  */
 router.get('/offers', userController.getOffers);
+router.get('/settings/financial', userController.getFinancialSettings);
 
 // ============================================================================
 // CART ROUTES

@@ -11,8 +11,8 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
   // Use real sellerId from profile context (from backend), fallback to snapshot if not available
   const sellerId = profile.sellerId || sellerSnapshot.profile.sellerId
   const sellerName = profile.name || sellerSnapshot.profile.name
-  const shareText = `Hello! I'm ${sellerName}, your local IRA Sathi IRA Partner. Use my unique IRA Partner ID: *${sellerId}* when you register or place an order on the IRA Sathi app to get exclusive benefits and support. Download the app here: https://irasathi.com/download`
-  const shareUrl = `https://irasathi.com/register?seller=${sellerId}`
+  const shareText = `Hello! I'm ${sellerName}, your local Satpura Bio Satpura Partner. Use my unique Satpura Partner ID: *${sellerId}* when you register or place an order on the Satpura Bio app to get exclusive benefits and support. Download the app here: https://satpurabio.com/download`
+  const shareUrl = `https://satpurabio.com/register?seller=${sellerId}`
 
   useEffect(() => {
     if (!isOpen) {
@@ -54,7 +54,7 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
   const handleShareLink = () => {
     if (navigator.share) {
       navigator.share({
-        title: 'Share IRA Sathi IRA Partner ID',
+        title: 'Share Satpura Bio Satpura Partner ID',
         text: shareText,
         url: shareUrl,
       })
@@ -76,7 +76,7 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
               <ShareIcon className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="seller-panel__title"><Trans>Share IRA Partner ID</Trans></h3>
+              <h3 className="seller-panel__title"><Trans>Share Satpura Partner ID</Trans></h3>
               <p className="seller-panel__subtitle"><Trans>Help users register with your unique ID</Trans></p>
             </div>
           </div>
@@ -86,7 +86,7 @@ export function ShareSellerIdPanel({ isOpen, onClose, onCopy }) {
         </div>
         <div className="seller-panel__body">
           <div className="seller-share-id__display">
-            <span className="seller-share-id__label"><Trans>Your Unique IRA Partner ID</Trans></span>
+            <span className="seller-share-id__label"><Trans>Your Unique Satpura Partner ID</Trans></span>
             <span className="seller-share-id__value">{sellerId}</span>
             <button
               type="button"

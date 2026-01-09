@@ -34,7 +34,7 @@ const STATUS_DESCRIPTIONS = {
 function useTranslatedFilterTabs() {
   const labels = FILTER_TABS.map(tab => tab.label)
   const translatedLabels = useTranslatedArray(labels)
-  
+
   return FILTER_TABS.map((tab, index) => ({
     ...tab,
     label: translatedLabels[index] || tab.label,
@@ -46,7 +46,7 @@ function useTranslatedStatusLabels() {
   const statusKeys = Object.keys(STATUS_LABELS)
   const statusValues = statusKeys.map(key => STATUS_LABELS[key])
   const translatedValues = useTranslatedArray(statusValues)
-  
+
   const translated = {}
   statusKeys.forEach((key, index) => {
     translated[key] = translatedValues[index] || STATUS_LABELS[key]
@@ -59,7 +59,7 @@ function useTranslatedStatusDescriptions() {
   const statusKeys = Object.keys(STATUS_DESCRIPTIONS)
   const statusValues = statusKeys.map(key => STATUS_DESCRIPTIONS[key])
   const translatedValues = useTranslatedArray(statusValues)
-  
+
   const translated = {}
   statusKeys.forEach((key, index) => {
     translated[key] = translatedValues[index] || STATUS_DESCRIPTIONS[key]
@@ -78,21 +78,21 @@ const getStatusKey = (status) => {
 
 const getDisplayStatus = (status, translatedLabels, paymentStatus) => {
   if (status === 'added_to_cart') return 'In Cart'
-  
+
   // If status is fully_paid, just show "Fully Paid"
   const normalizedStatus = status?.toLowerCase()
   if (normalizedStatus === 'fully_paid' || normalizedStatus === 'fully paid') {
     return 'Fully Paid'
   }
-  
+
   const key = getStatusKey(status)
   const statusLabel = translatedLabels[key] || STATUS_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1)
-  
+
   // If fully paid and has a delivery status, show both status and payment status
   if (paymentStatus === 'fully_paid' && key !== 'fully_paid') {
     return `${statusLabel} • Fully Paid`
   }
-  
+
   return statusLabel
 }
 
@@ -117,7 +117,7 @@ export function OrdersView() {
   const { success, error: showError } = useToast()
   const [activeFilter, setActiveFilter] = useState('all')
   const [processingPayment, setProcessingPayment] = useState(null)
-  
+
   // Get translated labels
   const translatedFilterTabs = useTranslatedFilterTabs()
   const translatedStatusLabels = useTranslatedStatusLabels()
@@ -128,7 +128,7 @@ export function OrdersView() {
     const orderItems = orders.map((order, index) => {
       let deliveryStatus = order.status
       const normalizedStatus = order.status?.toLowerCase()
-      
+
       // If status is payment-related (fully_paid), extract delivery status from statusTimeline
       if (normalizedStatus === 'fully_paid' || normalizedStatus === 'fully paid') {
         if (order.statusTimeline && Array.isArray(order.statusTimeline) && order.statusTimeline.length > 0) {
@@ -153,12 +153,12 @@ export function OrdersView() {
           deliveryStatus = 'awaiting'
         }
       }
-      
+
       // Normalize the final status (only if not already normalized)
       const normalizedDeliveryStatus = deliveryStatus && ['awaiting', 'dispatched', 'delivered'].includes(deliveryStatus)
         ? deliveryStatus
         : getStatusKey(deliveryStatus || 'awaiting')
-      
+
       return {
         ...order,
         type: 'order',
@@ -172,17 +172,17 @@ export function OrdersView() {
     // Add cart items as "added_to_cart" status
     const cartItems = cart.length > 0
       ? [
-          {
-            id: 'cart',
-            type: 'cart',
-            status: 'added_to_cart',
-            date: new Date().toISOString(),
-            items: cart,
-            total: cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
-            paymentStatus: 'pending',
-            uniqueId: 'cart',
-          },
-        ]
+        {
+          id: 'cart',
+          type: 'cart',
+          status: 'added_to_cart',
+          date: new Date().toISOString(),
+          items: cart,
+          total: cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+          paymentStatus: 'pending',
+          uniqueId: 'cart',
+        },
+      ]
       : []
 
     return [...cartItems, ...orderItems]
@@ -194,13 +194,13 @@ export function OrdersView() {
     if (activeFilter === 'all') {
       return allItems
     }
-    
+
     // Early return for 'added_to_cart' filter
     if (activeFilter === 'added_to_cart') {
       const cartFiltered = allItems.filter((item) => item.status === 'added_to_cart' || item.type === 'cart')
       return cartFiltered
     }
-    
+
     // For status filters (awaiting, dispatched, delivered)
     // Status is already normalized in allItems, so direct comparison is faster
     const filtered = []
@@ -280,7 +280,7 @@ export function OrdersView() {
           amount: amount,
           currency: 'INR',
           order_id: razorpayOrderId,
-          name: 'IRA SATHI',
+          name: 'Satpura Bio',
           description: `Remaining payment for Order ${order.orderNumber || order.id}`,
           prefill: {
             name: order.userName || '',
@@ -307,7 +307,7 @@ export function OrdersView() {
 
         success(`Remaining payment of ₹${amount.toLocaleString('en-IN')} completed successfully!`)
         setProcessingPayment(null)
-        
+
         // Order status will be updated via real-time notification or refresh
       } catch (razorpayError) {
         // Handle Razorpay errors
@@ -329,10 +329,10 @@ export function OrdersView() {
     if (item.type !== 'order') return null
     const currentStatus = getStatusKey(item.status)
     const currentIndex = USER_ORDER_STATUSES.indexOf(currentStatus)
-    
+
     // Only show steps up to and including current step (not future steps)
     const maxIndex = currentIndex >= 0 ? currentIndex : 0
-    
+
     return (
       <div className="user-orders-view__tracker">
         {USER_ORDER_STATUSES.filter((_, index) => index <= maxIndex).map((status, index) => {
@@ -342,7 +342,7 @@ export function OrdersView() {
           })
           const actualIndex = USER_ORDER_STATUSES.indexOf(status)
           const isCompleted = actualIndex < currentIndex
-          
+
           return (
             <div
               key={`${item.id}-${status}`}
@@ -397,7 +397,7 @@ export function OrdersView() {
                   <input
                     type="radio"
                     checked={activeFilter === tab.id}
-                    onChange={() => {}}
+                    onChange={() => { }}
                     className="user-orders-view__filter-option-input"
                   />
                   <span className="user-orders-view__filter-option-label">{tab.label}</span>
@@ -430,186 +430,186 @@ export function OrdersView() {
 
           {/* Orders List */}
           <div key={`orders-list-${activeFilter}`} className="user-orders-view__list">
-        {filteredItems.length === 0 ? (
-          <div className="user-orders-view__empty">
-            <PackageIcon className="user-orders-view__empty-icon" />
-            <h3 className="user-orders-view__empty-title"><Trans>No orders found</Trans></h3>
-            <p className="user-orders-view__empty-text">
-              {activeFilter === 'all' ? (
-                <Trans>You haven't placed any orders yet</Trans>
-              ) : (
-                <Trans>No {translatedFilterTabs.find((t) => t.id === activeFilter)?.label.toLowerCase()} orders</Trans>
-              )}
-            </p>
-          </div>
-        ) : (
-          filteredItems.map((item, index) => (
-            <div key={`${activeFilter}-${item.uniqueId || `${item.type}-${item.id || item._id || index}`}`} className="user-orders-view__card">
-              <div className="user-orders-view__card-header">
-                <div className="user-orders-view__card-header-left">
-                  <div className="user-orders-view__card-id">
-                    {item.type === 'cart' ? <Trans>Cart</Trans> : <Trans>Order #{item.id?.slice(-8) || 'N/A'}</Trans>}
-                  </div>
-                  <div className="user-orders-view__card-date">{formatDate(item.date)}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className={cn('user-orders-view__card-status', getStatusColor(item.status))}>
-                    {getStatusIcon(item.status)}
-                    <span className="user-orders-view__card-status-text">
-                      {getDisplayStatus(item.status, translatedStatusLabels, item.paymentStatus)}
-                    </span>
-                  </div>
-                  {item.paymentStatus === 'fully_paid' && (
-                    <div className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
-                      <CreditCardIcon className="h-3 w-3" />
-                      <span><Trans>Fully Paid</Trans></span>
-                    </div>
+            {filteredItems.length === 0 ? (
+              <div className="user-orders-view__empty">
+                <PackageIcon className="user-orders-view__empty-icon" />
+                <h3 className="user-orders-view__empty-title"><Trans>No orders found</Trans></h3>
+                <p className="user-orders-view__empty-text">
+                  {activeFilter === 'all' ? (
+                    <Trans>You haven't placed any orders yet</Trans>
+                  ) : (
+                    <Trans>No {translatedFilterTabs.find((t) => t.id === activeFilter)?.label.toLowerCase()} orders</Trans>
                   )}
-                </div>
+                </p>
               </div>
-
-              {renderStatusTracker(item)}
-
-              <div className="user-orders-view__card-items">
-                {item.items?.map((orderItem, index) => {
-                  // Handle variant attributes display
-                  const variantAttrs = orderItem.variantAttributes || {}
-                  const variantKeys = Object.keys(variantAttrs)
-                  const hasVariants = variantKeys.length > 0
-                  
-                  // Get product name - use productName from orderItem or product.name
-                  const productName = orderItem.productName || orderItem.name || (orderItem.product?.name || 'Product')
-                  
-                  // Get price - use unitPrice from orderItem or price
-                  const unitPrice = orderItem.unitPrice || orderItem.price || 0
-                  
-                  // Create unique key for order item - include index to ensure uniqueness even if productId is same
-                  const orderItemId = orderItem.id || orderItem._id || orderItem.productId
-                  const orderItemKey = `${item.uniqueId || item.id || item._id || 'order'}-item-${orderItemId || index}-${index}`
-                  
-                  return (
-                    <div key={orderItemKey} className="user-orders-view__card-item">
-                      <div className="user-orders-view__card-item-image">
-                        <img
-                          src={orderItem.product ? getPrimaryImageUrl(orderItem.product) : (orderItem.image || 'https://via.placeholder.com/60')}
-                          alt={productName}
-                          className="w-full h-full object-cover"
-                        />
+            ) : (
+              filteredItems.map((item, index) => (
+                <div key={`${activeFilter}-${item.uniqueId || `${item.type}-${item.id || item._id || index}`}`} className="user-orders-view__card">
+                  <div className="user-orders-view__card-header">
+                    <div className="user-orders-view__card-header-left">
+                      <div className="user-orders-view__card-id">
+                        {item.type === 'cart' ? <Trans>Cart</Trans> : <Trans>Order #{item.id?.slice(-8) || 'N/A'}</Trans>}
                       </div>
-                      <div className="user-orders-view__card-item-details">
-                        <h4 className="user-orders-view__card-item-name"><TransText>{productName}</TransText></h4>
-                        {hasVariants && (
-                          <div className="user-orders-view__card-item-variants">
-                            {variantKeys.map((key) => (
-                              <span key={`${orderItemKey}-variant-${key}`} className="text-xs text-gray-600">
-                                {key}: {variantAttrs[key]}
-                              </span>
-                            ))}
+                      <div className="user-orders-view__card-date">{formatDate(item.date)}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={cn('user-orders-view__card-status', getStatusColor(item.status))}>
+                        {getStatusIcon(item.status)}
+                        <span className="user-orders-view__card-status-text">
+                          {getDisplayStatus(item.status, translatedStatusLabels, item.paymentStatus)}
+                        </span>
+                      </div>
+                      {item.paymentStatus === 'fully_paid' && (
+                        <div className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                          <CreditCardIcon className="h-3 w-3" />
+                          <span><Trans>Fully Paid</Trans></span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {renderStatusTracker(item)}
+
+                  <div className="user-orders-view__card-items">
+                    {item.items?.map((orderItem, index) => {
+                      // Handle variant attributes display
+                      const variantAttrs = orderItem.variantAttributes || {}
+                      const variantKeys = Object.keys(variantAttrs)
+                      const hasVariants = variantKeys.length > 0
+
+                      // Get product name - use productName from orderItem or product.name
+                      const productName = orderItem.productName || orderItem.name || (orderItem.product?.name || 'Product')
+
+                      // Get price - use unitPrice from orderItem or price
+                      const unitPrice = orderItem.unitPrice || orderItem.price || 0
+
+                      // Create unique key for order item - include index to ensure uniqueness even if productId is same
+                      const orderItemId = orderItem.id || orderItem._id || orderItem.productId
+                      const orderItemKey = `${item.uniqueId || item.id || item._id || 'order'}-item-${orderItemId || index}-${index}`
+
+                      return (
+                        <div key={orderItemKey} className="user-orders-view__card-item">
+                          <div className="user-orders-view__card-item-image">
+                            <img
+                              src={orderItem.product ? getPrimaryImageUrl(orderItem.product) : (orderItem.image || 'https://via.placeholder.com/60')}
+                              alt={productName}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
+                          <div className="user-orders-view__card-item-details">
+                            <h4 className="user-orders-view__card-item-name"><TransText>{productName}</TransText></h4>
+                            {hasVariants && (
+                              <div className="user-orders-view__card-item-variants">
+                                {variantKeys.map((key) => (
+                                  <span key={`${orderItemKey}-variant-${key}`} className="text-xs text-gray-600">
+                                    {key}: {variantAttrs[key]}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="user-orders-view__card-item-meta">
+                              <span className="user-orders-view__card-item-quantity">
+                                <Trans>Qty</Trans>: {orderItem.quantity}
+                              </span>
+                              <span className="user-orders-view__card-item-price">
+                                ₹{unitPrice.toLocaleString('en-IN')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="user-orders-view__card-footer">
+                    {/* Order Amount Breakdown */}
+                    <div className="space-y-2 mb-3">
+                      {item.subtotal !== undefined && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600"><Trans>Subtotal</Trans>:</span>
+                          <span className="text-gray-900 font-medium">₹{item.subtotal?.toLocaleString('en-IN') || '0'}</span>
+                        </div>
+                      )}
+                      {item.deliveryCharge !== undefined && item.deliveryCharge > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600"><Trans>Delivery</Trans>:</span>
+                          <span className="text-gray-900 font-medium">₹{item.deliveryCharge?.toLocaleString('en-IN') || '0'}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-base font-semibold pt-2 border-t border-gray-200">
+                        <span className="text-gray-900"><Trans>Total</Trans>:</span>
+                        <span className="text-gray-900">₹{(item.totalAmount || item.total || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+
+                    {/* Payment Status */}
+                    {item.paymentStatus && (
+                      <div className="space-y-2 mb-3">
+                        {item.paymentStatus !== 'fully_paid' && (
+                          <>
+                            {item.paymentPreference === 'partial' && item.upfrontAmount !== undefined && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600"><Trans>Advance (30%)</Trans>:</span>
+                                <span className="text-green-600 font-medium">₹{item.upfrontAmount?.toLocaleString('en-IN') || '0'}</span>
+                              </div>
+                            )}
+                            {item.paymentPreference === 'partial' && item.remainingAmount !== undefined && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600"><Trans>Remaining (70%)</Trans>:</span>
+                                <span className={cn(
+                                  'font-medium',
+                                  item.paymentStatus === 'partial_paid' ? 'text-orange-600' : 'text-red-600'
+                                )}>
+                                  ₹{item.remainingAmount?.toLocaleString('en-IN') || '0'}
+                                </span>
+                              </div>
+                            )}
+                          </>
                         )}
-                        <div className="user-orders-view__card-item-meta">
-                          <span className="user-orders-view__card-item-quantity">
-                            <Trans>Qty</Trans>: {orderItem.quantity}
-                          </span>
-                          <span className="user-orders-view__card-item-price">
-                            ₹{unitPrice.toLocaleString('en-IN')}
+                        <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
+                          <span className="text-gray-600"><Trans>Payment Status</Trans>:</span>
+                          <span
+                            className={cn(
+                              'font-semibold',
+                              item.paymentStatus === 'fully_paid' && 'text-green-600',
+                              item.paymentStatus === 'partial_paid' && 'text-orange-600',
+                              item.paymentStatus === 'pending' && 'text-red-600'
+                            )}
+                          >
+                            {item.paymentStatus === 'fully_paid' ? (
+                              <Trans>Fully Paid</Trans>
+                            ) : item.paymentStatus === 'partial_paid' ? (
+                              <Trans>Partial Paid</Trans>
+                            ) : item.paymentStatus === 'pending' ? (
+                              <Trans>Pending</Trans>
+                            ) : (
+                              item.paymentStatus
+                            )}
                           </span>
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )}
 
-              <div className="user-orders-view__card-footer">
-                {/* Order Amount Breakdown */}
-                <div className="space-y-2 mb-3">
-                  {item.subtotal !== undefined && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600"><Trans>Subtotal</Trans>:</span>
-                      <span className="text-gray-900 font-medium">₹{item.subtotal?.toLocaleString('en-IN') || '0'}</span>
-                    </div>
-                  )}
-                  {item.deliveryCharge !== undefined && item.deliveryCharge > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600"><Trans>Delivery</Trans>:</span>
-                      <span className="text-gray-900 font-medium">₹{item.deliveryCharge?.toLocaleString('en-IN') || '0'}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-base font-semibold pt-2 border-t border-gray-200">
-                    <span className="text-gray-900"><Trans>Total</Trans>:</span>
-                    <span className="text-gray-900">₹{(item.totalAmount || item.total || 0).toLocaleString('en-IN')}</span>
+                    {/* Pay Remaining Button - Show when order is delivered and partially paid */}
+                    {item.status === 'delivered' && item.paymentStatus === 'partial_paid' && (item.remainingAmount || item.remaining) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handlePayRemaining(item)}
+                        disabled={processingPayment === item.id || loading}
+                        className="mt-3 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white text-sm font-semibold hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        <CreditCardIcon className="h-4 w-4" />
+                        {processingPayment === item.id || loading ? (
+                          <Trans>Processing...</Trans>
+                        ) : (
+                          <><Trans>Pay Remaining</Trans> ₹{((item.remainingAmount || item.remaining) || 0).toLocaleString('en-IN')}</>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
-                
-                {/* Payment Status */}
-                {item.paymentStatus && (
-                  <div className="space-y-2 mb-3">
-                    {item.paymentStatus !== 'fully_paid' && (
-                      <>
-                        {item.paymentPreference === 'partial' && item.upfrontAmount !== undefined && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600"><Trans>Advance (30%)</Trans>:</span>
-                            <span className="text-green-600 font-medium">₹{item.upfrontAmount?.toLocaleString('en-IN') || '0'}</span>
-                          </div>
-                        )}
-                        {item.paymentPreference === 'partial' && item.remainingAmount !== undefined && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600"><Trans>Remaining (70%)</Trans>:</span>
-                            <span className={cn(
-                              'font-medium',
-                              item.paymentStatus === 'partial_paid' ? 'text-orange-600' : 'text-red-600'
-                            )}>
-                              ₹{item.remainingAmount?.toLocaleString('en-IN') || '0'}
-                            </span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                    <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
-                      <span className="text-gray-600"><Trans>Payment Status</Trans>:</span>
-                      <span
-                        className={cn(
-                          'font-semibold',
-                          item.paymentStatus === 'fully_paid' && 'text-green-600',
-                          item.paymentStatus === 'partial_paid' && 'text-orange-600',
-                          item.paymentStatus === 'pending' && 'text-red-600'
-                        )}
-                      >
-                        {item.paymentStatus === 'fully_paid' ? (
-                          <Trans>Fully Paid</Trans>
-                        ) : item.paymentStatus === 'partial_paid' ? (
-                          <Trans>Partial Paid</Trans>
-                        ) : item.paymentStatus === 'pending' ? (
-                          <Trans>Pending</Trans>
-                        ) : (
-                          item.paymentStatus
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Pay Remaining Button - Show when order is delivered and partially paid */}
-                {item.status === 'delivered' && item.paymentStatus === 'partial_paid' && (item.remainingAmount || item.remaining) > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => handlePayRemaining(item)}
-                    disabled={processingPayment === item.id || loading}
-                    className="mt-3 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white text-sm font-semibold hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <CreditCardIcon className="h-4 w-4" />
-                    {processingPayment === item.id || loading ? (
-                      <Trans>Processing...</Trans>
-                    ) : (
-                      <><Trans>Pay Remaining</Trans> ₹{((item.remainingAmount || item.remaining) || 0).toLocaleString('en-IN')}</>
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-          ))
-        )}
+              ))
+            )}
           </div>
         </div>
       </div>

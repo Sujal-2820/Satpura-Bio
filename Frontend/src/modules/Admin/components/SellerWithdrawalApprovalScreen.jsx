@@ -70,7 +70,7 @@ export function SellerWithdrawalApprovalScreen({ request, onBack, onSuccess }) {
       // If in test mode (simulated order), skip Razorpay checkout and simulate payment
       if (isTestMode || razorpayOrderId?.startsWith('order_test_')) {
         console.log('⚠️ [SellerWithdrawalApprovalScreen] Test mode detected, simulating payment...')
-        
+
         // Simulate payment success
         const simulatedPaymentResponse = {
           paymentId: `pay_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -117,8 +117,8 @@ export function SellerWithdrawalApprovalScreen({ request, onBack, onSuccess }) {
         amount: amount,
         currency: 'INR',
         order_id: razorpayOrderId,
-        name: 'IRA SATHI',
-        description: `Seller Withdrawal Payment - ${request.sellerName || request.sellerId || 'IRA Partner'}`,
+        name: 'Satpura Bio',
+        description: `Satpura Partner Withdrawal Payment - ${request.sellerName || request.sellerId || 'Satpura Partner'}`,
         prefill: {
           name: request.sellerName || '',
           email: '',
@@ -177,8 +177,8 @@ export function SellerWithdrawalApprovalScreen({ request, onBack, onSuccess }) {
         </button>
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Finance • Withdrawals</p>
-          <h2 className="text-2xl font-bold text-gray-900">Approve IRA Partner Withdrawal</h2>
-          <p className="text-sm text-gray-600">Process IRA Partner (Seller) withdrawal request and payment</p>
+          <h2 className="text-2xl font-bold text-gray-900">Approve Satpura Partner Withdrawal</h2>
+          <p className="text-sm text-gray-600">Process Satpura Partner (Seller) withdrawal request and payment</p>
         </div>
       </header>
 
@@ -199,8 +199,8 @@ export function SellerWithdrawalApprovalScreen({ request, onBack, onSuccess }) {
                       isCompleted
                         ? 'border-green-500 bg-green-500 text-white'
                         : isActive
-                        ? 'border-green-500 bg-green-50 text-green-600'
-                        : 'border-gray-300 bg-white text-gray-400',
+                          ? 'border-green-500 bg-green-50 text-green-600'
+                          : 'border-gray-300 bg-white text-gray-400',
                     )}
                   >
                     <Icon className="h-5 w-5" />
@@ -239,7 +239,7 @@ export function SellerWithdrawalApprovalScreen({ request, onBack, onSuccess }) {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <p className="text-xs text-gray-600 mb-1">IRA Partner</p>
+                <p className="text-xs text-gray-600 mb-1">Satpura Partner</p>
                 <p className="text-lg font-bold text-gray-900">{request.sellerName || request.sellerId || 'N/A'}</p>
               </div>
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -251,10 +251,10 @@ export function SellerWithdrawalApprovalScreen({ request, onBack, onSuccess }) {
                 <p className="text-lg font-bold text-gray-900">
                   {request.date || request.createdAt
                     ? new Date(request.date || request.createdAt).toLocaleDateString('en-IN', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })
                     : 'N/A'}
                 </p>
               </div>

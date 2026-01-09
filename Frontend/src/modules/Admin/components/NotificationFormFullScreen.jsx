@@ -5,7 +5,7 @@ import { useAdminApi } from '../hooks/useAdminApi'
 
 const TARGET_AUDIENCES = [
   { value: 'all', label: 'All Users', icon: Users },
-  { value: 'sellers', label: 'IRA Partners', icon: ShieldCheck },
+  { value: 'sellers', label: 'Satpura Partners', icon: ShieldCheck },
   { value: 'vendors', label: 'Vendors', icon: Building2 },
   { value: 'users', label: 'Users (Farmers)', icon: Users },
 ]
@@ -179,7 +179,7 @@ export function NotificationFormFullScreen({ notification, onSave, onDelete, onC
           <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 8 • Operational Controls</p>
           <h2 className="text-2xl font-bold text-gray-900">{notification ? 'Edit Notification' : 'Add Notification'}</h2>
           <p className="text-sm text-gray-600">
-            Create or update platform notifications for users, vendors, and IRA partners.
+            Create or update platform notifications for users, vendors, and Satpura partners.
           </p>
         </div>
       </div>

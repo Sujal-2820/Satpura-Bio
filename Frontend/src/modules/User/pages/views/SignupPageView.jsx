@@ -154,7 +154,7 @@ export function SignupPageView({ onSuccess, onSwitchToLogin }) {
             <div className="user-auth-page-view__illustration-section">
               <div className="user-auth-page-view__illustration">
                 <div className="user-auth-page-view__illustration-content">
-                  <h2 className="user-auth-page-view__illustration-title"><Trans>Join IRA Sathi</Trans></h2>
+                  <h2 className="user-auth-page-view__illustration-title"><Trans>Join Satpura Bio</Trans></h2>
                   <p className="user-auth-page-view__illustration-text"><Trans>Start your journey towards better farming</Trans></p>
                 </div>
               </div>
@@ -173,7 +173,7 @@ export function SignupPageView({ onSuccess, onSwitchToLogin }) {
           <div className="user-auth-page-view__form-section">
             <div className="user-auth-page-view__form-wrapper">
               <h1 className="user-auth-page-view__title"><Trans>Create Account</Trans></h1>
-              <p className="user-auth-page-view__subtitle"><Trans>Sign up to get started with IRA Sathi</Trans></p>
+              <p className="user-auth-page-view__subtitle"><Trans>Sign up to get started with Satpura Bio</Trans></p>
 
               <form onSubmit={handleRequestOtp} className="user-auth-page-view__form">
                 {error && (
@@ -218,7 +218,7 @@ export function SignupPageView({ onSuccess, onSwitchToLogin }) {
                     onClick={() => setShowSellerId(!showSellerId)}
                     className="user-auth-page-view__toggle-link"
                   >
-                    {showSellerId ? <Trans>Hide Seller ID</Trans> : <Trans>Have a Seller ID?</Trans>}
+                    {showSellerId ? <Trans>Hide Satpura Partner ID</Trans> : <Trans>Have a Satpura Partner ID?</Trans>}
                   </button>
                   {showSellerId && (
                     <input
@@ -227,7 +227,7 @@ export function SignupPageView({ onSuccess, onSwitchToLogin }) {
                       type="text"
                       value={form.sellerId}
                       onChange={handleChange}
-                      placeholder="Enter Seller ID (optional)"
+                      placeholder="Enter Satpura Partner ID (optional)"
                       className="user-auth-page-view__input"
                     />
                   )}
@@ -268,7 +268,7 @@ export function SignupPageView({ onSuccess, onSwitchToLogin }) {
             <div className="user-auth-page-view__illustration">
               <div className="user-auth-page-view__illustration-content">
                 <h2 className="user-auth-page-view__illustration-title"><Trans>Start Your Journey</Trans></h2>
-                <p className="user-auth-page-view__illustration-text"><Trans>Join thousands of farmers who trust IRA Sathi for quality agricultural products and expert guidance</Trans></p>
+                <p className="user-auth-page-view__illustration-text"><Trans>Join thousands of farmers who trust Satpura Bio for quality agricultural products and expert guidance</Trans></p>
               </div>
             </div>
           </div>

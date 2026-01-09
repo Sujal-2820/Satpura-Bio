@@ -220,9 +220,9 @@ Expected response:
 
 Cloudinary for Product Images:
 password: YashP#001
-cloud name: dzr6joukq
-API KEY: 455119592853485
-API Secret: -5D4C5afkdVNFcqRgSLpFxqSjwA
-API Environment Variable: CLOUDINARY_URL=cloudinary://455119592853485:-5D4C5afkdVNFcqRgSLpFxqSjwA@dzr6joukq
+cloud name: dhmtagkyz
+API KEY: 883114994776468
+API Secret: VOc-g-Ag-dGh7Jj4YbilWJpzaUA
+API Environment Variable: CLOUDINARY_URL=cloudinary://883114994776468:VOc-g-Ag-dGh7Jj4YbilWJpzaUA@dhmtagkyz
 
 MongoDB password: eZs25fdXKLkVA5

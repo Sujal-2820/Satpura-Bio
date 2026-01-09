@@ -77,7 +77,7 @@ Product image upload functionality has been successfully implemented in the Admi
 Images are stored in MongoDB with the following structure:
 ```javascript
 {
-  url: "https://res.cloudinary.com/dzr6joukq/image/upload/...",
+  url: "https://res.cloudinary.com/dhmtagkyz/image/upload/...",
   publicId: "ira-sathi/products/abc123",
   isPrimary: true,  // First image is always primary
   order: 0         // Display order (0-3)
@@ -87,9 +87,9 @@ Images are stored in MongoDB with the following structure:
 ## Cloudinary Configuration
 
 ### Credentials (from SETUP_SUMMARY.md)
-- **Cloud Name**: `dzr6joukq`
-- **API Key**: `455119592853485`
-- **API Secret**: `-5D4C5afkdVNFcqRgSLpFxqSjwA`
+- **Cloud Name**: `dhmtagkyz`
+- **API Key**: `883114994776468`
+- **API Secret**: `VOc-g-Ag-dGh7Jj4YbilWJpzaUA`
 
 ### Upload Preset Required
 Before using the image upload feature, you must create an unsigned upload preset in Cloudinary:

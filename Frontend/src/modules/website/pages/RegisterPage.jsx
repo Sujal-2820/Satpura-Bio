@@ -55,8 +55,8 @@ export function RegisterPage() {
         return
       }
       // Validate coordinates are valid (not 0,0)
-      if (!form.location.coordinates.lat || !form.location.coordinates.lng || 
-          form.location.coordinates.lat === 0 || form.location.coordinates.lng === 0) {
+      if (!form.location.coordinates.lat || !form.location.coordinates.lng ||
+        form.location.coordinates.lat === 0 || form.location.coordinates.lng === 0) {
         setError('Please select a valid location. Coordinates are required.')
         setLoading(false)
         return
@@ -70,7 +70,7 @@ export function RegisterPage() {
 
       // Request OTP using websiteApi
       const result = await websiteApi.requestOTP({ phone: form.contact })
-      
+
       if (result.success || result.data) {
         setStep('otp')
       } else {
@@ -110,11 +110,11 @@ export function RegisterPage() {
       })
 
       if (result.success || result.data) {
-          // Store token if provided (same user_token as User module)
-          if (result.data?.token) {
-            localStorage.setItem('user_token', result.data.token)
-          }
-        
+        // Store token if provided (same user_token as User module)
+        if (result.data?.token) {
+          localStorage.setItem('user_token', result.data.token)
+        }
+
         // Update WebsiteContext with user data
         const userData = result.data?.user || { name: form.fullName, phone: form.contact }
         dispatch({
@@ -126,7 +126,7 @@ export function RegisterPage() {
             location: userData.location || location,
           },
         })
-        
+
         // Navigate to website homepage
         navigate('/')
       } else {
@@ -180,7 +180,7 @@ export function RegisterPage() {
             </svg>
           </div>
           <p className="text-xs uppercase tracking-wide text-green-600 font-semibold">Create Account</p>
-          <h1 className="text-3xl font-bold text-gray-900">Join IRA Sathi</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Join Satpura Bio</h1>
           <p className="text-sm text-gray-600">Start your journey to better farming</p>
         </div>
 
@@ -228,7 +228,7 @@ export function RegisterPage() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label htmlFor="register-sellerId" className="text-xs font-semibold text-gray-700">
-                  IRA Partner ID <span className="text-gray-400 text-xs">(Optional)</span>
+                  Satpura Partner ID <span className="text-gray-400 text-xs">(Optional)</span>
                 </label>
                 <button
                   type="button"
@@ -245,20 +245,20 @@ export function RegisterPage() {
                   type="text"
                   value={form.sellerId}
                   onChange={handleChange}
-                  placeholder="Enter IRA Partner ID (e.g., SLR-1001)"
+                  placeholder="Enter Satpura Partner ID (e.g., SLR-1001)"
                   className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
                 />
               )}
               {showSellerId && (
                 <p className="text-xs text-gray-500">
-                  Link your purchases to an IRA Partner for cashback benefits
+                  Link your purchases to a Satpura Partner for cashback benefits
                 </p>
               )}
             </div>
 
             <div className="border-t border-gray-200 pt-5 mt-5">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">Address & Location</h3>
-              
+
               <div className="space-y-4">
                 <GoogleMapsLocationPicker
                   onLocationSelect={(location) => {

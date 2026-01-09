@@ -4,10 +4,10 @@ This guide explains how to set up Cloudinary for product image uploads in the Ad
 
 ## Prerequisites
 
-Cloudinary credentials are already configured in the codebase:
-- **Cloud Name**: `dzr6joukq`
-- **API Key**: `455119592853485`
-- **API Secret**: `-5D4C5afkdVNFcqRgSLpFxqSjwA`
+Cloudinary credentials are now configured via environment variables (.env):
+- **Cloud Name**: `dhmtagkyz`
+- **API Key**: `883114994776468`
+- **API Secret**: `VOc-g-Ag-dGh7Jj4YbilWJpzaUA`
 
 ## Step 1: Create Unsigned Upload Preset
 

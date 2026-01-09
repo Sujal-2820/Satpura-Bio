@@ -20,6 +20,9 @@ import { RepaymentsPage } from '../pages/Repayments'
 import { ReviewsPage } from '../pages/Reviews'
 import TasksPage from '../pages/Tasks'
 import { PushNotificationsPage } from '../pages/PushNotifications'
+import { RepaymentConfigPage } from '../pages/RepaymentConfig'
+import { IncentiveConfigPage } from '../pages/IncentiveConfig'
+import { CategoriesPage } from '../pages/Categories'
 
 const routeConfig = [
   { id: 'dashboard', element: DashboardPage },
@@ -39,6 +42,9 @@ const routeConfig = [
   { id: 'reviews', element: ReviewsPage },
   { id: 'tasks', element: TasksPage },
   { id: 'push-notifications', element: PushNotificationsPage },
+  { id: 'repayment-config', element: RepaymentConfigPage },
+  { id: 'incentive-config', element: IncentiveConfigPage },
+  { id: 'categories', element: CategoriesPage },
 ]
 
 function AdminDashboardContent({ activeRoute, setActiveRoute, onExit }) {

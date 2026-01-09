@@ -30,17 +30,17 @@ export function SellerEditForm({ seller, onSave, onCancel, loading }) {
 
   const validateForm = () => {
     const newErrors = {}
-    
+
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required'
     }
-    
+
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone is required'
     } else if (!/^[6-9]\d{9}$/.test(formData.phone.replace(/\D/g, ''))) {
       newErrors.phone = 'Please enter a valid 10-digit phone number'
     }
-    
+
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -67,13 +67,13 @@ export function SellerEditForm({ seller, onSave, onCancel, loading }) {
           className="mb-4 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-gray-50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)]"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to IRA Partners
+          Back to Satpura Partners
         </button>
         <div>
-          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 4 • IRA Partner Management</p>
-          <h2 className="text-2xl font-bold text-gray-900">Edit IRA Partner Information</h2>
+          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 4 • Satpura Partner Management</p>
+          <h2 className="text-2xl font-bold text-gray-900">Edit Satpura Partner Information</h2>
           <p className="text-sm text-gray-600">
-            Update IRA partner name, contact number, and email address.
+            Update Satpura partner name, contact number, and email address.
           </p>
         </div>
       </div>
@@ -86,8 +86,8 @@ export function SellerEditForm({ seller, onSave, onCancel, loading }) {
                 <ShieldCheck className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">IRA Partner ID: {seller?.id || seller?._id || seller?.sellerId || 'N/A'}</h3>
-                <p className="text-sm text-gray-600">Update basic IRA partner information</p>
+                <h3 className="text-lg font-bold text-gray-900">Satpura Partner ID: {seller?.id || seller?._id || seller?.sellerId || 'N/A'}</h3>
+                <p className="text-sm text-gray-600">Update basic Satpura partner information</p>
               </div>
             </div>
           </div>
@@ -95,14 +95,14 @@ export function SellerEditForm({ seller, onSave, onCancel, loading }) {
           {/* Name Field */}
           <div>
             <label htmlFor="name" className="mb-2 block text-sm font-bold text-gray-900">
-              IRA Partner Name <span className="text-red-500">*</span>
+              Satpura Partner Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               id="name"
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="Enter IRA partner name"
+              placeholder="Enter Satpura partner name"
               className={cn(
                 'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2',
                 errors.name

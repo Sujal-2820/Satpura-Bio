@@ -55,16 +55,16 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
         const width = img.naturalWidth
         const height = img.naturalHeight
         const ratio = width / height
-        
+
         setImageDimensions({ width, height })
         setAspectRatio(ratio)
-        
+
         // Validate aspect ratio
         // Ideal carousel aspect ratio: ~2:1 (2.0) or 16:9 (1.78)
         // Acceptable range: 1.5 to 2.5 (landscape)
         // Warning for: 0.8 to 1.2 (square-ish)
         // Error for: < 0.8 (portrait/tall) or > 2.5 (too wide)
-        
+
         if (ratio < 0.8) {
           setWarning('Image is too tall (portrait). Please upload a landscape/rectangular image.')
         } else if (ratio >= 0.8 && ratio <= 1.2) {
@@ -121,7 +121,7 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
       croppingAspectRatio: 2, // 2:1 aspect ratio (landscape)
       croppingDefaultSelectionRatio: 0.9,
       croppingShowDimensions: true,
-      folder: 'ira-sathi/carousels',
+      folder: 'satpura-bio/carousels',
       transformation: [
         {
           width: 1200,
@@ -154,7 +154,7 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
       options,
       (error, result) => {
         setUploading(false)
-        
+
         if (error) {
           console.error('Upload error:', error)
           setError(error.message || 'Failed to upload image. Please try again.')
@@ -176,7 +176,7 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
 
   const removeImage = () => {
     if (disabled) return
-    
+
     setImageUrl('')
     setImageDimensions({ width: 0, height: 0 })
     setAspectRatio(0)
@@ -205,29 +205,27 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
       )}
 
       {warning && (
-        <div className={`rounded-lg border px-4 py-2 text-sm flex items-start gap-2 ${
-          isSquareLike || isTooTall || isTooWide
+        <div className={`rounded-lg border px-4 py-2 text-sm flex items-start gap-2 ${isSquareLike || isTooTall || isTooWide
             ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
             : 'bg-blue-50 border-blue-200 text-blue-800'
-        }`}>
+          }`}>
           <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <span>{warning}</span>
         </div>
       )}
 
       {imageUrl && aspectRatio > 0 && (
-        <div className={`rounded-lg border px-4 py-2 text-sm flex items-center gap-2 ${
-          isAcceptableRatio
+        <div className={`rounded-lg border px-4 py-2 text-sm flex items-center gap-2 ${isAcceptableRatio
             ? 'bg-green-50 border-green-200 text-green-800'
             : 'bg-gray-50 border-gray-200 text-gray-700'
-        }`}>
+          }`}>
           {isAcceptableRatio ? (
             <CheckCircle className="h-4 w-4 flex-shrink-0" />
           ) : (
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
           )}
           <span>
-            Image dimensions: {imageDimensions.width} × {imageDimensions.height}px 
+            Image dimensions: {imageDimensions.width} × {imageDimensions.height}px
             {' '}(Aspect ratio: {aspectRatio.toFixed(2)}:1)
             {isAcceptableRatio && ' ✓ Good for carousel'}
           </span>
@@ -243,7 +241,7 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
                 src={imageUrl}
                 alt="Carousel preview"
                 className="w-full h-auto object-cover"
-                style={{ 
+                style={{
                   aspectRatio: aspectRatio > 0 ? aspectRatio : '2/1',
                   maxHeight: '150px',
                   objectFit: 'cover'
@@ -269,11 +267,10 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
             type="button"
             onClick={openUploadWidget}
             disabled={uploading || disabled}
-            className={`w-full max-w-md aspect-[2/1] rounded-lg border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1.5 ${
-              uploading
+            className={`w-full max-w-md aspect-[2/1] rounded-lg border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1.5 ${uploading
                 ? 'border-blue-400 bg-blue-50'
                 : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             style={{ maxHeight: '150px' }}
           >
             {uploading ? (
@@ -293,7 +290,7 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
       </div>
 
       <p className="text-xs text-gray-500">
-        <strong>Important:</strong> Upload a landscape/rectangular image (wider than tall). 
+        <strong>Important:</strong> Upload a landscape/rectangular image (wider than tall).
         Square or circular images will show a warning. Ideal aspect ratio: 1.5:1 to 2.5:1.
       </p>
     </div>

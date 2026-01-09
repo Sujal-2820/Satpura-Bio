@@ -1,5 +1,5 @@
 /**
- * Seller (IRA Partner) Controller
+ * Seller (Satpura Partner) Controller
  * 
  * Handles all seller-related operations
  */
@@ -229,8 +229,8 @@ exports.register = async (req, res, next) => {
     // Create Admin TODO Task
     try {
       await adminTaskController.createTaskInternal({
-        title: 'New IRA Partner Application',
-        description: `A new IRA Partner "${name}" (${phone}) has registered and is waiting for approval in ${area || 'unspecified area'}.`,
+        title: 'New Satpura Partner Application',
+        description: `A new Satpura Partner "${name}" (${phone}) has registered and is waiting for approval in ${area || 'unspecified area'}.`,
         category: 'seller',
         priority: 'high',
         link: '/sellers',

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { cn } from '../../../lib/cn'
 import { CloseIcon, MenuIcon, BellIcon, SearchIcon, FilterIcon, UserIcon, ChevronRightIcon } from './icons'
-import iraSathiLogo from '../../../assets/IRA Sathi.png'
+
 import { MapPinIcon } from './icons'
 import { NotificationsDropdown } from './NotificationsDropdown'
 import { LanguageToggle } from '../../../components/LanguageToggle'
@@ -123,7 +123,7 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY
           const scrollDelta = currentScrollY - lastScrollY
-          
+
           // Determine scroll direction with threshold to prevent jitter
           if (Math.abs(scrollDelta) > scrollThreshold) {
             scrollDirection = scrollDelta > 0 ? 1 : -1
@@ -141,7 +141,7 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
               setHideSecondRow(false)
             }
           }
-          
+
           lastScrollY = currentScrollY
           ticking = false
         })
@@ -151,7 +151,7 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
 
     // Initial state
     handleScroll()
-    
+
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
@@ -162,8 +162,8 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
         <div className="user-shell-header__glow" />
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <img src={iraSathiLogo} alt="IRA Sathi" className="h-11 w-auto transition-transform duration-200" />
-            <span className="user-shell-header__logo-text">IRA SATHI</span>
+            <img src="/assets/Satpura-1.webp" alt="Satpura Bio" className="h-11 w-auto transition-transform duration-200" />
+            <span className="user-shell-header__logo-text">SATPURA BIO</span>
           </div>
           {/* Search Bar - Between Logo and Navigation (Laptop Only) */}
           <div className="user-shell-header__search-bar ml-8">
@@ -325,12 +325,12 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
           <div className="user-shell-footer__content">
             {/* Brand Column */}
             <div className="user-shell-footer__column">
-              <h3 className="user-shell-footer__brand"><Trans>IRA SATHI</Trans></h3>
+              <h3 className="user-shell-footer__brand"><Trans>SATPURA BIO</Trans></h3>
               <p className="user-shell-footer__slogan"><Trans>Your Trusted Farming Partner</Trans></p>
               <div className="user-shell-footer__about">
                 <h4 className="user-shell-footer__heading"><Trans>About Us</Trans></h4>
                 <p className="user-shell-footer__text">
-                  <Trans>IRA Sathi is a comprehensive agricultural marketplace connecting farmers with quality seeds, fertilizers, pesticides, and farming equipment. We are committed to empowering farmers with the best agricultural products and services across India.</Trans>
+                  <Trans>Satpura Bio is a comprehensive agricultural marketplace connecting farmers with quality seeds, fertilizers, pesticides, and farming equipment. We are committed to empowering farmers with the best agricultural products and services across India.</Trans>
                 </p>
               </div>
             </div>
@@ -351,7 +351,7 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
             <div className="user-shell-footer__column">
               <h4 className="user-shell-footer__heading"><Trans>Company</Trans></h4>
               <ul className="user-shell-footer__list">
-                <li><a href="#" className="user-shell-footer__link"><Trans>About IRA Sathi</Trans></a></li>
+                <li><a href="#" className="user-shell-footer__link"><Trans>About Satpura Bio</Trans></a></li>
                 <li><a href="#" className="user-shell-footer__link"><Trans>Our Mission</Trans></a></li>
                 <li><a href="#" className="user-shell-footer__link"><Trans>Become a Seller</Trans></a></li>
                 <li><a href="#" className="user-shell-footer__link"><Trans>Careers</Trans></a></li>
@@ -364,7 +364,7 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
               <h4 className="user-shell-footer__heading"><Trans>Contact us</Trans></h4>
               <div className="user-shell-footer__contact">
                 <p className="user-shell-footer__text"><Trans>Call</Trans> : <a href="tel:+911234567890" className="user-shell-footer__link">+91 123 456 7890</a></p>
-                <p className="user-shell-footer__text"><Trans>Email</Trans>: <a href="mailto:support@irasathi.com" className="user-shell-footer__link">support@irasathi.com</a></p>
+                <p className="user-shell-footer__text"><Trans>Email</Trans>: <a href="mailto:support@satpurabio.com" className="user-shell-footer__link">support@satpurabio.com</a></p>
               </div>
             </div>
 
@@ -397,7 +397,7 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
               <a href="#" className="user-shell-footer__legal-link"><Trans>What We Do</Trans></a>
             </div>
             <p className="user-shell-footer__copyright">
-              <Trans>© 2025 IRA Sathi. All images are for demo purposes only.</Trans>
+              <Trans>© 2025 Satpura Bio. All images are for demo purposes only.</Trans>
             </p>
           </div>
         </div>
@@ -434,9 +434,9 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
           </div>
           {typeof menuContent === 'function'
             ? menuContent({
-                close: () => setOpen(false),
-                onNavigate: () => setOpen(false),
-              })
+              close: () => setOpen(false),
+              onNavigate: () => setOpen(false),
+            })
             : menuContent}
         </div>
       </aside>
@@ -448,4 +448,3 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
     </div>
   )
 }
-

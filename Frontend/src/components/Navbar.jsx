@@ -24,7 +24,7 @@ const defaultCta = {
 }
 
 export function Navbar({
-  brand = { name: 'IRA Sathi', logo: null },
+  brand = { name: 'Satpura Bio', logo: '/assets/Satpura-1.webp' },
   links = defaultLinks,
   cta = defaultCta,
 }) {

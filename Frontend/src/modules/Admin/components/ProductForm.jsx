@@ -106,11 +106,30 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
     attributeStocks: [], // Array of stock entries per attribute combination
   })
 
+  const [categories, setCategories] = useState([])
+  const [loadingCategories, setLoadingCategories] = useState(false)
+
+
   const [tagInput, setTagInput] = useState('')
   const [errors, setErrors] = useState({})
   const [showAttributeStockForm, setShowAttributeStockForm] = useState(false)
 
   useEffect(() => {
+    const fetchCats = async () => {
+      setLoadingCategories(true)
+      try {
+        const response = await api.getCategories()
+        if (response.success) {
+          setCategories(response.data)
+        }
+      } catch (error) {
+        console.error('Failed to load categories:', error)
+      } finally {
+        setLoadingCategories(false)
+      }
+    }
+    fetchCats()
+
     if (product) {
       // Parse existing product data
       // Handle stock: check for actualStock and displayStock first, fallback to legacy stock
@@ -522,18 +541,27 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
           name="category"
           value={formData.category}
           onChange={handleChange}
+          disabled={loadingCategories}
           className={cn(
-            'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2',
+            'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2 disabled:opacity-50',
             errors.category
               ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
               : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
           )}
         >
-          {FERTILIZER_CATEGORIES.map((cat) => (
-            <option key={cat.value} value={cat.value}>
-              {cat.label} - {cat.description}
-            </option>
-          ))}
+          {loadingCategories ? (
+            <option>Loading categories...</option>
+          ) : (
+            categories.map((cat) => (
+              <option key={cat._id} value={cat.slug || cat.name.toLowerCase()}>
+                {cat.name} {cat.description ? ` - ${cat.description}` : ''}
+              </option>
+            ))
+          )}
+          {/* Fallback for legacy categories if they don't exist in the new list */}
+          {formData.category && !categories.some(c => (c.slug || c.name.toLowerCase()) === formData.category) && (
+            <option value={formData.category}>{formData.category.toUpperCase()}</option>
+          )}
         </select>
         {errors.category && <p className="mt-1 text-xs text-red-600">{errors.category}</p>}
       </div>

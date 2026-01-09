@@ -30,7 +30,7 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
   const autoSlideTimeoutRef = useRef(null)
   const touchStartXRef = useRef(null)
   const touchEndXRef = useRef(null)
-  
+
   // Real data from API
   const [categories, setCategories] = useState([])
   const [products, setProducts] = useState([])
@@ -74,7 +74,7 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
           // Shuffle categories to get random ones
           const shuffledCategories = [...cats].sort(() => Math.random() - 0.5)
           const selectedCategories = shuffledCategories.slice(0, Math.min(4, cats.length))
-          
+
           // Fetch products from each selected category
           const allCategoryProducts = []
           await Promise.all(
@@ -95,11 +95,11 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
               }
             })
           )
-          
+
           // Shuffle and select 4 random products
           const shuffledProducts = allCategoryProducts.sort(() => Math.random() - 0.5)
           const selectedProducts = shuffledProducts.slice(0, 4)
-          
+
           setCategoryProducts(selectedProducts)
         }
 
@@ -141,14 +141,14 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
 
   // Use dynamic carousels from API, fallback to empty array
   // Carousels are already filtered and sorted by order in the fetch
-  const banners = carousels.length > 0 
+  const banners = carousels.length > 0
     ? carousels.map(carousel => ({
-        id: carousel.id || carousel._id,
-        title: carousel.title || '',
-        subtitle: carousel.description || '',
-        image: carousel.image || '',
-        productIds: carousel.productIds || [],
-      }))
+      id: carousel.id || carousel._id,
+      title: carousel.title || '',
+      subtitle: carousel.description || '',
+      image: carousel.image || '',
+      productIds: carousel.productIds || [],
+    }))
     : []
 
   const goToNextSlide = () => {
@@ -184,7 +184,7 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
     const interval = setInterval(() => {
       setBannerIndex((prev) => (prev + 1) % banners.length)
     }, 3000)
-    
+
     return () => clearInterval(interval)
   }, [isUserInteracting, banners.length])
 
@@ -291,56 +291,56 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
     <div className="user-home-view space-y-6">
       {/* Hero Banner Section - Only show if carousels exist */}
       {banners.length > 0 && (
-      <section id="home-hero" className="home-hero-section">
-        <div
-          ref={bannerRef}
-          className="home-hero-banner"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
-          {banners.map((banner, index) => (
-            <div
-              key={banner.id || `banner-${index}`}
-              className={cn(
-                'home-hero-banner__slide',
-                index === bannerIndex ? 'home-hero-banner__slide--active' : 'home-hero-banner__slide--hidden'
-              )}
-              style={{ backgroundImage: `url(${banner.image})` }}
+        <section id="home-hero" className="home-hero-section">
+          <div
+            ref={bannerRef}
+            className="home-hero-banner"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            {banners.map((banner, index) => (
+              <div
+                key={banner.id || `banner-${index}`}
+                className={cn(
+                  'home-hero-banner__slide',
+                  index === bannerIndex ? 'home-hero-banner__slide--active' : 'home-hero-banner__slide--hidden'
+                )}
+                style={{ backgroundImage: `url(${banner.image})` }}
                 onClick={() => {
                   // Navigate to carousel products view
                   if (banner.productIds && banner.productIds.length > 0) {
                     onProductClick(`carousel:${banner.id}`)
                   }
                 }}
-            >
-              <div className="home-hero-banner__overlay" />
-              <div className="home-hero-banner__content">
-                <h2 className="home-hero-banner__title"><TransText>{banner.title}</TransText></h2>
-                <p className="home-hero-banner__subtitle"><TransText>{banner.subtitle}</TransText></p>
+              >
+                <div className="home-hero-banner__overlay" />
+                <div className="home-hero-banner__content">
+                  <h2 className="home-hero-banner__title"><TransText>{banner.title}</TransText></h2>
+                  <p className="home-hero-banner__subtitle"><TransText>{banner.subtitle}</TransText></p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-        <div className="home-hero-banner__indicators">
-          {banners.map((_, index) => (
-            <button
-              key={index}
-              type="button"
-              className={cn(
-                'home-hero-banner__indicator',
-                index === bannerIndex && 'home-hero-banner__indicator--active'
-              )}
-              onClick={() => goToSlide(index)}
-              aria-label={`Go to banner ${index + 1}`}
-            />
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+          <div className="home-hero-banner__indicators">
+            {banners.map((_, index) => (
+              <button
+                key={index}
+                type="button"
+                className={cn(
+                  'home-hero-banner__indicator',
+                  index === bannerIndex && 'home-hero-banner__indicator--active'
+                )}
+                onClick={() => goToSlide(index)}
+                aria-label={`Go to banner ${index + 1}`}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Categories Section */}
@@ -369,11 +369,11 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
           ) : (
             categories.map((category) => (
               <CategoryCard
-                key={category.id}
+                key={category._id || category.id}
                 category={{
-                  id: category.id,
+                  id: category._id || category.id,
                   name: formatCategoryName(category.name),
-                  emoji: category.icon,
+                  icon: category.image?.url || category.icon || category.emoji,
                   count: category.count,
                   description: category.description,
                 }}
@@ -486,30 +486,30 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
 
       {/* Special Deals Section - Only show if special offers exist */}
       {specialOffers.length > 0 && (
-      <section id="home-deals" className="home-deals-section">
-        <div className="home-section-header">
-          <div className="home-section-header__content">
-            <h3 className="home-section-header__title"><Trans>Special Offers</Trans></h3>
-            <p className="home-section-header__subtitle"><Trans>Limited time deals</Trans></p>
+        <section id="home-deals" className="home-deals-section">
+          <div className="home-section-header">
+            <div className="home-section-header__content">
+              <h3 className="home-section-header__title"><Trans>Special Offers</Trans></h3>
+              <p className="home-section-header__subtitle"><Trans>Limited time deals</Trans></p>
+            </div>
           </div>
-        </div>
-        <div className="home-deals-grid">
+          <div className="home-deals-grid">
             {specialOffers.map((offer) => (
               <div key={offer.id} className="home-deal-card">
                 <div className="home-deal-card__badge"><TransText>{offer.specialTag}</TransText></div>
-            <div className="home-deal-card__content">
+                <div className="home-deal-card__content">
                   <h4 className="home-deal-card__title"><TransText>{offer.title}</TransText></h4>
                   {offer.description && (
                     <p className="home-deal-card__description"><TransText>{offer.description}</TransText></p>
                   )}
-              <div className="home-deal-card__price">
+                  <div className="home-deal-card__price">
                     <span className="home-deal-card__price-current"><TransText>{offer.specialValue}</TransText></span>
-            </div>
-          </div>
+                  </div>
+                </div>
               </div>
             ))}
-        </div>
-      </section>
+          </div>
+        </section>
       )}
 
       {/* Quick Stats Section */}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BarChart3, Bell, Building2, Factory, Home, Layers3, ShieldCheck, Users2, Wallet, Settings, ArrowRightLeft, IndianRupee, History, ChevronDown, ChevronRight, ImageIcon, Star, ListTodo } from 'lucide-react'
+import { BarChart3, Bell, Building2, Factory, Home, Layers3, Layers, ShieldCheck, Users2, Wallet, Settings, ArrowRightLeft, IndianRupee, History, ChevronDown, ChevronRight, ImageIcon, Star, ListTodo, Settings2, Gift } from 'lucide-react'
 import { cn } from '../../../lib/cn'
 import { useAdminState } from '../context/AdminContext'
 
@@ -30,6 +30,16 @@ const links = [
       { id: 'products/add', label: 'Add Products' },
       { id: 'products/active', label: 'Active Products' },
       { id: 'products/inactive', label: 'Inactive Products' },
+    ]
+  },
+  {
+    id: 'categories',
+    label: 'Categories',
+    icon: Layers,
+    description: 'Manage product categories',
+    color: 'purple',
+    suboptions: [
+      { id: 'categories/add', label: 'Add Category' },
     ]
   },
   {
@@ -75,13 +85,13 @@ const links = [
   },
   {
     id: 'sellers',
-    label: 'IRA Partners',
+    label: 'Satpura Partners',
     icon: ShieldCheck,
     description: 'Goals & earnings',
     color: 'yellow',
     suboptions: [
-      { id: 'sellers/active', label: 'Active IRA Partners' },
-      { id: 'sellers/inactive', label: 'Inactive IRA Partners' },
+      { id: 'sellers/active', label: 'Active Satpura Partners' },
+      { id: 'sellers/inactive', label: 'Inactive Satpura Partners' },
     ]
   },
   {
@@ -109,6 +119,26 @@ const links = [
     ]
   },
   {
+    id: 'repayment-config',
+    label: 'Repayment Config',
+    icon: Settings2,
+    description: 'Configure discount & interest tiers',
+    color: 'cyan',
+    suboptions: [
+      { id: 'repayment-config/discounts', label: 'Discount Tiers' },
+      { id: 'repayment-config/interests', label: 'Interest Tiers' },
+      { id: 'repayment-config/status', label: 'System Status' },
+    ]
+  },
+  {
+    id: 'incentive-config',
+    label: 'Incentives',
+    icon: Gift,
+    description: 'Manage reward schemes & claims',
+    color: 'purple',
+    suboptions: []
+  },
+  {
     id: 'vendor-withdrawals',
     label: 'Vendor Withdrawals',
     icon: Factory,
@@ -118,7 +148,7 @@ const links = [
   },
   {
     id: 'seller-withdrawals',
-    label: 'IRA Partner Withdrawals',
+    label: 'Satpura Partner Withdrawals',
     icon: ShieldCheck,
     description: 'Manage seller withdrawal requests',
     color: 'yellow',
@@ -229,6 +259,13 @@ const colorStyles = {
     text: 'text-teal-600',
     border: 'border-teal-200',
     hover: 'hover:bg-teal-50 hover:border-teal-300',
+  },
+  cyan: {
+    active: 'bg-gradient-to-br from-cyan-500 to-cyan-600 text-white shadow-[0_2px_6px_rgba(0,0,0,0.1)]',
+    bg: 'bg-cyan-50',
+    text: 'text-cyan-600',
+    border: 'border-cyan-200',
+    hover: 'hover:bg-cyan-50 hover:border-cyan-300',
   },
 }
 

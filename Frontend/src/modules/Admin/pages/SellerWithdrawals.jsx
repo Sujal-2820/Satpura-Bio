@@ -11,7 +11,7 @@ import { cn } from '../../../lib/cn'
 import { getMaskedBankDetails } from '../../../utils/maskSensitiveData'
 
 const columns = [
-  { Header: 'IRA Partner', accessor: 'sellerName' },
+  { Header: 'Satpura Partner', accessor: 'sellerName' },
   { Header: 'Amount', accessor: 'amount' },
   { Header: 'Request Date', accessor: 'date' },
   { Header: 'Status', accessor: 'status' },
@@ -293,8 +293,8 @@ export function SellerWithdrawalsPage({ subRoute = null, navigate }) {
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Finance • Withdrawals</p>
-          <h2 className="text-2xl font-bold text-gray-900">IRA Partner Withdrawal Requests</h2>
-          <p className="text-sm text-gray-600">Manage IRA Partner (Seller) withdrawal requests and process payments</p>
+          <h2 className="text-2xl font-bold text-gray-900">Satpura Partner Withdrawal Requests</h2>
+          <p className="text-sm text-gray-600">Manage Satpura Partner (Seller) withdrawal requests and process payments</p>
         </div>
       </header>
 
@@ -355,7 +355,7 @@ export function SellerWithdrawalsPage({ subRoute = null, navigate }) {
           <Search className="h-4 w-4 text-gray-500" />
           <input
             type="text"
-            placeholder="Search by IRA Partner name..."
+            placeholder="Search by Satpura Partner name..."
             value={filters.search}
             onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
             className="flex-1 border-none bg-transparent text-sm outline-none"
@@ -386,7 +386,7 @@ export function SellerWithdrawalsPage({ subRoute = null, navigate }) {
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <p className="text-xs text-gray-600 mb-1">IRA Partner</p>
+                <p className="text-xs text-gray-600 mb-1">Satpura Partner</p>
                 <p className="text-sm font-bold text-gray-900">{selectedRequest.sellerName || selectedRequest.sellerId || 'N/A'}</p>
               </div>
               <div>
@@ -473,7 +473,7 @@ export function SellerWithdrawalsPage({ subRoute = null, navigate }) {
         message={`Please verify all details before ${pendingAction?.type === 'approve' ? 'approving' : 'rejecting'} this withdrawal request. This action cannot be undone.`}
         type={pendingAction?.type === 'reject' ? 'danger' : 'warning'}
         details={selectedRequest && pendingAction ? {
-          'IRA Partner': selectedRequest.sellerName || selectedRequest.sellerId || 'N/A',
+          'Satpura Partner': selectedRequest.sellerName || selectedRequest.sellerId || 'N/A',
           'Amount': formatCurrency(selectedRequest.amount || 0),
           'Request Date': selectedRequest.date || 'N/A',
           ...(pendingAction.type === 'reject' && pendingAction.reason ? {

@@ -13,8 +13,8 @@ import { cn } from '../../../lib/cn'
 import { getMaskedBankDetails } from '../../../utils/maskSensitiveData'
 
 const columns = [
-  { Header: 'IRA Partner', accessor: 'name' },
-  { Header: 'IRA Partner ID', accessor: 'id' },
+  { Header: 'Satpura Partner', accessor: 'name' },
+  { Header: 'Satpura Partner ID', accessor: 'id' },
   { Header: 'Cashback %', accessor: 'cashback' },
   { Header: 'Commission %', accessor: 'commission' },
   { Header: 'Monthly Target', accessor: 'target' },
@@ -119,13 +119,13 @@ export function SellersPage({ subRoute = null, navigate }) {
 
     // Filter by subRoute
     if (subRoute === 'active') {
-      // Active IRA Partners: those with sales and commissions
+      // Active Satpura Partners: those with sales and commissions
       filtered = filtered.filter((s) => {
         const sales = typeof s.totalSales === 'number' ? s.totalSales : parseFloat(s.sales?.replace(/[₹,\sL]/g, '') || '0') * 100000
         return sales > 0 && (s.status === 'approved' || s.status === 'On Track' || s.status === 'on_track')
       })
     } else if (subRoute === 'inactive') {
-      // Inactive IRA Partners: those not getting sales and commissions
+      // Inactive Satpura Partners: those not getting sales and commissions
       filtered = filtered.filter((s) => {
         const sales = typeof s.totalSales === 'number' ? s.totalSales : parseFloat(s.sales?.replace(/[₹,\sL]/g, '') || '0') * 100000
         return sales === 0 || (s.status !== 'approved' && s.status !== 'On Track' && s.status !== 'on_track')
@@ -225,14 +225,14 @@ export function SellersPage({ subRoute = null, navigate }) {
         setCurrentView(null)
         setSelectedSellerForEdit(null)
         fetchSellers()
-        success('IRA Partner information updated successfully!', 3000)
+        success('Satpura Partner information updated successfully!', 3000)
         if (navigate) navigate('sellers')
       } else if (result.error) {
-        const errorMessage = result.error.message || 'Failed to update IRA partner'
+        const errorMessage = result.error.message || 'Failed to update Satpura partner'
         showError(errorMessage, 5000)
       }
     } catch (error) {
-      showError(error.message || 'Failed to update IRA partner', 5000)
+      showError(error.message || 'Failed to update Satpura partner', 5000)
     }
   }
 
@@ -494,7 +494,7 @@ export function SellersPage({ subRoute = null, navigate }) {
               className: 'text-gray-700 hover:bg-gray-50'
             },
             {
-              label: 'Edit IRA partner info',
+              label: 'Edit Satpura partner info',
               icon: Edit2,
               onClick: () => {
                 handleEditSellerBasicInfo(originalSeller)
@@ -640,7 +640,7 @@ export function SellersPage({ subRoute = null, navigate }) {
   }
 
   const getSellerName = (request) => {
-    if (!request) return 'Unknown IRA Partner'
+    if (!request) return 'Unknown Satpura Partner'
     if (request.sellerName) {
       return request.sellerName
     }
@@ -650,7 +650,7 @@ export function SellersPage({ subRoute = null, navigate }) {
     if (request.seller && typeof request.seller === 'object') {
       return request.seller.name
     }
-    return 'Unknown IRA Partner'
+    return 'Unknown Satpura Partner'
   }
 
   // If a full-screen view is active, render it instead of the main list
@@ -672,12 +672,12 @@ export function SellersPage({ subRoute = null, navigate }) {
           <button
             onClick={handleBackToList}
             className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
-            title="Back to IRA Partners"
+            title="Back to Satpura Partners"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <h2 className="text-2xl font-bold text-gray-900">
-            {selectedSeller ? 'Edit IRA Partner Profile' : 'Create New IRA Partner Profile'}
+            {selectedSeller ? 'Edit Satpura Partner Profile' : 'Create New Satpura Partner Profile'}
           </h2>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
@@ -724,14 +724,14 @@ export function SellersPage({ subRoute = null, navigate }) {
           <button
             onClick={handleBackToList}
             className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
-            title="Back to IRA Partners"
+            title="Back to Satpura Partners"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <h2 className="text-2xl font-bold text-gray-900">IRA Partner Performance Details</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Satpura Partner Performance Details</h2>
         </div>
         <div className="space-y-6">
-          {/* IRA Partner Header */}
+          {/* Satpura Partner Header */}
           <div className="rounded-2xl border border-gray-200 bg-white p-5">
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-4">
@@ -740,7 +740,7 @@ export function SellersPage({ subRoute = null, navigate }) {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">{seller.name}</h3>
-                  <p className="text-sm text-gray-600">IRA Partner ID: {seller.sellerId || seller.id}</p>
+                  <p className="text-sm text-gray-600">Satpura Partner ID: {seller.sellerId || seller.id}</p>
                   {seller.area && (
                     <p className="mt-1 text-xs text-gray-500">{seller.area}</p>
                   )}
@@ -881,11 +881,11 @@ export function SellersPage({ subRoute = null, navigate }) {
           <button
             onClick={handleBackToList}
             className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
-            title="Back to IRA Partners"
+            title="Back to Satpura Partners"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <h2 className="text-2xl font-bold text-gray-900">IRA Partner Withdrawal Request Review</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Satpura Partner Withdrawal Request Review</h2>
         </div>
         <div className="space-y-6">
           {/* Request Header */}
@@ -902,7 +902,7 @@ export function SellersPage({ subRoute = null, navigate }) {
                     <span>{sellerName}</span>
                   </div>
                   {sellerId && (
-                    <p className="mt-1 text-xs text-gray-500">IRA Partner ID: {sellerId}</p>
+                    <p className="mt-1 text-xs text-gray-500">Satpura Partner ID: {sellerId}</p>
                   )}
                   {(request.date || request.createdAt) && (
                     <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
@@ -974,7 +974,7 @@ export function SellersPage({ subRoute = null, navigate }) {
 
             {request.sellerPerformance && (
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                <p className="mb-2 text-xs font-bold text-blue-900">IRA Partner Performance Summary</p>
+                <p className="mb-2 text-xs font-bold text-blue-900">Satpura Partner Performance Summary</p>
                 <div className="grid gap-2 text-xs text-blue-800 sm:grid-cols-2">
                   {request.sellerPerformance.totalSales && (
                     <div>
@@ -1076,7 +1076,7 @@ export function SellersPage({ subRoute = null, navigate }) {
           <button
             onClick={handleBackToList}
             className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
-            title="Back to IRA Partners"
+            title="Back to Satpura Partners"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -1177,7 +1177,7 @@ export function SellersPage({ subRoute = null, navigate }) {
               }
             }}
             className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
-            title={changeRequests.length > 1 ? "Back to Change Requests List" : "Back to IRA Partners"}
+            title={changeRequests.length > 1 ? "Back to Change Requests List" : "Back to Satpura Partners"}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -1196,7 +1196,7 @@ export function SellersPage({ subRoute = null, navigate }) {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">{seller.name || 'N/A'}</h3>
-                  <p className="text-sm text-gray-600">IRA Partner ID: {seller.sellerId || request.sellerIdCode || 'N/A'}</p>
+                  <p className="text-sm text-gray-600">Satpura Partner ID: {seller.sellerId || request.sellerIdCode || 'N/A'}</p>
                   <p className="text-sm text-gray-600">Phone: {seller.phone || request.currentValue || 'N/A'}</p>
                 </div>
               </div>
@@ -1323,11 +1323,11 @@ export function SellersPage({ subRoute = null, navigate }) {
           <button
             onClick={handleBackToList}
             className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
-            title="Back to IRA Partners"
+            title="Back to Satpura Partners"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <h2 className="text-2xl font-bold text-gray-900">Approve IRA Partner</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Approve Satpura Partner</h2>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <div className="space-y-6">
@@ -1338,7 +1338,7 @@ export function SellersPage({ subRoute = null, navigate }) {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">{seller.name}</h3>
-                  <p className="text-sm text-gray-600">IRA Partner ID: {seller.sellerId || seller.id}</p>
+                  <p className="text-sm text-gray-600">Satpura Partner ID: {seller.sellerId || seller.id}</p>
                   {seller.email && (
                     <p className="mt-1 text-xs text-gray-500">Email: {seller.email}</p>
                   )}
@@ -1347,7 +1347,7 @@ export function SellersPage({ subRoute = null, navigate }) {
             </div>
             <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-5">
               <p className="text-sm text-gray-700">
-                Are you sure you want to approve this IRA Partner? This action will activate their account and allow them to start earning commissions.
+                Are you sure you want to approve this Satpura Partner? This action will activate their account and allow them to start earning commissions.
               </p>
             </div>
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -1365,7 +1365,7 @@ export function SellersPage({ subRoute = null, navigate }) {
                 className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(34,197,94,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(34,197,94,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
               >
                 <CheckCircle className="h-4 w-4" />
-                {loading ? 'Processing...' : 'Approve IRA Partner'}
+                {loading ? 'Processing...' : 'Approve Satpura Partner'}
               </button>
             </div>
           </div>
@@ -1382,11 +1382,11 @@ export function SellersPage({ subRoute = null, navigate }) {
           <button
             onClick={handleBackToList}
             className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-all hover:border-purple-500 hover:bg-purple-50 hover:text-purple-700"
-            title="Back to IRA Partners"
+            title="Back to Satpura Partners"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <h2 className="text-2xl font-bold text-gray-900">Reject IRA Partner</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Reject Satpura Partner</h2>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <div className="space-y-6">
@@ -1397,7 +1397,7 @@ export function SellersPage({ subRoute = null, navigate }) {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">{seller.name}</h3>
-                  <p className="text-sm text-gray-600">IRA Partner ID: {seller.sellerId || seller.id}</p>
+                  <p className="text-sm text-gray-600">Satpura Partner ID: {seller.sellerId || seller.id}</p>
                   {seller.email && (
                     <p className="mt-1 text-xs text-gray-500">Email: {seller.email}</p>
                   )}
@@ -1429,7 +1429,7 @@ export function SellersPage({ subRoute = null, navigate }) {
                 className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(239,68,68,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(239,68,68,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
               >
                 <XCircle className="h-4 w-4" />
-                {loading ? 'Processing...' : 'Reject IRA Partner'}
+                {loading ? 'Processing...' : 'Reject Satpura Partner'}
               </button>
             </div>
           </div>
@@ -1439,14 +1439,14 @@ export function SellersPage({ subRoute = null, navigate }) {
   }
 
   const getPageTitle = () => {
-    if (subRoute === 'active') return 'Active IRA Partners'
-    if (subRoute === 'inactive') return 'Inactive IRA Partners'
+    if (subRoute === 'active') return 'Active Satpura Partners'
+    if (subRoute === 'inactive') return 'Inactive Satpura Partners'
     return 'Sales Network HQ'
   }
 
   const getPageDescription = () => {
-    if (subRoute === 'active') return 'View and manage IRA Partners who are actively getting sales and commissions.'
-    if (subRoute === 'inactive') return 'View and manage IRA Partners who are not getting sales and commissions.'
+    if (subRoute === 'active') return 'View and manage Satpura Partners who are actively getting sales and commissions.'
+    if (subRoute === 'inactive') return 'View and manage Satpura Partners who are not getting sales and commissions.'
     return 'Incentivise performance, track targets, and manage wallet payouts with clarity.'
   }
 
@@ -1454,7 +1454,7 @@ export function SellersPage({ subRoute = null, navigate }) {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 4 • IRA Partner Management</p>
+          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Step 4 • Satpura Partner Management</p>
           <h2 className="text-2xl font-bold text-gray-900">{getPageTitle()}</h2>
           <p className="text-sm text-gray-600">
             {getPageDescription()}
@@ -1497,7 +1497,7 @@ export function SellersPage({ subRoute = null, navigate }) {
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-yellow-500 to-yellow-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_15px_rgba(234,179,8,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(234,179,8,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] hover:scale-105 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]"
           >
             <Award className="h-4 w-4" />
-            Create IRA Partner Profile
+            Create Satpura Partner Profile
           </button>
         </div>
       </header>
@@ -1510,7 +1510,7 @@ export function SellersPage({ subRoute = null, navigate }) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search IRA partners by name, phone, email, or ID..."
+            placeholder="Search Satpura partners by name, phone, email, or ID..."
             className="w-full rounded-xl border border-gray-300 bg-white pl-12 pr-4 py-3 text-sm font-semibold transition-all focus:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50"
           />
           {searchQuery && (
@@ -1525,7 +1525,7 @@ export function SellersPage({ subRoute = null, navigate }) {
         </div>
         {searchQuery && (
           <p className="mt-2 text-xs text-gray-600">
-            Found {sellersList.length} IRA partner{sellersList.length !== 1 ? 's' : ''} matching "{searchQuery}"
+            Found {sellersList.length} Satpura partner{sellersList.length !== 1 ? 's' : ''} matching "{searchQuery}"
           </p>
         )}
       </div>
@@ -1533,7 +1533,7 @@ export function SellersPage({ subRoute = null, navigate }) {
       <DataTable
         columns={tableColumns}
         rows={sellersList}
-        emptyState={searchQuery ? `No IRA partners found matching "${searchQuery}"` : "No IRA Partners found in the network"}
+        emptyState={searchQuery ? `No Satpura partners found matching "${searchQuery}"` : "No Satpura Partners found in the network"}
       />
 
       <section className="grid gap-6 lg:grid-cols-2">

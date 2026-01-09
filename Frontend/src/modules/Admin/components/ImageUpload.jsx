@@ -73,7 +73,7 @@ export function ImageUpload({ images = [], onChange, maxImages = 4, disabled = f
       cropping: true,
       croppingAspectRatio: 1, // Square images
       croppingDefaultSelectionRatio: 0.9,
-      folder: 'ira-sathi/products', // Organize images in folder
+      folder: 'satpura-bio/products', // Organize images in folder
       transformation: [
         {
           width: 800,
@@ -106,7 +106,7 @@ export function ImageUpload({ images = [], onChange, maxImages = 4, disabled = f
       options,
       (error, result) => {
         setUploadingIndex(null)
-        
+
         if (error) {
           console.error('Upload error:', error)
           setError(error.message || 'Failed to upload image. Please try again.')
@@ -149,9 +149,9 @@ export function ImageUpload({ images = [], onChange, maxImages = 4, disabled = f
 
   const removeImage = (index) => {
     if (disabled) return
-    
+
     const updatedImages = images.filter((_, idx) => idx !== index)
-    
+
     // Ensure first image is primary
     const finalImages = updatedImages.map((img, idx) => ({
       ...img,
@@ -198,20 +198,20 @@ export function ImageUpload({ images = [], onChange, maxImages = 4, disabled = f
   const handleDrop = (e, dropIndex) => {
     e.preventDefault()
     setDragOverIndex(null)
-    
+
     if (draggedIndex === null || draggedIndex === dropIndex || disabled) {
       return
     }
 
     const updatedImages = [...images]
     const draggedImage = updatedImages[draggedIndex]
-    
+
     // Remove dragged image from its position
     updatedImages.splice(draggedIndex, 1)
-    
+
     // Insert at new position
     updatedImages.splice(dropIndex, 0, draggedImage)
-    
+
     // Update order and primary status
     const finalImages = updatedImages.map((img, idx) => ({
       ...img,
@@ -247,67 +247,68 @@ export function ImageUpload({ images = [], onChange, maxImages = 4, disabled = f
           // Handle both object format {url, publicId} and string format (for backward compatibility)
           const imageUrl = typeof image === 'string' ? image : (image?.url || '')
           if (!imageUrl) return null
-          
+
           const isDragging = draggedIndex === index
           const isDragOver = dragOverIndex === index
-          
+
           return (
-          <div 
-            key={index} 
-            className={cn(
-              "relative group transition-all",
-              !disabled && images.length > 1 && "cursor-move",
-              isDragging && "opacity-50 scale-95",
-              isDragOver && "ring-2 ring-purple-500 ring-offset-2 scale-105"
-            )}
-            draggable={!disabled && images.length > 1}
-            onDragStart={(e) => handleDragStart(e, index)}
-            onDragEnd={handleDragEnd}
-            onDragOver={(e) => handleDragOver(e, index)}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, index)}
-          >
-            <div className="relative aspect-square rounded-xl border-2 border-gray-300 overflow-hidden bg-gray-50">
-              {!disabled && images.length > 1 && (
-                <div className="absolute top-2 left-2 z-10 p-1.5 bg-gray-800/70 text-white rounded cursor-move opacity-0 group-hover:opacity-100 transition-opacity">
-                  <GripVertical className="h-4 w-4" />
-                </div>
+            <div
+              key={index}
+              className={cn(
+                "relative group transition-all",
+                !disabled && images.length > 1 && "cursor-move",
+                isDragging && "opacity-50 scale-95",
+                isDragOver && "ring-2 ring-purple-500 ring-offset-2 scale-105"
               )}
-              <img
-                src={imageUrl}
-                alt={`Product image ${index + 1}`}
-                className="w-full h-full object-cover pointer-events-none"
-                draggable={false}
-                onError={(e) => {
-                  e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI0U0RThFQiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5Q0EzQUYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBub3QgZm91bmQ8L3RleHQ+PC9zdmc+'
-                }}
-              />
-              {((typeof image === 'object' && image.isPrimary) || (index === 0)) && (
-                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">
-                  Primary
-                </div>
+              draggable={!disabled && images.length > 1}
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragEnd={handleDragEnd}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, index)}
+            >
+              <div className="relative aspect-square rounded-xl border-2 border-gray-300 overflow-hidden bg-gray-50">
+                {!disabled && images.length > 1 && (
+                  <div className="absolute top-2 left-2 z-10 p-1.5 bg-gray-800/70 text-white rounded cursor-move opacity-0 group-hover:opacity-100 transition-opacity">
+                    <GripVertical className="h-4 w-4" />
+                  </div>
+                )}
+                <img
+                  src={imageUrl}
+                  alt={`Product image ${index + 1}`}
+                  className="w-full h-full object-cover pointer-events-none"
+                  draggable={false}
+                  onError={(e) => {
+                    e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI0U0RThFQiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5Q0EzQUYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBub3QgZm91bmQ8L3RleHQ+PC9zdmc+'
+                  }}
+                />
+                {((typeof image === 'object' && image.isPrimary) || (index === 0)) && (
+                  <div className="absolute top-2 right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">
+                    Primary
+                  </div>
+                )}
+                {!disabled && (
+                  <button
+                    type="button"
+                    onClick={() => removeImage(index)}
+                    className="absolute bottom-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-10"
+                    aria-label="Remove image"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {index === 0 && images.length > 1 && (
+                <p className="mt-1 text-xs text-center text-gray-500">Primary</p>
               )}
-              {!disabled && (
-                <button
-                  type="button"
-                  onClick={() => removeImage(index)}
-                  className="absolute bottom-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-10"
-                  aria-label="Remove image"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+              {images.length > 1 && !disabled && (
+                <p className="mt-1 text-xs text-center text-gray-500">
+                  Position {index + 1} • Drag to reorder
+                </p>
               )}
             </div>
-            {index === 0 && images.length > 1 && (
-              <p className="mt-1 text-xs text-center text-gray-500">Primary</p>
-            )}
-            {images.length > 1 && !disabled && (
-              <p className="mt-1 text-xs text-center text-gray-500">
-                Position {index + 1} • Drag to reorder
-              </p>
-            )}
-          </div>
-        )})}
+          )
+        })}
 
         {/* Upload Button */}
         {canAddMore && !disabled && (

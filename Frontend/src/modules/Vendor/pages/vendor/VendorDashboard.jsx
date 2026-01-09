@@ -19,7 +19,9 @@ import {
   CloseIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  GiftIcon,
 } from '../../components/icons'
+import { RewardsView } from './RewardsView'
 import { cn } from '../../../../lib/cn'
 import { useButtonAction } from '../../hooks/useButtonAction'
 import { ButtonActionPanel } from '../../components/ButtonActionPanel'
@@ -35,6 +37,9 @@ import { useTranslation } from '../../../../context/TranslationContext'
 import { Trans } from '../../../../components/Trans'
 import { TransText } from '../../../../components/TransText'
 import { playNotificationSoundIfEnabled } from '../../../../utils/notificationSound'
+import { RepaymentCalculator } from '../../components/RepaymentCalculator'
+import { CreditSummaryWidget } from '../../components/CreditSummaryWidget'
+import { RewardsWidget } from '../../components/RewardsWidget'
 
 const NAV_ITEMS = [
   {
@@ -73,6 +78,12 @@ const NAV_ITEMS = [
     description: <Trans>Weekly / monthly summary</Trans>,
     icon: ReportIcon,
   },
+  {
+    id: 'rewards',
+    label: <Trans>Rewards</Trans>,
+    description: <Trans>Milestones & gifts</Trans>,
+    icon: GiftIcon,
+  },
 ]
 
 export function VendorDashboard({ onLogout }) {
@@ -107,7 +118,7 @@ export function VendorDashboard({ onLogout }) {
   const [confirmationLoading, setConfirmationLoading] = useState(false)
 
   // Valid tabs for navigation
-  const validTabs = ['overview', 'inventory', 'orders', 'credit', 'earnings', 'reports']
+  const validTabs = ['overview', 'inventory', 'orders', 'credit', 'earnings', 'reports', 'rewards']
 
   // Initialize tab from URL parameter on mount or when URL changes
   useEffect(() => {
@@ -139,6 +150,15 @@ export function VendorDashboard({ onLogout }) {
       closePanel()
     }
   }, [navigate, closePanel, showOrderDetails])
+
+  // Listen for navigation events from children
+  useEffect(() => {
+    const handleNavigate = (e) => {
+      if (e.detail) navigateToTab(e.detail)
+    }
+    window.addEventListener('navigate-to-tab', handleNavigate)
+    return () => window.removeEventListener('navigate-to-tab', handleNavigate)
+  }, [navigateToTab])
 
   // Scroll to top when tab changes
   useEffect(() => {
@@ -642,6 +662,7 @@ export function VendorDashboard({ onLogout }) {
           {activeTab === 'credit' && <CreditView openPanel={openPanel} />}
           {activeTab === 'earnings' && <EarningsView openPanel={openPanel} onNavigate={navigateTo} />}
           {activeTab === 'reports' && <ReportsView onNavigate={navigateTo} />}
+          {activeTab === 'rewards' && <RewardsView navigate={navigateToTab} />}
         </section>
       </MobileShell>
 
@@ -1076,7 +1097,7 @@ export function VendorDashboard({ onLogout }) {
                         amount: razorpayData.amount / 100, // Convert from paise to rupees
                         currency: razorpayData.currency || 'INR',
                         order_id: razorpayData.orderId,
-                        name: 'IRA SATHI',
+                        name: 'Satpura Bio',
                         description: `Credit Repayment - ₹${repaymentAmount.toLocaleString('en-IN')}`,
                         prefill: {
                           name: profile?.name || '',
@@ -1192,7 +1213,7 @@ export function VendorDashboard({ onLogout }) {
                     amount: confirmationData.razorpayAmount / 100, // Convert from paise to rupees
                     currency: 'INR',
                     order_id: confirmationData.razorpayOrderId,
-                    name: 'IRA SATHI',
+                    name: 'Satpura Bio',
                     description: `Credit Repayment - ₹${confirmationData.amount.toLocaleString('en-IN')}`,
                     prefill: {
                       name: profile?.name || '',
@@ -1337,12 +1358,24 @@ export function VendorDashboard({ onLogout }) {
 
 function OverviewView({ onNavigate, welcomeName, openPanel }) {
   const { profile, dashboard } = useVendorState()
-  const { fetchDashboardData, getWithdrawals, getRepaymentHistory, getEarningsSummary } = useVendorApi()
-  const servicesRef = useRef(null)
-  const [servicePage, setServicePage] = useState(0)
   const [recentWithdrawals, setRecentWithdrawals] = useState([])
   const [recentRepayments, setRecentRepayments] = useState([])
   const [availableBalance, setAvailableBalance] = useState(0)
+  const [creditSummary, setCreditSummary] = useState(null)
+  const [loadingSummary, setLoadingSummary] = useState(false)
+  const [incentiveSchemes, setIncentiveSchemes] = useState([])
+  const [incentiveHistory, setIncentiveHistory] = useState([])
+  const [loadingRewards, setLoadingRewards] = useState(false)
+
+  const {
+    fetchDashboardData,
+    getWithdrawals,
+    getRepaymentHistory,
+    getEarningsSummary,
+    getCreditSummary,
+    getIncentiveSchemes,
+    getIncentiveHistory,
+  } = useVendorApi()
 
   // Fetch dashboard data on mount
   useEffect(() => {
@@ -1360,7 +1393,25 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
     }).catch(() => {
       // Silently fail - earnings data is optional
     })
-  }, [fetchDashboardData, getEarningsSummary])
+
+    // Fetch credit summary (Phase 3)
+    setLoadingSummary(true)
+    getCreditSummary().then((result) => {
+      if (result.data) {
+        setCreditSummary(result.data)
+      }
+    }).finally(() => setLoadingSummary(false))
+
+    // Fetch Reward info (Phase 6)
+    setLoadingRewards(true)
+    Promise.all([
+      getIncentiveSchemes(),
+      getIncentiveHistory()
+    ]).then(([schemesRes, historyRes]) => {
+      if (schemesRes.data) setIncentiveSchemes(schemesRes.data)
+      if (historyRes.data) setIncentiveHistory(historyRes.data)
+    }).finally(() => setLoadingRewards(false))
+  }, [fetchDashboardData, getEarningsSummary, getCreditSummary, getIncentiveSchemes, getIncentiveHistory])
 
   const services = [
     { label: <Trans>Stock</Trans>, note: <Trans>Reorder stock</Trans>, tone: 'success', target: 'inventory', icon: BoxIcon, action: null },
@@ -1575,6 +1626,24 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
         </div>
       </section>
 
+      {/* Credit Summary Feature (Phase 3) */}
+      <section id="overview-credit-summary" className="px-4">
+        <CreditSummaryWidget
+          creditData={creditSummary}
+          onNavigateToCalculator={() => onNavigate('credit')}
+        />
+      </section>
+
+      {/* Reward Milestones (Phase 6) */}
+      <section id="overview-rewards" className="px-4">
+        <RewardsWidget
+          schemes={incentiveSchemes}
+          history={incentiveHistory}
+          loading={loadingRewards}
+          onNavigateToRewards={() => onNavigate('rewards')}
+        />
+      </section>
+
       <section id="overview-services" className="overview-section">
         <div className="overview-section__header">
           <div>
@@ -1747,12 +1816,12 @@ function OverviewView({ onNavigate, welcomeName, openPanel }) {
 }
 
 function InventoryView({ openPanel, onNavigate }) {
-  const { dashboard, profile } = useVendorState()
+  const { dashboard, profile, settings } = useVendorState()
   const dispatch = useVendorDispatch()
   const { success, error: showError } = useToast()
   const { getProducts, getProductDetails, requestCreditPurchase, getCreditPurchases, fetchDashboardData } = useVendorApi()
   const { translateProduct } = useTranslation()
-  const MIN_PURCHASE_VALUE = 50000
+  const MIN_PURCHASE_VALUE = settings?.minimumVendorPurchase || 50000
   const MAX_PURCHASE_VALUE = 100000
   const [productsData, setProductsData] = useState(null)
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -3212,7 +3281,7 @@ function InventoryView({ openPanel, onNavigate }) {
                     className="mt-1 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                   />
                   <span>
-                    I have reviewed the credit policy, repayment timeline, and authorize IRA Sathi to adjust my credit balance once the stock is dispatched.
+                    I have reviewed the credit policy, repayment timeline, and authorize Satpura Bio to adjust my credit balance once the stock is dispatched.
                   </span>
                 </label>
                 <div className="flex flex-col gap-2">
@@ -5224,9 +5293,26 @@ function OrderDetailsView({ order: initialOrder, openPanel, onBack, onOpenEscala
 function CreditView({ openPanel }) {
   const { dashboard } = useVendorState()
   const dispatch = useVendorDispatch()
-  const { getCreditInfo, getRepaymentHistory } = useVendorApi()
+  const {
+    getCreditInfo,
+    getRepaymentHistory,
+    getCreditSummary,
+    getPendingPurchases,
+    calculateRepaymentAmount,
+    getRepaymentProjection,
+    submitRepayment,
+    getIncentiveSchemes,
+    getIncentiveHistory
+  } = useVendorApi()
   const [repaymentHistory, setRepaymentHistory] = useState([])
   const [repaymentRefreshKey, setRepaymentRefreshKey] = useState(0)
+  const [creditSummary, setCreditSummary] = useState(null)
+  const [pendingPurchases, setPendingPurchases] = useState([])
+  const [loadingSummary, setLoadingSummary] = useState(false)
+  const [loadingPurchases, setLoadingPurchases] = useState(false)
+  const [incentiveSchemes, setIncentiveSchemes] = useState([])
+  const [incentiveHistory, setIncentiveHistory] = useState([])
+  const [loadingRewards, setLoadingRewards] = useState(false)
 
   // Refresh repayment history function
   const refreshRepaymentHistory = useCallback(() => {
@@ -5244,9 +5330,35 @@ function CreditView({ openPanel }) {
       }
     })
 
+    // Fetch credit summary (Phase 3)
+    setLoadingSummary(true)
+    getCreditSummary().then((result) => {
+      if (result.data) {
+        setCreditSummary(result.data)
+      }
+    }).finally(() => setLoadingSummary(false))
+
+    // Fetch pending purchases (Phase 3)
+    setLoadingPurchases(true)
+    getPendingPurchases().then((result) => {
+      if (result.data?.purchases) {
+        setPendingPurchases(result.data.purchases)
+      }
+    }).finally(() => setLoadingPurchases(false))
+
+    // Fetch Reward info (Phase 6)
+    setLoadingRewards(true)
+    Promise.all([
+      getIncentiveSchemes(),
+      getIncentiveHistory()
+    ]).then(([schemesRes, historyRes]) => {
+      if (schemesRes.data) setIncentiveSchemes(schemesRes.data)
+      if (historyRes.data) setIncentiveHistory(historyRes.data)
+    }).finally(() => setLoadingRewards(false))
+
     // Fetch repayment history
     refreshRepaymentHistory()
-  }, [getCreditInfo, refreshRepaymentHistory, dispatch, repaymentRefreshKey])
+  }, [getCreditInfo, refreshRepaymentHistory, getCreditSummary, getPendingPurchases, getIncentiveSchemes, getIncentiveHistory, dispatch, repaymentRefreshKey])
 
   // Listen for repayment success event to refresh history
   useEffect(() => {
@@ -5333,8 +5445,41 @@ function CreditView({ openPanel }) {
   ]
 
   return (
-    <div className="credit-view space-y-6">
+    <div className="credit-view space-y-8 pb-10">
+      {/* 1. Credit Summary Section */}
+      <section id="credit-summary-new">
+        <CreditSummaryWidget
+          creditData={creditSummary}
+          onNavigateToCalculator={() => {
+            const el = document.getElementById('repayment-calculator-section')
+            if (el) el.scrollIntoView({ behavior: 'smooth' })
+          }}
+        />
+      </section>
 
+      {/* 2. Repayment Calculator Section */}
+      <section id="repayment-calculator-section">
+        <RepaymentCalculator
+          vendorApi={{
+            getPendingPurchases: async () => ({ data: { purchases: pendingPurchases } }),
+            calculateRepayment: calculateRepaymentAmount,
+            getRepaymentProjection,
+            submitRepayment
+          }}
+          onSuccess={() => {
+            setRepaymentRefreshKey(prev => prev + 1)
+            // Trigger credit data refresh
+            getCreditInfo().then((result) => {
+              if (result.data) dispatch({ type: 'SET_CREDIT_DATA', payload: result.data })
+            })
+            getCreditSummary().then((result) => {
+              if (result.data) setCreditSummary(result.data)
+            })
+          }}
+        />
+      </section>
+
+      {/* 3. Old Credit Status Section (kept for compatibility or hidden by logic) */}
       <section id="credit-status" className="credit-status-section">
         <div className="credit-status-card">
           <div className="credit-status-card__main">
@@ -5396,6 +5541,19 @@ function CreditView({ openPanel }) {
             )
           })}
         </div>
+      </section>
+
+      {/* Reward Milestones (Phase 6) */}
+      <section id="credit-rewards" className="px-4">
+        <RewardsWidget
+          schemes={incentiveSchemes}
+          history={incentiveHistory}
+          loading={loadingRewards}
+          onNavigateToRewards={() => {
+            // Scroll to navigation if needed, but here we just navigate
+            window.dispatchEvent(new CustomEvent('navigate-to-tab', { detail: 'rewards' }))
+          }}
+        />
       </section>
 
       <section id="credit-actions" className="credit-section">

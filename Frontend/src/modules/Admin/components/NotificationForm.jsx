@@ -5,7 +5,7 @@ import { cn } from '../../../lib/cn'
 
 const TARGET_AUDIENCES = [
   { value: 'all', label: 'All Users', icon: Users },
-  { value: 'sellers', label: 'IRA Partners', icon: ShieldCheck },
+  { value: 'sellers', label: 'Satpura Partners', icon: ShieldCheck },
   { value: 'vendors', label: 'Vendors', icon: Building2 },
   { value: 'users', label: 'Users (Farmers)', icon: Users },
 ]
@@ -50,9 +50,9 @@ export function NotificationForm({ isOpen, onClose, notification, onSave, onDele
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    
+
     const newErrors = {}
-    
+
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required'
     }

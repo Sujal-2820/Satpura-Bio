@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { ShieldCheckIcon, UserIcon, StoreIcon, ShoppingBagIcon } from 'lucide-react'
-import iraSathiLogo from '../../assets/IRA Sathi.png'
+
 
 // Theme configurations for different user types
 const themes = {
@@ -16,7 +16,7 @@ const themes = {
     iconBg: 'bg-green-100',
     iconColor: 'text-green-600',
     title: 'User Verification',
-    subtitle: 'IRA Sathi User Account'
+    subtitle: 'Satpura Bio User Account'
   },
   vendor: {
     bgGradient: 'from-green-50 via-white to-green-50',
@@ -30,7 +30,7 @@ const themes = {
     iconBg: 'bg-green-100',
     iconColor: 'text-green-600',
     title: 'Vendor Verification',
-    subtitle: 'IRA Sathi Vendor Portal'
+    subtitle: 'Satpura Bio Vendor Portal'
   },
   seller: {
     bgGradient: 'from-green-50 via-white to-green-50',
@@ -44,7 +44,7 @@ const themes = {
     iconBg: 'bg-green-100',
     iconColor: 'text-green-600',
     title: 'Seller Verification',
-    subtitle: 'IRA Sathi Seller Portal'
+    subtitle: 'Satpura Bio Seller Portal'
   },
   admin: {
     bgGradient: 'from-gray-50 via-white to-gray-50',
@@ -58,7 +58,7 @@ const themes = {
     iconBg: 'bg-gray-100',
     iconColor: 'text-gray-700',
     title: 'Admin Verification',
-    subtitle: 'IRA Sathi Admin Dashboard'
+    subtitle: 'Satpura Bio Admin Dashboard'
   }
 }
 
@@ -172,7 +172,7 @@ export function OtpVerification({ phone, email, onVerify, onResend, onBack, load
         <div className="flex flex-col items-center gap-3">
           {/* Logo */}
           <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${theme.iconBg} mb-2 overflow-hidden border-2 ${theme.borderColor}`}>
-            <img src={iraSathiLogo} alt="IRA Sathi" className="h-full w-full object-contain p-2" />
+            <img src="/assets/Satpura-1.webp" alt="Satpura Bio" className="h-full w-full object-contain p-2" />
           </div>
 
           {/* User Type Badge */}

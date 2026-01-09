@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { LayoutDashboard, LogOut, Menu } from 'lucide-react'
 import { cn } from '../../../lib/cn'
-import iraSathiLogo from '../../../assets/IRA Sathi.png'
 
 export function AdminLayout({ sidebar, children, onExit }) {
   const [open, setOpen] = useState(true)
@@ -24,10 +23,10 @@ export function AdminLayout({ sidebar, children, onExit }) {
         )}>
           <div className={cn('flex items-center gap-3 overflow-hidden transition-all', open ? 'opacity-100' : 'opacity-0 w-0')}>
             <div className="flex h-8 w-8 items-center justify-center bg-white rounded overflow-hidden flex-shrink-0">
-              <img src={iraSathiLogo} alt="IRA Sathi" className="h-full w-full object-contain" />
+              <img src="/assets/Satpura-1.webp" alt="Satpura Bio" className="h-full w-full object-contain" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">IRA Sathi</p>
+              <p className="text-sm font-semibold text-white">Satpura Bio</p>
               <p className="text-xs text-[#b4b9be]">Administrator</p>
             </div>
           </div>
@@ -43,7 +42,7 @@ export function AdminLayout({ sidebar, children, onExit }) {
             <Menu className={cn('transition-all', open ? 'h-4 w-4' : 'h-5 w-5')} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-0">{sidebar({ condensed: !open, onSignOut: onExit })}</div>
+        <div className="flex-1 overflow-y-auto p-0 no-scrollbar">{sidebar({ condensed: !open, onSignOut: onExit })}</div>
         <div className="border-t border-[#32373c] flex-shrink-0 space-y-0">
           <button
             type="button"

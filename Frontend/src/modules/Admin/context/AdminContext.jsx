@@ -5,7 +5,7 @@ const AdminStateContext = createContext(null)
 const AdminDispatchContext = createContext(() => { })
 
 const initialState = {
-  activeTenant: 'IRA Sathi Super Admin',
+  activeTenant: 'Satpura Bio Super Admin',
   authenticated: false,
   profile: {
     name: 'Guest Admin',

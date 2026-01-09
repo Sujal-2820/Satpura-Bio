@@ -6,7 +6,7 @@
  * 
  * Base URL should be configured in environment variables:
  * - Development: http://localhost:3000/api
- * - Production: https://api.irasathi.com/api
+ * - Production: https://api.satpurabio.com/api
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
@@ -203,33 +203,43 @@ function transformDashboardData(backendData) {
     {
       id: 'revenue',
       title: 'Gross Revenue',
-      value: formatCurrency(overview.revenue.total),
-      subtitle: `Avg order: ${formatCurrency(overview.revenue.averageOrderValue || 0)}`,
+      value: formatCurrency(overview.finance.revenue),
+      subtitle: `Avg order: ${formatCurrency(overview.finance.averageOrderValue || 0)}`,
       trend: {
         direction: 'up',
-        value: formatCurrency(overview.revenue.last7Days || 0),
+        value: formatCurrency(overview.finance.revenueLast7Days || 0),
         message: 'last 7 days revenue',
       },
     },
+    {
+      id: 'incentives',
+      title: 'Pending Claims',
+      value: formatNumber(overview.finance.pendingIncentiveClaims || 0),
+      subtitle: 'Vendor reward requests',
+      trend: {
+        direction: overview.finance.pendingIncentiveClaims > 0 ? 'warning' : 'success',
+        value: overview.finance.pendingIncentiveClaims > 0 ? 'Requires action' : 'All clear',
+        message: 'incentive claims status',
+      },
+    }
   ]
 
   // Calculate payables
-  // Note: Backend provides pendingPaymentAmount (which may include remaining 70% payments)
-  // For advance (30%), we estimate based on total revenue pattern
-  // TODO: Enhance backend to provide actual advance vs remaining breakdown from orders
-  const pendingPaymentsAmount = overview.payments.pendingAmount || 0
-  const totalRevenue = overview.revenue.total || 0
+  const pendingPaymentsAmount = overview.finance.pendingPayments || 0
+  const totalRevenue = overview.finance.revenue || 0
+  const outstandingCredits = overview.finance.totalOutstandingCredits || 0
 
   // Estimate: Assuming orders with partial payment, calculate 30% advance from revenue
   // This is an approximation - backend should ideally aggregate from Order.upfrontAmount and Order.remainingAmount
   const estimatedAdvanceAmount = Math.round(totalRevenue * 0.3) // Estimate: 30% of revenue as advance
   const remainingPaymentAmount = pendingPaymentsAmount || 0 // Backend provides this as pending payments (70% remaining)
-  const outstandingCredits = overview.credits.outstanding || 0
+  const outstandingCreditsFromFinance = outstandingCredits || overview.credits?.outstanding || 0
 
   const payables = {
     advance: formatCurrency(estimatedAdvanceAmount),
     pending: formatCurrency(remainingPaymentAmount),
-    outstanding: formatCurrency(outstandingCredits),
+    outstanding: formatCurrency(outstandingCreditsFromFinance),
+    incentiveClaims: overview.finance.pendingIncentiveClaims || 0,
   }
 
   return {
@@ -3931,4 +3941,104 @@ export async function markTaskAsCompleted(taskId) {
     method: 'PUT',
   })
 }
+// ============================================================================
+// CATEGORY MANAGEMENT APIs
+// ============================================================================
 
+/**
+ * Get All Categories (Admin)
+ */
+export async function getAdminCategories() {
+  return apiRequest('/admin/categories')
+}
+
+/**
+ * Get All Categories (Public)
+ */
+export async function getCategories() {
+  return apiRequest('/categories')
+}
+
+/**
+ * Create Category
+ * @param {Object} data - { name, description, image: { url, publicId }, order, isActive }
+ */
+export async function createCategory(data) {
+  return apiRequest('/admin/categories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/**
+ * Update Category
+ * @param {string} id - Category ID
+ * @param {Object} data - Category data to update
+ */
+export async function updateCategory(id, data) {
+  return apiRequest(`/admin/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+/**
+ * Delete Category
+ * @param {string} id - Category ID
+ */
+export async function deleteCategory(id) {
+  return apiRequest(`/admin/categories/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+
+// ============================================================================
+// GENERIC HTTP METHODS (for new APIs like repayment-config)
+// ============================================================================
+
+/**
+ * Generic GET Request
+ * @param {string} endpoint - API endpoint (e.g., '/repayment-config/discounts')
+ * @returns {Promise<Object>} - API response
+ */
+export async function apiGet(endpoint) {
+  return apiRequest(`/admin${endpoint}`)
+}
+
+/**
+ * Generic POST Request
+ * @param {string} endpoint - API endpoint
+ * @param {Object} data - Request body data
+ * @returns {Promise<Object>} - API response
+ */
+export async function apiPost(endpoint, data) {
+  return apiRequest(`/admin${endpoint}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/**
+ * Generic PUT Request
+ * @param {string} endpoint - API endpoint
+ * @param {Object} data - Request body data
+ * @returns {Promise<Object>} - API response
+ */
+export async function apiPut(endpoint, data) {
+  return apiRequest(`/admin${endpoint}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+/**
+ * Generic DELETE Request
+ * @param {string} endpoint - API endpoint
+ * @returns {Promise<Object>} - API response
+ */
+export async function apiDelete(endpoint) {
+  return apiRequest(`/admin${endpoint}`, {
+    method: 'DELETE',
+  })
+}

@@ -330,7 +330,8 @@ export const userSnapshot = {
   ],
 }
 
-export const MIN_ORDER_VALUE = 2000
-export const ADVANCE_PAYMENT_PERCENTAGE = 30
-export const REMAINING_PAYMENT_PERCENTAGE = 70
+
+// Financial constants are now dynamic and managed via Admin Dashboard -> Finance
+// They are fetched from Backend Settings model and provided via Context Providers.
+// Default values are maintained in context initial states as fallbacks.
 

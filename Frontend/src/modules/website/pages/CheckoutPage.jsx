@@ -313,7 +313,7 @@ export function CheckoutPage() {
           amount: amount,
           currency: 'INR',
           order_id: razorpayOrderId,
-          name: 'IRA SATHI',
+          name: 'Satpura Bio',
           description: `Payment for Order ${pendingOrder.orderNumber || pendingOrder.id}`,
           prefill: {
             name: profile.name || '',

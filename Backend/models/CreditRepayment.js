@@ -31,11 +31,154 @@ const creditRepaymentSchema = new mongoose.Schema({
     required: [true, 'Total amount is required'],
     min: [1, 'Total amount must be greater than 0'],
   },
-  // Penalty amount included in this repayment
+  // Penalty amount included in this repayment (DEPRECATED - use interestApplied instead)
   penaltyAmount: {
     type: Number,
     default: 0,
     min: [0, 'Penalty amount cannot be negative'],
+  },
+
+  // ============================================================================
+  // NEW FIELDS FOR ADVANCED DISCOUNT/INTEREST SYSTEM
+  // ============================================================================
+
+  // Link to credit purchase order
+  purchaseOrderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CreditPurchase',
+    // The credit purchase being repaid
+  },
+
+  // Timeline tracking
+  purchaseDate: {
+    type: Date,
+    // When the credit was taken (from CreditPurchase.createdAt)
+  },
+  dueDate: {
+    type: Date,
+    // Expected repayment date
+  },
+  repaymentDate: {
+    type: Date,
+    // Actual repayment date
+  },
+  daysElapsed: {
+    type: Number,
+    min: [0, 'Days elapsed cannot be negative'],
+    // Days from purchase to repayment
+  },
+
+  // Discount tier applied (for early payment)
+  discountApplied: {
+    tierName: {
+      type: String,
+      // e.g., "0-30 days Early Payment Discount"
+    },
+    tierId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'RepaymentDiscount',
+      // Reference to the discount tier
+    },
+    discountRate: {
+      type: Number,
+      default: 0,
+      min: [0, 'Discount rate cannot be negative'],
+      max: [100, 'Discount rate cannot exceed 100%'],
+      // Percentage discount (e.g., 10 for 10%)
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Discount amount cannot be negative'],
+      // Calculated discount deduction in rupees
+    },
+  },
+
+  // Interest tier applied (for late payment)
+  interestApplied: {
+    tierName: {
+      type: String,
+      // e.g., "105-120 days Late Payment Interest"
+    },
+    tierId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'RepaymentInterest',
+      // Reference to the interest tier
+    },
+    interestRate: {
+      type: Number,
+      default: 0,
+      min: [0, 'Interest rate cannot be negative'],
+      max: [100, 'Interest rate cannot exceed 100%'],
+      // Percentage interest (e.g., 5 for 5%)
+    },
+    interestAmount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Interest amount cannot be negative'],
+      // Calculated interest addition in rupees
+    },
+  },
+
+  // Financial breakdown
+  originalAmount: {
+    type: Number,
+    min: [0, 'Original amount cannot be negative'],
+    // Base amount before any discount/interest
+  },
+  adjustedAmount: {
+    type: Number,
+    min: [0, 'Adjusted amount cannot be negative'],
+    // Final amount after discount/interest calculations
+  },
+
+  financialBreakdown: {
+    baseAmount: {
+      type: Number,
+      default: 0,
+      // Original purchase amount
+    },
+    discountDeduction: {
+      type: Number,
+      default: 0,
+      // Amount deducted as discount
+    },
+    interestAddition: {
+      type: Number,
+      default: 0,
+      // Amount added as interest
+    },
+    finalPayable: {
+      type: Number,
+      default: 0,
+      // Final amount vendor needs to pay
+    },
+    savingsFromEarlyPayment: {
+      type: Number,
+      default: 0,
+      // How much vendor saved by paying early
+    },
+    penaltyFromLatePayment: {
+      type: Number,
+      default: 0,
+      // How much extra vendor paid due to delay
+    },
+  },
+
+  // Calculation metadata
+  calculationMethod: {
+    type: String,
+    enum: ['legacy', 'tiered_discount_interest', 'manual'],
+    default: 'tiered_discount_interest',
+    // Method used to calculate repayment amount
+  },
+  calculatedAt: {
+    type: Date,
+    // When the calculation was performed
+  },
+  calculationNotes: {
+    type: String,
+    // Any notes about the calculation
   },
   // Credit balance before repayment
   creditUsedBefore: {
@@ -119,18 +262,18 @@ creditRepaymentSchema.pre('save', async function (next) {
     try {
       const date = new Date();
       const dateStr = date.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
-      
+
       // Find count of repayments created today
       const todayStart = new Date(date);
       todayStart.setHours(0, 0, 0, 0);
       const todayEnd = new Date(date);
       todayEnd.setHours(23, 59, 59, 999);
-      
+
       const RepaymentModel = this.constructor;
       const todayCount = await RepaymentModel.countDocuments({
         createdAt: { $gte: todayStart, $lte: todayEnd },
       });
-      
+
       const sequence = String(todayCount + 1).padStart(4, '0');
       this.repaymentId = `REP-${dateStr}-${sequence}`;
     } catch (error) {

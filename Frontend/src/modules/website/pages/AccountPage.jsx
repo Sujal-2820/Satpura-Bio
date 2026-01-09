@@ -89,29 +89,29 @@ export function AccountPage() {
           {/* Sidebar Navigation - Desktop */}
           <aside className="account-page__sidebar">
             <nav className="account-page__nav">
-              <Link 
-                to="/account/profile" 
+              <Link
+                to="/account/profile"
                 className={cn('account-page__nav-link', activeSection === 'profile' && 'account-page__nav-link--active')}
                 onClick={() => setActiveSection('profile')}
               >
                 Profile
               </Link>
-              <Link 
-                to="/account/orders" 
+              <Link
+                to="/account/orders"
                 className={cn('account-page__nav-link', activeSection === 'orders' && 'account-page__nav-link--active')}
                 onClick={() => setActiveSection('orders')}
               >
                 Orders
               </Link>
-              <Link 
-                to="/account/addresses" 
+              <Link
+                to="/account/addresses"
                 className={cn('account-page__nav-link', activeSection === 'addresses' && 'account-page__nav-link--active')}
                 onClick={() => setActiveSection('addresses')}
               >
                 Addresses
               </Link>
-              <Link 
-                to="/account/support" 
+              <Link
+                to="/account/support"
                 className={cn('account-page__nav-link', activeSection === 'support' && 'account-page__nav-link--active')}
                 onClick={() => setActiveSection('support')}
               >
@@ -155,11 +155,11 @@ export function AccountProfilePage() {
       alert('Name cannot be empty')
       return
     }
-    
+
     try {
       const result = await updateUserProfile({ name: editedName.trim() })
       setEditingName(false)
-      
+
       if (result && !result.error && result.data) {
         dispatch({
           type: 'AUTH_LOGIN',
@@ -192,7 +192,7 @@ export function AccountProfilePage() {
 
       <div className="account-profile__section">
         <h3 className="account-profile__section-title">Personal Information</h3>
-        
+
         {/* Name Field */}
         <div className="account-profile__field">
           <label className="account-profile__field-label">Full Name</label>
@@ -525,7 +525,7 @@ export function AccountProfilePage() {
 
 export function AccountAddressesPage() {
   const { profile, addresses } = useWebsiteState()
-  
+
   return (
     <div className="account-addresses">
       <h2 className="account-addresses__title">Delivery Addresses</h2>
@@ -555,7 +555,7 @@ export function AccountSupportPage() {
             <strong>Phone:</strong> +91 1800-XXX-XXXX
           </p>
           <p className="account-support__section-text">
-            <strong>Email:</strong> support@irasathi.com
+            <strong>Email:</strong> support@satpurabio.com
           </p>
           <p className="account-support__section-text">
             <strong>Hours:</strong> Mon-Sat, 9 AM - 6 PM
@@ -588,19 +588,19 @@ export function AccountOrdersPage() {
     // Add cart items as "added_to_cart" status
     const cartItems = cart.length > 0
       ? [
-          {
-            id: 'cart',
-            type: 'cart',
-            status: 'added_to_cart',
-            date: new Date().toISOString(),
-            items: cart,
-            total: cart.reduce((sum, item) => {
-              const price = item.unitPrice || item.price || 0
-              return sum + price * item.quantity
-            }, 0),
-            paymentStatus: 'pending',
-          },
-        ]
+        {
+          id: 'cart',
+          type: 'cart',
+          status: 'added_to_cart',
+          date: new Date().toISOString(),
+          items: cart,
+          total: cart.reduce((sum, item) => {
+            const price = item.unitPrice || item.price || 0
+            return sum + price * item.quantity
+          }, 0),
+          paymentStatus: 'pending',
+        },
+      ]
       : []
 
     return [...cartItems, ...orderItems]
@@ -705,7 +705,7 @@ export function AccountOrdersPage() {
           amount: amount,
           currency: 'INR',
           order_id: razorpayOrderId,
-          name: 'IRA SATHI',
+          name: 'Satpura Bio',
           description: `Remaining payment for Order ${order.orderNumber || order.id}`,
           prefill: {
             name: order.userName || '',
@@ -841,7 +841,7 @@ export function AccountOrdersPage() {
                   const hasVariants = variantKeys.length > 0
                   const productName = orderItem.productName || orderItem.name || (orderItem.product?.name || 'Product')
                   const unitPrice = orderItem.unitPrice || orderItem.price || 0
-                  
+
                   return (
                     <div key={index} className="account-orders__card-item">
                       <div className="account-orders__card-item-image">
@@ -896,7 +896,7 @@ export function AccountOrdersPage() {
                     <span>₹{(item.totalAmount || item.total || 0).toLocaleString('en-IN')}</span>
                   </div>
                 </div>
-                
+
                 {/* Payment Status */}
                 {item.paymentStatus && item.paymentStatus !== 'fully_paid' && (
                   <div className="account-orders__card-payment">
@@ -932,7 +932,7 @@ export function AccountOrdersPage() {
                     </div>
                   </div>
                 )}
-                
+
                 {/* Pay Remaining Button */}
                 {item.status === 'delivered' && item.paymentStatus === 'partial_paid' && (item.remainingAmount || item.remaining) > 0 && (
                   <button

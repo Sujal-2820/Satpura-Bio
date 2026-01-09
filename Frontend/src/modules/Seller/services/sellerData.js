@@ -4,7 +4,7 @@ export const sellerSnapshot = {
     sellerId: 'SLR-1001',
     area: 'Kolhapur, Maharashtra',
     phone: '+91 98765 43210',
-    email: 'priya.nair@irasathi.com',
+    email: 'priya.nair@satpurabio.com',
     assignedVendor: 'Green Valley Hub',
     commissionRate: '2% - 3%',
     cashbackRate: '2.5%',

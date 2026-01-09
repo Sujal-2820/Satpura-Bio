@@ -206,3 +206,17 @@ export function ChevronUpIcon({ className = 'h-5 w-5' }) {
   )
 }
 
+export function GiftIcon({ active = false, className = 'h-5 w-5' }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+        d="M20 12V8H4v4m16 0v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8m16 0h-3m-13 0h3m4-4h4m-4 0v4m4-4v4m-4-6.5a2.5 2.5 0 1 0-5 0c0 1.5 2.5 2.5 2.5 2.5h2.5zm4 0a2.5 2.5 0 1 1 5 0c0 1.5-2.5 2.5-2.5 2.5H12z"
+      />
+    </svg>
+  )
+}
+
+

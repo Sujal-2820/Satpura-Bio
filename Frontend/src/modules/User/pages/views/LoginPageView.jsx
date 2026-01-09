@@ -130,7 +130,7 @@ export function LoginPageView({ onSuccess, onSwitchToSignup }) {
               <div className="user-auth-page-view__illustration">
                 <div className="user-auth-page-view__illustration-content">
                   <h2 className="user-auth-page-view__illustration-title"><Trans>Welcome Back</Trans></h2>
-                  <p className="user-auth-page-view__illustration-text"><Trans>Continue your farming journey with IRA Sathi</Trans></p>
+                  <p className="user-auth-page-view__illustration-text"><Trans>Continue your farming journey with Satpura Bio</Trans></p>
                 </div>
               </div>
             </div>

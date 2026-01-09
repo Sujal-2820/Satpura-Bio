@@ -8,7 +8,7 @@
  * 
  * Base URL should be configured in environment variables:
  * - Development: http://localhost:3000/api
- * - Production: https://api.irasathi.com/api
+ * - Production: https://api.satpurabio.com/api
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
@@ -30,7 +30,7 @@ async function handleResponse(response) {
  */
 async function apiRequest(endpoint, options = {}) {
   const token = localStorage.getItem('user_token') // Same token as User module (same backend, same user)
-  
+
   const config = {
     headers: {
       'Content-Type': 'application/json',
@@ -811,9 +811,9 @@ export function initializeRealtimeConnection(onMessage) {
   //   onMessage(data)
   // }
   // return () => ws.close()
-  
+
   // For now, return a no-op cleanup function
-  return () => {}
+  return () => { }
 }
 
 /**
@@ -830,7 +830,7 @@ export function handleRealtimeNotification(notification) {
   // - 'order_delivered': When order is delivered
   // - 'offer': When new offers are available
   // - 'announcement': When admin posts announcements
-  
+
   return notification
 }
 

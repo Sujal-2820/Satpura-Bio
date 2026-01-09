@@ -212,13 +212,13 @@ export function useVendorApi() {
       return callApi(vendorApi.confirmRepayment, confirmationData).then((result) => {
         if (result.data) {
           // Update credit balance after successful repayment
-          dispatch({ 
-            type: 'UPDATE_CREDIT_BALANCE', 
-            payload: { 
-              isIncrement: false, 
+          dispatch({
+            type: 'UPDATE_CREDIT_BALANCE',
+            payload: {
+              isIncrement: false,
               amount: result.data.repayment?.amount || 0,
               creditUsed: result.data.vendor?.creditUsed || 0,
-            } 
+            }
           })
           // Refresh dashboard data to get updated credit info
           fetchDashboardData()
@@ -281,6 +281,52 @@ export function useVendorApi() {
 
   const getRegionAnalytics = useCallback(() => callApi(vendorApi.getRegionAnalytics), [callApi])
 
+  // New Repayment System APIs (Phase 3)
+  const getPendingPurchases = useCallback(() => callApi(vendorApi.getPendingPurchases), [callApi])
+
+  const calculateRepaymentAmount = useCallback(
+    (calculationData) => callApi(vendorApi.calculateRepaymentAmount, calculationData),
+    [callApi]
+  )
+
+  const getRepaymentProjection = useCallback(
+    (purchaseId) => callApi(vendorApi.getRepaymentProjection, purchaseId),
+    [callApi]
+  )
+
+  const submitRepayment = useCallback(
+    (purchaseId, repaymentData) => {
+      return callApi(vendorApi.submitRepayment, purchaseId, repaymentData).then((result) => {
+        if (result.data) {
+          // Refresh dashboard and credit info after successful repayment
+          dispatch({
+            type: 'UPDATE_CREDIT_BALANCE',
+            payload: {
+              isIncrement: false,
+              amount: result.data.repayment?.amount || 0,
+              creditUsed: result.data.creditUsedAfter || 0,
+            }
+          })
+          fetchDashboardData()
+        }
+        return result
+      })
+    },
+    [callApi, dispatch, fetchDashboardData]
+  )
+
+  const getCreditSummary = useCallback(() => callApi(vendorApi.getCreditSummary), [callApi])
+
+  // Incentive System APIs (Phase 6)
+  const getIncentiveSchemes = useCallback(() => callApi(vendorApi.getIncentiveSchemes), [callApi])
+
+  const getIncentiveHistory = useCallback((params) => callApi(vendorApi.getIncentiveHistory, params), [callApi])
+
+  const claimReward = useCallback(
+    (claimId, data) => callApi(vendorApi.claimIncentiveReward, claimId, data),
+    [callApi]
+  )
+
   return {
     loading,
     error,
@@ -341,6 +387,16 @@ export function useVendorApi() {
     markNotificationAsRead,
     markAllNotificationsAsRead,
     deleteNotification,
+    // New Repayment System (Phase 3)
+    getPendingPurchases,
+    calculateRepaymentAmount,
+    getRepaymentProjection,
+    submitRepayment,
+    getCreditSummary,
+    // Incentives (Phase 6)
+    getIncentiveSchemes,
+    getIncentiveHistory,
+    claimReward,
   }
 }
 

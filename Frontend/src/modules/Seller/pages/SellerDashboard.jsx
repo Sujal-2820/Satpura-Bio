@@ -145,7 +145,7 @@ export function SellerDashboard({ onLogout }) {
       id: 'logout',
       label: <Trans>Sign out</Trans>,
       icon: <MenuIcon className="h-4 w-4" />,
-      description: <Trans>Log out from IRA Partner account</Trans>,
+      description: <Trans>Log out from Satpura Partner account</Trans>,
       onSelect: () => {
         handleLogout()
         close()

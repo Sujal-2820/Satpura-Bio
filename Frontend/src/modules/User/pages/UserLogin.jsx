@@ -38,7 +38,7 @@ export function UserLogin({ onSuccess, onSwitchToRegister }) {
       // Bypass OTP for specific phone number (8878495505)
       const BYPASS_PHONE = '8878495505'
       const BYPASS_OTP = '123456'
-      
+
       if (form.phone === BYPASS_PHONE) {
         // Skip OTP request and directly verify with bypass OTP
         setLoading(false)
@@ -48,7 +48,7 @@ export function UserLogin({ onSuccess, onSwitchToRegister }) {
 
       // Request OTP (mock for now - accepts any data)
       const result = await userApi.requestOTP({ phone: form.phone })
-      
+
       if (result.success || result.data) {
         setStep('otp')
       } else {
@@ -74,7 +74,7 @@ export function UserLogin({ onSuccess, onSwitchToRegister }) {
         if (result.data?.token) {
           localStorage.setItem('user_token', result.data.token)
         }
-        
+
         // Update context with user data
         const userData = result.data?.user || { name: 'User', phone: form.phone }
         dispatch({
@@ -86,7 +86,7 @@ export function UserLogin({ onSuccess, onSwitchToRegister }) {
             location: userData.location || null,
           },
         })
-        
+
         onSuccess?.(userData)
         // Navigation is handled by onSuccess callback from parent component
       } else {
@@ -156,7 +156,7 @@ export function UserLogin({ onSuccess, onSwitchToRegister }) {
             </svg>
           </div>
           <p className="text-xs uppercase tracking-wide text-green-600 font-semibold">Welcome Back</p>
-          <h1 className="text-3xl font-bold text-gray-900">Sign in to IRA Sathi</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Sign in to Satpura Bio</h1>
           <p className="text-sm text-gray-600">Enter your contact number to continue</p>
         </div>
 

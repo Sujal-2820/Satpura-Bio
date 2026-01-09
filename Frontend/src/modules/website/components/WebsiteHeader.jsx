@@ -27,9 +27,9 @@ export function WebsiteHeader() {
           {/* Left: Logo */}
           <div className="website-header__logo">
             <Link to="/" className="website-header__logo-link">
-              <img 
-                src="/logo.png" 
-                alt="IRA Sathi" 
+              <img
+                src="/assets/Satpura-1.webp"
+                alt="Satpura Bio"
                 className="website-header__logo-img"
               />
             </Link>

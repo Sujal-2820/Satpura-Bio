@@ -6,7 +6,7 @@
  * 
  * Base URL should be configured in environment variables:
  * - Development: http://localhost:3000/api
- * - Production: https://api.irasathi.com/api
+ * - Production: https://api.satpurabio.com/api
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
@@ -20,12 +20,12 @@ async function handleResponse(response) {
     const text = await response.text()
     data = text ? JSON.parse(text) : {}
   } catch (err) {
-    data = { 
+    data = {
       success: false,
       error: { message: 'An error occurred while parsing response' }
     }
   }
-  
+
   if (!response.ok) {
     // Return error in same format as success response for consistent error handling
     return {
@@ -36,7 +36,7 @@ async function handleResponse(response) {
       },
     }
   }
-  
+
   return data
 }
 
@@ -45,7 +45,7 @@ async function handleResponse(response) {
  */
 async function apiRequest(endpoint, options = {}) {
   const token = localStorage.getItem('seller_token') // Seller authentication token
-  
+
   const config = {
     headers: {
       'Content-Type': 'application/json',
@@ -64,7 +64,7 @@ async function apiRequest(endpoint, options = {}) {
 // ============================================================================
 
 /**
- * Request OTP for Seller (IRA Partner)
+ * Request OTP for Seller (Satpura Partner)
  * POST /sellers/auth/request-otp
  * 
  * @param {Object} data - { phone }
@@ -78,7 +78,7 @@ export async function requestSellerOTP(data) {
 }
 
 /**
- * Register Seller (IRA Partner)
+ * Register Seller (Satpura Partner)
  * POST /sellers/auth/register
  * Note: This sends OTP. Use verifyOTP to complete registration.
  * 
@@ -98,7 +98,7 @@ export async function registerSeller(data) {
 }
 
 /**
- * Login Seller (IRA Partner) with OTP
+ * Login Seller (Satpura Partner) with OTP
  * POST /sellers/auth/verify-otp
  * 
  * @param {Object} data - { phone, otp }
@@ -711,9 +711,9 @@ export function initializeRealtimeConnection(onMessage) {
   //   onMessage(data)
   // }
   // return () => ws.close()
-  
+
   // For now, return a no-op cleanup function
-  return () => {}
+  return () => { }
 }
 
 /**
@@ -729,7 +729,7 @@ export function handleRealtimeNotification(notification) {
   // - 'announcement': When admin posts new announcement
   // - 'withdrawal_approved': When withdrawal request is approved
   // - 'withdrawal_rejected': When withdrawal request is rejected
-  
+
   return notification
 }
 

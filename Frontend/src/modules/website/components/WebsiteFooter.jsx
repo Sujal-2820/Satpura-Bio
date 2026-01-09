@@ -11,7 +11,7 @@ export function WebsiteFooter() {
           <div className="website-footer__column">
             <h3 className="website-footer__column-title">About Us</h3>
             <ul className="website-footer__links">
-              <li><Link to="/about" className="website-footer__link">About IRA Sathi</Link></li>
+              <li><Link to="/about" className="website-footer__link">About Satpura Bio</Link></li>
               <li><Link to="/contact" className="website-footer__link">Contact Us</Link></li>
               <li><Link to="/careers" className="website-footer__link">Careers</Link></li>
               <li><Link to="/blog" className="website-footer__link">Blog</Link></li>
@@ -60,7 +60,7 @@ export function WebsiteFooter() {
         {/* Bottom Bar */}
         <div className="website-footer__bottom">
           <p className="website-footer__copyright">
-            © {new Date().getFullYear()} IRA Sathi. All rights reserved.
+            © {new Date().getFullYear()} Satpura Bio. All rights reserved.
           </p>
           <div className="website-footer__social">
             <a href="#" className="website-footer__social-link" aria-label="Facebook">

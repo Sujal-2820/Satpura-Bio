@@ -408,7 +408,7 @@ export function WebsiteProvider({ children }) {
       dispatch({
         type: 'ADD_NOTIFICATION',
         payload: {
-          title: 'Welcome to IRA Sathi!',
+          title: 'Welcome to Satpura Bio!',
           message: 'Start shopping for your farming needs',
           type: 'welcome',
         },

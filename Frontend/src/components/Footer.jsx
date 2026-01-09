@@ -27,7 +27,7 @@ const defaultColumns = [
   },
 ]
 
-export function Footer({ brand = { name: 'IRA Sathi', description: 'Connecting farms with markets.' }, columns = defaultColumns, cta }) {
+export function Footer({ brand = { name: 'Satpura Bio', description: 'Empowering farmers with bio-technological solutions.' }, columns = defaultColumns, cta }) {
   return (
     <footer className="mt-16 bg-surface/80">
       <div className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-12 sm:px-6 lg:flex-row lg:gap-16">
@@ -57,7 +57,7 @@ export function Footer({ brand = { name: 'IRA Sathi', description: 'Connecting f
                     >
                       {label}
                     </a>
-                    
+
                   </li>
                 ))}
               </ul>

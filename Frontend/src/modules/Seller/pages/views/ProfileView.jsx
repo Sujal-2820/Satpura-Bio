@@ -144,7 +144,7 @@ export function ProfileView({ onLogout, onNavigate }) {
         },
         {
           id: 'seller-id',
-          label: <Trans>Seller ID</Trans>,
+          label: <Trans>Satpura Partner ID</Trans>,
           value: sellerProfile.sellerId || sellerSnapshot.profile.sellerId,
           editable: false,
         },
@@ -218,7 +218,7 @@ export function ProfileView({ onLogout, onNavigate }) {
         </div>
         <div className="seller-profile-view__header-info">
           <h2 className="seller-profile-view__header-name"><TransText>{sellerProfile.name}</TransText></h2>
-          <p className="seller-profile-view__header-id"><TransText>Seller ID: {{ id: sellerProfile.sellerId || sellerSnapshot.profile.sellerId }}</TransText></p>
+          <p className="seller-profile-view__header-id"><TransText>Satpura Partner ID: {{ id: sellerProfile.sellerId || sellerSnapshot.profile.sellerId }}</TransText></p>
           <p className="seller-profile-view__header-location">
             <MapPinIcon className="h-4 w-4 inline mr-1" />
             <TransText>{sellerProfile.area || sellerSnapshot.profile.area || sellerProfile.location?.city || sellerProfile.location?.state || 'Location not set'}</TransText>
@@ -488,7 +488,7 @@ export function ProfileView({ onLogout, onNavigate }) {
                     <strong><Trans>Phone:</Trans></strong> +91 1800-XXX-XXXX
                   </p>
                   <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
-                    <strong><Trans>Email:</Trans></strong> support@irasathi.com
+                    <strong><Trans>Email:</Trans></strong> support@satpurabio.com
                   </p>
                   <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
                     <strong><Trans>Hours:</Trans></strong> <Trans>Mon-Sat, 9 AM - 6 PM</Trans>

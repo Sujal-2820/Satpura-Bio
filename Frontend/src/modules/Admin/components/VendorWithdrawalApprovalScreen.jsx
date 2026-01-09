@@ -70,7 +70,7 @@ export function VendorWithdrawalApprovalScreen({ request, onBack, onSuccess }) {
       // If in test mode (simulated order), skip Razorpay checkout and simulate payment
       if (isTestMode || razorpayOrderId?.startsWith('order_test_')) {
         console.log('⚠️ [VendorWithdrawalApprovalScreen] Test mode detected, simulating payment...')
-        
+
         // Simulate payment success
         const simulatedPaymentResponse = {
           paymentId: `pay_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -117,7 +117,7 @@ export function VendorWithdrawalApprovalScreen({ request, onBack, onSuccess }) {
         amount: amount,
         currency: 'INR',
         order_id: razorpayOrderId,
-        name: 'IRA SATHI',
+        name: 'Satpura Bio',
         description: `Vendor Withdrawal Payment - ${request.vendorName || 'Vendor'}`,
         prefill: {
           name: request.vendorName || '',
@@ -199,8 +199,8 @@ export function VendorWithdrawalApprovalScreen({ request, onBack, onSuccess }) {
                       isCompleted
                         ? 'border-green-500 bg-green-500 text-white'
                         : isActive
-                        ? 'border-green-500 bg-green-50 text-green-600'
-                        : 'border-gray-300 bg-white text-gray-400'
+                          ? 'border-green-500 bg-green-50 text-green-600'
+                          : 'border-gray-300 bg-white text-gray-400'
                     )}
                   >
                     {isCompleted ? (

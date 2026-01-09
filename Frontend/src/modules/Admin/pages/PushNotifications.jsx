@@ -19,7 +19,7 @@ const TARGET_AUDIENCES = [
     { value: 'all', label: 'All Users', icon: Users, description: 'Send to everyone on the platform' },
     { value: 'users', label: 'Users (Farmers)', icon: Users, description: 'Send to all registered users' },
     { value: 'vendors', label: 'Vendors', icon: Building2, description: 'Send to all vendors' },
-    { value: 'sellers', label: 'IRA Partners', icon: ShieldCheck, description: 'Send to all IRA Partners' },
+    { value: 'sellers', label: 'Satpura Partners', icon: ShieldCheck, description: 'Send to all Satpura Partners' },
 ]
 
 const PRIORITY_OPTIONS = [
@@ -53,7 +53,7 @@ export function PushNotificationsPage({ subRoute = null, navigate }) {
     const [pushHistory, setPushHistory] = useState([
         {
             id: '1',
-            title: 'Welcome to IRA Sathi!',
+            title: 'Welcome to Satpura Bio!',
             message: 'Thank you for joining our farming community.',
             targetAudience: 'users',
             sentAt: new Date(Date.now() - 86400000).toISOString(),
@@ -227,7 +227,7 @@ export function PushNotificationsPage({ subRoute = null, navigate }) {
                     <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Push Notifications</p>
                     <h2 className="text-2xl font-bold text-gray-900">Push Notification Manager</h2>
                     <p className="text-sm text-gray-600 mt-1">
-                        Send custom push notifications to users, vendors, and IRA Partners
+                        Send custom push notifications to users, vendors, and Satpura Partners
                     </p>
                 </div>
                 <button
@@ -404,7 +404,7 @@ export function PushNotificationsPage({ subRoute = null, navigate }) {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs font-semibold text-gray-500">IRA SATHI</span>
+                                            <span className="text-xs font-semibold text-gray-500">Satpura Bio</span>
                                             <span className="text-xs text-gray-400">now</span>
                                         </div>
                                         <p className="font-bold text-gray-900 truncate mt-0.5">

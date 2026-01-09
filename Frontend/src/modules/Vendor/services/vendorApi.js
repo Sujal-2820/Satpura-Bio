@@ -6,7 +6,7 @@
  * 
  * Base URL should be configured in environment variables:
  * - Development: http://localhost:3000/api
- * - Production: https://api.irasathi.com/api
+ * - Production: https://api.satpurabio.com/api
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
@@ -15,11 +15,11 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
  * API Response Handler
  */
 async function handleResponse(response) {
-  const data = await response.json().catch(() => ({ 
+  const data = await response.json().catch(() => ({
     success: false,
     error: { message: 'An error occurred' }
   }))
-  
+
   if (!response.ok) {
     // Return error in same format as success response for consistent error handling
     const errorResponse = {
@@ -29,15 +29,15 @@ async function handleResponse(response) {
         status: response.status,
       },
     }
-    
+
     // If 401, also clear token
     if (response.status === 401) {
       localStorage.removeItem('vendor_token')
     }
-    
+
     return errorResponse
   }
-  
+
   return data
 }
 
@@ -46,7 +46,7 @@ async function handleResponse(response) {
  */
 async function apiRequest(endpoint, options = {}) {
   const token = localStorage.getItem('vendor_token') // Vendor authentication token
-  
+
   const config = {
     headers: {
       'Content-Type': 'application/json',
@@ -172,14 +172,16 @@ export async function logoutVendor() {
   })
 }
 
-/**
- * Get Vendor Profile
- * GET /vendors/auth/profile
- * 
- * @returns {Promise<Object>} - Vendor profile data
- */
 export async function getVendorProfile() {
   return apiRequest('/vendors/auth/profile')
+}
+
+/**
+ * Get public financial settings
+ * GET /users/settings/financial
+ */
+export async function getFinancialSettings() {
+  return apiRequest('/users/settings/financial')
 }
 
 // ============================================================================
@@ -860,5 +862,102 @@ export function handleRealtimeNotification(notification, dispatch, showToast) {
       dispatch({ type: 'ADD_NOTIFICATION', payload: notification })
       break
   }
+}
+
+
+// ============================================================================
+// NEW REPAYMENT SYSTEM APIs (Phase 3)
+// ============================================================================
+
+/**
+ * Get Pending Purchases
+ * GET /vendors/credit/purchases/pending
+ * 
+ * @returns {Promise<Object>} - { purchases: Array }
+ */
+export async function getPendingPurchases() {
+  return apiRequest('/vendors/credit/purchases/pending')
+}
+
+/**
+ * Calculate Repayment Amount
+ * POST /vendors/credit/repayment/calculate
+ * 
+ * @param {Object} data - { purchaseId, repaymentDate }
+ * @returns {Promise<Object>} - { calculation: Object }
+ */
+export async function calculateRepaymentAmount(data) {
+  return apiRequest('/vendors/credit/repayment/calculate', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/**
+ * Get Repayment Projection
+ * GET /vendors/credit/repayment/:purchaseId/projection
+ * 
+ * @param {string} purchaseId - Purchase ID
+ * @returns {Promise<Object>} - { projections: Array, recommendation: Object }
+ */
+export async function getRepaymentProjection(purchaseId) {
+  return apiRequest(`/vendors/credit/repayment/${purchaseId}/projection`)
+}
+
+/**
+ * Submit Repayment
+ * POST /vendors/credit/repayment/:purchaseId/submit
+ * 
+ * @param {string} purchaseId - Purchase ID
+ * @param {Object} data - { amount, repaymentDate?, paymentMethod?, notes? }
+ * @returns {Promise<Object>} - { repayment: Object, creditUsedAfter: number }
+ */
+export async function submitRepayment(purchaseId, data) {
+  return apiRequest(`/vendors/credit/repayment/${purchaseId}/submit`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/**
+ * Get Credit Summary
+ * GET /vendors/credit/summary
+ * 
+ * @returns {Promise<Object>} - { creditLimit, creditUsed, creditAvailable, creditScore, performanceTier, stats }
+ */
+export async function getCreditSummary() {
+  return apiRequest('/vendors/credit/summary')
+}
+
+// ============================================================================
+// INCENTIVE SYSTEM APIs (Phase 6)
+// ============================================================================
+
+/**
+ * Get Available Incentive Schemes
+ * GET /vendors/incentives/schemes
+ */
+export async function getIncentiveSchemes() {
+  return apiRequest('/vendors/incentives/schemes')
+}
+
+/**
+ * Get Incentive History/Claims
+ * GET /vendors/incentives/history
+ */
+export async function getIncentiveHistory(params) {
+  const query = params ? `?status=${params.status || ''}` : ''
+  return apiRequest(`/vendors/incentives/history${query}`)
+}
+
+/**
+ * Claim Incentive Reward
+ * POST /vendors/incentives/claims/:claimId
+ */
+export async function claimIncentiveReward(claimId, data) {
+  return apiRequest(`/vendors/incentives/claims/${claimId}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { cn } from '../../../lib/cn'
 import { CloseIcon, MenuIcon, SearchIcon, BellIcon } from './icons'
-import iraSathiLogo from '../../../assets/IRA Sathi.png'
+
 import { MapPinIcon } from './icons'
 import { LanguageToggle } from '../../../components/LanguageToggle'
 import { Trans } from '../../../components/Trans'
@@ -47,7 +47,7 @@ export function MobileShell({ title, subtitle, children, navigation, menuContent
         <div className="vendor-shell-header__glow" />
         <div className="vendor-shell-header__controls">
           <div className="vendor-shell-header__brand">
-            <img src={iraSathiLogo} alt="IRA Sathi" className="vendor-logo" />
+            <img src="/assets/Satpura-1.webp" alt="Satpura Bio" className="vendor-logo" />
           </div>
           <div className="vendor-shell-header__actions">
             <button

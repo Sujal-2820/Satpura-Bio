@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useReducer, useEffect, useState } from 'react'
-import { getVendorProfile } from '../services/vendorApi'
+import { getVendorProfile, getFinancialSettings } from '../services/vendorApi'
 
 const initialState = {
   language: 'en',
@@ -25,6 +25,12 @@ const initialState = {
   ordersUpdated: false,
   inventoryUpdated: false,
   realtimeConnected: false,
+  settings: {
+    minOrderValue: 2000,
+    advancePaymentPercent: 30,
+    deliveryCharge: 50,
+    minimumVendorPurchase: 50000,
+  },
 }
 
 // Use a symbol to detect if context is actually provided
@@ -39,6 +45,8 @@ function reducer(state, action) {
       return { ...state, language: action.payload }
     case 'SET_ROLE':
       return { ...state, role: action.payload }
+    case 'SET_SETTINGS':
+      return { ...state, settings: { ...state.settings, ...action.payload } }
     case 'AUTH_LOGIN':
       return {
         ...state,
@@ -320,6 +328,21 @@ export function VendorProvider({ children }) {
 
     initializeVendor()
   }, [state.authenticated]) // Run when authenticated state changes
+
+  // Fetch financial settings on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const result = await getFinancialSettings()
+        if (result.success && result.data) {
+          dispatch({ type: 'SET_SETTINGS', payload: result.data })
+        }
+      } catch (error) {
+        console.error('Failed to fetch financial settings:', error)
+      }
+    }
+    fetchSettings()
+  }, [])
 
   const value = useMemo(() => ({ ...state, [VENDOR_CONTEXT_SYMBOL]: true }), [state])
   const dispatchWithSymbol = useMemo(() => {

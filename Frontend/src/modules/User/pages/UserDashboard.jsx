@@ -6,7 +6,7 @@ import { BottomNavItem } from '../components/BottomNavItem'
 import { MenuList } from '../components/MenuList'
 import { HomeIcon, SearchIcon, CartIcon, UserIcon, MenuIcon, HeartIcon, PackageIcon } from '../components/icons'
 import { Trans } from '../../../components/Trans'
-import { MIN_ORDER_VALUE } from '../services/userData'
+// import { MIN_ORDER_VALUE } from '../services/userData'
 import * as userApi from '../services/userApi'
 import { cn } from '../../../lib/cn'
 import { useToast, ToastProvider } from '../components/ToastNotification'
@@ -65,7 +65,8 @@ const NAV_ITEMS = [
 ]
 
 function UserDashboardContent({ onLogout }) {
-  const { profile, cart, favourites, notifications, orders, authenticated } = useUserState()
+  const { profile, cart, favourites, notifications, orders, authenticated, settings } = useUserState()
+  const MIN_ORDER_VALUE = settings?.minOrderValue || 2000
   const dispatch = useUserDispatch()
   const navigate = useNavigate()
   const location = useLocation()
@@ -214,7 +215,7 @@ function UserDashboardContent({ onLogout }) {
       dispatch({
         type: 'ADD_NOTIFICATION',
         payload: {
-          title: 'Welcome to IRA Sathi!',
+          title: 'Welcome to Satpura Bio!',
           message: 'Start shopping for your farming needs',
           type: 'welcome',
         },
@@ -781,7 +782,7 @@ function UserDashboardContent({ onLogout }) {
   }
 
   const handleProceedToCheckout = () => {
-    const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const cartTotal = cart.reduce((sum, item) => sum + (item.unitPrice || item.price) * item.quantity, 0)
     if (cartTotal < MIN_ORDER_VALUE) {
       warning(`Minimum order value is ₹${MIN_ORDER_VALUE.toLocaleString('en-IN')}`)
       return
@@ -1251,7 +1252,7 @@ function UserDashboardContent({ onLogout }) {
           {activeTab === 'orders' && !authenticated && isLaptopView && (
             <div className="user-orders-view__auth-prompt">
               <div className="user-orders-view__auth-prompt-content">
-                <h2 className="user-orders-view__auth-prompt-title"><Trans>Authentication Required</Trans></h2>
+                <h1 className="text-3xl font-bold text-gray-900">Sign in to Satpura Bio</h1>
                 <p className="user-orders-view__auth-prompt-message">
                   <Trans>You can't view your orders now. First login or create your account.</Trans>
                 </p>

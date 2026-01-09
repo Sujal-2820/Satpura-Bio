@@ -1,7 +1,7 @@
 {
-  "name": "ira-sathi-backend",
+  "name": "satpura-bio-backend",
   "version": "1.0.0",
-  "description": "IRA SATHI - Fertilizer Management Ecosystem Backend API",
+  "description": "Satpura Bio - Fertilizer Management Ecosystem Backend API",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

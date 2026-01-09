@@ -73,7 +73,7 @@ cartSchema.virtual('calculatedSubtotal').get(function () {
 });
 
 // Pre-save hook: Calculate subtotal and validate minimum order
-cartSchema.pre('save', function (next) {
+cartSchema.pre('save', async function (next) {
   // Calculate subtotal from items
   if (this.items && this.items.length > 0) {
     this.subtotal = this.items.reduce((sum, item) => {
@@ -84,8 +84,17 @@ cartSchema.pre('save', function (next) {
     this.subtotal = 0;
   }
 
-  // Check if meets minimum order value
-  this.meetsMinimumOrder = this.subtotal >= MIN_ORDER_VALUE;
+  try {
+    const Settings = mongoose.model('Settings');
+    const dynamicMinOrderValue = await Settings.getSetting('FINANCIAL_PARAMETERS', { minimumUserOrder: MIN_ORDER_VALUE })
+      .then(s => s.minimumUserOrder || MIN_ORDER_VALUE);
+
+    // Check if meets minimum order value
+    this.meetsMinimumOrder = this.subtotal >= dynamicMinOrderValue;
+  } catch (error) {
+    console.error('Error fetching dynamic MIN_ORDER_VALUE in Cart pre-save:', error);
+    this.meetsMinimumOrder = this.subtotal >= MIN_ORDER_VALUE;
+  }
 
   next();
 });
@@ -93,7 +102,7 @@ cartSchema.pre('save', function (next) {
 // Instance method: Add item to cart
 cartSchema.methods.addItem = function (productId, quantity, unitPrice, variantAttributes = null) {
   console.log('🛒 Cart.addItem called:', { productId, quantity, unitPrice, variantAttributes })
-  
+
   // Convert variantAttributes to plain object for comparison
   let variantAttrsObj = {}
   if (variantAttributes) {
@@ -103,45 +112,45 @@ cartSchema.methods.addItem = function (productId, quantity, unitPrice, variantAt
       variantAttrsObj = variantAttributes
     }
   }
-  
+
   const hasVariantAttrs = variantAttrsObj && typeof variantAttrsObj === 'object' && Object.keys(variantAttrsObj).length > 0
   console.log('🛒 Variant attributes object:', variantAttrsObj, 'Has variants:', hasVariantAttrs)
-  
+
   // For items with variants, check if exact variant already exists
   // IMPORTANT: Different variants of same product should be separate cart items
   const existingItemIndex = hasVariantAttrs
     ? this.items.findIndex(item => {
-        if (item.productId.toString() !== productId.toString()) return false
-        
-        const itemAttrs = item.variantAttributes instanceof Map 
-          ? Object.fromEntries(item.variantAttributes)
-          : (item.variantAttributes || {})
-        
-        // Compare variant attributes - must match exactly (sorted keys for consistent comparison)
-        const itemAttrsStr = JSON.stringify(Object.keys(itemAttrs).sort().reduce((obj, key) => {
-          obj[key] = String(itemAttrs[key])
-          return obj
-        }, {}))
-        const variantAttrsStr = JSON.stringify(Object.keys(variantAttrsObj).sort().reduce((obj, key) => {
-          obj[key] = String(variantAttrsObj[key])
-          return obj
-        }, {}))
-        
-        const matches = itemAttrsStr === variantAttrsStr
-        console.log('🛒 Comparing variants:', {
-          itemAttrs,
-          variantAttrsObj,
-          itemAttrsStr,
-          variantAttrsStr,
-          matches
-        })
-        return matches
+      if (item.productId.toString() !== productId.toString()) return false
+
+      const itemAttrs = item.variantAttributes instanceof Map
+        ? Object.fromEntries(item.variantAttributes)
+        : (item.variantAttributes || {})
+
+      // Compare variant attributes - must match exactly (sorted keys for consistent comparison)
+      const itemAttrsStr = JSON.stringify(Object.keys(itemAttrs).sort().reduce((obj, key) => {
+        obj[key] = String(itemAttrs[key])
+        return obj
+      }, {}))
+      const variantAttrsStr = JSON.stringify(Object.keys(variantAttrsObj).sort().reduce((obj, key) => {
+        obj[key] = String(variantAttrsObj[key])
+        return obj
+      }, {}))
+
+      const matches = itemAttrsStr === variantAttrsStr
+      console.log('🛒 Comparing variants:', {
+        itemAttrs,
+        variantAttrsObj,
+        itemAttrsStr,
+        variantAttrsStr,
+        matches
       })
+      return matches
+    })
     : this.items.findIndex(
-        item => item.productId.toString() === productId.toString() &&
-                (!item.variantAttributes || 
-                 (item.variantAttributes instanceof Map ? item.variantAttributes.size === 0 : Object.keys(item.variantAttributes).length === 0))
-      );
+      item => item.productId.toString() === productId.toString() &&
+        (!item.variantAttributes ||
+          (item.variantAttributes instanceof Map ? item.variantAttributes.size === 0 : Object.keys(item.variantAttributes).length === 0))
+    );
 
   console.log('🛒 Existing item index:', existingItemIndex, 'Total items before:', this.items.length)
 
@@ -149,7 +158,7 @@ cartSchema.methods.addItem = function (productId, quantity, unitPrice, variantAt
     // Update existing item (same variant already exists)
     console.log('🛒 Updating existing item at index:', existingItemIndex)
     this.items[existingItemIndex].quantity += quantity;
-    this.items[existingItemIndex].totalPrice = 
+    this.items[existingItemIndex].totalPrice =
       this.items[existingItemIndex].quantity * this.items[existingItemIndex].unitPrice;
   } else {
     // Add new item (different variant or new product)
@@ -161,7 +170,7 @@ cartSchema.methods.addItem = function (productId, quantity, unitPrice, variantAt
       totalPrice: quantity * unitPrice,
       addedAt: new Date(),
     };
-    
+
     // Add variant attributes if provided
     if (hasVariantAttrs) {
       // Convert to Map for storage
@@ -172,15 +181,15 @@ cartSchema.methods.addItem = function (productId, quantity, unitPrice, variantAt
       newItem.variantAttributes = variantAttrsMap
       console.log('🛒 Added variant attributes to new item:', Object.fromEntries(variantAttrsMap))
     }
-    
+
     this.items.push(newItem);
     console.log('🛒 New item added. Total items now:', this.items.length)
   }
-  
+
   // Recalculate subtotal
   this.subtotal = this.items.reduce((sum, item) => sum + item.totalPrice, 0);
   this.meetsMinimumOrder = this.subtotal >= MIN_ORDER_VALUE;
-  
+
   console.log('🛒 Cart after addItem:', {
     itemsCount: this.items.length,
     items: this.items.map((item, idx) => ({
@@ -188,7 +197,7 @@ cartSchema.methods.addItem = function (productId, quantity, unitPrice, variantAt
       productId: item.productId,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
-      variantAttributes: item.variantAttributes instanceof Map 
+      variantAttributes: item.variantAttributes instanceof Map
         ? Object.fromEntries(item.variantAttributes)
         : item.variantAttributes
     }))
@@ -200,7 +209,7 @@ cartSchema.methods.removeItem = function (productId) {
   this.items = this.items.filter(
     item => item.productId.toString() !== productId.toString()
   );
-  
+
   // Recalculate subtotal
   this.subtotal = this.items.reduce((sum, item) => sum + item.totalPrice, 0);
   this.meetsMinimumOrder = this.subtotal >= MIN_ORDER_VALUE;
@@ -215,7 +224,7 @@ cartSchema.methods.updateItemQuantity = function (productId, quantity) {
   if (item) {
     item.quantity = quantity;
     item.totalPrice = item.quantity * item.unitPrice;
-    
+
     // Recalculate subtotal
     this.subtotal = this.items.reduce((sum, item) => sum + item.totalPrice, 0);
     this.meetsMinimumOrder = this.subtotal >= MIN_ORDER_VALUE;

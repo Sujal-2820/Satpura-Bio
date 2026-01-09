@@ -880,6 +880,47 @@ export function useAdminApi() {
     [callApi, dispatch],
   )
 
+  // Incentive Management APIs (Phase 4)
+  const getIncentives = useCallback(() => callApi(adminApi.apiGet, '/admin/incentives'), [callApi])
+
+  const createIncentive = useCallback(
+    (data) => callApi(adminApi.apiPost, '/admin/incentives', data),
+    [callApi]
+  )
+
+  const updateIncentive = useCallback(
+    (id, data) => callApi(adminApi.apiPut, `/admin/incentives/${id}`, data),
+    [callApi]
+  )
+
+  const deleteIncentive = useCallback(
+    (id) => callApi(adminApi.apiDelete, `/admin/incentives/${id}`),
+    [callApi]
+  )
+
+  const getIncentiveHistory = useCallback(
+    (params) => {
+      const query = new URLSearchParams(params).toString()
+      return callApi(adminApi.apiGet, `/admin/incentives/history?${query}`)
+    },
+    [callApi]
+  )
+
+  const approveIncentiveClaim = useCallback(
+    (id) => callApi(adminApi.apiPost, `/admin/incentives/claims/${id}/approve`),
+    [callApi]
+  )
+
+  const rejectIncentiveClaim = useCallback(
+    (id, data) => callApi(adminApi.apiPost, `/admin/incentives/claims/${id}/reject`, data),
+    [callApi]
+  )
+
+  const markIncentiveAsClaimed = useCallback(
+    (id, data) => callApi(adminApi.apiPost, `/admin/incentives/claims/${id}/mark-claimed`, data),
+    [callApi]
+  )
+
   return {
     loading,
     error,
@@ -991,6 +1032,24 @@ export function useAdminApi() {
     fetchTasks,
     markTaskViewed,
     markTaskCompleted,
+    // Incentives (Phase 4)
+    getIncentives,
+    createIncentive,
+    updateIncentive,
+    deleteIncentive,
+    getIncentiveHistory,
+    approveIncentiveClaim,
+    rejectIncentiveClaim,
+    markIncentiveAsClaimed,
+    // Categories
+    getCategories: useCallback(() => callApi(adminApi.getAdminCategories), [callApi]),
+    createCategory: useCallback((data) => callApi(adminApi.createCategory, data), [callApi]),
+    updateCategory: useCallback((id, data) => callApi(adminApi.updateCategory, id, data), [callApi]),
+    deleteCategory: useCallback((id) => callApi(adminApi.deleteCategory, id), [callApi]),
+    // Generic HTTP methods for new APIs
+    get: useCallback((endpoint) => callApi(adminApi.apiGet, endpoint), [callApi]),
+    post: useCallback((endpoint, data) => callApi(adminApi.apiPost, endpoint, data), [callApi]),
+    put: useCallback((endpoint, data) => callApi(adminApi.apiPut, endpoint, data), [callApi]),
+    delete: useCallback((endpoint) => callApi(adminApi.apiDelete, endpoint), [callApi]),
   }
 }
-

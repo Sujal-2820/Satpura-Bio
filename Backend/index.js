@@ -12,6 +12,14 @@ const sellerRoutes = require('./routes/seller');
 const adminRoutes = require('./routes/admin');
 // const utilsRoutes = require('./routes/utils');
 
+// NEW: Import repayment system routes (vendor module rework)
+const adminRepaymentConfigRoutes = require('./routes/adminRepaymentConfig');
+const vendorRepaymentRoutes = require('./routes/vendorRepayment');
+const adminIncentiveRoutes = require('./routes/adminIncentive');
+const vendorIncentiveRoutes = require('./routes/vendorIncentive');
+const categoryRoutes = require('./routes/category');
+const adminCategoryRoutes = require('./routes/adminCategory');
+
 // Import config
 const { connectDB } = require('./config/database');
 const { initializeRealtimeServer } = require('./config/realtime');
@@ -65,7 +73,7 @@ app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
-    message: 'IRA SATHI Backend Server is running',
+    message: 'Satpura Bio Backend Server is running',
     timestamp: new Date().toISOString(),
   });
 });
@@ -79,6 +87,14 @@ app.use('/api/vendors', vendorRoutes);
 app.use('/api/sellers', sellerRoutes);
 app.use('/api/admin', adminRoutes);
 // app.use('/api/utils', utilsRoutes); // Deprecated: Frontend uses Google Cloud Translation API directly
+
+// NEW: Repayment system routes (vendor module rework - isolated for safety)
+app.use('/api/admin/repayment-config', adminRepaymentConfigRoutes);
+app.use('/api/vendors/credit/repayment', vendorRepaymentRoutes);
+app.use('/api/admin/incentives', adminIncentiveRoutes);
+app.use('/api/vendors/incentives', vendorIncentiveRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/admin/categories', adminCategoryRoutes);
 
 // 404 handler (must come before error handler)
 app.use((req, res) => {
@@ -101,7 +117,7 @@ connectDB()
   .then(() => {
     // Start HTTP server
     const server = app.listen(PORT, HOST, () => {
-      console.log(`🚀 IRA SATHI Backend Server running on http://${HOST}:${PORT}`);
+      console.log(`🚀 Satpura Bio Backend Server running on http://${HOST}:${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔗 MongoDB: ${process.env.MONGO_URI ? 'Connected' : 'Not configured'}`);
     });

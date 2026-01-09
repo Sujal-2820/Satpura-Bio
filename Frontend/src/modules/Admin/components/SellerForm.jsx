@@ -68,7 +68,7 @@ export function SellerForm({ seller, onSubmit, onCancel, loading = false }) {
     const newErrors = {}
 
     if (!formData.name.trim()) {
-      newErrors.name = 'IRA Partner name is required'
+      newErrors.name = 'Satpura Partner name is required'
     }
 
     if (!seller && !formData.email.trim()) {
@@ -88,9 +88,9 @@ export function SellerForm({ seller, onSubmit, onCancel, loading = false }) {
     }
 
     if (!formData.sellerId.trim()) {
-      newErrors.sellerId = 'IRA Partner ID is required'
+      newErrors.sellerId = 'Satpura Partner ID is required'
     } else if (!/^SLR-\d{3}$/.test(formData.sellerId)) {
-      newErrors.sellerId = 'IRA Partner ID must be in format SLR-XXX'
+      newErrors.sellerId = 'Satpura Partner ID must be in format SLR-XXX'
     }
 
     if (formData.cashbackRate === '' || parseFloat(formData.cashbackRate) < 0 || parseFloat(formData.cashbackRate) > 10) {
@@ -141,11 +141,11 @@ export function SellerForm({ seller, onSubmit, onCancel, loading = false }) {
       {/* Personal Information */}
       <div className="space-y-4">
         <h4 className="text-sm font-bold text-gray-900">Personal Information</h4>
-        
+
         <div>
           <label htmlFor="name" className="mb-2 block text-sm font-bold text-gray-900">
             <User className="mr-1 inline h-4 w-4" />
-            IRA Partner Name <span className="text-red-500">*</span>
+            Satpura Partner Name <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -234,7 +234,7 @@ export function SellerForm({ seller, onSubmit, onCancel, loading = false }) {
       <div>
         <label htmlFor="sellerId" className="mb-2 block text-sm font-bold text-gray-900">
           <Hash className="mr-1 inline h-4 w-4" />
-          Unique IRA Partner ID <span className="text-red-500">*</span>
+          Unique Satpura Partner ID <span className="text-red-500">*</span>
         </label>
         <div className="flex gap-2">
           <input
@@ -269,7 +269,7 @@ export function SellerForm({ seller, onSubmit, onCancel, loading = false }) {
       {/* Incentive Settings */}
       <div className="space-y-4">
         <h4 className="text-sm font-bold text-gray-900">Incentive Settings</h4>
-        
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="cashbackRate" className="mb-2 block text-sm font-bold text-gray-900">
@@ -374,7 +374,7 @@ export function SellerForm({ seller, onSubmit, onCancel, loading = false }) {
           disabled={loading}
           className="rounded-xl bg-gradient-to-r from-yellow-500 to-yellow-600 px-6 py-3 text-sm font-bold text-white shadow-[0_4px_15px_rgba(234,179,8,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(234,179,8,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-50"
         >
-          {loading ? 'Saving...' : seller ? 'Update IRA Partner' : 'Create IRA Partner'}
+          {loading ? 'Saving...' : seller ? 'Update Satpura Partner' : 'Create Satpura Partner'}
         </button>
       </div>
     </form>

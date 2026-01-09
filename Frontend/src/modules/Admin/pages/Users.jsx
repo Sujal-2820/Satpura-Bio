@@ -13,7 +13,7 @@ const columns = [
   { Header: 'User', accessor: 'name' },
   { Header: 'User ID', accessor: 'id' },
   { Header: 'Region', accessor: 'region' },
-  { Header: 'Linked Seller', accessor: 'sellerId' },
+  { Header: 'Linked Satpura Partner', accessor: 'sellerId' },
   { Header: 'Orders', accessor: 'orders' },
   { Header: 'Payments', accessor: 'payments' },
   { Header: 'Support Tickets', accessor: 'supportTickets' },
@@ -426,14 +426,14 @@ export function UsersPage({ subRoute = null, navigate }) {
             </div>
           </div>
 
-          {/* Linked IRA Partner */}
+          {/* Linked Satpura Partner */}
           {user.sellerId && (
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Hash className="h-5 w-5 text-blue-600" />
                   <div>
-                    <p className="text-xs text-blue-500">Linked IRA Partner ID</p>
+                    <p className="text-xs text-blue-500">Linked Satpura Partner ID</p>
                     <p className="text-sm font-bold text-blue-900">{user.sellerId}</p>
                   </div>
                 </div>
