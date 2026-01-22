@@ -129,18 +129,12 @@ export function OffersPage({ subRoute = null, navigate }) {
 
   const handleSaveCarousel = async (carouselForm) => {
     try {
-      if (!carouselForm.title.trim()) {
-        showError('Title is required')
-        return false
-      }
+      // Title is optional for carousels
       if (!carouselForm.image) {
         showError('Image is required for carousel')
         return false
       }
-      if (!carouselForm.productIds || carouselForm.productIds.length === 0) {
-        showError('At least one product must be selected')
-        return false
-      }
+      // Products are optional for carousels
 
       if (editingCarousel) {
         const result = await adminApi.updateOffer(editingCarousel._id || editingCarousel.id, {
@@ -233,20 +227,20 @@ export function OffersPage({ subRoute = null, navigate }) {
   const handleCarouselDrop = async (e, dropIndex) => {
     e.preventDefault()
     setDragOverCarouselIndex(null)
-    
+
     if (draggedCarouselIndex === null || draggedCarouselIndex === dropIndex) {
       return
     }
 
     const updatedCarousels = [...carousels]
     const draggedCarousel = updatedCarousels[draggedCarouselIndex]
-    
+
     // Remove dragged carousel from its position
     updatedCarousels.splice(draggedCarouselIndex, 1)
-    
+
     // Insert at new position
     updatedCarousels.splice(dropIndex, 0, draggedCarousel)
-    
+
     // Update order values based on new positions
     const reorderedCarousels = updatedCarousels.map((carousel, idx) => ({
       ...carousel,
@@ -715,7 +709,7 @@ function CarouselFormScreen({ editingCarousel, allProducts, productsLoading, onS
             {isEditing ? 'Edit Carousel' : 'Add New Carousel'}
           </h2>
           <p className="text-sm text-gray-600">
-            {isEditing 
+            {isEditing
               ? 'Update carousel details, image, and linked products.'
               : 'Create a new carousel with image and linked products for the user dashboard.'}
           </p>
@@ -726,7 +720,7 @@ function CarouselFormScreen({ editingCarousel, allProducts, productsLoading, onS
       <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-[0_4px_15px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]">
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Title <span className="text-gray-400 font-normal">(Optional)</span></label>
             <input
               type="text"
               value={form.title}
@@ -761,8 +755,8 @@ function CarouselFormScreen({ editingCarousel, allProducts, productsLoading, onS
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Link Products *</label>
-            <p className="text-xs text-gray-500 mb-2">Select products to showcase when users click this carousel</p>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Link Products <span className="text-gray-400 font-normal">(Optional)</span></label>
+            <p className="text-xs text-gray-500 mb-2">Select products to showcase when users click this carousel (leave empty for image-only carousel)</p>
             {productsLoading ? (
               <p className="text-sm text-gray-500">Loading products...</p>
             ) : (
@@ -814,8 +808,8 @@ function CarouselFormScreen({ editingCarousel, allProducts, productsLoading, onS
           {imageUrl && (
             <div className="pt-4 border-t border-gray-200">
               <p className="text-xs font-semibold text-gray-700 mb-2">Preview: How it will appear on user dashboard</p>
-              <div className="relative rounded-xl border-2 border-gray-300 overflow-hidden bg-gray-50 mx-auto" style={{ 
-                width: '380px', 
+              <div className="relative rounded-xl border-2 border-gray-300 overflow-hidden bg-gray-50 mx-auto" style={{
+                width: '380px',
                 maxWidth: '100%',
                 height: '200px'
               }}>
@@ -925,7 +919,7 @@ function SpecialOfferFormScreen({ editingSpecialOffer, allProducts, productsLoad
             {isEditing ? 'Edit Special Offer' : 'Add New Special Offer'}
           </h2>
           <p className="text-sm text-gray-600">
-            {isEditing 
+            {isEditing
               ? 'Update special offer details, tags, and linked products.'
               : 'Create a new special offer card for the user dashboard.'}
           </p>
@@ -1038,7 +1032,7 @@ function SpecialOfferFormScreen({ editingSpecialOffer, allProducts, productsLoad
             <div className="pt-4 border-t border-gray-200">
               <p className="text-xs font-semibold text-gray-700 mb-2">Preview: How it will appear on user dashboard</p>
               <div className="max-w-md mx-auto">
-                <div className="home-deal-card" style={{ 
+                <div className="home-deal-card" style={{
                   padding: '1.25rem',
                   borderRadius: '20px',
                   border: '1px solid rgba(34, 94, 65, 0.16)',

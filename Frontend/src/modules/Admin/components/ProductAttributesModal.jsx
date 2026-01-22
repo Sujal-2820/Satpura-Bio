@@ -52,7 +52,7 @@ export function ProductAttributesModal({ isOpen, onClose, product }) {
   return (
     <div className={cn('fixed inset-0 z-50 flex items-center justify-center', isOpen ? 'block' : 'hidden')}>
       {/* Overlay */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
@@ -172,7 +172,7 @@ export function ProductAttributesModal({ isOpen, onClose, product }) {
                     <div className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100/50 p-4">
                       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Vendor Price</p>
                       <p className="text-2xl font-bold text-purple-700">
-                        ₹{currentStock.vendorPrice?.toLocaleString('en-IN') || 0}
+                        ₹{Math.round(currentStock.vendorPrice || 0).toLocaleString('en-IN')}
                       </p>
                       <p className="text-xs text-gray-600 mt-1">per {currentStock.stockUnit || 'kg'}</p>
                     </div>
@@ -180,7 +180,7 @@ export function ProductAttributesModal({ isOpen, onClose, product }) {
                     <div className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100/50 p-4">
                       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">User Price</p>
                       <p className="text-2xl font-bold text-orange-700">
-                        ₹{currentStock.userPrice?.toLocaleString('en-IN') || 0}
+                        ₹{Math.round(currentStock.userPrice || 0).toLocaleString('en-IN')}
                       </p>
                       <p className="text-xs text-gray-600 mt-1">per {currentStock.stockUnit || 'kg'}</p>
                     </div>
@@ -219,7 +219,7 @@ export function ProductAttributesModal({ isOpen, onClose, product }) {
         <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-600">
-              {hasAttributes 
+              {hasAttributes
                 ? `Viewing variant ${currentIndex + 1} of ${attributeStocks.length}`
                 : 'This product uses standard pricing and stock management'}
             </p>

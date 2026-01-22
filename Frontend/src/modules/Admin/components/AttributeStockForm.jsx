@@ -28,6 +28,8 @@ export function AttributeStockForm({
     if (isOpen) {
       const initialStocks = attributeStocks.length > 0 ? attributeStocks.map((stock, idx) => ({
         ...stock,
+        vendorPrice: stock.vendorPrice != null ? Math.round(parseFloat(stock.vendorPrice) || 0) : '',
+        userPrice: stock.userPrice != null ? Math.round(parseFloat(stock.userPrice) || 0) : '',
         id: stock.id || Date.now() + idx // Ensure each has an ID
       })) : []
       setStocks(initialStocks)
@@ -74,6 +76,8 @@ export function AttributeStockForm({
       stockUnit: stockUnit,
       vendorPrice: '',
       userPrice: '',
+      discountVendor: '', // Optional discount % for vendor price
+      discountUser: '', // Optional discount % for user price
       batchNumber: '',
       expiry: '',
     }
@@ -313,8 +317,10 @@ export function AttributeStockForm({
         ...stockData,
         actualStock: parseFloat(stock.actualStock) || 0,
         displayStock: parseFloat(stock.displayStock) || 0,
-        vendorPrice: parseFloat(stock.vendorPrice) || 0,
-        userPrice: parseFloat(stock.userPrice) || 0,
+        vendorPrice: Math.round(parseFloat(stock.vendorPrice) || 0),
+        userPrice: Math.round(parseFloat(stock.userPrice) || 0),
+        discountVendor: parseFloat(stock.discountVendor) || 0,
+        discountUser: parseFloat(stock.discountUser) || 0,
         // Use final attributes with proper key-value pairs (label -> value)
         attributes: finalAttributes,
       }
@@ -648,59 +654,113 @@ export function AttributeStockForm({
                 </div>
 
                 {/* Pricing */}
-                <div className="grid gap-4 sm:grid-cols-2 mb-4">
-                  <div>
-                    <label htmlFor={`${stock.id}_vendorPrice`} className="mb-2 block text-sm font-bold text-gray-900">
-                      <IndianRupee className="mr-1 inline h-4 w-4" />
-                      Vendor Price <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      id={`${stock.id}_vendorPrice`}
-                      value={stock.vendorPrice || ''}
-                      onChange={(e) => handleStockChange(stock.id, 'vendorPrice', e.target.value)}
-                      placeholder="0.00"
-                      min="0"
-                      step="0.01"
-                      className={cn(
-                        'w-full rounded-xl border px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
-                        errors[`${stock.id}_vendorPrice`]
-                          ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                          : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
+                <div className="space-y-4 mb-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor={`${stock.id}_vendorPrice`} className="mb-2 block text-sm font-bold text-gray-900">
+                        <IndianRupee className="mr-1 inline h-4 w-4" />
+                        Vendor Price <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        id={`${stock.id}_vendorPrice`}
+                        value={stock.vendorPrice || ''}
+                        onChange={(e) => handleStockChange(stock.id, 'vendorPrice', e.target.value)}
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                        className={cn(
+                          'w-full rounded-xl border px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
+                          errors[`${stock.id}_vendorPrice`]
+                            ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
+                            : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
+                        )}
+                      />
+                      {errors[`${stock.id}_vendorPrice`] && (
+                        <p className="mt-1 text-xs text-red-600">{errors[`${stock.id}_vendorPrice`]}</p>
                       )}
-                    />
-                    {errors[`${stock.id}_vendorPrice`] && (
-                      <p className="mt-1 text-xs text-red-600">{errors[`${stock.id}_vendorPrice`]}</p>
-                    )}
+                    </div>
+
+                    <div>
+                      <label htmlFor={`${stock.id}_discountVendor`} className="mb-2 block text-sm font-bold text-gray-900">
+                        Vendor Discount % <span className="text-xs font-normal text-gray-500">(Optional)</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          id={`${stock.id}_discountVendor`}
+                          value={stock.discountVendor || ''}
+                          onChange={(e) => handleStockChange(stock.id, 'discountVendor', e.target.value)}
+                          placeholder="0"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 pr-8 text-sm transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">%</span>
+                      </div>
+                      {stock.discountVendor && stock.vendorPrice && (
+                        <p className="mt-1 text-xs text-green-600">
+                          Final: ₹{(parseFloat(stock.vendorPrice) * (1 - parseFloat(stock.discountVendor) / 100)).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
-                  <div>
-                    <label htmlFor={`${stock.id}_userPrice`} className="mb-2 block text-sm font-bold text-gray-900">
-                      <IndianRupee className="mr-1 inline h-4 w-4" />
-                      User Price <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      id={`${stock.id}_userPrice`}
-                      value={stock.userPrice || ''}
-                      onChange={(e) => handleStockChange(stock.id, 'userPrice', e.target.value)}
-                      placeholder="0.00"
-                      min="0"
-                      step="0.01"
-                      className={cn(
-                        'w-full rounded-xl border px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
-                        errors[`${stock.id}_userPrice`]
-                          ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
-                          : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor={`${stock.id}_userPrice`} className="mb-2 block text-sm font-bold text-gray-900">
+                        <IndianRupee className="mr-1 inline h-4 w-4" />
+                        User Price <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        id={`${stock.id}_userPrice`}
+                        value={stock.userPrice || ''}
+                        onChange={(e) => handleStockChange(stock.id, 'userPrice', e.target.value)}
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                        className={cn(
+                          'w-full rounded-xl border px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
+                          errors[`${stock.id}_userPrice`]
+                            ? 'border-red-300 bg-red-50 focus:ring-red-500/50'
+                            : 'border-gray-300 bg-white focus:border-purple-500 focus:ring-purple-500/50',
+                        )}
+                      />
+                      {errors[`${stock.id}_userPrice`] && (
+                        <p className="mt-1 text-xs text-red-600">{errors[`${stock.id}_userPrice`]}</p>
                       )}
-                    />
-                    {errors[`${stock.id}_userPrice`] && (
-                      <p className="mt-1 text-xs text-red-600">{errors[`${stock.id}_userPrice`]}</p>
-                    )}
-                    {stock.vendorPrice && stock.userPrice &&
-                      parseFloat(stock.userPrice) <= parseFloat(stock.vendorPrice) && (
-                        <p className="mt-1 text-xs text-yellow-600">⚠️ User price must be greater than vendor price</p>
+                      {stock.vendorPrice && stock.userPrice &&
+                        parseFloat(stock.userPrice) <= parseFloat(stock.vendorPrice) && (
+                          <p className="mt-1 text-xs text-yellow-600">⚠️ User price must be greater than vendor price</p>
+                        )}
+                    </div>
+
+                    <div>
+                      <label htmlFor={`${stock.id}_discountUser`} className="mb-2 block text-sm font-bold text-gray-900">
+                        User Discount % <span className="text-xs font-normal text-gray-500">(Optional)</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          id={`${stock.id}_discountUser`}
+                          value={stock.discountUser || ''}
+                          onChange={(e) => handleStockChange(stock.id, 'discountUser', e.target.value)}
+                          placeholder="0"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 pr-8 text-sm transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">%</span>
+                      </div>
+                      {stock.discountUser && stock.userPrice && (
+                        <p className="mt-1 text-xs text-green-600">
+                          Final: ₹{(parseFloat(stock.userPrice) * (1 - parseFloat(stock.discountUser) / 100)).toFixed(2)}
+                        </p>
                       )}
+                    </div>
                   </div>
                 </div>
 

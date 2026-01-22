@@ -89,7 +89,7 @@ export default function CategoryForm({ categoryId, onCancel, onSuccess }) {
     }
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto">
+        <div className="space-y-6 max-w-7xl mx-auto">
             {/* Header with Back Button */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -148,16 +148,6 @@ export default function CategoryForm({ categoryId, onCancel, onSuccess }) {
                                 placeholder="E.g. Bio Fertilizers"
                             />
                         </div>
-                        <div className="space-y-1">
-                            <label className="text-sm font-bold text-gray-700 uppercase tracking-tight">Description</label>
-                            <textarea
-                                rows={4}
-                                value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-purple-500 focus:bg-white outline-none transition-all resize-none font-medium"
-                                placeholder="Describe what products belong in this category..."
-                            />
-                        </div>
                     </div>
 
                     <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
@@ -180,18 +170,7 @@ export default function CategoryForm({ categoryId, onCancel, onSuccess }) {
                 {/* Sidebar Info */}
                 <div className="space-y-6">
                     <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-                        <div className="space-y-1">
-                            <label className="text-sm font-bold text-gray-700 uppercase tracking-tight">Display Priority</label>
-                            <input
-                                type="number"
-                                value={formData.order}
-                                onChange={(e) => setFormData({ ...formData, order: Number(e.target.value) })}
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-purple-500 focus:bg-white outline-none transition-all font-bold text-xl text-center"
-                            />
-                            <p className="text-[10px] text-gray-400 text-center font-medium mt-1 uppercase">Lower numbers appear first</p>
-                        </div>
-
-                        <div className="pt-4 border-t border-gray-50">
+                        <div>
                             <label className="flex items-center justify-between cursor-pointer group">
                                 <span className="text-sm font-bold text-gray-700 uppercase">Availability Status</span>
                                 <div className={`w-12 h-7 rounded-full p-1 transition-all ${formData.isActive ? 'bg-purple-600 shadow-lg shadow-purple-100' : 'bg-gray-200'}`}>
@@ -210,7 +189,7 @@ export default function CategoryForm({ categoryId, onCancel, onSuccess }) {
                         </div>
                     </div>
 
-                    <div className="md:hidden pt-4">
+                    <div className="pt-4">
                         <button
                             disabled={isSaving}
                             onClick={handleSubmit}

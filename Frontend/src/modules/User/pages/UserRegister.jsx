@@ -152,7 +152,7 @@ export function UserRegister({ onSuccess, onSwitchToLogin }) {
 
   if (step === 'otp') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-50 via-white to-green-50 px-6 py-12">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50 px-6 py-12">
         <div className="w-full max-w-md space-y-6">
           <div className="rounded-3xl border border-green-200/60 bg-white/90 p-8 shadow-xl backdrop-blur-sm">
             <OtpVerification
@@ -171,7 +171,7 @@ export function UserRegister({ onSuccess, onSwitchToLogin }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-50 via-white to-green-50 px-6 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50 px-6 py-12">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">

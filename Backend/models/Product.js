@@ -20,7 +20,12 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Product description is required'],
     trim: true,
-    // Long description for product details page
+    // Standard description field
+  },
+  longDescription: {
+    type: String,
+    trim: true,
+    // Full formatted description from rich text editor
   },
   shortDescription: {
     type: String,
@@ -53,6 +58,19 @@ const productSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Price to user is required'],
     min: [0, 'Price to user cannot be negative'],
+  },
+  // Optional discount percentages
+  discountVendor: {
+    type: Number,
+    min: [0, 'Discount cannot be negative'],
+    max: [100, 'Discount cannot exceed 100%'],
+    default: 0,
+  },
+  discountUser: {
+    type: Number,
+    min: [0, 'Discount cannot be negative'],
+    max: [100, 'Discount cannot exceed 100%'],
+    default: 0,
   },
   // Stock tracking (global/admin-managed stock)
   // Actual stock quantity (internal/admin use only)
@@ -156,12 +174,23 @@ const productSchema = new mongoose.Schema({
     of: String,
     // Flexible key-value pairs for product specs
   },
-  // Stock quantities per attribute combination
+  // Stock quantities per size/attribute combination
   attributeStocks: [{
+    // Simplified size variant fields
+    sizeValue: {
+      type: Number,
+      // Size value (e.g., 250, 500, 1, 5)
+    },
+    sizeUnit: {
+      type: String,
+      enum: ['mg', 'g', 'kg', 'ml', 'L', 'bag', 'bags', 'unit', 'units', 'packet', 'bottle'],
+      // Unit for the size (e.g., ml, L, kg, g)
+    },
+    // Legacy attribute support
     attributes: {
       type: Map,
       of: String,
-      // Attribute key-value pairs (e.g., { npkRatio: '19:19:19', form: 'Granular' })
+      // Attribute key-value pairs (e.g., { size: '250 ml' })
     },
     actualStock: {
       type: Number,
@@ -191,6 +220,19 @@ const productSchema = new mongoose.Schema({
       required: true,
       min: [0, 'User price cannot be negative'],
       // Price to user for this specific attribute combination
+    },
+    // Optional discount percentages for this attribute combination
+    discountVendor: {
+      type: Number,
+      min: [0, 'Discount cannot be negative'],
+      max: [100, 'Discount cannot exceed 100%'],
+      default: 0,
+    },
+    discountUser: {
+      type: Number,
+      min: [0, 'Discount cannot be negative'],
+      max: [100, 'Discount cannot exceed 100%'],
+      default: 0,
     },
     batchNumber: {
       type: String,

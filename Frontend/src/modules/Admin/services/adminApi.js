@@ -622,6 +622,31 @@ export async function toggleProductVisibility(productId, visibilityData) {
 }
 
 // ============================================================================
+// CATEGORY MANAGEMENT APIs
+// ============================================================================
+
+/**
+ * Get All Categories for Admin
+ * GET /admin/categories
+ * 
+ * @returns {Promise<Object>} - { success: true, data: Array<Category> }
+ */
+export async function getAdminCategories() {
+  const response = await apiRequest('/admin/categories', {
+    method: 'GET',
+  })
+
+  if (response.success && response.data) {
+    return {
+      success: true,
+      data: response.data.categories || response.data,
+    }
+  }
+
+  return response
+}
+
+// ============================================================================
 // VENDOR MANAGEMENT APIs
 // ============================================================================
 
@@ -3941,17 +3966,6 @@ export async function markTaskAsCompleted(taskId) {
     method: 'PUT',
   })
 }
-// ============================================================================
-// CATEGORY MANAGEMENT APIs
-// ============================================================================
-
-/**
- * Get All Categories (Admin)
- */
-export async function getAdminCategories() {
-  return apiRequest('/admin/categories')
-}
-
 /**
  * Get All Categories (Public)
  */
@@ -3989,6 +4003,17 @@ export async function updateCategory(id, data) {
 export async function deleteCategory(id) {
   return apiRequest(`/admin/categories/${id}`, {
     method: 'DELETE',
+  })
+}
+
+/**
+ * Reorder Categories (bulk update order)
+ * @param {Array} categories - Array of { id, order }
+ */
+export async function reorderCategories(categories) {
+  return apiRequest('/admin/categories/reorder', {
+    method: 'PUT',
+    body: JSON.stringify({ categories }),
   })
 }
 

@@ -28,6 +28,18 @@ export function ProductCard({ product: rawProduct, onAddToCart, onWishlist, onNa
     >
       <div className="product-card-wrapper__image">
         <img src={productImage} alt={product.name} className="product-card-wrapper__image-img" />
+        {/* Rating Badge - only show if showRatingBadge prop is true */}
+        {product.showRatingBadge && (product.rating || product.averageRating) && (
+          <div className="product-card-wrapper__rating-badge">
+            {(product.rating ?? product.averageRating ?? 0).toFixed(1)}
+          </div>
+        )}
+        {/* NEW Badge - only show if showNewBadge prop is true */}
+        {product.showNewBadge && (
+          <div className="product-card-wrapper__new-badge">
+            NEW
+          </div>
+        )}
         <button
           type="button"
           className="product-card-wrapper__wishlist-btn"
@@ -45,7 +57,10 @@ export function ProductCard({ product: rawProduct, onAddToCart, onWishlist, onNa
           <h3 className="product-card-wrapper__title">{product.name}</h3>
           {(product.shortDescription || product.description) && (
             <p className="product-card-wrapper__description">
-              {product.shortDescription || product.description}
+              {(product.shortDescription || product.description)
+                .replace(/<[^>]*>?/gm, '')
+                .replace(/&nbsp;/g, ' ')
+                .slice(0, 100)}
             </p>
           )}
           {product.vendor && (

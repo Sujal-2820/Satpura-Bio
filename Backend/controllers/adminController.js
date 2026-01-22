@@ -27,6 +27,7 @@ const UserNotification = require('../models/UserNotification');
 const Offer = require('../models/Offer');
 const CreditRepayment = require('../models/CreditRepayment');
 const Review = require('../models/Review');
+const Category = require('../models/Category');
 const SellerChangeRequest = require('../models/SellerChangeRequest');
 const razorpayService = require('../services/razorpayService');
 const incentiveService = require('../services/incentiveService');
@@ -808,6 +809,7 @@ exports.createProduct = async (req, res, next) => {
       sku,
       batchNumber,
       attributeStocks, // Array of stock entries per attribute combination
+      longDescription, // Detailed formatted description
     } = req.body;
 
     // Validate required fields
@@ -887,12 +889,26 @@ exports.createProduct = async (req, res, next) => {
     }
 
     // Validate category against fertilizer categories
-    const { isValidCategory } = require('../utils/fertilizerCategories');
+    const { isValidCategory, FERTILIZER_CATEGORIES } = require('../utils/fertilizerCategories');
     const categoryLower = category.toLowerCase();
-    if (!isValidCategory(categoryLower)) {
+
+    // Check if valid in hardcoded list OR exists in database
+    let categoryExists = isValidCategory(categoryLower);
+    if (!categoryExists) {
+      const dbCategory = await Category.findOne({
+        $or: [
+          { slug: categoryLower },
+          { name: new RegExp('^' + category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }
+        ]
+      });
+      if (dbCategory) categoryExists = true;
+    }
+
+    if (!categoryExists) {
+      const hardcodedList = FERTILIZER_CATEGORIES.map(c => c.id).join(', ');
       return res.status(400).json({
         success: false,
-        message: `Invalid category. Must be one of: ${require('../utils/fertilizerCategories').FERTILIZER_CATEGORIES.map(c => c.id).join(', ')}`,
+        message: `Invalid category. Must be one of the pre-defined categories (${hardcodedList}) or a custom category created in the system.`,
       });
     }
 
@@ -917,8 +933,8 @@ exports.createProduct = async (req, res, next) => {
       });
 
       if (totalStock > 0) {
-        finalPriceToVendor = weightedVendorPrice / totalStock;
-        finalPriceToUser = weightedUserPrice / totalStock;
+        finalPriceToVendor = Math.round(weightedVendorPrice / totalStock);
+        finalPriceToUser = Math.round(weightedUserPrice / totalStock);
       } else {
         // Fallback to first entry's prices
         const firstEntry = attributeStocks[0];
@@ -945,6 +961,7 @@ exports.createProduct = async (req, res, next) => {
       actualStock: actualStockValue,
       displayStock: displayStockValue,
       stock: displayStockValue, // Legacy field for backward compatibility
+      longDescription: longDescription || description, // Fallback to description
     };
 
     if (images && Array.isArray(images)) {
@@ -1028,8 +1045,8 @@ exports.createProduct = async (req, res, next) => {
             actualStock: parseFloat(stock.actualStock) || 0,
             displayStock: parseFloat(stock.displayStock) || 0,
             stockUnit: stock.stockUnit || stockUnit || 'kg',
-            vendorPrice: vendorPriceValue,
-            userPrice: userPriceValue,
+            vendorPrice: Math.round(vendorPriceValue),
+            userPrice: Math.round(userPriceValue),
             ...(stock.batchNumber && { batchNumber: String(stock.batchNumber).trim() }),
             ...(stock.expiry && { expiry: stock.expiry }),
           };
@@ -1088,12 +1105,26 @@ exports.updateProduct = async (req, res, next) => {
 
     // Normalize and validate category if provided
     if (updateData.category) {
-      const { isValidCategory } = require('../utils/fertilizerCategories');
+      const { isValidCategory, FERTILIZER_CATEGORIES } = require('../utils/fertilizerCategories');
       const categoryLower = updateData.category.toLowerCase();
-      if (!isValidCategory(categoryLower)) {
+
+      // Check if valid in hardcoded list OR exists in database
+      let categoryExists = isValidCategory(categoryLower);
+      if (!categoryExists) {
+        const dbCategory = await Category.findOne({
+          $or: [
+            { slug: categoryLower },
+            { name: new RegExp('^' + updateData.category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }
+          ]
+        });
+        if (dbCategory) categoryExists = true;
+      }
+
+      if (!categoryExists) {
+        const hardcodedList = FERTILIZER_CATEGORIES.map(c => c.id).join(', ');
         return res.status(400).json({
           success: false,
-          message: `Invalid category. Must be one of: ${require('../utils/fertilizerCategories').FERTILIZER_CATEGORIES.map(c => c.id).join(', ')}`,
+          message: `Invalid category. Must be one of the pre-defined categories (${hardcodedList}) or a custom category created in the system.`,
         });
       }
       updateData.category = categoryLower;
@@ -1227,8 +1258,8 @@ exports.updateProduct = async (req, res, next) => {
               actualStock: parseFloat(stock.actualStock) || 0,
               displayStock: parseFloat(stock.displayStock) || 0,
               stockUnit: stock.stockUnit || product.weight?.unit || 'kg',
-              vendorPrice: vendorPriceValue,
-              userPrice: userPriceValue,
+              vendorPrice: Math.round(vendorPriceValue),
+              userPrice: Math.round(userPriceValue),
               ...(stock.batchNumber && { batchNumber: String(stock.batchNumber).trim() }),
               ...(stock.expiry && { expiry: stock.expiry }),
             };
@@ -8228,12 +8259,8 @@ exports.createOffer = async (req, res, next) => {
         });
       }
 
-      if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'At least one product must be linked to carousel',
-        });
-      }
+
+      // Products are optional for carousels
     }
 
     if (type === 'special_offer') {

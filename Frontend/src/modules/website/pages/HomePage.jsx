@@ -23,14 +23,14 @@ export function HomePage() {
   const dispatch = useWebsiteDispatch()
   const { favourites, authenticated } = useWebsiteState()
   const { fetchCategories, fetchPopularProducts, addToCart, addToFavourites, removeFromFavourites } = useWebsiteApi()
-  
+
   const [bannerIndex, setBannerIndex] = useState(0)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [isUserInteracting, setIsUserInteracting] = useState(false)
   const autoSlideTimeoutRef = useRef(null)
   const touchStartXRef = useRef(null)
   const touchEndXRef = useRef(null)
-  
+
   // Data state
   const [categories, setCategories] = useState([])
   const [popularProducts, setPopularProducts] = useState([])
@@ -78,14 +78,14 @@ export function HomePage() {
   }, [])
 
   // Banner carousel logic
-  const banners = carousels.length > 0 
+  const banners = carousels.length > 0
     ? carousels.map(carousel => ({
-        id: carousel.id || carousel._id,
-        title: carousel.title || '',
-        subtitle: carousel.description || '',
-        image: carousel.image || '',
-        productIds: carousel.productIds || [],
-      }))
+      id: carousel.id || carousel._id,
+      title: carousel.title || '',
+      subtitle: carousel.description || '',
+      image: carousel.image || '',
+      productIds: carousel.productIds || [],
+    }))
     : []
 
   const goToNextSlide = () => {
@@ -121,7 +121,7 @@ export function HomePage() {
     const interval = setInterval(() => {
       setBannerIndex((prev) => (prev + 1) % banners.length)
     }, 3000)
-    
+
     return () => clearInterval(interval)
   }, [isUserInteracting, banners.length])
 
@@ -288,13 +288,13 @@ export function HomePage() {
             ) : (
               categories.slice(0, 6).map((category) => (
                 <Link
-                  key={category.id}
+                  key={category._id || category.id}
                   to={`/products?category=${category.id}`}
                   className="home-category-card"
                 >
                   <div className="home-category-card__image">
-                    {category.icon ? (
-                      <img src={category.icon} alt={category.name} />
+                    {category.image || category.icon ? (
+                      <img src={category.image || category.icon} alt={category.name} />
                     ) : (
                       <span className="text-4xl">{category.emoji || '📦'}</span>
                     )}
@@ -336,7 +336,7 @@ export function HomePage() {
                 const inStock = (product.stock || 0) > 0
                 const productImage = getPrimaryImageUrl(product)
                 const isWishlisted = favourites.includes(productId)
-                
+
                 return (
                   <div
                     key={productId}

@@ -60,8 +60,8 @@ export function ProductsPage({ subRoute = null, navigate }) {
     const actualStockFormatted = `${actualStockValue.toLocaleString('en-IN')} ${stockUnit}`
     const vendorStockFormatted = `${displayStockValue.toLocaleString('en-IN')} ${stockUnit}`
 
-    const vendorPrice = typeof product.vendorPrice === 'number' ? product.vendorPrice : parseFloat(product.vendorPrice?.replace(/[₹,]/g, '') || product.priceToVendor || '0')
-    const userPrice = typeof product.userPrice === 'number' ? product.userPrice : parseFloat(product.userPrice?.replace(/[₹,]/g, '') || product.priceToUser || '0')
+    const vendorPrice = Math.round(typeof product.vendorPrice === 'number' ? product.vendorPrice : parseFloat(product.vendorPrice?.replace(/[₹,]/g, '') || product.priceToVendor || '0'))
+    const userPrice = Math.round(typeof product.userPrice === 'number' ? product.userPrice : parseFloat(product.userPrice?.replace(/[₹,]/g, '') || product.priceToUser || '0'))
 
     // Format expiry date
     let expiryFormatted = product.expiry || ''

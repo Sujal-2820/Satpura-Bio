@@ -1137,10 +1137,10 @@ exports.getSellerID = async (req, res, next) => {
  */
 exports.getCategories = async (req, res, next) => {
   try {
-    const { getCategoryNames, getAllCategories } = require('../utils/fertilizerCategories');
+    const Category = require('../models/Category');
 
-    // Get all fertilizer categories
-    const allCategories = getAllCategories();
+    // Get all active categories from database, sorted by order (descending for latest first)
+    const categories = await Category.find({ isActive: true }).sort({ order: -1 }).lean();
 
     // Get product counts for each category
     const categoryCounts = await Product.aggregate([
@@ -1148,19 +1148,24 @@ exports.getCategories = async (req, res, next) => {
       { $group: { _id: '$category', count: { $sum: 1 } } },
     ]);
 
-    // Create a map of category counts
+    // Create a map of category counts (match by slug/name lowercase)
     const countMap = {};
     categoryCounts.forEach(item => {
-      countMap[item._id] = item.count;
+      if (item._id) {
+        countMap[item._id.toLowerCase()] = item.count;
+      }
     });
 
     // Merge category info with counts
-    const categoriesWithCounts = allCategories.map(cat => ({
-      id: cat.id,
+    const categoriesWithCounts = categories.map(cat => ({
+      id: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-'),
+      _id: cat._id,
       name: cat.name,
-      description: cat.description,
-      icon: cat.icon,
-      count: countMap[cat.id] || 0,
+      description: cat.description || '',
+      icon: cat.image?.url || '',
+      image: cat.image?.url || '',
+      count: countMap[cat.slug] || countMap[cat.name.toLowerCase()] || 0,
+      order: cat.order,
     }));
 
     res.status(200).json({
@@ -1407,6 +1412,7 @@ exports.getProductDetails = async (req, res, next) => {
           id: product._id,
           name: product.name,
           description: product.description,
+          longDescription: product.longDescription,
           category: product.category,
           priceToUser: product.priceToUser,
           priceToVendor: product.priceToVendor,

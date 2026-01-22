@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { cn } from '../../../lib/cn'
-import { CloseIcon, MenuIcon, BellIcon, SearchIcon, FilterIcon, UserIcon, ChevronRightIcon } from './icons'
+import { CloseIcon, MenuIcon, BellIcon, SearchIcon, FilterIcon, UserIcon, ChevronRightIcon, HeartIcon, CartIcon } from './icons'
 
 import { MapPinIcon } from './icons'
 import { NotificationsDropdown } from './NotificationsDropdown'
@@ -104,7 +104,7 @@ function TranslatedEmailInput() {
   )
 }
 
-export function MobileShell({ title, subtitle, children, navigation, bottomNavigation, menuContent, onSearchClick, onFilterClick, notificationsCount = 0, isAuthenticated = false, onNavigate, onLogout, onLogin }) {
+export function MobileShell({ title, subtitle, children, navigation, bottomNavigation, menuContent, onSearchClick, onFilterClick, notificationsCount = 0, cartCount = 0, favouritesCount = 0, isAuthenticated = false, onNavigate, onLogout, onLogin, isHome = false }) {
   const [open, setOpen] = useState(false)
   const [compact, setCompact] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -129,17 +129,15 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
             scrollDirection = scrollDelta > 0 ? 1 : -1
           }
 
-          // Only update state if there's a meaningful scroll change
-          if (Math.abs(scrollDelta) > 2) {
-            if (scrollDirection === 1) {
-              // Scrolling down
-              setCompact(currentScrollY > 30)
-              setHideSecondRow(currentScrollY > hideThreshold)
-            } else if (scrollDirection === -1) {
-              // Scrolling up
-              setCompact(currentScrollY > 20)
-              setHideSecondRow(false)
-            }
+          // Mobile Header Animation Logic
+          if (scrollDirection === 1) {
+            // Scrolling down - make header compact
+            if (currentScrollY > 30) setCompact(true)
+            if (currentScrollY > hideThreshold) setHideSecondRow(true)
+          } else if (scrollDirection === -1) {
+            // Scrolling up - show header rows immediately
+            setCompact(false)
+            setHideSecondRow(false)
           }
 
           lastScrollY = currentScrollY
@@ -158,7 +156,7 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
 
   return (
     <div className="user-shell">
-      <header className={cn('user-shell-header', compact && 'is-compact')}>
+      <header className={cn('user-shell-header', compact && 'is-compact', isHome && 'is-home-header')}>
         <div className="user-shell-header__glow" />
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -199,29 +197,60 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
               </span>
             </button>
           </nav>
-          <div className="flex items-center gap-2 user-shell-header__right-buttons">
+          <div className="flex items-center gap-4 user-shell-header__right-buttons">
             <button
               type="button"
-              onClick={onSearchClick}
-              className="flex items-center justify-center w-10 h-10 rounded-2xl border-none bg-transparent text-white transition-transform duration-200 hover:-translate-y-0.5 hover:opacity-85"
-              aria-label="Search"
+              onClick={() => setNotificationsOpen(true)}
+              className="relative flex items-center justify-center text-white"
+              aria-label="Notifications"
             >
-              <SearchIcon className="h-5 w-5 stroke-[2.5]" />
+              <BellIcon className="h-6 w-6" />
+              {notificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[0.6rem] font-bold text-white bg-red-500">
+                  {notificationsCount}
+                </span>
+              )}
             </button>
             <button
               type="button"
-              onClick={() => setOpen(true)}
-              className="flex items-center justify-center w-10 h-10 rounded-2xl border-none bg-transparent text-white transition-transform duration-200 hover:-translate-y-0.5 hover:opacity-85"
-              aria-label="Open menu"
+              onClick={() => onNavigate?.('favourites')}
+              className="relative flex items-center justify-center text-white"
+              aria-label="Favourites"
             >
-              <MenuIcon className="h-5 w-5 stroke-[2.5]" />
+              <HeartIcon className="h-6 w-6" />
+              {favouritesCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[0.6rem] font-bold text-white bg-red-500">
+                  {favouritesCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate?.('cart')}
+              className="relative flex items-center justify-center text-white"
+              aria-label="Cart"
+            >
+              <CartIcon className="h-6 w-6" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[0.6rem] font-bold text-white bg-red-500">
+                  {cartCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
-        {/* Mobile Title/Subtitle - Original Position */}
-        {title && (
-          <div className={cn('user-shell-header__mobile-info relative z-10 flex flex-col gap-1 opacity-100 transition-all duration-300 pointer-events-auto', compact && 'is-compact')}>
-            <span className="relative z-10 text-[0.95rem] font-bold text-white tracking-[0.01em]"><TransText>{title}</TransText></span>
+
+        {/* Mobile Title/Subtitle - Display Name & Location with Animation */}
+        {(title || subtitle) && (
+          <div className={cn(
+            'user-shell-header__mobile-info relative z-10 flex flex-col gap-1 opacity-100 transition-all duration-300 pointer-events-auto pl-[4px]',
+            compact && 'is-compact'
+          )}>
+            {title && (
+              <span className="relative z-10 text-[0.95rem] font-bold text-white tracking-[0.01em]">
+                <TransText>{title}</TransText>
+              </span>
+            )}
             {subtitle && (
               <p className="relative z-10 text-[0.72rem] font-medium text-white/90 tracking-[0.04em] uppercase">
                 <MapPinIcon className="mr-2 inline h-3.5 w-3.5" />
@@ -230,93 +259,117 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
             )}
           </div>
         )}
-        {/* Second Row - Title/Subtitle and Navigation Links (Laptop Only) */}
-        <div className={cn('user-shell-header__second-row', hideSecondRow && 'user-shell-header__second-row--hidden')}>
-          {title && (
-            <div className="user-shell-header__info">
-              <span className="user-shell-header__title-text"><TransText>{title}</TransText></span>
-              {subtitle && (
-                <p className="user-shell-header__subtitle-text">
-                  <MapPinIcon className="mr-2 inline h-3.5 w-3.5" />
-                  <TransText>{subtitle}</TransText>
-                </p>
-              )}
-            </div>
-          )}
-          <nav className="user-shell-header__links">
-            <button
-              type="button"
-              onClick={() => onNavigate?.('home')}
-              className="user-shell-header__link"
-            >
-              <Trans>HOME</Trans>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate?.('favourites')}
-              className="user-shell-header__link"
-            >
-              <Trans>FAVOURITES</Trans>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onNavigate?.('home')
-                // Scroll to categories section or trigger category view
-                setTimeout(() => {
-                  const categoriesSection = document.getElementById('home-categories')
-                  if (categoriesSection) {
-                    categoriesSection.scrollIntoView({ behavior: 'smooth' })
-                  }
-                }, 100)
-              }}
-              className="user-shell-header__link"
-            >
-              <Trans>CATEGORIES</Trans>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate?.('orders')}
-              className="user-shell-header__link"
-            >
-              <Trans>ORDERS</Trans>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate?.('account')}
-              className="user-shell-header__link"
-            >
-              <Trans>ACCOUNT</Trans>
-            </button>
-            {isAuthenticated ? (
-              <button
-                type="button"
-                onClick={onLogout}
-                className="user-shell-header__link user-shell-header__link--signout"
-              >
-                <UserIcon className="h-4 w-4 mr-1.5" />
-                <Trans>SIGNOUT</Trans>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onLogin}
-                className="user-shell-header__link user-shell-header__link--signin"
-              >
-                <UserIcon className="h-4 w-4 mr-1.5" />
-                <Trans>SIGNIN</Trans>
-              </button>
-            )}
-          </nav>
-        </div>
       </header>
 
-      <main className="user-shell-content">
+      {/* Mobile Search Bar - Separated from Header - Only shown on Home Screen */}
+      {isHome && (
+        <div className={cn('home-search-section', compact && 'is-compact')}>
+          <div className="home-search-bar">
+            <div className="home-search-input-wrapper">
+              <input
+                type="text"
+                placeholder="Search Product..."
+                className="home-search-input"
+                onClick={onSearchClick}
+                readOnly
+              />
+            </div>
+            <button className="home-search-button" onClick={onSearchClick} aria-label="Search">
+              <SearchIcon className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Second Row - Title/Subtitle and Navigation Links (Laptop Only) */}
+      <div className={cn('user-shell-header__second-row', hideSecondRow && 'user-shell-header__second-row--hidden')}>
+        {title && (
+          <div className="user-shell-header__info">
+            <span className="user-shell-header__title-text"><TransText>{title}</TransText></span>
+            {subtitle && (
+              <p className="user-shell-header__subtitle-text">
+                <MapPinIcon className="mr-2 inline h-3.5 w-3.5" />
+                <TransText>{subtitle}</TransText>
+              </p>
+            )}
+          </div>
+        )}
+        <nav className="user-shell-header__links">
+          <button
+            type="button"
+            onClick={() => onNavigate?.('home')}
+            className="user-shell-header__link"
+          >
+            <Trans>HOME</Trans>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate?.('favourites')}
+            className="user-shell-header__link"
+          >
+            <Trans>FAVOURITES</Trans>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onNavigate?.('home')
+              // Scroll to categories section or trigger category view
+              setTimeout(() => {
+                const categoriesSection = document.getElementById('home-categories')
+                if (categoriesSection) {
+                  categoriesSection.scrollIntoView({ behavior: 'smooth' })
+                }
+              }, 100)
+            }}
+            className="user-shell-header__link"
+          >
+            <Trans>CATEGORIES</Trans>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate?.('orders')}
+            className="user-shell-header__link"
+          >
+            <Trans>ORDERS</Trans>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate?.('account')}
+            className="user-shell-header__link"
+          >
+            <Trans>ACCOUNT</Trans>
+          </button>
+          {isAuthenticated ? (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="user-shell-header__link user-shell-header__link--signout"
+            >
+              <UserIcon className="h-4 w-4 mr-1.5" />
+              <Trans>SIGNOUT</Trans>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onLogin}
+              className="user-shell-header__link user-shell-header__link--signin"
+            >
+              <UserIcon className="h-4 w-4 mr-1.5" />
+              <Trans>SIGNIN</Trans>
+            </button>
+          )}
+        </nav>
+      </div>
+
+
+      <main
+        className={cn('user-shell-content', !isHome && 'user-shell-content--subpage', compact && 'is-compact')}
+      >
         <div className="space-y-6">{children}</div>
       </main>
 
       <nav className="user-shell-bottom-nav">
-        <div className="flex items-center justify-between ml-3 gap-3">{bottomNavigation || navigation}</div>
+        <div className="flex items-center justify-between px-1">{bottomNavigation || navigation}</div>
       </nav>
 
       {/* Footer - Laptop Only */}

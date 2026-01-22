@@ -15,12 +15,12 @@ const offerSchema = new mongoose.Schema(
       required: true,
       enum: ['carousel', 'special_offer'],
     },
-    
+
     // Common fields
     title: {
       type: String,
-      required: true,
       trim: true,
+      default: '', // Optional for carousels
     },
     description: {
       type: String,
@@ -28,7 +28,7 @@ const offerSchema = new mongoose.Schema(
     },
     image: {
       type: String, // Cloudinary URL
-      required: function() {
+      required: function () {
         return this.type === 'carousel';
       },
     },
@@ -40,29 +40,27 @@ const offerSchema = new mongoose.Schema(
       type: Number,
       default: 0, // For sorting carousels
     },
-    
+
     // Carousel-specific fields
     productIds: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'Product',
       default: [],
-      required: function() {
-        return this.type === 'carousel';
-      },
+      // Optional - carousels can be image-only without linked products
     },
-    
+
     // Special offer-specific fields
     specialTag: {
       type: String,
       trim: true,
-      required: function() {
+      required: function () {
         return this.type === 'special_offer';
       },
     },
     specialValue: {
       type: String,
       trim: true,
-      required: function() {
+      required: function () {
         return this.type === 'special_offer';
       },
     },
@@ -72,7 +70,7 @@ const offerSchema = new mongoose.Schema(
       ref: 'Product',
       default: [],
     },
-    
+
     // Metadata
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -94,12 +92,12 @@ offerSchema.index({ type: 1, isActive: 1, order: 1 }); // For carousel ordering
 // Note: offerId already has an index from unique: true
 
 // Virtual for carousel count check
-offerSchema.statics.getCarouselCount = async function() {
+offerSchema.statics.getCarouselCount = async function () {
   return this.countDocuments({ type: 'carousel', isActive: true });
 };
 
 // Virtual for max carousel check
-offerSchema.statics.canAddCarousel = async function() {
+offerSchema.statics.canAddCarousel = async function () {
   const count = await this.getCarouselCount();
   return count < 6;
 };

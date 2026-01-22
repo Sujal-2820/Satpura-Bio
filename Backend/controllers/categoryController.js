@@ -137,3 +137,34 @@ exports.deleteCategory = async (req, res, next) => {
         next(error);
     }
 };
+/**
+ * @desc    Reorder categories
+ * @route   PUT /api/admin/categories/reorder
+ * @access  Private (Admin)
+ */
+exports.reorderCategories = async (req, res, next) => {
+    try {
+        const { categories } = req.body; // Array of { id, order }
+
+        if (!Array.isArray(categories)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid input: categories must be an array',
+            });
+        }
+
+        // Use Promise.all to update all categories
+        await Promise.all(
+            categories.map((cat) =>
+                Category.findByIdAndUpdate(cat.id, { order: cat.order })
+            )
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'Categories reordered successfully',
+        });
+    } catch (error) {
+        next(error);
+    }
+};

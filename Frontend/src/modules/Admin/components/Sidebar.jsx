@@ -364,7 +364,7 @@ export function Sidebar({ active, onNavigate, condensed = false, onSignOut }) {
                       className={cn(
                         'w-full flex items-center gap-3 pl-11 pr-3 py-2 text-left text-sm transition-colors duration-150',
                         isSubActive
-                          ? 'bg-[#2271b1] text-white border-l-4 border-[#2271b1]'
+                          ? 'bg-[#2271b1]/20 text-[#72aee6]'
                           : 'text-[#b4b9be] hover:bg-[#32373c] hover:text-white',
                       )}
                     >

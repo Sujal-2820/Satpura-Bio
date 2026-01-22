@@ -7,6 +7,7 @@ import { useUserApi } from '../../hooks/useUserApi'
 import * as userApi from '../../services/userApi'
 import { Trans } from '../../../../components/Trans'
 import { TransText } from '../../../../components/TransText'
+import './home-redesign.css'
 
 // Helper function to format category names - split "Fertilizer" word for better display
 const formatCategoryName = (name) => {
@@ -18,7 +19,7 @@ const formatCategoryName = (name) => {
     return name
 }
 
-export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearchClick, onFilterClick, onToggleFavourite, favourites = [] }) {
+export function HomeViewRedesigned({ onProductClick, onCategoryClick, onAddToCart, onSearchClick, onFilterClick, onToggleFavourite, favourites = [] }) {
     const [bannerIndex, setBannerIndex] = useState(0)
     const categoriesRef = useRef(null)
     const bannerRef = useRef(null)
@@ -167,7 +168,7 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
             {/* Try New Section */}
             <section id="home-try-new" className="home-try-new-section">
                 <div className="home-try-new-header">
-                    <h3 className="home-try-new-title"><span><Trans>Try New</Trans></span></h3>
+                    <h3 className="home-try-new-title"><Trans>Try New</Trans></h3>
                     <p className="home-try-new-subtitle"><Trans>Try these top picks that you haven't purchased yet!</Trans></p>
                 </div>
                 <div className="home-try-new-grid">
@@ -375,7 +376,7 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
                             <p className="text-sm text-gray-500"><Trans>No categories available</Trans></p>
                         </div>
                     ) : (
-                        categories.map((category) => (
+                        categories.slice(0, 4).map((category) => (
                             <div
                                 key={category._id || category.id}
                                 className="home-shop-category-card"
@@ -392,7 +393,6 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
                                         <span className="home-shop-category-card__emoji">{category.icon || category.emoji || '🌾'}</span>
                                     )}
                                 </div>
-                                <p className="home-shop-category-card__title"><TransText>{category.name}</TransText></p>
                             </div>
                         ))
                     )}

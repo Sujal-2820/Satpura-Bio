@@ -60,21 +60,23 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
         setAspectRatio(ratio)
 
         // Validate aspect ratio
-        // Ideal carousel aspect ratio: ~2:1 (2.0) or 16:9 (1.78)
-        // Acceptable range: 1.5 to 2.5 (landscape)
+        // Ideal carousel aspect ratio: ~2.67:1 (1600x600)
+        // Acceptable range: 2.0 to 3.0 (wide landscape)
         // Warning for: 0.8 to 1.2 (square-ish)
-        // Error for: < 0.8 (portrait/tall) or > 2.5 (too wide)
+        // Error for: < 0.8 (portrait/tall)
 
         if (ratio < 0.8) {
           setWarning('Image is too tall (portrait). Please upload a landscape/rectangular image.')
         } else if (ratio >= 0.8 && ratio <= 1.2) {
           setWarning('Image appears to be square. Carousel images should be landscape/rectangular (wider than tall).')
-        } else if (ratio > 2.5) {
-          setWarning('Image is too wide. Recommended aspect ratio is between 1.5:1 and 2.5:1.')
-        } else if (ratio >= 1.5 && ratio <= 2.5) {
+        } else if (ratio > 3.5) {
+          setWarning('Image is too wide. Recommended aspect ratio is around 2.67:1 (1600×600px).')
+        } else if (ratio >= 2.0 && ratio <= 3.0) {
           setWarning(null) // Perfect aspect ratio
-        } else if (ratio > 1.2 && ratio < 1.5) {
-          setWarning('Image aspect ratio is acceptable but not ideal. Recommended: 1.5:1 to 2.5:1 (landscape).')
+        } else if (ratio > 1.2 && ratio < 2.0) {
+          setWarning('Image aspect ratio is acceptable but not ideal. Recommended: ~2.67:1 (1600×600px).')
+        } else if (ratio > 3.0 && ratio <= 3.5) {
+          setWarning('Image is wider than recommended. Ideal: 2.67:1 (1600×600px).')
         }
       }
       img.onerror = () => {
@@ -118,13 +120,13 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
       clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
       maxFileSize: 5000000, // 5MB
       cropping: true,
-      croppingAspectRatio: 2, // 2:1 aspect ratio (landscape)
+      croppingAspectRatio: 2.67, // ~8:3 aspect ratio (1600:600)
       croppingDefaultSelectionRatio: 0.9,
       croppingShowDimensions: true,
       folder: 'satpura-bio/carousels',
       transformation: [
         {
-          width: 1200,
+          width: 1600,
           height: 600,
           crop: 'limit',
           quality: 'auto:good',
@@ -185,10 +187,10 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
     onChange('')
   }
 
-  const isAcceptableRatio = aspectRatio >= 1.5 && aspectRatio <= 2.5
+  const isAcceptableRatio = aspectRatio >= 2.0 && aspectRatio <= 3.0
   const isSquareLike = aspectRatio >= 0.8 && aspectRatio <= 1.2
   const isTooTall = aspectRatio < 0.8
-  const isTooWide = aspectRatio > 2.5
+  const isTooWide = aspectRatio > 3.5
 
   return (
     <div className="space-y-4">
@@ -206,8 +208,8 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
 
       {warning && (
         <div className={`rounded-lg border px-4 py-2 text-sm flex items-start gap-2 ${isSquareLike || isTooTall || isTooWide
-            ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-            : 'bg-blue-50 border-blue-200 text-blue-800'
+          ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+          : 'bg-blue-50 border-blue-200 text-blue-800'
           }`}>
           <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <span>{warning}</span>
@@ -216,8 +218,8 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
 
       {imageUrl && aspectRatio > 0 && (
         <div className={`rounded-lg border px-4 py-2 text-sm flex items-center gap-2 ${isAcceptableRatio
-            ? 'bg-green-50 border-green-200 text-green-800'
-            : 'bg-gray-50 border-gray-200 text-gray-700'
+          ? 'bg-green-50 border-green-200 text-green-800'
+          : 'bg-gray-50 border-gray-200 text-gray-700'
           }`}>
           {isAcceptableRatio ? (
             <CheckCircle className="h-4 w-4 flex-shrink-0" />
@@ -268,8 +270,8 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
             onClick={openUploadWidget}
             disabled={uploading || disabled}
             className={`w-full max-w-md aspect-[2/1] rounded-lg border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1.5 ${uploading
-                ? 'border-blue-400 bg-blue-50'
-                : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
+              ? 'border-blue-400 bg-blue-50'
+              : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             style={{ maxHeight: '150px' }}
           >
@@ -282,7 +284,7 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
               <>
                 <Upload className="h-6 w-6 text-gray-400" />
                 <span className="text-xs font-semibold text-gray-600">Upload Landscape Image</span>
-                <span className="text-xs text-gray-500">Recommended: 2:1 (e.g., 1200×600px)</span>
+                <span className="text-xs text-gray-500">Recommended: 1600×600px (8:3 ratio)</span>
               </>
             )}
           </button>
@@ -291,7 +293,7 @@ export function CarouselImageUpload({ image = '', onChange, disabled = false, ti
 
       <p className="text-xs text-gray-500">
         <strong>Important:</strong> Upload a landscape/rectangular image (wider than tall).
-        Square or circular images will show a warning. Ideal aspect ratio: 1.5:1 to 2.5:1.
+        Square or circular images will show a warning. Ideal size: 1600×600px (aspect ratio: ~2.67:1).
       </p>
     </div>
   )

@@ -4,7 +4,7 @@ import { useUserDispatch, useUserState } from '../context/UserContext'
 import { MobileShell } from '../components/MobileShell'
 import { BottomNavItem } from '../components/BottomNavItem'
 import { MenuList } from '../components/MenuList'
-import { HomeIcon, SearchIcon, CartIcon, UserIcon, MenuIcon, HeartIcon, PackageIcon } from '../components/icons'
+import { HomeIcon, SearchIcon, CartIcon, UserIcon, MenuIcon, HeartIcon, PackageIcon, WalletIcon } from '../components/icons'
 import { Trans } from '../../../components/Trans'
 // import { MIN_ORDER_VALUE } from '../services/userData'
 import * as userApi from '../services/userApi'
@@ -23,6 +23,7 @@ import { FavouritesView } from './views/FavouritesView'
 import { CategoryProductsView } from './views/CategoryProductsView'
 import { CarouselProductsView } from './views/CarouselProductsView'
 import { OrdersView } from './views/OrdersView'
+import { WalletView } from './views/WalletView'
 import { LoginPageView } from './views/LoginPageView'
 import { SignupPageView } from './views/SignupPageView'
 import { VendorAvailabilityWarning } from '../components/VendorAvailabilityWarning'
@@ -39,16 +40,10 @@ const NAV_ITEMS = [
     icon: HomeIcon,
   },
   {
-    id: 'favourites',
-    label: 'Favourites',
-    description: 'Your favourite products',
-    icon: HeartIcon,
-  },
-  {
-    id: 'cart',
-    label: 'Cart',
-    description: 'Your shopping cart',
-    icon: CartIcon,
+    id: 'wallet',
+    label: 'Hisaab',
+    description: 'Manage payments and credits',
+    icon: WalletIcon,
   },
   {
     id: 'orders',
@@ -93,7 +88,7 @@ function UserDashboardContent({ onLogout }) {
   const [isLaptopView, setIsLaptopView] = useState(window.innerWidth >= 1024)
 
   // Valid tabs for navigation
-  const validTabs = ['home', 'favourites', 'cart', 'orders', 'account', 'search', 'product-detail', 'category-products', 'carousel-products', 'checkout', 'login', 'signup', 'signin']
+  const validTabs = ['home', 'wallet', 'favourites', 'cart', 'orders', 'account', 'search', 'product-detail', 'category-products', 'carousel-products', 'checkout', 'login', 'signup', 'signin']
 
   // Initialize tab from URL parameter on mount or when URL changes
   useEffect(() => {
@@ -110,6 +105,21 @@ function UserDashboardContent({ onLogout }) {
           // Default to 'all' if no category in URL
           setSelectedCategory('all')
         }
+      } else if (tab === 'product-detail') {
+        // Extract product ID from URL search params for product-detail page
+        const productIdFromUrl = searchParams.get('id')
+        if (productIdFromUrl) {
+          setSelectedProduct(productIdFromUrl)
+        } else {
+          // No product ID in URL, redirect to home
+          navigate('/user/dashboard/home', { replace: true })
+        }
+      } else if (tab === 'carousel-products') {
+        // Extract carousel ID from URL search params for carousel-products page
+        const carouselIdFromUrl = searchParams.get('carousel')
+        if (carouselIdFromUrl) {
+          setSelectedCarousel(carouselIdFromUrl)
+        }
       } else {
         // Clear selections when navigating to a different tab
         if (tab !== 'product-detail') setSelectedProduct(null)
@@ -125,15 +135,15 @@ function UserDashboardContent({ onLogout }) {
 
   // Navigate function that updates both state and URL
   const navigateToTab = useCallback((tab) => {
-    // Check authentication for orders tab
-    if (tab === 'orders' && !authenticated) {
+    // Check authentication for orders and wallet tabs
+    if ((tab === 'orders' || tab === 'wallet') && !authenticated) {
       if (isLaptopView) {
         // Show prompt on laptop
-        setAuthActionType('orders')
+        setAuthActionType(tab)
         setShowAuthPromptLaptop(true)
       } else {
         // Show modal on mobile
-        setAuthActionType('orders')
+        setAuthActionType(tab)
         setShowAuthModal(true)
       }
       return
@@ -151,6 +161,22 @@ function UserDashboardContent({ onLogout }) {
       if (targetTab !== 'checkout') setShowCheckout(false)
     }
   }, [navigate, authenticated, isLaptopView])
+
+  // Navigate to product detail with ID in URL for refresh persistence
+  const navigateToProductDetail = useCallback((productId) => {
+    if (!productId) return
+    setSelectedProduct(productId)
+    setActiveTab('product-detail')
+    navigate(`/user/dashboard/product-detail?id=${productId}`, { replace: false })
+  }, [navigate])
+
+  // Navigate to carousel products with ID in URL for refresh persistence
+  const navigateToCarouselProducts = useCallback((carouselId) => {
+    if (!carouselId) return
+    setSelectedCarousel(carouselId)
+    setActiveTab('carousel-products')
+    navigate(`/user/dashboard/carousel-products?carousel=${carouselId}`, { replace: false })
+  }, [navigate])
 
   // Scroll to top when tab changes
   useEffect(() => {
@@ -525,7 +551,7 @@ function UserDashboardContent({ onLogout }) {
   }, [activeTab, fetchCart, syncCartState])
 
   const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart])
-  const favouritesCount = useMemo(() => favourites.length, [favourites])
+  const favouritesCount = useMemo(() => favourites.filter(id => id && String(id).trim() !== '' && String(id) !== 'null' && String(id) !== 'undefined').length, [favourites])
   const unreadNotificationsCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications])
 
   // Translate navigation items
@@ -1071,7 +1097,8 @@ function UserDashboardContent({ onLogout }) {
       />
       <VendorAvailabilityWarning />
       <MobileShell
-        title={activeTab === 'home' ? `Hello ${profile.name.split(' ')[0]}` : null}
+        isHome={activeTab === 'home'}
+        title={profile.name ? `Hello ${profile.name.split(' ')[0]}` : null}
         subtitle={profile.location?.city ? `${profile.location.city}, ${profile.location.state}` : null}
         onSearchClick={handleSearchClick}
         onFilterClick={handleFilterClick}
@@ -1082,7 +1109,7 @@ function UserDashboardContent({ onLogout }) {
             label={item.label}
             active={activeTab === item.id}
             onClick={() => navigateToTab(item.id)}
-            icon={<item.icon active={activeTab === item.id} className="h-5 w-5" filled={item.id === 'favourites' ? favouritesCount > 0 : undefined} />}
+            icon={<item.icon active={activeTab === item.id} className="h-7 w-7" filled={true} />}
             badge={item.id === 'cart' ? (cartCount > 0 ? cartCount : undefined) : item.id === 'favourites' ? (favouritesCount > 0 ? favouritesCount : undefined) : undefined}
           />
         ))}
@@ -1092,12 +1119,13 @@ function UserDashboardContent({ onLogout }) {
             label={item.label}
             active={activeTab === item.id}
             onClick={() => navigateToTab(item.id)}
-            icon={<item.icon active={activeTab === item.id} className="h-5 w-5" filled={item.id === 'favourites' ? favouritesCount > 0 : undefined} />}
+            icon={<item.icon active={activeTab === item.id} className="h-7 w-7" filled={true} />}
             badge={item.id === 'cart' ? (cartCount > 0 ? cartCount : undefined) : item.id === 'favourites' ? (favouritesCount > 0 ? favouritesCount : undefined) : undefined}
           />
         ))}
         menuContent={({ close }) => <MenuList items={buildMenuItems(close)} active={activeTab} />}
         cartCount={cartCount}
+        favouritesCount={favouritesCount}
         isAuthenticated={authenticated}
         onNavigate={navigateToTab}
         onLogout={onLogout}
@@ -1118,13 +1146,12 @@ function UserDashboardContent({ onLogout }) {
                   setSearchQuery('')
                   navigateToTab('search')
                 } else if (productId && productId.startsWith('carousel:')) {
-                  // Carousel clicked - show carousel products
+                  // Carousel clicked - show carousel products with URL persistence
                   const carouselId = productId.replace('carousel:', '')
-                  setSelectedCarousel(carouselId)
-                  navigateToTab('carousel-products')
+                  navigateToCarouselProducts(carouselId)
                 } else {
-                  setSelectedProduct(productId)
-                  navigateToTab('product-detail')
+                  // Navigate to product detail with URL persistence
+                  navigateToProductDetail(productId)
                 }
               }}
               onCategoryClick={(categoryId) => {
@@ -1139,12 +1166,12 @@ function UserDashboardContent({ onLogout }) {
               favourites={favourites}
             />
           )}
+          {activeTab === 'wallet' && (
+            <WalletView />
+          )}
           {activeTab === 'favourites' && (
             <FavouritesView
-              onProductClick={(productId) => {
-                setSelectedProduct(productId)
-                navigateToTab('product-detail')
-              }}
+              onProductClick={(productId) => navigateToProductDetail(productId)}
               onAddToCart={handleAddToCart}
               onRemoveFromFavourites={(productId) => {
                 success('Removed from favourites')
@@ -1154,10 +1181,7 @@ function UserDashboardContent({ onLogout }) {
           {activeTab === 'category-products' && (
             <CategoryProductsView
               categoryId={selectedCategory || 'all'}
-              onProductClick={(productId) => {
-                setSelectedProduct(productId)
-                navigateToTab('product-detail')
-              }}
+              onProductClick={(productId) => navigateToProductDetail(productId)}
               onAddToCart={handleAddToCart}
               onBack={() => {
                 navigateToTab('home')
@@ -1169,10 +1193,7 @@ function UserDashboardContent({ onLogout }) {
           {activeTab === 'carousel-products' && selectedCarousel && (
             <CarouselProductsView
               carouselId={selectedCarousel}
-              onProductClick={(productId) => {
-                setSelectedProduct(productId)
-                navigateToTab('product-detail')
-              }}
+              onProductClick={(productId) => navigateToProductDetail(productId)}
               onAddToCart={handleAddToCart}
               onBack={() => {
                 navigateToTab('home')
@@ -1184,10 +1205,7 @@ function UserDashboardContent({ onLogout }) {
           {activeTab === 'search' && (
             <SearchView
               query={searchQuery}
-              onProductClick={(productId) => {
-                setSelectedProduct(productId)
-                navigateToTab('product-detail')
-              }}
+              onProductClick={(productId) => navigateToProductDetail(productId)}
               onAddToCart={handleAddToCart}
               onToggleFavourite={handleToggleFavourite}
               favourites={favourites}
@@ -1203,10 +1221,7 @@ function UserDashboardContent({ onLogout }) {
               onBack={() => {
                 navigateToTab('home')
               }}
-              onProductClick={(productId) => {
-                setSelectedProduct(productId)
-                navigateToTab('product-detail')
-              }}
+              onProductClick={(productId) => navigateToProductDetail(productId)}
             />
           )}
           {activeTab === 'cart' && (

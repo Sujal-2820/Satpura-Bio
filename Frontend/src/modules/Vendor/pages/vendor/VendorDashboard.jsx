@@ -36,6 +36,7 @@ import { openRazorpayCheckout } from '../../../../utils/razorpay'
 import { useTranslation } from '../../../../context/TranslationContext'
 import { Trans } from '../../../../components/Trans'
 import { TransText } from '../../../../components/TransText'
+import { MarkdownRenderer } from '../../../../components/MarkdownRenderer'
 import { playNotificationSoundIfEnabled } from '../../../../utils/notificationSound'
 import { RepaymentCalculator } from '../../components/RepaymentCalculator'
 import { CreditSummaryWidget } from '../../components/CreditSummaryWidget'
@@ -2539,15 +2540,15 @@ function InventoryView({ openPanel, onNavigate }) {
 
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="aspect-video w-full overflow-hidden rounded-xl bg-gray-100">
+            <div className="aspect-square w-full overflow-hidden rounded-xl bg-white border border-gray-100 flex items-center justify-center">
               {selectedProduct.primaryImage || selectedProduct.images?.[0]?.url ? (
                 <img
                   src={selectedProduct.primaryImage || selectedProduct.images[0].url}
                   alt={selectedProduct.name}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center">
+                <div className="flex h-full w-full items-center justify-center bg-gray-50">
                   <BoxIcon className="h-16 w-16 text-gray-400" />
                 </div>
               )}
@@ -2557,9 +2558,16 @@ function InventoryView({ openPanel, onNavigate }) {
           <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div>
               <h4 className="text-sm font-semibold text-gray-700"><Trans>Description</Trans></h4>
-              <p className="text-sm text-gray-600 mt-1">
-                <TransText>{selectedProduct.description || 'No description available'}</TransText>
-              </p>
+              <div className="mt-1">
+                {selectedProduct.description ? (
+                  <MarkdownRenderer
+                    content={selectedProduct.longDescription || selectedProduct.description}
+                    className="text-sm"
+                  />
+                ) : (
+                  <p className="text-sm text-gray-500 italic"><Trans>No description available</Trans></p>
+                )}
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">

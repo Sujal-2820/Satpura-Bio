@@ -39,15 +39,15 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
           limit: 100,
           maxPrice,
         }
-        
+
         if (query.trim()) {
           params.search = query.trim()
         }
-        
+
         if (selectedCategory !== 'all') {
           params.category = selectedCategory
         }
-        
+
         // Map sortBy to API sort parameter
         if (sortBy === 'price-low') {
           params.sort = 'price_asc'
@@ -58,7 +58,7 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
         } else {
           params.sort = 'popular'
         }
-        
+
         const result = await userApi.getProducts(params)
         if (result.success && result.data?.products) {
           setProducts(result.data.products)
@@ -69,7 +69,7 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
         setLoading(false)
       }
     }
-    
+
     loadProducts()
   }, [query, selectedCategory, sortBy, maxPrice])
 
@@ -116,7 +116,7 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="p-4 rounded-2xl border border-[rgba(34,94,65,0.16)] bg-gradient-to-br from-white to-[rgba(241,244,236,0.9)] shadow-[0_18px_38px_-28px_rgba(13,38,24,0.35)] space-y-4 mb-4">
+        <div className="p-4 rounded-2xl border border-[rgba(34,94,65,0.16)] bg-gradient-to-br from-white to-[rgba(235,243,255,0.9)] shadow-[0_18px_38px_-28px_rgba(13,38,24,0.35)] space-y-4 mb-4">
           <div>
             <label className="block text-sm font-semibold text-[rgba(26,42,34,0.75)] mb-2 uppercase tracking-[0.05em]">Category</label>
             <div className="flex flex-wrap gap-2">
@@ -126,7 +126,7 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
                   'px-3 py-1.5 rounded-full text-xs font-semibold transition-all',
                   selectedCategory === 'all'
                     ? 'bg-gradient-to-r from-[#1b8f5b] to-[#2a9d61] text-white shadow-md'
-                    : 'bg-[rgba(240,245,242,0.8)] text-[rgba(23,32,34,0.65)] border border-[rgba(34,94,65,0.15)] hover:bg-[rgba(248,252,249,0.95)]'
+                    : 'bg-[rgba(235,245,255,0.8)] text-[rgba(23,32,34,0.65)] border border-[rgba(34,94,65,0.15)] hover:bg-[rgba(240,250,255,0.95)]'
                 )}
                 onClick={() => setSelectedCategory('all')}
               >
@@ -263,8 +263,8 @@ export function SearchView({ query = '', onProductClick, onAddToCart, onToggleFa
           {filteredProducts.map((product, index) => (
             <ProductCard
               key={product._id || product.id || `search-product-${index}`}
-              product={{ 
-                ...product, 
+              product={{
+                ...product,
                 id: product._id || product.id,
                 price: product.priceToUser || product.price || 0,
                 image: product.images?.[0]?.url || product.primaryImage || product.image,

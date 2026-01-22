@@ -170,7 +170,7 @@ function reducer(state, action) {
         addresses: [],
       }
     case 'ADD_TO_FAVOURITES':
-      if (state.favourites.includes(action.payload.productId)) {
+      if (!action.payload?.productId || String(action.payload.productId).trim() === '' || state.favourites.includes(action.payload.productId)) {
         return state
       }
       return {
@@ -421,10 +421,15 @@ export function UserProvider({ children }) {
       try {
         const parsed = JSON.parse(savedFavourites)
         if (Array.isArray(parsed) && parsed.length > 0) {
+          // Filter out any invalid IDs from localStorage
+          const validIds = parsed.filter(id => id && typeof id === 'string')
+
           // Only load if there are no favourites in state yet (initial load)
-          if (state.favourites.length === 0) {
-            parsed.forEach(productId => {
-              dispatch({ type: 'ADD_TO_FAVOURITES', payload: { productId } })
+          if (state.favourites.length === 0 && validIds.length > 0) {
+            validIds.forEach(productId => {
+              if (productId && String(productId).trim() !== '') {
+                dispatch({ type: 'ADD_TO_FAVOURITES', payload: { productId } })
+              }
             })
           }
         }

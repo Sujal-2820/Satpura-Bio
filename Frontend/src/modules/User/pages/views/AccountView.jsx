@@ -47,7 +47,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
   const [newPhoneOTP, setNewPhoneOTP] = useState('')
   const [phoneUpdateLoading, setPhoneUpdateLoading] = useState(false)
   const [activeSectionId, setActiveSectionId] = useState('profile') // For laptop view navigation
-  
+
   // Report issue form
   const [reportForm, setReportForm] = useState({
     subject: '',
@@ -59,7 +59,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
   useEffect(() => {
     setEditedName(profile.name)
   }, [profile.name])
-  
+
   // Update delivery address form when profile changes
   useEffect(() => {
     setDeliveryAddressForm({
@@ -83,20 +83,20 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
       alert('Name cannot be empty')
       return
     }
-    
+
     try {
       const result = await updateUserProfile({ name: editedName.trim() })
-      
+
       // Close edit modal immediately
       setEditingName(false)
-      
+
       // useUserApi hook returns { data, error } structure
       // If error is null/undefined, it means success
       if (result && !result.error && result.data) {
-    dispatch({
-      type: 'AUTH_LOGIN',
+        dispatch({
+          type: 'AUTH_LOGIN',
           payload: { ...profile, name: result.data.user?.name || editedName.trim() },
-    })
+        })
         // Show green success notification with tick icon
         success(result.data.message || 'Name updated successfully')
       } else {
@@ -106,12 +106,12 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
     } catch (error) {
       console.error('Error updating name:', error)
       // Close edit modal on error
-    setEditingName(false)
+      setEditingName(false)
       // Show red error notification
       showError(error?.error?.message || error?.message || 'Failed to update name')
     }
   }
-  
+
   const handleSaveDeliveryAddress = async () => {
     // Check authentication
     if (!authenticated) {
@@ -126,12 +126,12 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
       showError('Please select a location from Google Maps')
       return
     }
-    
+
     if (!selectedDeliveryLocation.city || !selectedDeliveryLocation.state || !selectedDeliveryLocation.pincode) {
       showError('Please select a complete address with city, state, and pincode')
       return
     }
-    
+
     try {
       const result = await updateUserProfile({
         location: {
@@ -142,7 +142,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
           coordinates: selectedDeliveryLocation.coordinates,
         },
       })
-      
+
       // useUserApi hook returns { data, error } structure
       if (result && !result.error && result.data) {
         dispatch({
@@ -154,7 +154,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
         setDeliveryAddressOTPStep(1)
         setDeliveryAddressOTP('')
         setSelectedDeliveryLocation(null)
-    } else {
+      } else {
         showError(result?.error?.message || result?.data?.message || 'Failed to update delivery address')
       }
     } catch (error) {
@@ -162,7 +162,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
       showError(error?.error?.message || error?.message || 'Failed to update delivery address')
     }
   }
-  
+
   const handleSubmitReport = () => {
     // Check authentication
     if (!authenticated) {
@@ -419,7 +419,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
                             <input
                               type="checkbox"
                               checked={item.enabled}
-                              onChange={item.onToggle || (() => {})}
+                              onChange={item.onToggle || (() => { })}
                               className="user-account-view__toggle-input"
                             />
                             <span className="user-account-view__toggle-slider" />
@@ -510,7 +510,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
                             <input
                               type="checkbox"
                               checked={item.enabled}
-                              onChange={item.onToggle || (() => {})}
+                              onChange={item.onToggle || (() => { })}
                               className="user-account-view__toggle-input"
                             />
                             <span className="user-account-view__toggle-slider" />
@@ -584,7 +584,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
             </div>
             <div className="user-account-view__panel-body">
               <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
+                <div className="p-4 rounded-xl bg-[rgba(235,245,255,0.4)] border border-[rgba(34,94,65,0.1)]">
                   <h4 className="font-semibold text-[#172022] mb-2"><Trans>Help Center</Trans></h4>
                   <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
                     <Trans>Browse FAQs and guides to find answers to common questions.</Trans>
@@ -596,7 +596,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
                     <Trans>Visit Help Center</Trans> →
                   </button>
                 </div>
-                <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
+                <div className="p-4 rounded-xl bg-[rgba(235,245,255,0.4)] border border-[rgba(34,94,65,0.1)]">
                   <h4 className="font-semibold text-[#172022] mb-2"><Trans>Contact Support</Trans></h4>
                   <p className="text-sm text-[rgba(26,42,34,0.7)] mb-2">
                     <strong><Trans>Phone</Trans>:</strong> +91 1800-XXX-XXXX
@@ -737,8 +737,8 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
             <div className="user-account-view__panel-body">
               {/* Step 1: Request OTP for current phone */}
               {phoneUpdateStep === 1 && (
-              <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-[rgba(235,245,255,0.4)] border border-[rgba(34,94,65,0.1)]">
                     <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
                       We'll send an OTP to your current phone number <strong>{profile.phone}</strong> to verify your identity.
                     </p>
@@ -781,15 +781,15 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
               {/* Step 2: Verify OTP for current phone */}
               {phoneUpdateStep === 2 && (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
+                  <div className="p-4 rounded-xl bg-[rgba(235,245,255,0.4)] border border-[rgba(34,94,65,0.1)]">
                     <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
                       Enter the OTP sent to <strong>{profile.phone}</strong>
                     </p>
                   </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[#172022] mb-1.5">
+                  <div>
+                    <label className="block text-sm font-semibold text-[#172022] mb-1.5">
                       OTP <span className="text-red-500">*</span>
-                  </label>
+                    </label>
                     <input
                       type="text"
                       value={currentPhoneOTP}
@@ -797,34 +797,34 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
                       placeholder="Enter 6-digit OTP" // TODO: Translate placeholder
                       maxLength={6}
                       className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
-                  />
-                </div>
+                    />
+                  </div>
                   <div className="flex gap-3">
                     <button
                       type="button"
                       onClick={() => setPhoneUpdateStep(1)}
-                      className="flex-1 py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(240,245,242,0.5)] transition-colors"
+                      className="flex-1 py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(235,245,255,0.5)] transition-colors"
                     >
                       <Trans>Back</Trans>
                     </button>
                     <button
                       type="button"
-                    onClick={async () => {
-                      // Check authentication
-                      if (!authenticated) {
-                        if (onShowAuthPrompt) {
-                          onShowAuthPrompt('profile')
+                      onClick={async () => {
+                        // Check authentication
+                        if (!authenticated) {
+                          if (onShowAuthPrompt) {
+                            onShowAuthPrompt('profile')
+                          }
+                          return
                         }
-                        return
-                      }
 
-                      if (!currentPhoneOTP || currentPhoneOTP.length !== 6) {
-                        showError('Please enter a valid 6-digit OTP')
-                        return
-                      }
-                      setPhoneUpdateLoading(true)
-                      try {
-                        const result = await userApi.verifyOTPForCurrentPhone({ otp: currentPhoneOTP })
+                        if (!currentPhoneOTP || currentPhoneOTP.length !== 6) {
+                          showError('Please enter a valid 6-digit OTP')
+                          return
+                        }
+                        setPhoneUpdateLoading(true)
+                        try {
+                          const result = await userApi.verifyOTPForCurrentPhone({ otp: currentPhoneOTP })
                           if (result.success) {
                             success('Current phone verified successfully')
                             setPhoneUpdateStep(3)
@@ -850,7 +850,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
               {/* Step 3: Enter new phone number */}
               {phoneUpdateStep === 3 && (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
+                  <div className="p-4 rounded-xl bg-[rgba(235,245,255,0.4)] border border-[rgba(34,94,65,0.1)]">
                     <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
                       Current phone verified! Now enter your new phone number.
                     </p>
@@ -874,32 +874,32 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
                         setPhoneUpdateStep(2)
                         setNewPhone('')
                       }}
-                      className="flex-1 py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(240,245,242,0.5)] transition-colors"
+                      className="flex-1 py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(235,245,255,0.5)] transition-colors"
                     >
                       <Trans>Back</Trans>
                     </button>
                     <button
                       type="button"
                       onClick={async () => {
-                      // Check authentication
-                      if (!authenticated) {
-                        if (onShowAuthPrompt) {
-                          onShowAuthPrompt('profile')
+                        // Check authentication
+                        if (!authenticated) {
+                          if (onShowAuthPrompt) {
+                            onShowAuthPrompt('profile')
+                          }
+                          return
                         }
-                        return
-                      }
 
-                      if (!newPhone || newPhone.length < 10) {
-                        showError('Please enter a valid phone number')
-                        return
-                      }
-                      if (newPhone === profile.phone) {
-                        showError('New phone number must be different from current phone number')
-                        return
-                      }
-                      setPhoneUpdateLoading(true)
-                      try {
-                        const result = await userApi.requestOTPForNewPhone({ newPhone })
+                        if (!newPhone || newPhone.length < 10) {
+                          showError('Please enter a valid phone number')
+                          return
+                        }
+                        if (newPhone === profile.phone) {
+                          showError('New phone number must be different from current phone number')
+                          return
+                        }
+                        setPhoneUpdateLoading(true)
+                        try {
+                          const result = await userApi.requestOTPForNewPhone({ newPhone })
                           if (result.success) {
                             success('OTP sent to your new phone number')
                             setPhoneUpdateStep(4)
@@ -925,7 +925,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
               {/* Step 4: Verify OTP for new phone */}
               {phoneUpdateStep === 4 && (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
+                  <div className="p-4 rounded-xl bg-[rgba(235,245,255,0.4)] border border-[rgba(34,94,65,0.1)]">
                     <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
                       Enter the OTP sent to <strong>{newPhone}</strong>
                     </p>
@@ -950,28 +950,28 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
                         setPhoneUpdateStep(3)
                         setNewPhoneOTP('')
                       }}
-                      className="flex-1 py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(240,245,242,0.5)] transition-colors"
+                      className="flex-1 py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(235,245,255,0.5)] transition-colors"
                     >
                       <Trans>Back</Trans>
                     </button>
                     <button
                       type="button"
                       onClick={async () => {
-                      // Check authentication
-                      if (!authenticated) {
-                        if (onShowAuthPrompt) {
-                          onShowAuthPrompt('profile')
+                        // Check authentication
+                        if (!authenticated) {
+                          if (onShowAuthPrompt) {
+                            onShowAuthPrompt('profile')
+                          }
+                          return
                         }
-                        return
-                      }
 
-                      if (!newPhoneOTP || newPhoneOTP.length !== 6) {
-                        showError('Please enter a valid 6-digit OTP')
-                        return
-                      }
-                      setPhoneUpdateLoading(true)
-                      try {
-                        const result = await userApi.verifyOTPForNewPhone({ otp: newPhoneOTP })
+                        if (!newPhoneOTP || newPhoneOTP.length !== 6) {
+                          showError('Please enter a valid 6-digit OTP')
+                          return
+                        }
+                        setPhoneUpdateLoading(true)
+                        try {
+                          const result = await userApi.verifyOTPForNewPhone({ otp: newPhoneOTP })
                           if (result.success) {
                             success('Phone number updated successfully')
                             dispatch({
@@ -998,7 +998,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
                     >
                       {phoneUpdateLoading ? <Trans>Updating...</Trans> : <Trans>Update Phone Number</Trans>}
                     </button>
-                </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1039,7 +1039,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
               {/* Step 1: Request OTP for current phone */}
               {deliveryAddressOTPStep === 1 && (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
+                  <div className="p-4 rounded-xl bg-[rgba(235,245,255,0.4)] border border-[rgba(34,94,65,0.1)]">
                     <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
                       We'll send an OTP to your registered phone number <strong>{profile.phone}</strong> to verify your identity before updating the delivery address.
                     </p>
@@ -1082,29 +1082,29 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
               {/* Step 2: Verify OTP */}
               {deliveryAddressOTPStep === 2 && (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
+                  <div className="p-4 rounded-xl bg-[rgba(235,245,255,0.4)] border border-[rgba(34,94,65,0.1)]">
                     <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
                       Enter the OTP sent to <strong>{profile.phone}</strong>
                     </p>
                   </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[#172022] mb-1.5">
+                  <div>
+                    <label className="block text-sm font-semibold text-[#172022] mb-1.5">
                       OTP <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
+                    </label>
+                    <input
+                      type="text"
                       value={deliveryAddressOTP}
                       onChange={(e) => setDeliveryAddressOTP(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       placeholder="Enter 6-digit OTP" // TODO: Translate placeholder
-                    maxLength={6}
-                    className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
-                  />
-                </div>
+                      maxLength={6}
+                      className="w-full px-3 py-2.5 rounded-lg border border-[rgba(34,94,65,0.15)] bg-white text-sm focus:outline-none focus:border-[#1b8f5b]"
+                    />
+                  </div>
                   <div className="flex gap-3">
                     <button
                       type="button"
                       onClick={() => setDeliveryAddressOTPStep(1)}
-                      className="flex-1 py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(240,245,242,0.5)] transition-colors"
+                      className="flex-1 py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(235,245,255,0.5)] transition-colors"
                     >
                       <Trans>Back</Trans>
                     </button>
@@ -1144,19 +1144,19 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
                     >
                       {deliveryAddressOTPLoading ? <Trans>Verifying...</Trans> : <Trans>Verify OTP</Trans>}
                     </button>
-              </div>
+                  </div>
                 </div>
               )}
 
               {/* Step 3: Select Address from Google Maps */}
               {deliveryAddressOTPStep === 3 && (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
+                  <div className="p-4 rounded-xl bg-[rgba(235,245,255,0.4)] border border-[rgba(34,94,65,0.1)]">
                     <p className="text-sm text-[rgba(26,42,34,0.7)] mb-3">
                       Phone verified! Now select your delivery address using Google Maps. You can search for an address or use your live location.
                     </p>
                   </div>
-                  
+
                   <GoogleMapsLocationPicker
                     onLocationSelect={(location) => {
                       setSelectedDeliveryLocation(location)
@@ -1173,7 +1173,7 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
                   />
 
                   {selectedDeliveryLocation && (
-                    <div className="p-4 rounded-xl bg-[rgba(240,245,242,0.4)] border border-[rgba(34,94,65,0.1)]">
+                    <div className="p-4 rounded-xl bg-[rgba(235,245,255,0.4)] border border-[rgba(34,94,65,0.1)]">
                       <p className="text-xs font-semibold text-[#172022] mb-2">Selected Address:</p>
                       <p className="text-sm text-[rgba(26,42,34,0.7)]">
                         {selectedDeliveryLocation.address}
@@ -1185,25 +1185,25 @@ export function AccountView({ onNavigate, authenticated, isLaptopView, onShowAut
                   )}
 
                   <div className="flex gap-3">
-                <button
-                  type="button"
+                    <button
+                      type="button"
                       onClick={() => {
                         setDeliveryAddressOTPStep(2)
                         setSelectedDeliveryLocation(null)
                       }}
-                  className="flex-1 py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(240,245,242,0.5)] transition-colors"
-                >
+                      className="flex-1 py-2.5 px-4 rounded-xl border border-[rgba(34,94,65,0.2)] bg-white text-[#1b8f5b] text-sm font-semibold hover:bg-[rgba(235,245,255,0.5)] transition-colors"
+                    >
                       <Trans>Back</Trans>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveDeliveryAddress}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveDeliveryAddress}
                       disabled={loading || !selectedDeliveryLocation}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-[#1b8f5b] text-white text-sm font-semibold hover:bg-[#2a9d61] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? <Trans>Saving...</Trans> : <Trans>Save Address</Trans>}
-                </button>
-              </div>
+                      className="flex-1 py-2.5 px-4 rounded-xl bg-[#1b8f5b] text-white text-sm font-semibold hover:bg-[#2a9d61] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? <Trans>Saving...</Trans> : <Trans>Save Address</Trans>}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

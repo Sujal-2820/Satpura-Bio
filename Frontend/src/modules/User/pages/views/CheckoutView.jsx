@@ -604,7 +604,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           <OrderSummary />
 
           {/* Promo Code */}
-          <div className="p-4 rounded-xl border border-[rgba(34,94,65,0.12)] bg-[rgba(240,245,242,0.3)]">
+          <div className="p-4 rounded-xl border border-[rgba(34,94,65,0.12)] bg-[rgba(235,245,255,0.3)]">
             <label className="block text-sm font-semibold text-[#172022] mb-2">Promo Code</label>
             <div className="flex gap-2">
               <input
@@ -635,7 +635,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
                   className={cn(
                     'text-left p-4 rounded-xl border-2 transition-all',
                     paymentPreference === option.id
-                      ? 'border-[#1b8f5b] bg-[rgba(240,245,242,0.6)] shadow-sm'
+                      ? 'border-[#1b8f5b] bg-[rgba(235,245,255,0.6)] shadow-sm'
                       : 'border-[rgba(34,94,65,0.15)] bg-white hover:border-[rgba(34,94,65,0.25)]',
                   )}
                 >
@@ -673,14 +673,14 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           <div className="p-4 rounded-xl border border-[rgba(34,94,65,0.12)] bg-white user-checkout-payment-breakdown">
             <h3 className="text-sm font-semibold text-[#172022] mb-3">Payment Breakdown</h3>
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
+              <div className="p-3 rounded-lg bg-[rgba(235,245,255,0.5)] border border-[rgba(34,94,65,0.15)]">
                 <p className="text-xs font-semibold text-[rgba(26,42,34,0.65)] uppercase tracking-wide mb-1">
                   {paymentDueNowLabel}
                 </p>
                 <p className="text-lg font-bold text-[#1b8f5b]">₹{amountDueNow.toLocaleString('en-IN')}</p>
                 <p className="text-xs text-[rgba(26,42,34,0.6)] mt-1">Pay now</p>
               </div>
-              <div className="p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
+              <div className="p-3 rounded-lg bg-[rgba(235,245,255,0.5)] border border-[rgba(34,94,65,0.15)]">
                 <p className="text-xs font-semibold text-[rgba(26,42,34,0.65)] uppercase tracking-wide mb-1">
                   {paymentDueLaterLabel}
                 </p>
@@ -732,7 +732,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
               <button
                 type="button"
                 onClick={() => setShowChangeAddressPanel(true)}
-                className="w-full mt-4 py-2.5 px-4 rounded-xl bg-white border border-[rgba(34,94,65,0.2)] text-sm font-semibold text-[#1b8f5b] hover:bg-[rgba(240,245,242,0.6)] transition-all hover:shadow-sm"
+                className="w-full mt-4 py-2.5 px-4 rounded-xl bg-white border border-[rgba(34,94,65,0.2)] text-sm font-semibold text-[#1b8f5b] hover:bg-[rgba(235,245,255,0.6)] transition-all hover:shadow-sm"
               >
                 Want to change Delivery Address?
               </button>
@@ -808,7 +808,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           </div>
 
           {(assignedVendor || cartItems[0]?.vendor) && (
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-[rgba(240,245,242,0.6)] to-[rgba(255,255,255,0.9)] border border-[rgba(34,94,65,0.2)] shadow-sm user-checkout-vendor-container">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-[rgba(235,245,255,0.6)] to-[rgba(255,255,255,0.9)] border border-[rgba(34,94,65,0.2)] shadow-sm user-checkout-vendor-container">
               <p className="text-xs font-bold text-[rgba(26,42,34,0.7)] uppercase tracking-wide mb-2 flex items-center gap-2">
                 <PackageIcon className="h-4 w-4 text-[#1b8f5b]" />
                 Assigned Vendor
@@ -848,7 +848,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
           </div>
 
           {/* Final Summary */}
-          <div className="p-5 rounded-2xl border-2 border-[rgba(34,94,65,0.15)] bg-gradient-to-br from-[rgba(240,245,242,0.6)] to-[rgba(255,255,255,0.95)] shadow-[0_4px_12px_-4px_rgba(16,44,30,0.15)] user-checkout-final-summary">
+          <div className="p-5 rounded-2xl border-2 border-[rgba(34,94,65,0.15)] bg-gradient-to-br from-[rgba(235,245,255,0.6)] to-[rgba(255,255,255,0.95)] shadow-[0_4px_12px_-4px_rgba(16,44,30,0.15)] user-checkout-final-summary">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg bg-[rgba(27,143,91,0.1)] flex items-center justify-center">
                 <PackageIcon className="h-5 w-5 text-[#1b8f5b]" />
@@ -885,7 +885,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
                   <p className="text-lg font-bold text-[#1b8f5b]">₹{amountDueNow.toLocaleString('en-IN')}</p>
                   <p className="text-[10px] text-[rgba(26,42,34,0.6)] font-medium mt-1">Pay now</p>
                 </div>
-                <div className="p-4 rounded-xl bg-gradient-to-br from-[rgba(240,245,242,0.6)] to-white border-2 border-[rgba(34,94,65,0.15)] shadow-sm">
+                <div className="p-4 rounded-xl bg-gradient-to-br from-[rgba(235,245,255,0.6)] to-white border-2 border-[rgba(34,94,65,0.15)] shadow-sm">
                   <p className="text-[10px] font-bold text-[rgba(26,42,34,0.65)] uppercase tracking-wide mb-2">
                     {paymentDueLaterLabel}
                   </p>
@@ -1116,7 +1116,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
               </p>
 
               <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(235,245,255,0.5)] border border-[rgba(34,94,65,0.15)]">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1b8f5b] text-white flex items-center justify-center text-sm font-bold">
                     1
                   </div>
@@ -1126,7 +1126,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(235,245,255,0.5)] border border-[rgba(34,94,65,0.15)]">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1b8f5b] text-white flex items-center justify-center text-sm font-bold">
                     2
                   </div>
@@ -1136,7 +1136,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(235,245,255,0.5)] border border-[rgba(34,94,65,0.15)]">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1b8f5b] text-white flex items-center justify-center text-sm font-bold">
                     3
                   </div>
@@ -1146,7 +1146,7 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(240,245,242,0.5)] border border-[rgba(34,94,65,0.15)]">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-[rgba(235,245,255,0.5)] border border-[rgba(34,94,65,0.15)]">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1b8f5b] text-white flex items-center justify-center text-sm font-bold">
                     4
                   </div>

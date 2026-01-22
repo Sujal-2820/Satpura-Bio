@@ -1043,9 +1043,11 @@ export function useAdminApi() {
     markIncentiveAsClaimed,
     // Categories
     getCategories: useCallback(() => callApi(adminApi.getAdminCategories), [callApi]),
+    getAdminCategories: useCallback(() => callApi(adminApi.getAdminCategories), [callApi]),
     createCategory: useCallback((data) => callApi(adminApi.createCategory, data), [callApi]),
     updateCategory: useCallback((id, data) => callApi(adminApi.updateCategory, id, data), [callApi]),
     deleteCategory: useCallback((id) => callApi(adminApi.deleteCategory, id), [callApi]),
+    reorderCategories: useCallback((categories) => callApi(adminApi.reorderCategories, categories), [callApi]),
     // Generic HTTP methods for new APIs
     get: useCallback((endpoint) => callApi(adminApi.apiGet, endpoint), [callApi]),
     post: useCallback((endpoint, data) => callApi(adminApi.apiPost, endpoint, data), [callApi]),

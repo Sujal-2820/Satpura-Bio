@@ -253,7 +253,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart, 
         {groupedCartItems.map((group, groupIndex) => (
           <div
             key={group.productId || `cart-group-${groupIndex}`}
-            className="rounded-2xl border border-[rgba(34,94,65,0.16)] bg-gradient-to-br from-white to-[rgba(239,246,240,0.92)] shadow-[0_20px_42px_-30px_rgba(16,44,30,0.36)] overflow-hidden"
+            className="rounded-2xl border border-[rgba(34,94,65,0.16)] bg-gradient-to-br from-white to-[rgba(235,243,255,0.92)] shadow-[0_20px_42px_-30px_rgba(16,44,30,0.36)] overflow-hidden"
           >
             {/* Product Header */}
             <div className="flex gap-3 p-4 border-b border-[rgba(34,94,65,0.1)]">
@@ -281,7 +281,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart, 
                     <button
                       type="button"
                       onClick={() => setExpandedVariants(prev => ({ ...prev, [variantId]: !prev[variantId] }))}
-                      className="w-full flex items-start justify-between gap-3 p-3 hover:bg-[rgba(240,245,242,0.3)] transition-colors"
+                      className="w-full flex items-start justify-between gap-3 p-3 hover:bg-[rgba(235,245,255,0.3)] transition-colors"
                     >
                       <div className="flex-1 min-w-0 text-left">
                         <div className="flex items-center gap-2 mb-1">
@@ -338,7 +338,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart, 
 
                     {/* Expanded Variant Details */}
                     {isExpanded && (
-                      <div className="px-3 pb-3 border-t border-[rgba(34,94,65,0.1)] bg-[rgba(240,245,242,0.2)]">
+                      <div className="px-3 pb-3 border-t border-[rgba(34,94,65,0.1)] bg-[rgba(235,245,255,0.2)]">
                         {variant.variantAttributes && Object.keys(variant.variantAttributes).length > 0 ? (
                           <div className="pt-2 space-y-1">
                             <p className="text-xs font-bold text-[rgba(26,42,34,0.7)] mb-2"><Trans>Variant Properties:</Trans></p>
@@ -358,11 +358,11 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart, 
                     )}
 
                     {/* Variant Controls - Always visible */}
-                    <div className="flex items-center justify-between gap-3 p-3 border-t border-[rgba(34,94,65,0.1)] bg-[rgba(240,245,242,0.1)]">
+                    <div className="flex items-center justify-between gap-3 p-3 border-t border-[rgba(34,94,65,0.1)] bg-[rgba(235,245,255,0.1)]">
                       <div className="flex items-center gap-2 border border-[rgba(34,94,65,0.2)] rounded-xl bg-white">
                         <button
                           type="button"
-                          className="p-1.5 hover:bg-[rgba(240,245,242,0.5)] transition-colors"
+                          className="p-1.5 hover:bg-[rgba(235,245,255,0.5)] transition-colors"
                           onClick={(e) => {
                             e.stopPropagation()
                             const currentQty = optimisticQuantities[variantId] !== undefined
@@ -383,7 +383,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart, 
                         </span>
                         <button
                           type="button"
-                          className="p-1.5 hover:bg-[rgba(240,245,242,0.5)] transition-colors"
+                          className="p-1.5 hover:bg-[rgba(235,245,255,0.5)] transition-colors"
                           onClick={(e) => {
                             e.stopPropagation()
                             const currentQty = optimisticQuantities[variantId] !== undefined
@@ -426,7 +426,7 @@ export function CartView({ onUpdateQuantity, onRemove, onCheckout, onAddToCart, 
         ))}
       </div>
 
-      <div className="p-4 rounded-2xl border border-[rgba(34,94,65,0.16)] bg-gradient-to-br from-white to-[rgba(241,244,236,0.9)] shadow-[0_18px_38px_-28px_rgba(13,38,24,0.35)] space-y-3 user-cart-summary">
+      <div className="p-4 rounded-2xl border border-[rgba(34,94,65,0.16)] bg-gradient-to-br from-white to-[rgba(235,243,255,0.9)] shadow-[0_18px_38px_-28px_rgba(13,38,24,0.35)] space-y-3 user-cart-summary">
         <div className="flex items-center justify-between text-sm">
           <span className="text-[rgba(26,42,34,0.65)]"><Trans>Subtotal</Trans></span>
           <span className="font-semibold text-[#172022]">₹{totals.subtotal.toLocaleString('en-IN')}</span>

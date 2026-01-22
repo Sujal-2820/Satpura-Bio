@@ -71,14 +71,16 @@ export function ImageUpload({ images = [], onChange, maxImages = 4, disabled = f
       clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
       maxFileSize: 5000000, // 5MB
       cropping: true,
-      croppingAspectRatio: 1, // Square images
+      // croppingAspectRatio: 1, // Removed to allow any aspect ratio
+      croppingShowDimensions: true,
       croppingDefaultSelectionRatio: 0.9,
       folder: 'satpura-bio/products', // Organize images in folder
       transformation: [
         {
-          width: 800,
-          height: 800,
-          crop: 'limit',
+          width: 1200,
+          height: 1200,
+          crop: 'pad',
+          background: 'white',
           quality: 'auto:good', // Optimize quality and file size
           fetchFormat: 'auto', // Auto format (webp when supported)
         },
@@ -267,7 +269,7 @@ export function ImageUpload({ images = [], onChange, maxImages = 4, disabled = f
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, index)}
             >
-              <div className="relative aspect-square rounded-xl border-2 border-gray-300 overflow-hidden bg-gray-50">
+              <div className="relative aspect-square rounded-xl border-2 border-gray-300 overflow-hidden bg-white flex items-center justify-center">
                 {!disabled && images.length > 1 && (
                   <div className="absolute top-2 left-2 z-10 p-1.5 bg-gray-800/70 text-white rounded cursor-move opacity-0 group-hover:opacity-100 transition-opacity">
                     <GripVertical className="h-4 w-4" />
@@ -276,7 +278,7 @@ export function ImageUpload({ images = [], onChange, maxImages = 4, disabled = f
                 <img
                   src={imageUrl}
                   alt={`Product image ${index + 1}`}
-                  className="w-full h-full object-cover pointer-events-none"
+                  className="w-full h-full object-contain pointer-events-none"
                   draggable={false}
                   onError={(e) => {
                     e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI0U0RThFQiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5Q0EzQUYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBub3QgZm91bmQ8L3RleHQ+PC9zdmc+'

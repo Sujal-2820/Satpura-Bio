@@ -18,6 +18,13 @@ router.get('/', authorizeAdmin, categoryController.getAdminCategories);
 router.post('/', authorizeAdmin, categoryController.createCategory);
 
 /**
+ * @route   PUT /api/admin/categories/reorder
+ * @desc    Reorder categories (bulk update)
+ * @access  Private (Admin)
+ */
+router.put('/reorder', authorizeAdmin, categoryController.reorderCategories);
+
+/**
  * @route   PUT /api/admin/categories/:id
  * @desc    Update a category
  * @access  Private (Admin)

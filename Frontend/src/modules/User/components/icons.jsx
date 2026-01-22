@@ -1,6 +1,14 @@
-export function HomeIcon({ active = false, className = 'h-5 w-5' }) {
+export function HomeIcon({ active = false, filled = false, className = 'h-5 w-5' }) {
+  if (filled || active) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z" />
+        <path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z" />
+      </svg>
+    )
+  }
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke={active ? 'currentColor' : 'currentColor'}>
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -35,7 +43,14 @@ export function CartIcon({ active = false, className = 'h-5 w-5' }) {
   )
 }
 
-export function UserIcon({ active = false, className = 'h-5 w-5' }) {
+export function UserIcon({ active = false, filled = false, className = 'h-5 w-5' }) {
+  if (filled || active) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
+      </svg>
+    )
+  }
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path
@@ -101,6 +116,26 @@ export function HeartIcon({ className = 'h-5 w-5', filled = false }) {
         strokeLinejoin="round"
         strokeWidth="1.5"
         d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z"
+      />
+    </svg>
+  )
+}
+
+export function WalletIcon({ active = false, filled = false, className = 'h-5 w-5' }) {
+  if (filled || active) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <path fillRule="evenodd" d="M2.25 8.25a.75.75 0 01.75-.75h9a.75.75 0 01.75.75v1.5a.75.75 0 01-.75.75h-9a.75.75 0 01-.75-.75v-1.5zM2.25 12a.75.75 0 01.75-.75h18a.75.75 0 01.75.75v5.25a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V12zm15 2.25a.75.75 0 100 1.5.75.75 0 000-1.5zm-15-10.5a2.25 2.25 0 012.25-2.25h12a2.25 2.25 0 012.25 2.25v2.25a.75.75 0 01-1.5 0V3.75a.75.75 0 00-.75-.75h-12a.75.75 0 00-.75.75v2.25a.75.75 0 01-1.5 0V3.75z" clipRule="evenodd" />
+      </svg>
+    )
+  }
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+        d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3"
       />
     </svg>
   )
@@ -195,7 +230,14 @@ export function CreditCardIcon({ className = 'h-5 w-5' }) {
   )
 }
 
-export function PackageIcon({ className = 'h-5 w-5' }) {
+export function PackageIcon({ active = false, filled = false, className = 'h-5 w-5' }) {
+  if (filled || active) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <path d="M12.378 1.602a.75.75 0 00-.756 0L3 6.632l9 5.25 9-5.25-8.622-5.03zM21.75 7.93l-9 5.25v9l9-5.25V7.93zM11.25 22.18v-9l-9-5.25v9l9 5.25z" />
+      </svg>
+    )
+  }
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path
