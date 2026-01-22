@@ -41,14 +41,34 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
     loadCategories()
   }, [])
 
+  // Sync selectedCategory with categoryId prop
+  useEffect(() => {
+    if (categoryId) {
+      setSelectedCategory(categoryId)
+    }
+  }, [categoryId])
+
   // Fetch products for selected category
   useEffect(() => {
     const loadProducts = async () => {
+      // If a specific category is selected, we need categories to be loaded first
+      // so we can resolve the ID to a name for the API
+      if (selectedCategory !== 'all' && categories.length === 0) {
+        return
+      }
+
       setLoading(true)
       try {
         const params = { limit: 100 }
         if (selectedCategory !== 'all') {
-          params.category = selectedCategory
+          // Find the category object to get the name (backend expects name, not ID)
+          const categoryObj = categories.find(c => (c._id || c.id) === selectedCategory)
+          if (categoryObj) {
+            params.category = categoryObj.name
+          } else {
+            // Fallback for when selectedCategory might be a name or direct value
+            params.category = selectedCategory
+          }
         }
         const result = await userApi.getProducts(params)
         if (result.success && result.data?.products) {
@@ -62,7 +82,7 @@ export function CategoryProductsView({ categoryId, onProductClick, onAddToCart, 
     }
 
     loadProducts()
-  }, [selectedCategory])
+  }, [selectedCategory, categories])
 
   const category = useMemo(() => {
     if (selectedCategory === 'all') return null

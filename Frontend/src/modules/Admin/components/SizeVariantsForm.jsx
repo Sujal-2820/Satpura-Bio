@@ -72,8 +72,8 @@ export function SizeVariantsForm({
                     sizeUnit: v.sizeUnit || v.stockUnit || defaultUnit,
                     actualStock: v.actualStock != null ? String(v.actualStock) : '',
                     displayStock: v.displayStock != null ? String(v.displayStock) : '',
-                    vendorPrice: v.vendorPrice != null ? String(Math.round(parseFloat(v.vendorPrice) || 0)) : '',
-                    userPrice: v.userPrice != null ? String(Math.round(parseFloat(v.userPrice) || 0)) : '',
+                    vendorPrice: v.vendorPrice != null ? String(v.vendorPrice) : '',
+                    userPrice: v.userPrice != null ? String(v.userPrice) : '',
                     discountVendor: v.discountVendor != null ? String(v.discountVendor) : '',
                     discountUser: v.discountUser != null ? String(v.discountUser) : '',
                 })))
@@ -208,8 +208,8 @@ export function SizeVariantsForm({
             stockUnit: v.sizeUnit,
             actualStock: parseFloat(v.actualStock) || 0,
             displayStock: parseFloat(v.displayStock) || 0,
-            vendorPrice: Math.round(parseFloat(v.vendorPrice) || 0),
-            userPrice: Math.round(parseFloat(v.userPrice) || 0),
+            vendorPrice: parseFloat(v.vendorPrice) || 0,
+            userPrice: parseFloat(v.userPrice) || 0,
             discountVendor: parseFloat(v.discountVendor) || 0,
             discountUser: parseFloat(v.discountUser) || 0,
         }))

@@ -4,8 +4,9 @@ import { useUserDispatch, useUserState } from '../context/UserContext'
 import { MobileShell } from '../components/MobileShell'
 import { BottomNavItem } from '../components/BottomNavItem'
 import { MenuList } from '../components/MenuList'
-import { HomeIcon, SearchIcon, CartIcon, UserIcon, MenuIcon, HeartIcon, PackageIcon, WalletIcon } from '../components/icons'
+import { HomeIcon, SearchIcon, CartIcon, UserIcon, MenuIcon, HeartIcon, PackageIcon, WalletIcon, ChevronRightIcon } from '../components/icons'
 import { Trans } from '../../../components/Trans'
+import { TransText } from '../../../components/TransText'
 // import { MIN_ORDER_VALUE } from '../services/userData'
 import * as userApi from '../services/userApi'
 import { cn } from '../../../lib/cn'
@@ -78,6 +79,8 @@ function UserDashboardContent({ onLogout }) {
   const [searchMounted, setSearchMounted] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchSuggestions, setSearchSuggestions] = useState({ products: [], categories: [] })
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const searchInputRef = useRef(null)
   const searchPanelRef = useRef(null)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
@@ -832,6 +835,7 @@ function UserDashboardContent({ onLogout }) {
     }
 
     try {
+      let latestCart = cart
       // Add all products to cart first
       for (const item of productsData) {
         const { productId, quantity, attributes } = item
@@ -859,11 +863,18 @@ function UserDashboardContent({ onLogout }) {
         const cartResult = await userApi.addToCart(cartPayload)
         if (cartResult?.data?.cart) {
           syncCartState(cartResult.data.cart)
+          latestCart = cartResult.data.cart
         }
       }
 
       // Navigate to checkout after adding all items
-      const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      // Use subtotal from the latest API response if available
+      const cartTotal = latestCart.subtotal !== undefined
+        ? latestCart.subtotal
+        : Array.isArray(latestCart)
+          ? latestCart.reduce((sum, item) => sum + (item.price || item.unitPrice || 0) * item.quantity, 0)
+          : 0
+
       if (cartTotal < MIN_ORDER_VALUE) {
         warning(`Minimum order value is ₹${MIN_ORDER_VALUE.toLocaleString('en-IN')}`)
         return
@@ -939,14 +950,51 @@ function UserDashboardContent({ onLogout }) {
 
   const closeSearch = () => {
     setSearchOpen(false)
-    setKeyboardHeight(0)
-    // Restore body scroll
-    document.body.style.overflow = ''
-    setTimeout(() => {
+    setSearchQuery('')
+    setSearchSuggestions({ products: [], categories: [] })
+    requestAnimationFrame(() => {
       setSearchMounted(false)
-      setSearchQuery('')
-    }, 260)
+      // Restore body scroll
+      document.body.style.overflow = ''
+    })
   }
+
+  // Fetch search suggestions with debouncing
+  useEffect(() => {
+    if (!searchQuery.trim() || !searchOpen) {
+      setSearchSuggestions({ products: [], categories: [] })
+      setLoadingSuggestions(false)
+      return
+    }
+
+    setLoadingSuggestions(true)
+    const timeoutId = setTimeout(async () => {
+      try {
+        // Fetch both products and categories
+        const [productsResult, categoriesResult] = await Promise.all([
+          userApi.getProducts({ search: searchQuery.trim(), limit: 5 }),
+          userApi.getCategories()
+        ])
+
+        const products = productsResult.success ? (productsResult.data?.products || []) : []
+        const allCategories = categoriesResult.success ? (categoriesResult.data?.categories || []) : []
+
+        // Filter categories that match search query
+        const matchingCategories = allCategories.filter(cat =>
+          cat.name.toLowerCase().includes(searchQuery.toLowerCase())
+        ).slice(0, 3)
+
+        setSearchSuggestions({ products, categories: matchingCategories })
+      } catch (error) {
+        console.error('Error fetching search suggestions:', error)
+        setSearchSuggestions({ products: [], categories: [] })
+      } finally {
+        setLoadingSuggestions(false)
+      }
+    }, 300) // 300ms debounce
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery, searchOpen])
 
   // Handle keyboard visibility on mobile devices - smooth adjustment
   useEffect(() => {
@@ -1356,7 +1404,105 @@ function UserDashboardContent({ onLogout }) {
               </button>
             </div>
             <div className="user-search-sheet__body">
-              {searchResults.length ? (
+              {loadingSuggestions ? (
+                <div className="text-center py-8">
+                  <p className="text-sm text-gray-500">Searching...</p>
+                </div>
+              ) : searchQuery.trim() ? (
+                <>
+                  {/* Categories Section */}
+                  {searchSuggestions.categories.length > 0 && (
+                    <div className="mb-4">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-2">
+                        <Trans>Categories</Trans>
+                      </h3>
+                      <div className="space-y-1">
+                        {searchSuggestions.categories.map((category) => (
+                          <button
+                            key={category._id || category.id}
+                            type="button"
+                            onClick={() => {
+                              closeSearch()
+                              setSelectedCategory(category._id || category.id)
+                              navigate(`/user/dashboard/category-products?category=${category._id || category.id}`, { replace: false })
+                            }}
+                            className="user-search-result w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center flex-shrink-0">
+                              <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 text-left">
+                              <span className="user-search-result__label font-medium block"><TransText>{category.name}</TransText></span>
+                              <span className="user-search-result__meta text-xs text-gray-500 block mt-0.5"><Trans>View all products</Trans></span>
+                            </div>
+                            <ChevronRightIcon className="h-4 w-4 text-gray-400" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Products Section */}
+                  {searchSuggestions.products.length > 0 && (
+                    <div className="mb-4">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-2">
+                        <Trans>Products</Trans>
+                      </h3>
+                      <div className="space-y-1">
+                        {searchSuggestions.products.map((product) => {
+                          const productImage = product.images?.[0]?.url || product.primaryImage || product.image || 'https://via.placeholder.com/80'
+                          const displayPrice = product.priceToUser || product.price || 0
+
+                          return (
+                            <button
+                              key={product._id || product.id}
+                              type="button"
+                              onClick={() => {
+                                closeSearch()
+                                navigateToProductDetail(product._id || product.id)
+                              }}
+                              className="user-search-result w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                            >
+                              <img
+                                src={productImage}
+                                alt={product.name}
+                                className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-100"
+                              />
+                              <div className="flex-1 text-left min-w-0">
+                                <span className="user-search-result__label font-medium block truncate">
+                                  <TransText>{product.name}</TransText>
+                                </span>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-sm font-semibold text-green-600">₹{displayPrice.toLocaleString('en-IN')}</span>
+                                  {product.stock > 0 ? (
+                                    <span className="text-xs text-gray-500"><Trans>In Stock</Trans></span>
+                                  ) : (
+                                    <span className="text-xs text-red-500"><Trans>Out of Stock</Trans></span>
+                                  )}
+                                </div>
+                              </div>
+                              <ChevronRightIcon className="h-4 w-4 text-gray-400" />
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No Results */}
+                  {searchSuggestions.categories.length === 0 && searchSuggestions.products.length === 0 && (
+                    <div className="text-center py-12">
+                      <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-sm font-medium text-gray-600 mb-1"><Trans>No results found</Trans></p>
+                      <p className="text-xs text-gray-500"><Trans>Try searching for products or categories</Trans></p>
+                    </div>
+                  )}
+                </>
+              ) : searchResults.length ? (
                 searchResults.map((item) => (
                   <button
                     key={item.id}

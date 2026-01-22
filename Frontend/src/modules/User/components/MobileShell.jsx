@@ -113,31 +113,45 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
   useEffect(() => {
     let ticking = false
     let lastScrollY = window.scrollY
+    let lastDecisiveScrollY = window.scrollY // Track last position where we made a state change
     let scrollDirection = 0 // -1 = up, 1 = down, 0 = neutral
-    const scrollThreshold = 10 // Minimum scroll difference to trigger change
-    const hideThreshold = 50 // Scroll position to hide second row
-    const showThreshold = 20 // Scroll position to show second row
+    const scrollThreshold = 30 // Minimum scroll difference to change direction (increased from 10)
+    const hideThreshold = 80 // Scroll position to hide second row (increased from 50)
+    const showThreshold = 30 // Scroll position to show second row when scrolling up (increased from 20)
+    const stateChangeMinDistance = 40 // Minimum distance traveled before allowing another state change
 
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY
           const scrollDelta = currentScrollY - lastScrollY
+          const distanceFromLastChange = Math.abs(currentScrollY - lastDecisiveScrollY)
 
           // Determine scroll direction with threshold to prevent jitter
+          // Only update direction if scroll delta exceeds threshold
           if (Math.abs(scrollDelta) > scrollThreshold) {
             scrollDirection = scrollDelta > 0 ? 1 : -1
           }
 
-          // Mobile Header Animation Logic
+          // Mobile Header Animation Logic with hysteresis and state locking
           if (scrollDirection === 1) {
             // Scrolling down - make header compact
-            if (currentScrollY > 30) setCompact(true)
-            if (currentScrollY > hideThreshold) setHideSecondRow(true)
+            if (currentScrollY > 30) {
+              setCompact(true)
+            }
+            // Only hide second row if we've scrolled sufficient distance from last state change
+            if (currentScrollY > hideThreshold && distanceFromLastChange > stateChangeMinDistance) {
+              setHideSecondRow(true)
+              lastDecisiveScrollY = currentScrollY // Lock this decision
+            }
           } else if (scrollDirection === -1) {
-            // Scrolling up - show header rows immediately
-            setCompact(false)
-            setHideSecondRow(false)
+            // Scrolling up - show header rows
+            // Use different threshold (hysteresis) and require minimum distance traveled
+            if (currentScrollY < showThreshold || distanceFromLastChange > stateChangeMinDistance) {
+              setCompact(false)
+              setHideSecondRow(false)
+              lastDecisiveScrollY = currentScrollY // Lock this decision
+            }
           }
 
           lastScrollY = currentScrollY

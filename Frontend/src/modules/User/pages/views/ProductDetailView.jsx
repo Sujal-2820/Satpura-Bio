@@ -364,13 +364,13 @@ export function ProductDetailView({ productId, onAddToCart, onBuyNow, onToggleFa
 
       // Convert Sets to Arrays
       Object.keys(attributeProperties[attrName]).forEach(propKey => {
-        attributeProperties[attrName][propKey] = Array.from(attributeProperties[attrName][propKey]).sort()
+        attributeProperties[attrName][propKey] = Array.from(attributeProperties[attrName][propKey])
       })
     })
 
     return {
       attributeNameKey,
-      attributeNames: Array.from(attributeNames).sort(),
+      attributeNames: Array.from(attributeNames),
       attributeProperties
     }
   }, [product])
@@ -405,8 +405,24 @@ export function ProductDetailView({ productId, onAddToCart, onBuyNow, onToggleFa
     if (product) {
       setQuantity(1)
       setSelectedImage(0)
-      setSelectedAttributes({})
-      setSelectedAttributeStock(null)
+      // Default selection: Select the first variant (lowest price)
+      if (product.attributeStocks && product.attributeStocks.length > 0) {
+        const firstVariant = product.attributeStocks[0]
+        if (firstVariant.attributes) {
+          const attrs = firstVariant.attributes instanceof Map
+            ? Object.fromEntries(firstVariant.attributes)
+            : firstVariant.attributes
+          setSelectedAttributes(attrs)
+          setSelectedAttributeStock(firstVariant)
+        } else {
+          setSelectedAttributes({})
+          setSelectedAttributeStock(null)
+        }
+      } else {
+        setSelectedAttributes({})
+        setSelectedAttributeStock(null)
+      }
+
       setVariantError('')
       setIsWishlisted(product.isWishlisted || false)
       // Scroll to top when product changes

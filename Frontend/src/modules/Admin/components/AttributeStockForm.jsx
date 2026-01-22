@@ -28,8 +28,6 @@ export function AttributeStockForm({
     if (isOpen) {
       const initialStocks = attributeStocks.length > 0 ? attributeStocks.map((stock, idx) => ({
         ...stock,
-        vendorPrice: stock.vendorPrice != null ? Math.round(parseFloat(stock.vendorPrice) || 0) : '',
-        userPrice: stock.userPrice != null ? Math.round(parseFloat(stock.userPrice) || 0) : '',
         id: stock.id || Date.now() + idx // Ensure each has an ID
       })) : []
       setStocks(initialStocks)
@@ -317,8 +315,8 @@ export function AttributeStockForm({
         ...stockData,
         actualStock: parseFloat(stock.actualStock) || 0,
         displayStock: parseFloat(stock.displayStock) || 0,
-        vendorPrice: Math.round(parseFloat(stock.vendorPrice) || 0),
-        userPrice: Math.round(parseFloat(stock.userPrice) || 0),
+        vendorPrice: parseFloat(stock.vendorPrice) || 0,
+        userPrice: parseFloat(stock.userPrice) || 0,
         discountVendor: parseFloat(stock.discountVendor) || 0,
         discountUser: parseFloat(stock.discountUser) || 0,
         // Use final attributes with proper key-value pairs (label -> value)

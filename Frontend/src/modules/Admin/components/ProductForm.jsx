@@ -187,8 +187,8 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       // Convert prices to string if they're numbers
       const vendorPriceString = product.vendorPrice != null ? String(product.vendorPrice) : ''
       const userPriceString = product.userPrice != null ? String(product.userPrice) : ''
-      const vendorPriceValue = vendorPriceString ? String(Math.round(parseFloat(vendorPriceString.replace(/[₹,]/g, '')) || 0)) : ''
-      const userPriceValue = userPriceString ? String(Math.round(parseFloat(userPriceString.replace(/[₹,]/g, '')) || 0)) : ''
+      const vendorPriceValue = vendorPriceString.replace(/[₹,]/g, '') || ''
+      const userPriceValue = userPriceString.replace(/[₹,]/g, '') || ''
 
       // Parse expiry date (assuming format like "Aug 2026" or ISO date)
       let expiryDate = ''
@@ -280,8 +280,8 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
               sizeUnit: stock.sizeUnit || stock.stockUnit || 'kg',
               actualStock: stock.actualStock != null ? String(stock.actualStock) : '',
               displayStock: stock.displayStock != null ? String(stock.displayStock) : '',
-              vendorPrice: stock.vendorPrice != null ? String(Math.round(parseFloat(stock.vendorPrice) || 0)) : '',
-              userPrice: stock.userPrice != null ? String(Math.round(parseFloat(stock.userPrice) || 0)) : '',
+              vendorPrice: stock.vendorPrice != null ? String(stock.vendorPrice) : '',
+              userPrice: stock.userPrice != null ? String(stock.userPrice) : '',
               discountVendor: stock.discountVendor != null ? String(stock.discountVendor) : '',
               discountUser: stock.discountUser != null ? String(stock.discountUser) : '',
               id: stock.id || stock._id || Date.now() + index, // Ensure each has an ID
@@ -465,8 +465,8 @@ export function ProductForm({ product, onSubmit, onCancel, loading = false }) {
       })
 
       if (totalStock > 0) {
-        vendorPriceValue = Math.round(weightedVendorPrice / totalStock)
-        userPriceValue = Math.round(weightedUserPrice / totalStock)
+        vendorPriceValue = weightedVendorPrice / totalStock
+        userPriceValue = weightedUserPrice / totalStock
       }
 
       // Use first entry's expiry and batchNumber as defaults (or leave empty)
