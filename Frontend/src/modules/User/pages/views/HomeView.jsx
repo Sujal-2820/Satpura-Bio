@@ -175,12 +175,12 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
                         <div className="flex items-center justify-center p-8 col-span-full">
                             <p className="text-sm text-gray-500"><Trans>Loading products...</Trans></p>
                         </div>
-                    ) : popularProducts.length === 0 ? (
+                    ) : products.length === 0 ? (
                         <div className="flex items-center justify-center p-8 col-span-full">
                             <p className="text-sm text-gray-500"><Trans>No products available</Trans></p>
                         </div>
                     ) : (
-                        popularProducts.slice(0, 2).map((product) => (
+                        products.slice(0, 2).map((product) => (
                             <ProductCard
                                 key={product._id || product.id}
                                 product={{
@@ -219,12 +219,12 @@ export function HomeView({ onProductClick, onCategoryClick, onAddToCart, onSearc
                         <div className="flex items-center justify-center p-8 col-span-full">
                             <p className="text-sm text-gray-500"><Trans>Loading products...</Trans></p>
                         </div>
-                    ) : popularProducts.length === 0 ? (
+                    ) : products.length === 0 ? (
                         <div className="flex items-center justify-center p-8 col-span-full">
                             <p className="text-sm text-gray-500"><Trans>No products available</Trans></p>
                         </div>
                     ) : (
-                        popularProducts.slice(0, 4).map((product) => (
+                        products.slice(0, 4).map((product) => (
                             <ProductCard
                                 key={product._id || product.id}
                                 product={{

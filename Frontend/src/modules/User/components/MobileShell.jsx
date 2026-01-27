@@ -170,15 +170,20 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
 
   return (
     <div className="user-shell">
-      <header className={cn('user-shell-header', compact && 'is-compact', isHome && 'is-home-header')}>
+      <header className={cn(
+        'user-shell-header',
+        compact && 'is-compact',
+        isHome && 'is-home-header',
+        hideSecondRow && 'is-second-row-hidden'
+      )}>
         <div className="user-shell-header__glow" />
-        <div className="relative z-10 flex items-center justify-between">
+        <div className="user-shell-header__first-row relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img src="/assets/Satpura-1.webp" alt="Satpura Bio" className="h-11 w-auto transition-transform duration-200" />
             <span className="user-shell-header__logo-text">SATPURA BIO</span>
           </div>
           {/* Search Bar - Between Logo and Navigation (Laptop Only) */}
-          <div className="user-shell-header__search-bar ml-8">
+          <div className="user-shell-header__search-bar">
             <div className="home-search-bar__input-wrapper">
               <SearchIcon className="home-search-bar__icon" />
               <TranslatedSearchInput onSearchClick={onSearchClick} />
@@ -273,6 +278,92 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
             )}
           </div>
         )}
+        {/* Second Row - Title/Subtitle and Navigation Links (Laptop Only) */}
+        <div className={cn('user-shell-header__second-row', hideSecondRow && 'user-shell-header__second-row--hidden')}>
+          {title && (
+            <div className="user-shell-header__info">
+              <span className="user-shell-header__title-text"><TransText>{title}</TransText></span>
+              {subtitle && (
+                <p className="user-shell-header__subtitle-text">
+                  <MapPinIcon className="mr-2 inline h-3.5 w-3.5" />
+                  <TransText>{subtitle}</TransText>
+                </p>
+              )}
+            </div>
+          )}
+          <nav className="user-shell-header__links">
+            <button
+              type="button"
+              onClick={() => onNavigate?.('home')}
+              className="user-shell-header__link"
+            >
+              <Trans>HOME</Trans>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate?.('favourites')}
+              className="user-shell-header__link"
+            >
+              <Trans>FAVOURITES</Trans>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (isHome) {
+                  const categoriesSection = document.getElementById('home-shop-category')
+                  if (categoriesSection) {
+                    categoriesSection.scrollIntoView({ behavior: 'smooth' })
+                  }
+                } else {
+                  onNavigate?.('home')
+                  // Scroll to categories section after navigation with appropriate delay for HomeView to render
+                  setTimeout(() => {
+                    const categoriesSection = document.getElementById('home-shop-category')
+                    if (categoriesSection) {
+                      categoriesSection.scrollIntoView({ behavior: 'smooth' })
+                    }
+                  }, 400)
+                }
+              }}
+              className="user-shell-header__link"
+            >
+              <Trans>CATEGORIES</Trans>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate?.('orders')}
+              className="user-shell-header__link"
+            >
+              <Trans>ORDERS</Trans>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate?.('account')}
+              className="user-shell-header__link"
+            >
+              <Trans>ACCOUNT</Trans>
+            </button>
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="user-shell-header__link user-shell-header__link--signout"
+              >
+                <UserIcon className="h-4 w-4 mr-1.5" />
+                <Trans>SIGNOUT</Trans>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onLogin}
+                className="user-shell-header__link user-shell-header__link--signin"
+              >
+                <UserIcon className="h-4 w-4 mr-1.5" />
+                <Trans>SIGNIN</Trans>
+              </button>
+            )}
+          </nav>
+        </div>
       </header>
 
       {/* Mobile Search Bar - Separated from Header - Only shown on Home Screen */}
@@ -294,86 +385,6 @@ export function MobileShell({ title, subtitle, children, navigation, bottomNavig
           </div>
         </div>
       )}
-
-      {/* Second Row - Title/Subtitle and Navigation Links (Laptop Only) */}
-      <div className={cn('user-shell-header__second-row', hideSecondRow && 'user-shell-header__second-row--hidden')}>
-        {title && (
-          <div className="user-shell-header__info">
-            <span className="user-shell-header__title-text"><TransText>{title}</TransText></span>
-            {subtitle && (
-              <p className="user-shell-header__subtitle-text">
-                <MapPinIcon className="mr-2 inline h-3.5 w-3.5" />
-                <TransText>{subtitle}</TransText>
-              </p>
-            )}
-          </div>
-        )}
-        <nav className="user-shell-header__links">
-          <button
-            type="button"
-            onClick={() => onNavigate?.('home')}
-            className="user-shell-header__link"
-          >
-            <Trans>HOME</Trans>
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate?.('favourites')}
-            className="user-shell-header__link"
-          >
-            <Trans>FAVOURITES</Trans>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              onNavigate?.('home')
-              // Scroll to categories section or trigger category view
-              setTimeout(() => {
-                const categoriesSection = document.getElementById('home-categories')
-                if (categoriesSection) {
-                  categoriesSection.scrollIntoView({ behavior: 'smooth' })
-                }
-              }, 100)
-            }}
-            className="user-shell-header__link"
-          >
-            <Trans>CATEGORIES</Trans>
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate?.('orders')}
-            className="user-shell-header__link"
-          >
-            <Trans>ORDERS</Trans>
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate?.('account')}
-            className="user-shell-header__link"
-          >
-            <Trans>ACCOUNT</Trans>
-          </button>
-          {isAuthenticated ? (
-            <button
-              type="button"
-              onClick={onLogout}
-              className="user-shell-header__link user-shell-header__link--signout"
-            >
-              <UserIcon className="h-4 w-4 mr-1.5" />
-              <Trans>SIGNOUT</Trans>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onLogin}
-              className="user-shell-header__link user-shell-header__link--signin"
-            >
-              <UserIcon className="h-4 w-4 mr-1.5" />
-              <Trans>SIGNIN</Trans>
-            </button>
-          )}
-        </nav>
-      </div>
 
 
       <main

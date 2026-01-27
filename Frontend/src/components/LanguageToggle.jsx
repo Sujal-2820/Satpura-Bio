@@ -132,52 +132,46 @@ export function LanguageToggle({ className, variant = 'default', onLanguageChang
   // Compact variant (for desktop nav) - Toggle Switch design
   if (variant === 'compact') {
     const isEnglishSelected = currentLang.code === 'en'
-    
+
     return (
       <div ref={dropdownRef} className={cn('relative', className)}>
         {/* Toggle Switch */}
-        <div className="relative flex items-center w-[160px] h-12 rounded-full bg-gray-200 overflow-hidden cursor-pointer">
+        <div className="relative flex items-center w-[160px] h-10 rounded-full bg-black/20 overflow-hidden cursor-pointer border border-white/10">
+          {/* Moving Background Pill */}
+          <div
+            className={cn(
+              'absolute top-1 left-1 w-[76px] h-8 bg-white rounded-full shadow-md transition-transform duration-300 z-0',
+              isEnglishSelected ? 'translate-x-0' : 'translate-x-[76px]'
+            )}
+          />
+
           {/* English Section */}
           <button
             type="button"
             onClick={() => handleLanguageSelect('en')}
-            className={cn(
-              'flex-1 h-full flex items-center justify-center transition-all duration-300 z-10',
-              isEnglishSelected ? 'bg-blue-600' : 'bg-transparent'
-            )}
+            className="flex-1 h-full flex items-center justify-center z-10"
           >
             <span className={cn(
-              'text-sm font-semibold transition-colors duration-300',
-              isEnglishSelected ? 'text-white' : 'text-gray-600'
+              'text-xs font-bold transition-colors duration-300',
+              isEnglishSelected ? 'text-[#1b8f5b]' : 'text-white/80'
             )}>
-              English
+              ENGLISH
             </span>
           </button>
-          
+
           {/* Hindi Section */}
           <button
             type="button"
             onClick={() => handleLanguageSelect('hi')}
-            className={cn(
-              'flex-1 h-full flex items-center justify-center transition-all duration-300 z-10',
-              !isEnglishSelected ? 'bg-gray-300' : 'bg-transparent'
-            )}
+            className="flex-1 h-full flex items-center justify-center z-10"
           >
             <span className={cn(
-              'text-sm font-semibold transition-colors duration-300',
-              !isEnglishSelected ? 'text-black' : 'text-gray-600'
+              'text-xs font-bold transition-colors duration-300',
+              !isEnglishSelected ? 'text-[#1b8f5b]' : 'text-white/80'
             )}>
               हिंदी
             </span>
           </button>
-          
-          {/* Toggle Button (White Circle) */}
-          <div
-            className={cn(
-              'absolute top-1 left-1 w-10 h-10 bg-white rounded-full shadow-lg transition-transform duration-300 z-20',
-              isEnglishSelected ? 'translate-x-0' : 'translate-x-[80px]'
-            )}
-          />
         </div>
       </div>
     )

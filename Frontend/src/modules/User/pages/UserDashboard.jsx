@@ -591,7 +591,7 @@ function UserDashboardContent({ onLogout }) {
           label: 'Browse Categories',
           keywords: ['categories', 'seeds', 'fertilizers', 'pesticides', 'tools', 'browse'],
           tab: 'home',
-          targetId: 'home-categories',
+          targetId: 'home-shop-category',
         },
         {
           id: 'search-home-popular',

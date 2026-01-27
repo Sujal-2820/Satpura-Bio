@@ -46,14 +46,34 @@ router.post('/register', protect, async (req, res) => {
 
         const fieldToUpdate = platform === 'web' ? 'fcmTokenWeb' : 'fcmTokenApp';
 
-        // Update the token
-        const person = await Model.findByIdAndUpdate(
-            userId,
-            { [fieldToUpdate]: token },
-            { new: true }
-        );
+        // Resolve ObjectId properly to avoid CastErrors
+        let dbUser;
+        if (userId.match(/^[0-9a-fA-F]{24}$/)) {
+            // It's a valid ObjectId string
+            dbUser = await Model.findByIdAndUpdate(
+                userId,
+                { [fieldToUpdate]: token },
+                { new: true }
+            );
+        } else {
+            // It's a custom ID string (e.g., USR-101), find by custom ID field if exists
+            // We need to know which field to query. Assuming the field names from schemas:
+            const query = {};
+            if (role === 'user') query.userId = userId;
+            else if (role === 'vendor') query.vendorId = userId;
+            else if (role === 'seller') query.sellerId = userId;
+            else if (role === 'admin' || role === 'super_admin') query._id = userId; // Admin usually uses _id
 
-        if (!person) {
+            // Use findOneAndUpdate to handle custom ID fields
+            dbUser = await Model.findOneAndUpdate(
+                query,
+                { [fieldToUpdate]: token },
+                { new: true }
+            );
+        }
+
+        if (!dbUser) {
+            console.log(`FCM Registration: User not found with ID: ${userId} for role: ${role}`);
             return res.status(404).json({
                 success: false,
                 message: 'Account not found'

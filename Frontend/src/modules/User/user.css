@@ -132,6 +132,8 @@
   filter: blur(12px);
   opacity: 0.6;
   pointer-events: none;
+  padding: 0.3rem 2rem;
+  /* Sync with row padding as requested */
 }
 
 .user-shell-header.is-compact {
@@ -4434,12 +4436,19 @@
     /* Ensure no overflow that breaks sticky */
   }
 
+  .user-shell::before {
+    width: min(45%, 900px);
+    height: min(45%, 900px);
+    opacity: 0.03;
+  }
+
   /* Header - Full Width on Laptop */
   .user-shell-header {
     max-width: 100%;
     margin: 0;
     width: 100%;
-    padding: 1rem 2rem;
+    padding: 0;
+    /* Clear padding for inner rows to take up full space */
     position: fixed;
     top: 0;
     left: 0;
@@ -4448,29 +4457,35 @@
     background: #1b8f5b;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    will-change: padding;
-    transition: padding 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    gap: 0;
+    will-change: padding, height;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
 
-  .user-shell-header>div:first-child {
+  /* First row padding and layout */
+  .user-shell-header__first-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     width: 100%;
+    max-width: 1700px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0.3rem 2rem;
     gap: 2rem;
   }
 
   /* Logo - Align with title text */
-  .user-shell-header>div:first-child>div:first-child {
+  .user-shell-header__first-row>div:first-child {
     transform: translateX(0);
   }
 
-  .user-shell-header>div:first-child>div:first-child img {
+  .user-shell-header__first-row>div:first-child img {
     transform: translateX(0);
   }
 
@@ -4493,10 +4508,9 @@
     align-items: center;
     gap: 0.75rem;
     flex: 1;
-    max-width: 1100px;
+    max-width: 800px;
     margin-left: auto;
     margin-right: auto;
-    transform: translateX(60px);
   }
 
   .user-shell-header__search-bar .home-search-bar__input-wrapper {
@@ -4546,39 +4560,34 @@
   .user-shell-header__second-row {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     width: 100%;
-    gap: 2rem;
+    max-width: 1700px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0.3rem 2rem;
     position: relative;
     z-index: 10;
-    padding-top: 0.5rem;
+    background: transparent;
+    border-top: none;
     opacity: 1;
-    transform: translate3d(0, 0, 0);
-    -webkit-transform: translate3d(0, 0, 0);
     max-height: 100px;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
-    will-change: opacity, transform, max-height;
-    transition: opacity 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-      transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-      max-height 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-      padding 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-      margin 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-    perspective: 1000px;
-    -webkit-perspective: 1000px;
-    isolation: isolate;
+    will-change: max-height, opacity, padding;
   }
 
   .user-shell-header__second-row--hidden {
-    opacity: 0;
-    transform: translate3d(0, -20px, 0);
-    -webkit-transform: translate3d(0, -20px, 0);
-    max-height: 0;
-    margin: 0;
-    padding: 0;
-    padding-top: 0;
-    pointer-events: none;
+    display: flex !important;
+    opacity: 0 !important;
+    max-height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(-10px);
+    border-top-color: transparent !important;
   }
 
   .user-shell-header__info {
@@ -4610,9 +4619,11 @@
   .user-shell-header__links {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    justify-content: flex-end;
+    gap: 3rem;
     flex-wrap: wrap;
     margin-left: auto;
+    flex: 1;
   }
 
   .user-shell-header__link {
@@ -4758,7 +4769,7 @@
   }
 
   /* Hide notifications button from right side on laptop */
-  .user-shell-header>div:first-child>div:last-child button[aria-label="Notifications"] {
+  .user-shell-header__first-row>div:last-child button[aria-label="Notifications"] {
     display: none;
   }
 
@@ -4810,7 +4821,7 @@
   }
 
   /* Right side buttons container */
-  .user-shell-header>div:first-child>div:last-child {
+  .user-shell-header__first-row>div:last-child {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -4849,16 +4860,74 @@
   }
 
   /* Position hero banner at the top with visible gap from navbar */
-  .user-shell-content .user-home-view .home-hero-section {
-    margin-top: 24px;
-    padding-top: 160px;
-    transition: margin-top 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding-top 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Increase banner height for laptop */
+  .home-banner {
+    height: 700px !important;
+    /* Enhanced full height look */
+    border-radius: 0;
+    overflow: hidden;
   }
 
-  /* When navbar is compact, adjust hero section position */
-  .user-shell-header.is-compact~.user-shell-content .user-home-view .home-hero-section {
-    margin-top: 24px;
-    padding-top: 120px;
+  .home-banner-section {
+    margin-bottom: 2rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  /* Smooth dynamic padding for content to accommodate fixed header height changes */
+  .user-shell-content {
+    padding-top: 100px !important;
+    /* Matched for 2 compact rows */
+    transition: padding-top 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    min-height: 100vh;
+  }
+
+  /* Adjust padding when second row is hidden */
+  .user-shell-header.is-second-row-hidden~.user-shell-content,
+  .user-shell-header.is-compact~.user-shell-content {
+    padding-top: 65px !important;
+    /* Matched for 1 row */
+  }
+
+  /* Hide mobile search section on laptop */
+  .home-search-section {
+    display: none !important;
+  }
+
+  /* Home View Sections - Laptop Layout */
+  .user-home-view {
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .home-hero-section,
+  .home-try-new-section,
+  .home-available-products-section,
+  .home-premium-products-section,
+  .home-recently-viewed-section,
+  .home-shop-category-section,
+  .home-payment-banner,
+  .home-banner-section {
+    max-width: 1700px;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    width: 100% !important;
+    padding-left: 32px;
+    padding-right: 32px;
+    box-sizing: border-box;
+  }
+
+  /* Premium products section background expansion */
+  .home-premium-products-section {
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+    margin-top: 4rem;
+    margin-bottom: 4rem;
   }
 
 
@@ -4883,6 +4952,7 @@
   }
 
   /* Add padding to all views except home view to prevent content from being covered by navbar and footer */
+  /* Reset individual view paddings to rely on shell-content padding */
   .user-shell-content .user-favourites-view,
   .user-shell-content .user-cart-view,
   .user-shell-content .user-orders-view,
@@ -4892,24 +4962,10 @@
   .user-shell-content .user-order-confirmation-view,
   .user-shell-content .user-account-view,
   .user-shell-content .user-carousel-products-view,
-  .user-shell-content .user-search-view {
-    padding-top: 180px;
-    padding-bottom: 4rem;
-    transition: padding-top 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  /* Adjust padding when navbar is compact */
-  .user-shell-header.is-compact~.user-shell-content .user-favourites-view,
-  .user-shell-header.is-compact~.user-shell-content .user-cart-view,
-  .user-shell-header.is-compact~.user-shell-content .user-orders-view,
-  .user-shell-header.is-compact~.user-shell-content .user-product-detail-view,
-  .user-shell-header.is-compact~.user-shell-content .user-checkout-view,
-  .user-shell-header.is-compact~.user-shell-content .user-category-products-view,
-  .user-shell-header.is-compact~.user-shell-content .user-order-confirmation-view,
-  .user-shell-header.is-compact~.user-shell-content .user-account-view,
-  .user-shell-header.is-compact~.user-shell-content .user-carousel-products-view,
-  .user-shell-header.is-compact~.user-shell-content .user-search-view {
-    padding-top: 140px;
+  .user-shell-content .user-search-view,
+  .user-shell-content .user-home-view {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
   }
 
   /* Remove position relative from category products view to allow sticky positioning */
@@ -5293,11 +5349,25 @@
     border: 1px solid rgba(34, 94, 65, 0.08);
   }
 
-  .home-products-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 24px;
-    align-items: start;
+  .home-products-grid,
+  .home-try-new-grid,
+  .home-premium-grid,
+  .recently-viewed-grid,
+  .home-recently-viewed-rail {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 32px !important;
+    align-items: start !important;
+    overflow-x: visible !important;
+    width: 100% !important;
+  }
+
+  .home-shop-category-grid {
+    display: grid !important;
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 24px !important;
+    align-items: start !important;
+    width: 100% !important;
   }
 
   .home-products-grid .product-card-wrapper {
@@ -5467,7 +5537,7 @@
 
   /* Search View - Laptop Layout */
   .user-search-view {
-    max-width: 1440px;
+    max-width: 1700px;
     margin: 0 auto;
     padding: 0 32px;
   }
@@ -5619,7 +5689,7 @@
 
   /* Product Detail View - Laptop Layout */
   .user-product-detail-view {
-    max-width: 1440px;
+    max-width: 1700px;
     margin: 0 auto;
     padding: 0 32px;
     display: grid;
@@ -6247,7 +6317,7 @@
 
   /* Cart View - Laptop Layout */
   .user-cart-view {
-    max-width: 1440px;
+    max-width: 1700px;
     margin: 0 auto;
     padding: 0 32px;
     display: grid;
@@ -6310,7 +6380,7 @@
 
   /* Checkout View - Laptop Layout */
   .user-checkout-view-container {
-    max-width: 1440px;
+    max-width: 1700px;
     margin: 0 auto;
     margin-top: 48px;
     padding: 0 32px;
@@ -6526,7 +6596,7 @@
 
   /* Orders View - Laptop Layout */
   .user-orders-view {
-    max-width: 1440px;
+    max-width: 1700px;
     margin: 0 auto;
     padding: 0 32px;
   }
@@ -7116,7 +7186,7 @@
 
   /* Category Products View - Laptop Layout */
   .user-category-products-view {
-    max-width: 1440px;
+    max-width: 1700px;
     margin: 0 auto;
     padding: 0 32px;
     position: static !important;
