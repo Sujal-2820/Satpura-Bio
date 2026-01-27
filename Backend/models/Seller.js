@@ -101,6 +101,14 @@ const sellerSchema = new mongoose.Schema({
     code: String,
     expiresAt: Date,
   },
+  fcmTokenWeb: {
+    type: String,
+    trim: true,
+  },
+  fcmTokenApp: {
+    type: String,
+    trim: true,
+  },
 }, {
   timestamps: true,
 });

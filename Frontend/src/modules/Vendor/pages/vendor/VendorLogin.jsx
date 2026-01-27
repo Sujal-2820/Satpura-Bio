@@ -6,6 +6,7 @@ import { validatePhoneNumber } from '../../../../utils/phoneValidation'
 import { PhoneInput } from '../../../../components/PhoneInput'
 import { useToast } from '../../../../modules/Admin/components/ToastNotification'
 import { VendorStatusMessage } from '../../components/VendorStatusMessage'
+import { registerFCMTokenWithBackend } from '../../../../services/pushNotificationService'
 
 export function VendorLogin({ onSuccess, onSwitchToRegister }) {
   const dispatch = useVendorDispatch()
@@ -89,6 +90,8 @@ export function VendorLogin({ onSuccess, onSwitchToRegister }) {
 
         if (result.data?.token || result.data?.data?.token) {
           localStorage.setItem('vendor_token', result.data?.token || result.data?.data?.token)
+          // Register FCM token
+          registerFCMTokenWithBackend(true)
         }
 
         // Update vendor context with profile

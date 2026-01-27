@@ -86,6 +86,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  fcmTokenWeb: {
+    type: String,
+    trim: true,
+  },
+  fcmTokenApp: {
+    type: String,
+    trim: true,
+  },
 }, {
   timestamps: true,
 });
@@ -98,7 +106,7 @@ userSchema.index({ sellerId: 1 });
 userSchema.methods.generateOTP = function () {
   // Clear any existing OTP first
   this.clearOTP();
-  
+
   // Generate a 6-digit OTP using crypto for better randomness
   let code = Math.floor(100000 + Math.random() * 900000).toString(); // Fallback
   try {
@@ -107,7 +115,7 @@ userSchema.methods.generateOTP = function () {
   } catch (e) {
     console.warn('Crypto not available, falling back to Math.random for OTP generation.');
   }
-  
+
   this.otp = {
     code,
     expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes

@@ -69,7 +69,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'orders',
-    label: <Trans>Cust Orders</Trans>,
+    label: <Trans>Orders</Trans>,
     description: <Trans>Customer fulfillments</Trans>,
     icon: TruckIcon,
   },
@@ -707,7 +707,7 @@ export function VendorDashboard({ onLogout }) {
     <>
       <MobileShell
         isHome={activeTab === 'home'}
-        title={<><Trans>Welcome</Trans> {welcomeName}</>}
+        title={profile?.name || 'Partner'}
         subtitle={profile?.location?.city ? `${profile.location.city}${profile.location.state ? `, ${profile.location.state}` : ''}` : <Trans>Location not set</Trans>}
         onSearchClick={openSearch}
         onNotificationClick={handleNotificationClick}

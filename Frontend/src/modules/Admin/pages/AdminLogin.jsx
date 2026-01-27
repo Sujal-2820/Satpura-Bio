@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { OtpVerification } from '../../../components/auth/OtpVerification'
 import { useAdminDispatch } from '../context/AdminContext'
 import * as adminApi from '../services/adminApi'
+import { registerFCMTokenWithBackend } from '../../../services/pushNotificationService'
 
 export function AdminLogin({ onSubmit }) {
   const dispatch = useAdminDispatch()
@@ -57,6 +58,8 @@ export function AdminLogin({ onSubmit }) {
         // Store token
         if (result.data?.token) {
           localStorage.setItem('admin_token', result.data.token)
+          // Register FCM token
+          registerFCMTokenWithBackend(true)
         }
         // Update context with admin profile
         dispatch({

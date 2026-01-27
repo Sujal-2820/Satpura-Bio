@@ -36,7 +36,7 @@ export function ProductDetailView({ productId, onAddToCart, onBuyNow, onToggleFa
   const [similarProducts, setSimilarProducts] = useState([])
   const [suggestedProducts, setSuggestedProducts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [quantity, setQuantity] = useState(1)
+  const [quantity, setQuantity] = useState(rawProduct?.isWholesale ? 10 : 1)
   const [selectedImage, setSelectedImage] = useState(0)
   const [isWishlisted, setIsWishlisted] = useState(false)
   const [selectedAttributes, setSelectedAttributes] = useState({}) // Selected attribute combination
@@ -403,11 +403,13 @@ export function ProductDetailView({ productId, onAddToCart, onBuyNow, onToggleFa
   // Reset quantity and image when product changes
   useEffect(() => {
     if (product) {
-      setQuantity(1)
+      setQuantity(product?.isWholesale ? 10 : 1)
       setSelectedImage(0)
-      // Default selection: Select the first variant (lowest price)
+      // Default selection: Select the cheapest variation
       if (product.attributeStocks && product.attributeStocks.length > 0) {
-        const firstVariant = product.attributeStocks[0]
+        // Sort by userPrice to find the cheapest
+        const sortedVariants = [...product.attributeStocks].sort((a, b) => (a.userPrice || 0) - (b.userPrice || 0))
+        const firstVariant = sortedVariants[0]
         if (firstVariant.attributes) {
           const attrs = firstVariant.attributes instanceof Map
             ? Object.fromEntries(firstVariant.attributes)

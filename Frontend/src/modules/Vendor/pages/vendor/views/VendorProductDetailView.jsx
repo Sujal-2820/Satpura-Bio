@@ -77,10 +77,13 @@ export function VendorProductDetailView({ productId, onAddToCart, onBuyNow, onTo
                     }
 
                     if (productData.attributeStocks?.length > 0) {
-                        const first = productData.attributeStocks[0]
-                        setSelectedAttributeStock(first)
-                        if (first.attributes) {
-                            setSelectedAttributes(first.attributes instanceof Map ? Object.fromEntries(first.attributes) : first.attributes)
+                        // Find the smallest/cheapest one to match Home view default
+                        const cheapest = [...productData.attributeStocks]
+                            .sort((a, b) => (a.vendorPrice || 0) - (b.vendorPrice || 0))[0]
+
+                        setSelectedAttributeStock(cheapest)
+                        if (cheapest?.attributes) {
+                            setSelectedAttributes(cheapest.attributes instanceof Map ? Object.fromEntries(cheapest.attributes) : cheapest.attributes)
                         }
                     }
                 }
@@ -141,11 +144,21 @@ export function VendorProductDetailView({ productId, onAddToCart, onBuyNow, onTo
         const segmentCount = segments.length
         if (segmentCount === 0) return { rate: 0, amount: 0, final: totalPrice, label: 'No rules', type: 'none', days: 0 }
 
-        const segmentIndex = Math.min(Math.floor((progress / 100) * segmentCount), segmentCount - 1)
+        // Find which segment we are in based on progress (0-100)
+        // Each segment occupies 100/segmentCount portion of the slider
+        const portionSize = 100 / segmentCount
+        const segmentIndex = Math.min(Math.floor(progress / portionSize), segmentCount - 1)
         const segment = segments[segmentIndex]
 
-        // Map progress within segment to days
-        const progressInSegment = (progress % (100 / segmentCount)) / (100 / segmentCount)
+        // Calculate progress within the specific segment (0 to 1)
+        // For the last segment at 100%, it should be exactly 1
+        let progressInSegment
+        if (progress >= 100) {
+            progressInSegment = 1
+        } else {
+            progressInSegment = (progress % portionSize) / portionSize
+        }
+
         const range = segment.end - segment.start
         const days = Math.round(segment.start + (progressInSegment * range))
 
@@ -294,39 +307,61 @@ export function VendorProductDetailView({ productId, onAddToCart, onBuyNow, onTo
 
                     {/* Cash Discount Benefits */}
                     <div className="space-y-6 pt-2">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold text-slate-700 tracking-wide">
-                                <Trans>Cash discount benefits</Trans>
-                            </h3>
-                            <button className="text-gray-400 p-1">
-                                <HelpCircleIcon className="h-4 w-4" />
-                            </button>
+                        <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-semibold text-slate-700 tracking-wide">
+                                    <Trans>Cash discount benefits</Trans>
+                                </h3>
+                                <button className="text-gray-400 p-1">
+                                    <HelpCircleIcon className="h-4 w-4" />
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-gray-400 font-medium leading-tight">
+                                <Trans>Timeline and rates apply to your credit repayment cycle when using credit for purchase.</Trans>
+                            </p>
                         </div>
 
                         {/* Timeline Slider */}
-                        <div className="relative pt-8 px-1">
-                            {/* Dynamic Tooltip */}
+                        <div className="relative pt-10 px-2 pb-2">
+                            {/* Dynamic Tooltip - Premium Floating Version */}
                             <div
-                                className="absolute top-0 -translate-x-1/2 pointer-events-none transition-all duration-75 z-10"
-                                style={{ left: `${sliderProgress}%` }}
+                                className="absolute top-0 pointer-events-none z-10 flex flex-col items-center"
+                                style={{
+                                    left: `${sliderProgress}%`,
+                                    // High-performance transform without transition to avoid lag
+                                    transform: `translateX(-${sliderProgress}%)`
+                                }}
                             >
                                 <div className={cn(
-                                    "px-2.5 py-1 rounded-lg shadow-xl text-[10px] font-bold text-white whitespace-nowrap flex items-center gap-1 border border-white/20",
-                                    calculation.type === 'discount' ? "bg-blue-600" : calculation.type === 'interest' ? "bg-red-600" : "bg-green-700"
+                                    "px-3 py-1.5 rounded-xl shadow-lg text-[11px] font-bold text-white whitespace-nowrap flex flex-col items-center gap-0.5 border border-white/20 transition-colors duration-200",
+                                    calculation.type === 'discount' ? "bg-gradient-to-r from-blue-600 to-indigo-600" :
+                                        calculation.type === 'interest' ? "bg-gradient-to-r from-red-500 to-rose-600" :
+                                            "bg-green-700"
                                 )}>
-                                    {calculation.type === 'discount' ? (
-                                        <><span>-</span>{calculation.rate}% <span className="text-[8px] opacity-70">DISC</span></>
-                                    ) : calculation.type === 'interest' ? (
-                                        <><span>+</span>{calculation.rate}% <span className="text-[8px] opacity-70">INT</span></>
-                                    ) : (
-                                        <><span className="text-[8px] opacity-70">WINDOW</span> 0%</>
-                                    )}
+                                    <div className="flex items-center gap-1">
+                                        {calculation.type === 'discount' ? '-' : calculation.type === 'interest' ? '+' : ''}
+                                        {calculation.rate}%
+                                        <span className="text-[8px] opacity-80 font-black tracking-tighter uppercase">
+                                            {calculation.type === 'discount' ? 'Disc' : calculation.type === 'interest' ? 'Int' : 'Fee'}
+                                        </span>
+                                    </div>
+                                    <div className="h-[2px] w-4 bg-white/30 rounded-full"></div>
+                                    <span className="text-[8px] opacity-70 uppercase tracking-widest font-black">Day {calculation.days}</span>
                                 </div>
-                                {/* Tooltip Arrow */}
-                                <div className={cn(
-                                    "w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] mx-auto -mt-0.5",
-                                    calculation.type === 'discount' ? "border-t-blue-600" : calculation.type === 'interest' ? "border-t-red-600" : "border-t-green-700"
-                                )}></div>
+                                {/* Tooltip Arrow - Positioned absolutely to always point to the slider thumb */}
+                                <div
+                                    className={cn(
+                                        "w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] absolute -bottom-[5px]",
+                                        calculation.type === 'discount' ? "border-t-indigo-600" :
+                                            calculation.type === 'interest' ? "border-t-rose-600" :
+                                                "border-t-green-700"
+                                    )}
+                                    style={{
+                                        // Counteract the parent's translateX to keep arrow centered on pointer
+                                        left: `${sliderProgress}%`,
+                                        transform: 'translateX(-50%)'
+                                    }}
+                                ></div>
                             </div>
 
                             <input
@@ -338,7 +373,9 @@ export function VendorProductDetailView({ productId, onAddToCart, onBuyNow, onTo
                                 onChange={(e) => setSliderProgress(e.target.value)}
                                 className={cn(
                                     "w-full h-2 rounded-lg appearance-none cursor-pointer transition-colors shadow-inner relative z-0",
-                                    calculation.type === 'interest' ? "accent-red-500 bg-red-100" : calculation.type === 'discount' ? "accent-blue-500 bg-blue-100" : "accent-green-700 bg-green-100"
+                                    calculation.type === 'interest' ? "accent-red-500 bg-red-100" :
+                                        calculation.type === 'discount' ? "accent-blue-500 bg-blue-100" :
+                                            "accent-green-700 bg-green-100"
                                 )}
                             />
                             {/* Marker Info */}

@@ -136,6 +136,22 @@ userNotificationSchema.statics.createNotification = async function (data) {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
     });
 
+    // Trigger Push Notification (Async - Non-blocking)
+    try {
+        const { sendToUser } = require('../services/pushNotificationService');
+        sendToUser(userId, 'user', {
+            title,
+            body: message,
+            data: {
+                type,
+                relatedEntityType,
+                relatedEntityId: relatedEntityId ? relatedEntityId.toString() : null
+            }
+        }).catch(err => console.error('Push Notification Error (User):', err.message));
+    } catch (err) {
+        console.warn('Push Notification Service not available:', err.message);
+    }
+
     return notification;
 };
 

@@ -85,7 +85,7 @@ const vendorNotificationSchema = new mongoose.Schema({
     type: Date,
     required: true,
     // Default to 24 hours from creation
-    default: function() {
+    default: function () {
       return new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     },
   },
@@ -101,7 +101,7 @@ vendorNotificationSchema.index({ type: 1, createdAt: -1 }); // Get notifications
 // Note: notificationId already has an index from unique: true
 
 // Pre-save hook: Set expiresAt to 24 hours from now if not set
-vendorNotificationSchema.pre('save', function(next) {
+vendorNotificationSchema.pre('save', function (next) {
   if (!this.expiresAt) {
     this.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
   }
@@ -109,14 +109,14 @@ vendorNotificationSchema.pre('save', function(next) {
 });
 
 // Static method: Clean up expired notifications (older than 24 hours)
-vendorNotificationSchema.statics.cleanupExpired = async function() {
+vendorNotificationSchema.statics.cleanupExpired = async function () {
   const now = new Date();
   const result = await this.deleteMany({ expiresAt: { $lt: now } });
   return result;
 };
 
 // Static method: Create notification for vendor
-vendorNotificationSchema.statics.createNotification = async function(data) {
+vendorNotificationSchema.statics.createNotification = async function (data) {
   const {
     vendorId,
     type,
@@ -140,11 +140,27 @@ vendorNotificationSchema.statics.createNotification = async function(data) {
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
   });
 
+  // Trigger Push Notification (Async - Non-blocking)
+  try {
+    const { sendToUser } = require('../services/pushNotificationService');
+    sendToUser(vendorId, 'vendor', {
+      title,
+      body: message,
+      data: {
+        type,
+        relatedEntityType,
+        relatedEntityId: relatedEntityId ? relatedEntityId.toString() : null
+      }
+    }).catch(err => console.error('Push Notification Error (Vendor):', err.message));
+  } catch (err) {
+    console.warn('Push Notification Service not available:', err.message);
+  }
+
   return notification;
 };
 
 // Instance method: Mark as read
-vendorNotificationSchema.methods.markAsRead = async function() {
+vendorNotificationSchema.methods.markAsRead = async function () {
   this.read = true;
   this.readAt = new Date();
   return this.save();

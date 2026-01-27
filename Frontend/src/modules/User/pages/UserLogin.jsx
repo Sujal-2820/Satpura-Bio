@@ -5,6 +5,7 @@ import { useUserDispatch } from '../context/UserContext'
 import * as userApi from '../services/userApi'
 import { PhoneInput } from '../../../components/PhoneInput'
 import { validatePhoneNumber } from '../../../utils/phoneValidation'
+import { registerFCMTokenWithBackend } from '../../../services/pushNotificationService'
 
 export function UserLogin({ onSuccess, onSwitchToRegister }) {
   const navigate = useNavigate()
@@ -86,6 +87,8 @@ export function UserLogin({ onSuccess, onSwitchToRegister }) {
         // Store token if provided
         if (result.data?.token) {
           localStorage.setItem('user_token', result.data.token)
+          // Register FCM token for push notifications
+          registerFCMTokenWithBackend(true)
         }
 
         // Update context with user data

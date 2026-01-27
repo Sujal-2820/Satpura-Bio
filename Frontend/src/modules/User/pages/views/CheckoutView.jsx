@@ -15,8 +15,9 @@ const STEPS = [
   { id: 3, label: 'Payment', icon: CreditCardIcon },
 ]
 
-export function CheckoutView({ onBack, onOrderPlaced }) {
-  const { cart, profile, assignedVendor, vendorAvailability, settings } = useUserState()
+export function CheckoutView({ onBack, onOrderPlaced, initialItems = null }) {
+  const { cart: contextCart, profile, assignedVendor, vendorAvailability, settings } = useUserState()
+  const cart = initialItems || contextCart
   const ADVANCE_PAYMENT_PERCENTAGE = settings?.advancePaymentPercent || 30
   const REMAINING_PAYMENT_PERCENTAGE = 100 - ADVANCE_PAYMENT_PERCENTAGE
   const dispatch = useUserDispatch()
@@ -307,7 +308,15 @@ export function CheckoutView({ onBack, onOrderPlaced }) {
       const orderData = {
         paymentPreference, // 'partial' or 'full'
         notes: `Shipping method: ${selectedShipping.label}`,
-        // Backend will calculate amounts from cart items
+        // Pass specialized items if this is a Direct Checkout (Buy Now)
+        ...(initialItems && {
+          items: cart.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            variantAttributes: item.variantAttributes || {},
+            unitPrice: item.unitPrice || item.price || 0
+          }))
+        })
       }
 
       console.log('📦 Order Data being sent:', orderData)

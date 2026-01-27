@@ -40,6 +40,16 @@ const initialState = {
 }
 
 function reducer(state, action) {
+  // Robust attribute comparison (handles key order differences)
+  const areAttributesEqual = (attr1, attr2) => {
+    const a = attr1 || {}
+    const b = attr2 || {}
+    const keysA = Object.keys(a).sort()
+    const keysB = Object.keys(b).sort()
+    if (keysA.length !== keysB.length) return false
+    return keysA.every(key => String(a[key]) === String(b[key]))
+  }
+
   switch (action.type) {
     case 'AUTH_LOGIN':
       return {
@@ -84,36 +94,53 @@ function reducer(state, action) {
         assignedVendor: null,
       }
     case 'ADD_TO_CART': {
-      const existingItem = state.cart.find((item) => item.productId === action.payload.productId)
+      const { productId, variantAttributes, quantity: rawQuantity } = action.payload
+      const quantity = typeof rawQuantity === 'number' && !isNaN(rawQuantity) ? Math.max(1, rawQuantity) : 1
+
+      const existingItem = state.cart.find((item) =>
+        item.productId === productId &&
+        areAttributesEqual(item.variantAttributes, variantAttributes)
+      )
+
       if (existingItem) {
         return {
           ...state,
           cart: state.cart.map((item) =>
-            item.productId === action.payload.productId
-              ? { ...item, quantity: item.quantity + action.payload.quantity }
+            item.productId === productId &&
+              areAttributesEqual(item.variantAttributes, variantAttributes)
+              ? { ...item, quantity: (item.quantity || 0) + quantity }
               : item,
           ),
         }
       }
       return {
         ...state,
-        cart: [...state.cart, action.payload],
+        cart: [...state.cart, { ...action.payload, quantity }],
       }
     }
-    case 'UPDATE_CART_ITEM':
+    case 'UPDATE_CART_ITEM': {
+      const { productId, variantAttributes, quantity: rawQuantity } = action.payload
+      const quantity = typeof rawQuantity === 'number' && !isNaN(rawQuantity) ? Math.max(1, rawQuantity) : 1
+
       return {
         ...state,
         cart: state.cart.map((item) =>
-          item.productId === action.payload.productId
-            ? { ...item, quantity: action.payload.quantity }
+          item.productId === productId &&
+            areAttributesEqual(item.variantAttributes, variantAttributes)
+            ? { ...item, quantity }
             : item,
         ),
       }
-    case 'REMOVE_FROM_CART':
+    }
+    case 'REMOVE_FROM_CART': {
       return {
         ...state,
-        cart: state.cart.filter((item) => item.productId !== action.payload.productId),
+        cart: state.cart.filter((item) =>
+          !(item.productId === action.payload.productId &&
+            areAttributesEqual(item.variantAttributes, action.payload.variantAttributes))
+        ),
       }
+    }
     case 'CLEAR_CART':
       return {
         ...state,
@@ -422,7 +449,13 @@ export function UserProvider({ children }) {
         const parsed = JSON.parse(savedFavourites)
         if (Array.isArray(parsed) && parsed.length > 0) {
           // Filter out any invalid IDs from localStorage
-          const validIds = parsed.filter(id => id && typeof id === 'string')
+          const validIds = parsed.filter(id =>
+            id &&
+            typeof id === 'string' &&
+            id.trim() !== '' &&
+            id !== 'null' &&
+            id !== 'undefined'
+          )
 
           // Only load if there are no favourites in state yet (initial load)
           if (state.favourites.length === 0 && validIds.length > 0) {

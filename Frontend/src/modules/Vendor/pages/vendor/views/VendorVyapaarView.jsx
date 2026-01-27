@@ -246,7 +246,7 @@ export function VendorVyapaarView() {
                                 <div className="h-px flex-1 bg-gray-100 ml-4"></div>
                             </div>
 
-                            <div className="relative overflow-hidden rounded-2xl bg-[#1b8f5b] p-6 text-white shadow-xl shadow-green-900/10 group">
+                            <div className="relative overflow-hidden rounded-2xl bg-[#26b276] p-6 text-white shadow-xl shadow-green-600/10 group">
                                 <div className="relative z-10 flex flex-col gap-6">
                                     <div className="flex justify-between items-start">
                                         <div className="space-y-0.5">

@@ -49,6 +49,14 @@ const adminSchema = new mongoose.Schema({
     code: String,
     expiresAt: Date,
   },
+  fcmTokenWeb: {
+    type: String,
+    default: null,
+  },
+  fcmTokenApp: {
+    type: String,
+    default: null,
+  },
 }, {
   timestamps: true,
 });
@@ -79,7 +87,7 @@ adminSchema.methods.generateOTP = function () {
     // Fallback to Math.random if crypto is not available
     code = Math.floor(100000 + Math.random() * 900000).toString();
   }
-  
+
   // Always generate a new OTP (overwrite existing)
   this.otp = {
     code,

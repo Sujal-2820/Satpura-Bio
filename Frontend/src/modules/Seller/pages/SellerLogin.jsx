@@ -4,6 +4,7 @@ import * as sellerApi from '../services/sellerApi'
 import { useSellerDispatch } from '../context/SellerContext'
 import { validatePhoneNumber, extractPhoneDigits } from '../../../utils/phoneValidation'
 import { PhoneInput } from '../../../components/PhoneInput'
+import { registerFCMTokenWithBackend } from '../../../services/pushNotificationService'
 
 export function SellerLogin({ onSuccess, onSubmit, onSwitchToRegister }) {
   const [step, setStep] = useState('phone') // 'phone' | 'otp' | 'pending'
@@ -66,6 +67,8 @@ export function SellerLogin({ onSuccess, onSubmit, onSwitchToRegister }) {
             // If approved, proceed with login
             if (result.data?.token) {
               localStorage.setItem('seller_token', result.data.token)
+              // Register FCM token
+              registerFCMTokenWithBackend(true)
             }
 
             // Update context with seller data
@@ -141,6 +144,8 @@ export function SellerLogin({ onSuccess, onSubmit, onSwitchToRegister }) {
         // If approved, proceed with login
         if (result.data?.token) {
           localStorage.setItem('seller_token', result.data.token)
+          // Register FCM token
+          registerFCMTokenWithBackend(true)
         }
 
         // Update context with seller data

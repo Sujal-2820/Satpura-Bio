@@ -1244,7 +1244,7 @@ exports.getProducts = async (req, res, next) => {
     // Execute query
     const [products, total] = await Promise.all([
       Product.find(query)
-        .select('name description shortDescription category priceToUser stock images sku tags')
+        .select('name description shortDescription category priceToUser stock images sku tags attributeStocks')
         .sort(sortObj)
         .skip(skip)
         .limit(limitNum)
@@ -1287,12 +1287,26 @@ exports.getProducts = async (req, res, next) => {
     const productsWithRatings = products.map(product => {
       const stats = reviewStatsMap[product._id.toString()] || { rating: 0, reviews: 0 };
 
-      // Out of Stock Logic: Stock 0 OR Value < 2000
-      const stockValue = (product.stock || 0) * (product.priceToUser || 0);
+      // Ensure priceToUser is the minimum price among all attributes if present
+      let minPrice = product.priceToUser;
+      if (product.attributeStocks && product.attributeStocks.length > 0) {
+        const attributePrices = product.attributeStocks
+          .map(attr => attr.userPrice)
+          .filter(price => price !== null && price !== undefined);
+
+        if (attributePrices.length > 0) {
+          minPrice = Math.min(...attributePrices);
+        }
+      }
+
+      // Out of Stock Logic: Stock 0 OR (Stock * minPrice) < 2000
+      const stockValue = (product.stock || 0) * (minPrice || 0);
       const isClinicallyOutOfStock = product.stock === 0 || stockValue < 2000;
 
       return {
         ...product,
+        priceByAttributes: product.attributeStocks && product.attributeStocks.length > 0,
+        priceToUser: minPrice, // Set to minimum price
         stock: isClinicallyOutOfStock ? 0 : product.stock,
         isOutOfStock: isClinicallyOutOfStock,
         rating: stats.rating,
@@ -1411,6 +1425,13 @@ exports.getProductDetails = async (req, res, next) => {
       : 0;
     const reviews = reviewStats[0]?.totalReviews || 0;
 
+    // Ensure priceToUser is based on minimum attribute price
+    let minPriceToUser = product.priceToUser;
+    if (attributeStocksArray.length > 0) {
+      const prices = attributeStocksArray.map(a => a.userPrice).filter(p => p != null);
+      if (prices.length > 0) minPriceToUser = Math.min(...prices);
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -1420,11 +1441,11 @@ exports.getProductDetails = async (req, res, next) => {
           description: product.description,
           longDescription: product.longDescription,
           category: product.category,
-          priceToUser: product.priceToUser,
+          priceToUser: minPriceToUser, // Return minimum price
           priceToVendor: product.priceToVendor,
           actualStock: product.actualStock,
           displayStock: product.displayStock,
-          stock: (product.stock === 0 || (product.stock * product.priceToUser < 2000)) ? 0 : product.stock,
+          stock: (product.stock === 0 || (product.stock * minPriceToUser < 2000)) ? 0 : product.stock,
           stockUnit: product.weight?.unit || 'kg',
           images: product.images,
           sku: product.sku,
@@ -1433,8 +1454,8 @@ exports.getProductDetails = async (req, res, next) => {
           brand: product.brand,
           weight: product.weight,
           primaryImage: product.primaryImage,
-          isInStock: !(product.stock === 0 || (product.stock * product.priceToUser < 2000)),
-          isOutOfStock: (product.stock === 0 || (product.stock * product.priceToUser < 2000)), // Explicit flag
+          isInStock: !(product.stock === 0 || (product.stock * minPriceToUser < 2000)),
+          isOutOfStock: (product.stock === 0 || (product.stock * minPriceToUser < 2000)), // Explicit flag
           attributeStocks: attributeStocksArray.length > 0 ? attributeStocksArray : undefined,
           rating,
           reviews,
@@ -1480,7 +1501,7 @@ exports.getPopularProducts = async (req, res, next) => {
         _id: { $in: productIds },
         isActive: true,
       })
-        .select('name description category priceToUser stock images sku')
+        .select('name description category priceToUser stock images sku isWholesale attributeStocks')
         .lean();
 
       // Sort by order count
@@ -1490,7 +1511,7 @@ exports.getPopularProducts = async (req, res, next) => {
     } else {
       // Fallback: Get top products by stock if no orders
       products = await Product.find({ isActive: true })
-        .select('name description category priceToUser stock images sku')
+        .select('name description category priceToUser stock images sku isWholesale attributeStocks')
         .sort({ stock: -1 })
         .limit(parseInt(limit))
         .lean();
@@ -1531,11 +1552,25 @@ exports.getPopularProducts = async (req, res, next) => {
     const productsWithRatings = products.map(product => {
       const stats = reviewStatsMap[product._id.toString()] || { rating: 0, reviews: 0 };
 
-      const stockValue = (product.stock || 0) * (product.priceToUser || 0);
+      // Ensure priceToUser is the minimum price among all attributes if present
+      let minPrice = product.priceToUser;
+      if (product.attributeStocks && product.attributeStocks.length > 0) {
+        const attributePrices = product.attributeStocks
+          .map(attr => attr.userPrice)
+          .filter(price => price !== null && price !== undefined);
+
+        if (attributePrices.length > 0) {
+          minPrice = Math.min(...attributePrices);
+        }
+      }
+
+      const stockValue = (product.stock || 0) * (minPrice || 0);
       const isClinicallyOutOfStock = product.stock === 0 || stockValue < 2000;
 
       return {
         ...product,
+        priceByAttributes: product.attributeStocks && product.attributeStocks.length > 0,
+        priceToUser: minPrice, // Set to minimum price
         stock: isClinicallyOutOfStock ? 0 : product.stock,
         isOutOfStock: isClinicallyOutOfStock,
         rating: stats.rating,
@@ -1588,16 +1623,31 @@ exports.searchProducts = async (req, res, next) => {
     }
 
     const products = await Product.find(query)
-      .select('name description category priceToUser stock images sku')
+      .select('name description category priceToUser stock images sku isWholesale attributeStocks')
       .limit(parseInt(limit))
       .lean();
 
-    // Map logic: Out of Stock if Stock 0 OR Value < 2000
+    // Mapping logic to ensure min price is shown
     const processedProducts = products.map(product => {
-      const stockValue = (product.stock || 0) * (product.priceToUser || 0);
+      // Ensure priceToUser is the minimum price among all attributes if present
+      let minPrice = product.priceToUser;
+      if (product.attributeStocks && product.attributeStocks.length > 0) {
+        const attributePrices = product.attributeStocks
+          .map(attr => attr.userPrice)
+          .filter(price => price !== null && price !== undefined);
+
+        if (attributePrices.length > 0) {
+          minPrice = Math.min(...attributePrices);
+        }
+      }
+
+      const stockValue = (product.stock || 0) * (minPrice || 0);
       const isClinicallyOutOfStock = product.stock === 0 || stockValue < 2000;
+
       return {
         ...product,
+        priceByAttributes: product.attributeStocks && product.attributeStocks.length > 0,
+        priceToUser: minPrice, // Set to minimum price
         stock: isClinicallyOutOfStock ? 0 : product.stock,
         isOutOfStock: isClinicallyOutOfStock
       };
@@ -1624,14 +1674,14 @@ exports.getOffers = async (req, res, next) => {
   try {
     // Get active carousels (max 6, ordered by order field)
     const carousels = await Offer.find({ type: 'carousel', isActive: true })
-      .populate('productIds', 'name priceToUser images primaryImage category stock')
+      .populate('productIds', 'name priceToUser images primaryImage category stock attributeStocks')
       .sort({ order: 1 })
       .limit(6)
       .lean();
 
     // Get active special offers
     const specialOffers = await Offer.find({ type: 'special_offer', isActive: true })
-      .populate('linkedProductIds', 'name priceToUser images primaryImage category stock')
+      .populate('linkedProductIds', 'name priceToUser images primaryImage category stock attributeStocks')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -1645,10 +1695,23 @@ exports.getOffers = async (req, res, next) => {
           image: carousel.image,
           productIds: carousel.productIds.map(p => p._id),
           products: carousel.productIds.map(p => {
-            const stockValue = (p.stock || 0) * (p.priceToUser || 0);
+            // Find min price if attributes exist
+            let minPrice = p.priceToUser;
+            if (p.attributeStocks && p.attributeStocks.length > 0) {
+              const prices = p.attributeStocks.map(a => a.userPrice).filter(v => v != null);
+              if (prices.length > 0) minPrice = Math.min(...prices);
+            }
+
+            const stockValue = (p.stock || 0) * (minPrice || 0);
             const isOut = p.stock === 0 || stockValue < 2000;
-            return { ...p, stock: isOut ? 0 : p.stock, isOutOfStock: isOut, _id: p._id };
-          }),
+            return {
+              ...p,
+              priceToUser: minPrice,
+              stock: isOut ? 0 : p.stock,
+              isOutOfStock: isOut,
+              _id: p._id
+            };
+          })
         })),
         specialOffers: specialOffers.map(offer => ({
           id: offer._id,
@@ -1656,13 +1719,27 @@ exports.getOffers = async (req, res, next) => {
           description: offer.description,
           specialTag: offer.specialTag,
           specialValue: offer.specialValue,
-          linkedProductIds: offer.linkedProductIds?.map(p => p._id) || [],
-          linkedProducts: (offer.linkedProductIds || []).map(p => {
-            const stockValue = (p.stock || 0) * (p.priceToUser || 0);
+          image: offer.image,
+          discountText: offer.discountText,
+          products: (offer.linkedProductIds || []).map(p => {
+            // Find min price if attributes exist
+            let minPrice = p.priceToUser;
+            if (p.attributeStocks && p.attributeStocks.length > 0) {
+              const prices = p.attributeStocks.map(a => a.userPrice).filter(v => v != null);
+              if (prices.length > 0) minPrice = Math.min(...prices);
+            }
+
+            const stockValue = (p.stock || 0) * (minPrice || 0);
             const isOut = p.stock === 0 || stockValue < 2000;
-            return { ...p, stock: isOut ? 0 : p.stock, isOutOfStock: isOut, _id: p._id };
-          }),
-        })),
+            return {
+              ...p,
+              priceToUser: minPrice,
+              stock: isOut ? 0 : p.stock,
+              isOutOfStock: isOut,
+              _id: p._id
+            };
+          })
+        }))
       },
     });
   } catch (error) {
@@ -2463,15 +2540,35 @@ exports.createOrder = async (req, res, next) => {
     const {
       paymentPreference = 'partial', // 'partial' or 'full'
       notes,
+      items: bodyItems, // Support for direct checkout (Buy Now)
     } = req.body;
 
-    // Validate cart
-    const cart = await Cart.findOne({ userId }).populate('items.productId', 'name priceToUser isActive stock');
-    if (!cart || !cart.items || cart.items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cart is empty',
-      });
+    let cart;
+    let orderSource;
+
+    if (bodyItems && Array.isArray(bodyItems) && bodyItems.length > 0) {
+      // Direct checkout logic
+      orderSource = 'direct';
+      // Mock a cart-like structure for the rest of the logic
+      cart = {
+        items: bodyItems.map(item => ({
+          productId: { _id: item.productId },
+          quantity: item.quantity,
+          variantAttributes: item.variantAttributes || item.attributes || {},
+          unitPrice: item.unitPrice,
+          totalPrice: (item.unitPrice || 0) * (item.quantity || 1)
+        }))
+      };
+    } else {
+      // Standard cart checkout logic
+      orderSource = 'cart';
+      cart = await Cart.findOne({ userId }).populate('items.productId', 'name priceToUser isActive stock');
+      if (!cart || !cart.items || cart.items.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cart is empty',
+        });
+      }
     }
 
     // Get delivery address from user's location
@@ -2674,6 +2771,7 @@ exports.createOrder = async (req, res, next) => {
       deliveryAddress,
       status: ORDER_STATUS.AWAITING,
       notes,
+      orderSource, // 'cart' or 'direct'
     });
 
     await order.save();
@@ -3564,7 +3662,7 @@ exports.confirmPayment = async (req, res, next) => {
     // This ensures cart items remain available if user cancels payment or payment fails
     try {
       const cart = await Cart.findOne({ userId });
-      if (cart) {
+      if (cart && order.orderSource === 'cart') {
         cart.clear();
         await cart.save();
         console.log(`🛒 Cart cleared for user ${userId} after successful payment for order ${order.orderNumber}`);

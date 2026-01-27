@@ -445,6 +445,14 @@ const vendorSchema = new mongoose.Schema({
   termsAcceptedAt: {
     type: Date,
   },
+  fcmTokenWeb: {
+    type: String,
+    trim: true,
+  },
+  fcmTokenApp: {
+    type: String,
+    trim: true,
+  },
 
 }, {
   timestamps: true,

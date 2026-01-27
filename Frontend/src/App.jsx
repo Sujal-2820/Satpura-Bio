@@ -12,6 +12,8 @@ import {
 import { SellerDashboardPage, SellerLogin, SellerRegister, SellerProvider } from './modules/Seller'
 import { WebsiteProvider, WebsiteRoutes } from './modules/website'
 import { TranslationProvider } from './context/TranslationContext'
+import { useEffect } from 'react'
+import { initializePushNotifications, setupForegroundNotificationHandler } from './services/pushNotificationService'
 
 function Home() {
   const links = [
@@ -95,6 +97,17 @@ function SellerRegisterRoute() {
 }
 
 function App() {
+  useEffect(() => {
+    // Initialize Push Notifications
+    initializePushNotifications();
+
+    // Setup foreground handler
+    setupForegroundNotificationHandler((payload) => {
+      console.log('Push notification received in foreground:', payload);
+      // Optional: Add global toast or alert here
+    });
+  }, []);
+
   return (
     <TranslationProvider>
       <BrowserRouter>

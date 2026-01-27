@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useVendorState } from '../../../context/VendorContext'
-import { PlusIcon, MinusIcon, TrashIcon, TruckIcon, ChevronRightIcon } from '../../../../User/components/icons'
+import { PlusIcon, MinusIcon, TrashIcon, TruckIcon, ChevronRightIcon, HelpCircleIcon } from '../../../../User/components/icons'
 import { cn } from '../../../../../lib/cn'
 import { useVendorApi } from '../../../hooks/useVendorApi'
 import { getPrimaryImageUrl } from '../../../../User/utils/productImages'
@@ -14,7 +14,20 @@ export function VendorCartView({ onUpdateQuantity, onRemove, onCheckout, onAddTo
     const [cartProducts, setCartProducts] = useState({})
     const [expandedVariants, setExpandedVariants] = useState({})
     const fetchingProductsRef = useRef(new Set())
-    const { getProducts, getProductDetails } = useVendorApi()
+    const { getProducts, getProductDetails, getRepaymentRules } = useVendorApi()
+
+    // Credit Cycle States
+    const [sliderProgress, setSliderProgress] = useState(0)
+    const [repaymentRules, setRepaymentRules] = useState({
+        discountTiers: [
+            { start: 0, end: 15, rate: 5, name: 'Early Bird' },
+            { start: 16, end: 30, rate: 2, name: 'Standard' }
+        ],
+        interestTiers: [
+            { start: 45, end: 60, rate: 2, name: 'Late Fee' },
+            { start: 61, end: 180, rate: 5, name: 'Extended Late' }
+        ]
+    })
 
     // Optimistic quantity state for instant UI updates
     const [optimisticQuantities, setOptimisticQuantities] = useState({})
@@ -95,6 +108,64 @@ export function VendorCartView({ onUpdateQuantity, onRemove, onCheckout, onAddTo
         }
     }, [cart, getProductDetails])
 
+    // Fetch repayment rules
+    useEffect(() => {
+        const loadRules = async () => {
+            try {
+                const rulesResult = await getRepaymentRules()
+                if (rulesResult.data && (rulesResult.data.discountTiers?.length || rulesResult.data.interestTiers?.length)) {
+                    setRepaymentRules(rulesResult.data)
+                }
+            } catch (error) {
+                console.error('Error loading repayment rules:', error)
+            }
+        }
+        loadRules()
+    }, [getRepaymentRules])
+
+    // Derived tiers for calculation
+    const discountTiers = useMemo(() => {
+        const tiers = repaymentRules.discountTiers || []
+        return tiers.map(t => ({
+            start: t.start,
+            end: t.end,
+            rate: t.rate,
+            label: t.name || `${t.start}-${t.end} days`
+        }))
+    }, [repaymentRules.discountTiers])
+
+    const interestTiers = useMemo(() => {
+        const tiers = repaymentRules.interestTiers || []
+        return tiers.map(t => ({
+            start: t.start,
+            end: t.end,
+            rate: t.rate,
+            label: t.name || `After ${t.start} days`
+        }))
+    }, [repaymentRules.interestTiers])
+
+    // Segmented slider logic for even distribution
+    const segments = useMemo(() => {
+        const items = []
+        discountTiers.forEach(t => items.push({ ...t, type: 'discount' }))
+
+        const lastDiscount = discountTiers.length > 0 ? discountTiers[discountTiers.length - 1].end : -1
+        const firstInterest = interestTiers.length > 0 ? interestTiers[0].start : 999
+        if (firstInterest > lastDiscount + 1) {
+            items.push({
+                start: lastDiscount + 1,
+                end: firstInterest - 1,
+                label: 'Standard Window',
+                type: 'none',
+                rate: 0
+            })
+        }
+
+        interestTiers.forEach(t => items.push({ ...t, type: 'interest' }))
+        return items
+    }, [discountTiers, interestTiers])
+
+
     // Group items by productId
     const groupedCartItems = useMemo(() => {
         const grouped = {}
@@ -170,6 +241,41 @@ export function VendorCartView({ onUpdateQuantity, onRemove, onCheckout, onAddTo
             shortfall: meetsMinimum ? 0 : MIN_VENDOR_PURCHASE - (Number(total) || 0),
         }
     }, [groupedCartItems, optimisticQuantities, MIN_VENDOR_PURCHASE])
+
+    const totalSubtotal = totals.subtotal
+
+    const creditCalculation = useMemo(() => {
+        const progress = parseFloat(sliderProgress)
+        const segmentCount = segments.length
+        if (segmentCount === 0) return { rate: 0, amount: 0, final: totalSubtotal, label: 'No rules', type: 'none', days: 0 }
+
+        const portionSize = 100 / segmentCount
+        const segmentIndex = Math.min(Math.floor(progress / portionSize), segmentCount - 1)
+        const segment = segments[segmentIndex]
+
+        let progressInSegment
+        if (progress >= 100) {
+            progressInSegment = 1
+        } else {
+            progressInSegment = (progress % portionSize) / portionSize
+        }
+
+        const range = segment.end - segment.start
+        const days = Math.round(segment.start + (progressInSegment * range))
+
+        const rate = segment.rate
+        const amount = (totalSubtotal * rate) / 100
+        const final = segment.type === 'discount' ? totalSubtotal - amount : segment.type === 'interest' ? totalSubtotal + amount : totalSubtotal
+
+        return {
+            rate,
+            amount,
+            final,
+            label: segment.label,
+            type: segment.type,
+            days
+        }
+    }, [sliderProgress, segments, totalSubtotal])
 
     const totalItemsCount = useMemo(() => {
         return groupedCartItems.reduce((sum, group) => sum + group.variants.length, 0)
@@ -316,30 +422,158 @@ export function VendorCartView({ onUpdateQuantity, onRemove, onCheckout, onAddTo
                 ))}
             </div>
 
-            <div className="p-4 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500"><Trans>Subtotal</Trans></span>
-                    <span className="font-semibold text-gray-900">₹{totals.subtotal.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500"><Trans>Delivery Charges</Trans></span>
-                    <span className="font-semibold text-green-600"><Trans>FREE</Trans></span>
-                </div>
-                <div className="flex items-center justify-between pt-3 border-t border-gray-50">
-                    <span className="text-base font-bold text-gray-900"><Trans>Total Payable</Trans></span>
-                    <span className="text-xl font-bold text-green-600">₹{totals.total.toLocaleString('en-IN')}</span>
+            {/* Cash Discount Benefits - Collective Cart Logic */}
+            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden p-4 space-y-6">
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-slate-700 tracking-wide">
+                            <Trans>Collective Cash Benefits</Trans>
+                        </h3>
+                        <button className="text-gray-400 p-1">
+                            <HelpCircleIcon className="h-4 w-4" />
+                        </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-medium leading-tight">
+                        <Trans>Repayment timeline and rates for your credit order settlement.</Trans>
+                    </p>
                 </div>
 
-                {!totals.meetsMinimum && (
-                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-100">
-                        <p className="text-xs font-semibold text-amber-700 text-center">
-                            Min purchase of ₹{MIN_VENDOR_PURCHASE.toLocaleString('en-IN')} required for wholesale orders.
-                            <br />
-                            Add ₹{totals.shortfall.toLocaleString('en-IN')} more to proceed.
-                        </p>
+                {/* Timeline Slider */}
+                <div className="relative pt-10 px-2 pb-2">
+                    <div
+                        className="absolute top-0 pointer-events-none z-10 flex flex-col items-center"
+                        style={{
+                            left: `${sliderProgress}%`,
+                            transform: `translateX(-${sliderProgress}%)`
+                        }}
+                    >
+                        <div className={cn(
+                            "px-3 py-1.5 rounded-xl shadow-lg text-[11px] font-bold text-white whitespace-nowrap flex flex-col items-center gap-0.5 border border-white/20 transition-colors duration-200",
+                            creditCalculation.type === 'discount' ? "bg-gradient-to-r from-blue-600 to-indigo-600" :
+                                creditCalculation.type === 'interest' ? "bg-gradient-to-r from-red-500 to-rose-600" :
+                                    "bg-green-700"
+                        )}>
+                            <div className="flex items-center gap-1">
+                                {creditCalculation.type === 'discount' ? '-' : creditCalculation.type === 'interest' ? '+' : ''}
+                                {creditCalculation.rate}%
+                                <span className="text-[8px] opacity-80 font-black tracking-tighter uppercase">
+                                    {creditCalculation.type === 'discount' ? 'Disc' : creditCalculation.type === 'interest' ? 'Int' : 'Fee'}
+                                </span>
+                            </div>
+                            <div className="h-[2px] w-4 bg-white/30 rounded-full"></div>
+                            <span className="text-[8px] opacity-70 uppercase tracking-widest font-black">Day {creditCalculation.days}</span>
+                        </div>
+                        <div
+                            className={cn(
+                                "w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] absolute -bottom-[5px]",
+                                creditCalculation.type === 'discount' ? "border-t-indigo-600" :
+                                    creditCalculation.type === 'interest' ? "border-t-rose-600" :
+                                        "border-t-green-700"
+                            )}
+                            style={{
+                                left: `${sliderProgress}%`,
+                                transform: 'translateX(-50%)'
+                            }}
+                        ></div>
                     </div>
-                )}
+
+                    <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={sliderProgress}
+                        onChange={(e) => setSliderProgress(e.target.value)}
+                        className={cn(
+                            "w-full h-2 rounded-lg appearance-none cursor-pointer transition-colors shadow-inner relative z-0",
+                            creditCalculation.type === 'interest' ? "accent-red-500 bg-red-100" :
+                                creditCalculation.type === 'discount' ? "accent-blue-500 bg-blue-100" :
+                                    "accent-green-700 bg-green-100"
+                        )}
+                    />
+
+                    {/* Marker Info Card */}
+                    <div className="flex items-center mt-8 p-3 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden min-h-[70px]">
+                        <div className={cn(
+                            "absolute top-0 left-0 w-1 h-full",
+                            creditCalculation.type === 'discount' ? "bg-blue-500" : creditCalculation.type === 'interest' ? "bg-red-500" : "bg-gray-300"
+                        )}></div>
+                        <div className="flex-1 min-w-0 pr-2">
+                            <p className="text-xs font-semibold text-gray-900 leading-tight">{creditCalculation.label}</p>
+                            <p className="text-[8px] font-medium text-gray-400 capitalize">Day {creditCalculation.days}</p>
+                        </div>
+                        <div className="w-px h-8 bg-gray-200 shrink-0"></div>
+                        <div className="px-3 text-center shrink-0">
+                            <p className={cn(
+                                "text-xs font-semibold",
+                                creditCalculation.type === 'discount' ? "text-blue-600" : creditCalculation.type === 'interest' ? "text-red-600" : "text-gray-900"
+                            )}>{creditCalculation.rate}%</p>
+                            <p className="text-[8px] font-medium text-gray-400 uppercase tracking-tighter">
+                                {creditCalculation.type === 'interest' ? 'Int' : 'Disc'}
+                            </p>
+                        </div>
+                        <div className="w-px h-8 bg-gray-200 shrink-0"></div>
+                        <div className="pl-3 text-right shrink-0">
+                            <p className="text-sm font-bold text-green-700">₹{creditCalculation.final.toFixed(0)}</p>
+                            <p className="text-[8px] font-medium text-gray-400 uppercase tracking-tighter">Payable</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Pricing Details Breakdown */}
+                <div className="space-y-3">
+                    <h4 className="text-[10px] font-semibold text-gray-500 tracking-widest uppercase ml-1"><Trans>Cart Pricing Breakdown</Trans></h4>
+                    <div className="rounded-2xl border border-gray-100 overflow-hidden shadow-sm bg-white">
+                        <table className="w-full text-[10px] sm:text-xs">
+                            <thead className="bg-[#D1DCE2]/50 border-b border-gray-100">
+                                <tr className="text-gray-700 font-bold">
+                                    <th className="p-2.5 text-left font-bold uppercase tracking-tighter"><Trans>Item</Trans></th>
+                                    <th className="p-2.5 text-right font-bold uppercase tracking-tighter"><Trans>Rate</Trans></th>
+                                    <th className="p-2.5 text-right font-bold uppercase tracking-tighter bg-gray-50/50"><Trans>Total</Trans></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                <tr>
+                                    <td className="p-2.5 text-gray-600 font-medium"><Trans>Order Subtotal</Trans></td>
+                                    <td className="p-2.5 text-right font-medium">₹{totals.subtotal.toLocaleString('en-IN')}</td>
+                                    <td className="p-2.5 text-right font-semibold text-gray-900 bg-gray-50/30">₹{totals.subtotal.toFixed(0)}</td>
+                                </tr>
+                                {creditCalculation.type !== 'none' && (
+                                    <tr>
+                                        <td className="p-2.5 text-gray-600 font-medium whitespace-nowrap">
+                                            {creditCalculation.type === 'discount' ? <Trans>Cash Discount</Trans> : <Trans>Interest Fee</Trans>}
+                                        </td>
+                                        <td className="p-2.5 text-right font-medium">{creditCalculation.rate}%</td>
+                                        <td className={cn(
+                                            "p-2.5 text-right font-semibold bg-gray-50/30",
+                                            creditCalculation.type === 'discount' ? "text-blue-600" : "text-red-600"
+                                        )}>
+                                            {creditCalculation.type === 'discount' ? '-' : '+'} ₹{creditCalculation.amount.toFixed(0)}
+                                        </td>
+                                    </tr>
+                                )}
+                                <tr className="bg-green-50/30 border-t-2 border-green-100">
+                                    <td className="p-3 font-semibold text-gray-900"><Trans>Total Payable</Trans></td>
+                                    <td className="p-3 text-right"></td>
+                                    <td className="p-3 text-right font-bold text-green-700 text-sm bg-green-50/50">₹{creditCalculation.final.toFixed(0)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
+
+
+
+            {!totals.meetsMinimum && (
+                <div className="mx-4 mb-4 p-3 rounded-xl bg-amber-50 border border-amber-100 shadow-sm">
+                    <p className="text-xs font-semibold text-amber-700 text-center">
+                        <Trans>Minimum bulk purchase of</Trans> ₹{MIN_VENDOR_PURCHASE.toLocaleString('en-IN')} <Trans>required.</Trans>
+                        <br />
+                        <Trans>Add</Trans> ₹{totals.shortfall.toLocaleString('en-IN')} <Trans>more to proceed.</Trans>
+                    </p>
+                </div>
+            )}
 
             <div className="sticky bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 -mx-4 z-10 shadow-[0_-10px_20px_-15px_rgba(0,0,0,0.1)]">
                 <button

@@ -20,6 +20,7 @@ const vendorIncentiveRoutes = require('./routes/vendorIncentive');
 const categoryRoutes = require('./routes/category');
 const adminCategoryRoutes = require('./routes/adminCategory');
 const adminCreditManagementRoutes = require('./routes/adminCreditManagement');
+const fcmRoutes = require('./routes/fcm');
 
 // Import config
 const { connectDB } = require('./config/database');
@@ -98,6 +99,7 @@ app.use('/api/vendors/incentives', vendorIncentiveRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/admin/categories', adminCategoryRoutes);
 app.use('/api/admin/credit', adminCreditManagementRoutes);
+app.use('/api/fcm', fcmRoutes);
 
 // 404 handler (must come before error handler)
 app.use((req, res) => {

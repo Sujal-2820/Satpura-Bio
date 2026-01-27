@@ -132,6 +132,22 @@ sellerNotificationSchema.statics.createNotification = async function (data) {
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
+    // Trigger Push Notification (Async - Non-blocking)
+    try {
+        const { sendToUser } = require('../services/pushNotificationService');
+        sendToUser(sellerId, 'seller', {
+            title,
+            body: message,
+            data: {
+                type,
+                relatedEntityType,
+                relatedEntityId: relatedEntityId ? relatedEntityId.toString() : null
+            }
+        }).catch(err => console.error('Push Notification Error (Seller):', err.message));
+    } catch (err) {
+        console.warn('Push Notification Service not available:', err.message);
+    }
+
     return notification;
 };
 

@@ -309,6 +309,12 @@ const orderSchema = new mongoose.Schema({
     default: false,
     // Whether stock has been deducted from vendor/admin inventory
   },
+  orderSource: {
+    type: String,
+    enum: ['cart', 'direct'],
+    default: 'cart',
+    // Whether order came from standard cart or direct checkout (Buy Now)
+  },
 }, {
   timestamps: true,
 });

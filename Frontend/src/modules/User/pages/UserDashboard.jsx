@@ -9,6 +9,7 @@ import { Trans } from '../../../components/Trans'
 import { TransText } from '../../../components/TransText'
 // import { MIN_ORDER_VALUE } from '../services/userData'
 import * as userApi from '../services/userApi'
+import { getPrimaryImageUrl } from '../utils/productImages'
 import { cn } from '../../../lib/cn'
 import { useToast, ToastProvider } from '../components/ToastNotification'
 import { useUserApi } from '../hooks/useUserApi'
@@ -75,6 +76,7 @@ function UserDashboardContent({ onLogout }) {
   const [selectedCarousel, setSelectedCarousel] = useState(null)
   const [showCheckout, setShowCheckout] = useState(false)
   const [orderConfirmation, setOrderConfirmation] = useState(null)
+  const [buyNowItems, setBuyNowItems] = useState(null)
   const { toasts, dismissToast, success, error, warning, info } = useToast()
   const [searchMounted, setSearchMounted] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -554,7 +556,7 @@ function UserDashboardContent({ onLogout }) {
   }, [activeTab, fetchCart, syncCartState])
 
   const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart])
-  const favouritesCount = useMemo(() => favourites.filter(id => id && String(id).trim() !== '' && String(id) !== 'null' && String(id) !== 'undefined').length, [favourites])
+  const favouritesCount = useMemo(() => (Array.isArray(favourites) ? favourites.filter(id => id && typeof id === 'string' && id.trim() !== '' && id !== 'null' && id !== 'undefined').length : 0), [favourites])
   const unreadNotificationsCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications])
 
   // Translate navigation items
@@ -705,7 +707,7 @@ function UserDashboardContent({ onLogout }) {
     try {
       console.log('🛒 handleAddToCart called:', { productId, quantity, variantAttributes })
 
-      // Fetch product details from API
+      // Fetch product details from API to find cheapest variation if none selected
       const result = await userApi.getProductDetails(productId)
       if (!result.success || !result.data?.product) {
         error('Product not found')
@@ -713,27 +715,45 @@ function UserDashboardContent({ onLogout }) {
       }
 
       const product = result.data.product
-      if (product.stock === 0) {
+      if (product.stock === 0 && (!product.attributeStocks || product.attributeStocks.length === 0)) {
         error('Product is out of stock')
         return
       }
 
-      // Prepare cart payload with variant attributes if provided
-      const cartPayload = { productId, quantity }
-      if (variantAttributes && Object.keys(variantAttributes).length > 0) {
-        cartPayload.variantAttributes = variantAttributes
-        console.log('🛒 Adding variant to cart:', cartPayload)
-      } else {
-        console.log('🛒 Adding product without variants to cart:', cartPayload)
+      let finalVariantAttributes = variantAttributes
+      let finalQuantity = quantity
+
+      // Case: Dashboard "Quick Add" - Auto-select cheapest/smallest variation if none provided
+      if (!variantAttributes || Object.keys(variantAttributes).length === 0) {
+        if (product.attributeStocks && product.attributeStocks.length > 0) {
+          // Find variation with lowest userPrice
+          const cheapestVariant = [...product.attributeStocks].sort((a, b) => (a.userPrice || 0) - (b.userPrice || 0))[0]
+          if (cheapestVariant && cheapestVariant.attributes) {
+            finalVariantAttributes = cheapestVariant.attributes instanceof Map
+              ? Object.fromEntries(cheapestVariant.attributes)
+              : cheapestVariant.attributes
+            console.log('🛒 Auto-selected cheapest variant:', finalVariantAttributes)
+          }
+        }
       }
+
+      // Prepare cart payload
+      const cartPayload = {
+        productId,
+        quantity: finalQuantity,
+        variantAttributes: finalVariantAttributes
+      }
+
+      console.log('🛒 Final Cart Payload:', cartPayload)
 
       // Add to cart via API and sync state
       const cartResult = await userApi.addToCart(cartPayload)
       if (cartResult?.data?.cart) {
-        console.log('🛒 Cart result from API:', cartResult.data.cart)
         syncCartState(cartResult.data.cart)
+        success(`${product.name} added to cart`)
+      } else {
+        error('Failed to update cart')
       }
-      success(`${product.name} added to cart`)
     } catch (err) {
       error(err?.error?.message || err.message || 'Failed to add product to cart')
       console.error('Error adding to cart:', err)
@@ -835,12 +855,12 @@ function UserDashboardContent({ onLogout }) {
     }
 
     try {
-      let latestCart = cart
-      // Add all products to cart first
+      const validatedItems = []
+
       for (const item of productsData) {
         const { productId, quantity, attributes } = item
 
-        // Fetch product details to validate
+        // Fetch product details to validate and get current price
         const result = await userApi.getProductDetails(productId)
         if (!result.success || !result.data?.product) {
           error('Product not found')
@@ -848,38 +868,48 @@ function UserDashboardContent({ onLogout }) {
         }
 
         const product = result.data.product
-        if (product.stock === 0) {
-          error('Product is out of stock')
+
+        // Check stock
+        let stockAvailable = product.displayStock || product.stock || 0
+        let unitPrice = product.priceToUser || product.price || 0
+
+        // If it has attributes, find the specific one for price/stock
+        if (attributes && Object.keys(attributes).length > 0 && product.attributeStocks) {
+          const matchingStock = product.attributeStocks.find(v => {
+            const vAttrs = v.attributes instanceof Map ? Object.fromEntries(v.attributes) : (v.attributes || {})
+            return Object.keys(attributes).every(key => String(vAttrs[key]) === String(attributes[key]))
+          })
+          if (matchingStock) {
+            stockAvailable = matchingStock.displayStock || 0
+            unitPrice = matchingStock.userPrice || 0
+          }
+        }
+
+        if (stockAvailable < quantity) {
+          error(`Insufficient stock for ${product.name}. Available: ${stockAvailable}`)
           return
         }
 
-        // Prepare cart payload
-        const cartPayload = { productId, quantity }
-        if (attributes && Object.keys(attributes).length > 0) {
-          cartPayload.variantAttributes = attributes
-        }
-
-        // Add to cart via API
-        const cartResult = await userApi.addToCart(cartPayload)
-        if (cartResult?.data?.cart) {
-          syncCartState(cartResult.data.cart)
-          latestCart = cartResult.data.cart
-        }
+        validatedItems.push({
+          productId,
+          quantity,
+          variantAttributes: attributes || {},
+          unitPrice,
+          price: unitPrice,
+          name: product.name,
+          image: getPrimaryImageUrl(product)
+        })
       }
 
-      // Navigate to checkout after adding all items
-      // Use subtotal from the latest API response if available
-      const cartTotal = latestCart.subtotal !== undefined
-        ? latestCart.subtotal
-        : Array.isArray(latestCart)
-          ? latestCart.reduce((sum, item) => sum + (item.price || item.unitPrice || 0) * item.quantity, 0)
-          : 0
-
-      if (cartTotal < MIN_ORDER_VALUE) {
+      // Check subtotal for minimum order value
+      const subtotal = validatedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0)
+      if (subtotal < MIN_ORDER_VALUE) {
         warning(`Minimum order value is ₹${MIN_ORDER_VALUE.toLocaleString('en-IN')}`)
         return
       }
 
+      // Set buy now items (bypass standard cart)
+      setBuyNowItems(validatedItems)
       setShowCheckout(true)
       navigateToTab('checkout')
     } catch (err) {
@@ -1297,15 +1327,20 @@ function UserDashboardContent({ onLogout }) {
             <>
               {activeTab === 'checkout' && showCheckout && (
                 <CheckoutView
+                  initialItems={buyNowItems}
                   onBack={() => {
                     setShowCheckout(false)
+                    setBuyNowItems(null)
                     navigateToTab('cart')
                   }}
                   onOrderPlaced={(order) => {
                     dispatch({ type: 'ADD_ORDER', payload: order })
-                    dispatch({ type: 'CLEAR_CART' })
+                    if (!buyNowItems) {
+                      dispatch({ type: 'CLEAR_CART' })
+                    }
                     setOrderConfirmation(order)
                     setShowCheckout(false)
+                    setBuyNowItems(null)
                   }}
                 />
               )}

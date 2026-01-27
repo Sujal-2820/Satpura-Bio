@@ -42,6 +42,16 @@ const VendorStateContext = createContext(null)
 const VendorDispatchContext = createContext(null)
 
 function reducer(state, action) {
+  // Robust attribute comparison (handles key order differences)
+  const areAttributesEqual = (attr1, attr2) => {
+    const a = attr1 || {}
+    const b = attr2 || {}
+    const keysA = Object.keys(a).sort()
+    const keysB = Object.keys(b).sort()
+    if (keysA.length !== keysB.length) return false
+    return keysA.every(key => String(a[key]) === String(b[key]))
+  }
+
   switch (action.type) {
     case 'SET_LANGUAGE':
       return { ...state, language: action.payload }
@@ -279,14 +289,14 @@ function reducer(state, action) {
 
       const existingItem = state.cart.find((item) =>
         item.productId === productId &&
-        JSON.stringify(item.variantAttributes) === JSON.stringify(variantAttributes)
+        areAttributesEqual(item.variantAttributes, variantAttributes)
       )
       if (existingItem) {
         return {
           ...state,
           cart: state.cart.map((item) =>
             item.productId === productId &&
-              JSON.stringify(item.variantAttributes) === JSON.stringify(variantAttributes)
+              areAttributesEqual(item.variantAttributes, variantAttributes)
               ? { ...item, quantity: (item.quantity || 0) + quantity }
               : item,
           ),
@@ -305,20 +315,21 @@ function reducer(state, action) {
         ...state,
         cart: state.cart.map((item) =>
           item.productId === productId &&
-            JSON.stringify(item.variantAttributes) === JSON.stringify(variantAttributes)
+            areAttributesEqual(item.variantAttributes, variantAttributes)
             ? { ...item, quantity }
             : item,
         ),
       }
     }
-    case 'REMOVE_FROM_CART':
+    case 'REMOVE_FROM_CART': {
       return {
         ...state,
         cart: state.cart.filter((item) =>
           !(item.productId === action.payload.productId &&
-            JSON.stringify(item.variantAttributes) === JSON.stringify(action.payload.variantAttributes))
+            areAttributesEqual(item.variantAttributes, action.payload.variantAttributes))
         ),
       }
+    }
     case 'CLEAR_CART':
       return {
         ...state,

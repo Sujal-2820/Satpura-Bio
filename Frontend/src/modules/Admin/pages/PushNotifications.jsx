@@ -104,37 +104,53 @@ export function PushNotificationsPage({ subRoute = null, navigate }) {
 
         setIsSubmitting(true)
 
-        // Simulate API call (will be replaced with actual implementation)
         try {
-            await new Promise(resolve => setTimeout(resolve, 1500))
+            const authToken = localStorage.getItem('admin_token') || localStorage.getItem('token');
+            const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-            // Add to history (mock)
-            const newNotification = {
-                id: Date.now().toString(),
-                ...formData,
-                sentAt: new Date().toISOString(),
-                deliveredCount: 0,
-                openedCount: 0,
-                status: 'pending',
+            const response = await fetch(`${API_BASE_URL}/api/fcm/broadcast`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                // Add to history
+                const newNotification = {
+                    id: Date.now().toString(),
+                    ...formData,
+                    sentAt: new Date().toISOString(),
+                    deliveredCount: 0,
+                    openedCount: 0,
+                    status: 'delivered',
+                }
+                setPushHistory(prev => [newNotification, ...prev])
+
+                success('Push notification broadcast initiated!')
+                setShowCreateForm(false)
+                setFormData({
+                    title: '',
+                    message: '',
+                    targetAudience: 'all',
+                    targetMode: 'all',
+                    targetRecipients: [],
+                    priority: 'normal',
+                    scheduledAt: null,
+                    imageUrl: '',
+                    actionUrl: '',
+                })
+                setActiveTab('history')
+            } else {
+                error(result.message || 'Failed to send push notification')
             }
-            setPushHistory(prev => [newNotification, ...prev])
-
-            success('Push notification queued for delivery!')
-            setShowCreateForm(false)
-            setFormData({
-                title: '',
-                message: '',
-                targetAudience: 'all',
-                targetMode: 'all',
-                targetRecipients: [],
-                priority: 'normal',
-                scheduledAt: null,
-                imageUrl: '',
-                actionUrl: '',
-            })
-            setActiveTab('history')
         } catch (err) {
-            error('Failed to send push notification. Please try again.')
+            console.error('Push broadcast error:', err);
+            error('Failed to send push notification. Please check your connection.')
         } finally {
             setIsSubmitting(false)
         }

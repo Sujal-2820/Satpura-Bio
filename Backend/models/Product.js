@@ -139,6 +139,11 @@ const productSchema = new mongoose.Schema({
     default: true,
     // Only active products are shown to users
   },
+  isWholesale: {
+    type: Boolean,
+    default: false,
+    // Whether this is a wholesale product (defaults to 10 units in UI)
+  },
   // SEO and search
   tags: [{
     type: String,
